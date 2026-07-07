@@ -1,14 +1,15 @@
-"""Pure vault actions between duels — no I/O.
+"""Pure vault actions between duels — no I/O: deposit, use-power, and draw.
 
-Covers the deposit path and the use-power path. Draw is deferred: a draw would pull from the
-player's *personal* deck, which only fills from over-limit discards in the duel turn flow — so it
-stays inert until that flow lands.
+Draw pulls from the player's *personal* deck, which fills when they shelve surplus cards over the
+hand limit. Together, shelving a card and drawing a fresh one is how the player cycles their hand.
 """
 
 from __future__ import annotations
 
 from .models import Card, remove_card_from_hand
+from .settings import XiaolinSettings
 from .state import XiaolinState
+from .turn import max_hand_size
 
 # The gag Wu Ohwah Tegu Saim (deposit/0) has a "? ? ?" power that does nothing when used.
 FIZZLE_MESSAGE = "You feel like something should have happened..."
@@ -29,6 +30,24 @@ def deposit(state: XiaolinState, card: Card) -> None:
     state.player.hand.remove(card)
     state.player.points += card.points
     state.deposit_counter += 1
+
+
+def can_draw(state: XiaolinState, settings: XiaolinSettings) -> bool:
+    """The player may pull one Wu from their personal deck — if the deck holds one, this turn's
+    draw is unspent, and the hand has room under the size limit."""
+    return (
+        bool(state.player.deck)
+        and state.draw_counter < settings.draw_limit
+        and len(state.player.whole_hand) < max_hand_size(state.player, settings.max_hand_size)
+    )
+
+
+def draw(state: XiaolinState) -> Card:
+    """Pull the top Wu of the player's personal deck into their hand; counts against the turn limit."""
+    card = state.player.deck.pop(0)
+    state.player.hand.append(card)
+    state.draw_counter += 1
+    return card
 
 
 def usable_powers(state: XiaolinState, deposit_limit: int) -> list[Card]:

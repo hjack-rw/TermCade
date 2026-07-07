@@ -16,7 +16,9 @@ from xiaolin_showdown.logic.actions import (
     DRAW_MESSAGE,
     FIZZLE_MESSAGE,
     can_deposit,
+    can_draw,
     deposit,
+    draw,
     usable_powers,
     use_power,
 )
@@ -279,6 +281,33 @@ def test_use_power_on_the_gag_wu_fizzles_for_no_points():
     assert all(card is not ohwah for card in state.player.hand)  # discarded
     assert len(state.card_deck) == deck_before  # nothing drawn
     assert state.player.points == 0  # unlike depositing it, which would bank its point
+
+
+def test_draw_pulls_a_wu_from_the_personal_deck_into_the_hand():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    shelved = deepcopy(cat.card(6))
+    state.player.deck.append(shelved)
+    hand_before = len(state.player.hand)
+
+    drawn = draw(state)
+
+    assert drawn is shelved
+    assert any(card is shelved for card in state.player.hand)
+    assert len(state.player.hand) == hand_before + 1
+    assert not state.player.deck
+    assert state.draw_counter == 1
+
+
+def test_can_draw_respects_the_turn_draw_limit():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    settings = XiaolinSettings()
+    state.player.deck.append(deepcopy(cat.card(6)))  # a Wu waiting to be drawn, hand has room
+
+    assert can_draw(state, settings) is True
+    state.draw_counter = settings.draw_limit  # this turn's draw is spent
+    assert can_draw(state, settings) is False
 
 
 def test_usable_powers_respects_the_deposit_limit():

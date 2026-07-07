@@ -160,6 +160,22 @@ async def test_use_a_power_opens_the_picker_and_returns_to_the_vault(tmp_path):
         assert isinstance(app.screen, VaultScreen)
 
 
+async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test() as pilot:
+        await _new_game_at_vault(app, pilot)
+        cat = app.ctx.state.catalog
+        app.ctx.state.player.deck.append(deepcopy(cat.card(6)))  # a Wu waiting in the personal deck
+        hand_before = len(app.ctx.state.player.hand)
+
+        await pilot.press("w")  # Draw a card
+        await pilot.pause()
+
+        assert isinstance(app.screen, VaultScreen)  # a fresh vault reflecting the draw
+        assert len(app.ctx.state.player.hand) == hand_before + 1
+        assert not app.ctx.state.player.deck
+
+
 async def test_game_over_shows_the_outcome_and_can_play_again(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test() as pilot:

@@ -15,7 +15,7 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel
 
-from ..logic.actions import can_deposit, usable_powers
+from ..logic.actions import can_deposit, can_draw, draw, usable_powers
 from ..logic.mechanics import initiative
 from ..logic.models import Player
 from ..logic.settings import XiaolinSettings
@@ -31,6 +31,7 @@ class VaultScreen(EngineScreen):
         ("g", "gong_yi_tanpai", "Duel"),
         ("p", "use_power", "Power"),
         ("d", "deposit", "Deposit"),
+        ("w", "draw", "Draw"),
         ("c", "lookup_cards", "Cards"),
         ("h", "lookup_characters", "Characters"),
         ("s", "save_game", "Save"),
@@ -62,8 +63,8 @@ class VaultScreen(EngineScreen):
 
         with BoxedPanel(title="ACTIONS"):
             yield Static("G. Gong Yi Tanpai! — start a duel      P. Use a power")
-            yield Static("D. Deposit a card    C. Look up cards    H. Look up characters")
-            yield Static("S. Save game         Esc. Return to menu")
+            yield Static("D. Deposit a card    W. Draw a card     C. Look up cards")
+            yield Static("H. Look up characters   S. Save game    Esc. Return to menu")
 
         yield Footer()
 
@@ -71,6 +72,14 @@ class VaultScreen(EngineScreen):
         from .duel import DuelScreen  # lazy: DuelScreen returns here, so a top import would cycle
 
         self.app.switch_screen(DuelScreen())
+
+    def action_draw(self) -> None:
+        state = cast(XiaolinState, self.ctx.state)
+        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
+        if can_draw(state, settings):
+            card = draw(state)
+            self.app.notify(f"Drew {card.name}.")
+            self.app.switch_screen(VaultScreen())  # fresh vault reflects the drawn Wu
 
     def action_use_power(self) -> None:
         state = cast(XiaolinState, self.ctx.state)

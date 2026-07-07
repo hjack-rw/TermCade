@@ -31,10 +31,6 @@ def _state(player: Player, bot: Player, *, main: int = 0) -> XiaolinState:
 _SETTINGS = XiaolinSettings(max_hand_size=6, draw_limit=1, empty_draw_limit=3)
 
 
-def _first(cards: list[Card]) -> Card:
-    return cards[0]
-
-
 def test_max_hand_size_grows_by_one_with_a_third_arm_sash():
     assert max_hand_size(_player(3), 6) == 6
     sashed = _player(2)
@@ -46,29 +42,29 @@ def test_an_over_limit_hand_sheds_the_surplus_to_the_personal_deck():
     player = _player(8)  # two over the limit of six
     state = _state(player, _player(3))
 
-    settled = oversee_hand_size(state, is_player=True, settings=_SETTINGS, pick_discard=_first, rng=Rng(0))
+    settled = oversee_hand_size(state, is_player=True, settings=_SETTINGS, rng=Rng(0))
 
-    assert settled is False  # it did work — the vault loop will re-check
+    assert settled is False  # it shed cards — the vault loop will re-check
     assert len(player.hand) == 6
-    assert len(player.deck) == 2
+    assert len(player.deck) == 2  # the two surplus Wu went to the personal deck
 
 
-def test_a_short_hand_draws_from_the_personal_deck_up_to_the_draw_limit():
-    player = _player(4, deck=3)  # two short, but draw_limit is one
+def test_a_short_hand_is_left_for_the_player_to_draw():
+    player = _player(4, deck=3)  # under the limit, with cards waiting in the personal deck
     state = _state(player, _player(3))
 
-    settled = oversee_hand_size(state, is_player=True, settings=_SETTINGS, pick_discard=_first, rng=Rng(0))
+    settled = oversee_hand_size(state, is_player=True, settings=_SETTINGS, rng=Rng(0))
 
-    assert settled is True  # capped by draw_limit, it settles for a still-short hand
-    assert len(player.hand) == 5
-    assert state.draw_counter == 1
+    assert settled is True  # a short hand is not auto-topped-up — that is the player's Draw
+    assert len(player.hand) == 4  # unchanged
+    assert state.draw_counter == 0
 
 
 def test_an_empty_hand_is_refilled_from_the_main_pile():
     player = _player(0)  # empty hand, empty personal deck
     state = _state(player, _player(3), main=5)
 
-    oversee_hand_size(state, is_player=True, settings=_SETTINGS, pick_discard=_first, rng=Rng(0))
+    oversee_hand_size(state, is_player=True, settings=_SETTINGS, rng=Rng(0))
 
     assert len(player.hand) == 3  # emergency-drawn from the main pile, capped by empty_draw_limit
     assert len(state.card_deck) == 2
@@ -79,18 +75,18 @@ def test_refill_flags_the_run_over_at_the_point_limit():
     player.points = 13
     state = _state(player, _player(3))
 
-    refill_hands(state, XiaolinSettings(point_limit=13), pick_discard=_first, rng=Rng(0))
+    refill_hands(state, XiaolinSettings(point_limit=13), rng=Rng(0))
 
     assert state.has_ended
 
 
-def test_refill_settles_an_over_hand_and_a_short_hand_together():
+def test_refill_sheds_an_over_hand_and_leaves_a_short_one():
     state = _state(_player(8), _player(2, deck=4), main=0)
 
-    refill_hands(state, _SETTINGS, pick_discard=_first, rng=Rng(0))
+    refill_hands(state, _SETTINGS, rng=Rng(0))
 
     assert len(state.player.hand) == 6  # shed down to the limit
-    assert len(state.bot.hand) == 3  # drew one (draw_limit) from its personal deck
+    assert len(state.bot.hand) == 2  # a short hand is left as-is (no auto-top-up)
 
 
 def test_bot_turn_cashes_a_deposit_wu_for_points():

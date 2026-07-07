@@ -130,10 +130,6 @@ def _auto_choices() -> DuelChoices:
     return DuelChoices(challenge=_first, background=_first, boost=_no_boost, card=_first_card, element=_water)
 
 
-def _discard_first(cards: list[Card]) -> Card:
-    return cards[0]
-
-
 async def test_a_scripted_showdown_walks_all_seven_stages():
     cat = load_catalog()
     rng = Rng(1)
@@ -194,11 +190,11 @@ async def test_the_showdown_loop_runs_until_the_draw_pile_is_empty():
         rng = Rng(seed)
         state = new_game(cat, rng, cat.character(1))
         duel = Duel(state, rng, _auto_choices())
-        refill_hands(state, settings, pick_discard=_discard_first, rng=rng)
+        refill_hands(state, settings, rng=rng)
 
         for _ in range(500):  # bounded guard; a real run ends in ~8–11 showdowns
             if await duel.advance() == 0:  # a showdown ended → take the vault turn before the next
-                refill_hands(state, settings, pick_discard=_discard_first, rng=rng)
+                refill_hands(state, settings, rng=rng)
             if duel.is_over:
                 break
 

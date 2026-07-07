@@ -1,84 +1,70 @@
 """The vault turn — what happens on each return to the vault, between showdowns.
 
-Keeps both hands at their size limit (surplus discarded to the personal deck, a short hand
-drawn back up) and flags the run finished when a point limit is reached or the draw pile runs
-dry. This is the **loop terminator** — without a vault turn between showdowns the duel loop can
-strand on a hand that emptied out.
-
-Pure and TTY-free: the player's over-limit discard is an injected callback; the bot discards at
-random via ``rng``. The bot's *own* vault actions (deposit / power-up) are a separate slice.
+Keeps a hand from exceeding its size limit (surplus goes to the personal deck) and flags the run
+finished when a point limit is reached or the draw pile runs dry. A short hand is *not* topped up
+automatically — the player refills it themselves with Draw; only a fully empty hand is emergency-
+drawn from the main pile, so the duel loop can still terminate rather than strand on an empty hand.
 """
 
 from __future__ import annotations
 
-from typing import Callable
-
 from termcade.core.rng import Rng
 
-from .models import Card, Player, remove_card_from_hand
+from .models import Player, remove_card_from_hand
 from .settings import XiaolinSettings
 from .state import XiaolinState
 
-PickDiscard = Callable[[list[Card]], Card]
 
-
-def refill_hands(
-    state: XiaolinState,
-    settings: XiaolinSettings,
-    *,
-    pick_discard: PickDiscard,
-    rng: Rng,
-) -> None:
-    """Bring both hands back to size and update ``has_ended``.
+def refill_hands(state: XiaolinState, settings: XiaolinSettings, *, rng: Rng) -> None:
+    """Bring both hands within their size limit and update ``has_ended``.
 
     Runs each time control returns to the vault (between showdowns). Re-balances until both hands
-    are stable — loops :func:`oversee_hand_size` over both until neither reports more work.
+    are stable — loops :func:`oversee_hand_size` over both until neither reports more work. The
+    player's interactive over-limit discard is handled by the screen *before* this runs, so any
+    shedding here (the bot's) is random.
     """
     if state.player.points >= settings.point_limit or state.bot.points >= settings.point_limit:
         state.has_ended = True
 
     while not (
-        oversee_hand_size(state, is_player=True, settings=settings, pick_discard=pick_discard, rng=rng)
-        and oversee_hand_size(state, is_player=False, settings=settings, pick_discard=pick_discard, rng=rng)
+        oversee_hand_size(state, is_player=True, settings=settings, rng=rng)
+        and oversee_hand_size(state, is_player=False, settings=settings, rng=rng)
     ):
         pass
 
 
 def oversee_hand_size(
-    state: XiaolinState,
-    *,
-    is_player: bool,
-    settings: XiaolinSettings,
-    pick_discard: PickDiscard,
-    rng: Rng,
+    state: XiaolinState, *, is_player: bool, settings: XiaolinSettings, rng: Rng
 ) -> bool:
     """Nudge one duelist's hand toward its size limit by one pass; return whether it is settled.
 
-    Over the limit → move surplus to the personal deck (player picks, bot random). Under → draw
-    back up from the personal deck (capped by ``draw_limit``), or from the main pile only while the
-    hand is empty (capped by ``empty_draw_limit``). Returns ``False`` when it did work and wants a
-    re-check, ``True`` when balanced or unable to change further.
+    Over the limit → shed the surplus at random to the personal deck. Under → leave it (the player
+    tops up manually with Draw), unless the hand is *empty*, which is emergency-drawn from the main
+    pile. Returns ``False`` after shedding (the caller re-checks), ``True`` otherwise.
     """
     player = state.player if is_player else state.bot
-    difference = len(player.whole_hand) - max_hand_size(player, settings.max_hand_size)
-    if difference == 0:
+    over = len(player.whole_hand) - max_hand_size(player, settings.max_hand_size)
+    if over <= 0:
+        if not player.whole_hand:  # only an empty hand is refilled automatically
+            _emergency_fill(state, player, settings)
         return True
+    if state.has_ended:
+        return True  # game over — leftover cards stay, they still count toward the final score
 
-    over_the_limit = difference > 0
-    hand_was_empty = not player.whole_hand
-    for iteration in range(abs(difference)):
-        if over_the_limit and not state.has_ended:
-            card = pick_discard(list(player.hand)) if is_player else rng.choice(player.hand)
-            remove_card_from_hand(player, card)
-            player.deck.append(card)
-        elif player.deck and state.draw_counter < settings.draw_limit:
-            player.hand.append(player.deck.pop(0))
-            state.draw_counter += 1
-        elif hand_was_empty and state.card_deck and iteration < settings.empty_draw_limit:
-            _draw_from_main(state, player)
-        else:
-            return True  # can't shed or draw any more — accept the hand as it is
-    return False  # did work this pass — ask the caller to re-check
+    for _ in range(over):
+        card = rng.choice(player.hand)
+        remove_card_from_hand(player, card)
+        player.deck.append(card)
+    return False
+
+
+def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettings) -> None:
+    """Refill an empty hand from the main pile (up to ``empty_draw_limit``); emptying it ends the run."""
+    limit = max_hand_size(player, settings.max_hand_size)
+    for _ in range(settings.empty_draw_limit):
+        if not state.card_deck or len(player.whole_hand) >= limit:
+            break
+        _draw_from_main(state, player)
 
 
 def bot_turn(state: XiaolinState, settings: XiaolinSettings) -> None:

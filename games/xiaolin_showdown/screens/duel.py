@@ -4,12 +4,9 @@ The stage machine awaits the player's decisions; here each ``await`` raises a :c
 via ``push_screen_wait`` and resolves with the chosen value. The whole showdown runs in an async
 worker so the UI stays responsive and the pure game logic never touches Textual.
 
-One press of "Gong Yi Tanpai" plays exactly one showdown (stages 1→6→0). The vault turn that
-refills the hands runs here too, at the end, so control returns to a balanced vault — or, when the
-draw pile is spent, to the :class:`~.outcome.OutcomeScreen`.
-
-v1 simplification: the vault turn auto-sends a surplus card to the player's own deck rather than
-prompting; interactive over-limit discard can come with the outcome slice.
+One press of "Gong Yi Tanpai" plays exactly one showdown (stages 1→6→0). The vault turn runs here
+too, at the end — you shelve any surplus Wu, the bot takes its turn, and the hands settle — so
+control returns to the vault, or, when the draw pile is spent, to the :class:`~.outcome.OutcomeScreen`.
 """
 
 from __future__ import annotations
@@ -27,10 +24,10 @@ from termcade.ui.widgets import BoxedPanel
 
 from ..logic.duel import Duel, DuelChoices, DuelState
 from ..logic.elements import ELEMENTS
-from ..logic.models import Card, Player
+from ..logic.models import Card, Player, remove_card_from_hand
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
-from ..logic.turn import bot_turn, refill_hands
+from ..logic.turn import bot_turn, max_hand_size, refill_hands
 from .format import stats_line
 
 Option = tuple[str, object]
@@ -100,12 +97,25 @@ class DuelScreen(EngineScreen):
             await self._await_continue("Continue")
         await self._await_continue("Continue — back to the vault")
 
-        # The vault turn: the bot banks points, then both hands refill (which may flag the run over
-        # on the point limit). Skip it when the showdown already spent the pile.
+        # The vault turn: you shelve any surplus Wu (your choice), the bot banks points, then the
+        # hands settle (which may flag the run over on the point limit). Skip once the pile is spent.
         if not state.has_ended:
+            await self._discard_surplus(state, settings)
             bot_turn(state, settings)
-            refill_hands(state, settings, pick_discard=_discard_first, rng=rng)
+            refill_hands(state, settings, rng=rng)
         self._leave()
+
+    async def _discard_surplus(self, state: XiaolinState, settings: XiaolinSettings) -> None:
+        """Over the hand limit (you just won cards) → choose which Wu to shelve to your deck."""
+        while not state.has_ended:
+            if len(state.player.whole_hand) <= max_hand_size(state.player, settings.max_hand_size):
+                return
+            card = cast(
+                Card,
+                await self._ask(ChoiceModal("Too many Wu — shelve one to your deck", _card_options(state.player.hand))),
+            )
+            remove_card_from_hand(state.player, card)
+            state.player.deck.append(card)
 
     def _leave(self) -> None:
         # Lazy imports: the vault imports this screen, so importing it at module load would cycle.
@@ -149,10 +159,6 @@ class DuelScreen(EngineScreen):
 
     async def _ask(self, modal: ChoiceModal) -> object:
         return await self.app.push_screen_wait(modal)
-
-
-def _discard_first(cards: list[Card]) -> Card:
-    return cards[0]  # v1: auto-send the first surplus card to the deck (see module docstring)
 
 
 def _stat_options(values: list[str]) -> list[Option]:
