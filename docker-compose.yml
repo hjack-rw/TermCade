@@ -1,0 +1,25 @@
+# Two ways to run TermCade, sharing one saves volume.
+#   docker compose --profile play run --rm play     # terminal (interactive)
+#   docker compose --profile serve up serve         # browser on http://localhost:8000
+services:
+  play:
+    build: .
+    image: termcade
+    profiles: ["play"]
+    stdin_open: true
+    tty: true
+    volumes:
+      - tc_saves:/data
+
+  serve:
+    build: .
+    image: termcade
+    profiles: ["serve"]
+    command: ["serve"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - tc_saves:/data
+
+volumes:
+  tc_saves:
