@@ -1,8 +1,8 @@
-"""Final scoring — who won when the run ends (ported from ``ENGINE.show__end_state``).
+"""Final scoring — who won when the run ends.
 
 Pure: given the finished state, work out each side's final points and the winner. When the draw
-pile is spent, a duelist's leftover hand cards are cashed into their score (the reference's rule);
-when the run ended on the point limit instead, the pile still has cards and hands are not counted.
+pile is spent, a duelist's leftover hand cards are cashed into their score; when the run ended on
+the point limit instead, the pile still has cards and hands are not counted.
 """
 
 from __future__ import annotations

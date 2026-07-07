@@ -1,7 +1,7 @@
 """``XiaolinSettings`` — the game's tunable settings, a typed view over the engine ``Settings``.
 
-These were the reference's ``SETTINGS.py`` constants. They are player-editable on the Settings
-screen and frozen into each save (the engine persists settings in the save state). The engine
+These rule constants are player-editable on the Settings screen and frozen into each save (the
+engine persists settings in the save state). The engine
 owns *how* settings are stored and modified; the game owns *which* knobs exist and their
 defaults. ``FIRST_DECK_CARD`` stays a structural constant — tied to the card-data layout, not a
 player choice.

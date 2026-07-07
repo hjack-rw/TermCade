@@ -1,4 +1,4 @@
-"""Load the immutable card catalog from the bundled SQLite DB (ported from DATA.connect__database).
+"""Load the immutable card catalog from the bundled SQLite DB.
 
 Read-only reference data — distinct from the engine's *save* store. The game owns this
 file; the engine never sees it. ``sqlite3`` is stdlib, so the logic layer stays dependency-free.

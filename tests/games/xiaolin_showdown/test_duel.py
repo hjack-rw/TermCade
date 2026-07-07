@@ -1,7 +1,7 @@
-"""In-duel power resolution (``resolve_played_power``) — the ported ``ENGINE.powers`` slice.
+"""In-duel power resolution (``resolve_played_power``) — how a played card fills the scoring queues.
 
 Pure and TTY-free: a card is played into a :class:`DuelState`'s queues and the resulting queue
-mutations are asserted directly. Covers the four behaviours the reference bakes in — plain card,
+mutations are asserted directly. Covers the four core behaviours — plain card,
 Moby Morpher, boost amplification, and the negative-card curse.
 """
 

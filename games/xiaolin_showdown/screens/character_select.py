@@ -1,7 +1,6 @@
 """Character select — pick a playable dragon, then deal a fresh game into the vault.
 
-Replaces the reference's ``character__choice`` prompt; feeds the chosen character into
-``new_game`` with the current (settings-derived) ruleset.
+Feeds the chosen character into ``new_game`` with the current (settings-derived) ruleset.
 """
 
 from __future__ import annotations

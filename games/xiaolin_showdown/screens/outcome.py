@@ -1,4 +1,4 @@
-"""Outcome screen — the final scoreboard when the run ends (ported from ``show__end_state``).
+"""Outcome screen — the final scoreboard when the run ends.
 
 Shown once the draw pile is spent (or a point limit is reached): final points, the winner (or a
 tie), and a way on — play again with a fresh dragon, back to the menu, or quit.

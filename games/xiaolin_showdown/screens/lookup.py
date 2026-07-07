@@ -1,8 +1,4 @@
-"""Look-up — pick one card (from your hand) or a character (you / opponent), then see its detail.
-
-Mirrors the reference ``look_up__view``: card look-up chooses from the player's hand, character
-look-up chooses a duelist. Selecting one opens the ``DetailScreen``.
-"""
+"""Look-up — pick one card (from your hand) or a character (you / opponent), then see its detail."""
 
 from __future__ import annotations
 

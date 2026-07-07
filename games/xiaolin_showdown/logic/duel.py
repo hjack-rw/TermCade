@@ -1,5 +1,4 @@
-"""The showdown — the reference's blocking 7-stage machine (``ENGINE.change__duel_stage``),
-ported to a pure, injectable form.
+"""The showdown — a 7-stage machine in a pure, injectable form.
 
 A duel is a *loop of showdowns* over the shared draw pile until it runs dry. One showdown walks
 stages 1→6 then a closing stage 0:
@@ -33,7 +32,7 @@ from .models import Card, Player, remove_card_from_hand
 from .powers import resolve_played_power
 from .state import XiaolinState
 
-LAST_STAGE = 6  # the showdown cycles stages 0..6 (ENGINE.py last_duel_stage)
+LAST_STAGE = 6  # the showdown cycles stages 0..6
 
 
 @dataclass
@@ -86,7 +85,7 @@ class Duel:
         return self.state.has_ended
 
     async def advance(self) -> int:
-        """Run the next stage and return it, mirroring ``ENGINE.change__duel_stage``.
+        """Run the next stage and return it.
 
         Re-entering at stage 0 resets the per-showdown scratch, so the closing end phase (also
         stage 0) always runs on the *finished* showdown before the reset wipes it.
@@ -137,12 +136,12 @@ class Duel:
             self._commit_boost(player_card, self.duel.player_stakes, self.duel.player_queue)
 
         bot_boosts = self._boost_options(self.state.bot)
-        if bot_boosts:  # the bot always plays a boost when it holds one (BOT power__choice)
+        if bot_boosts:  # the bot always plays a boost when it holds one
             self._commit_boost(self.rng.choice(bot_boosts), self.duel.bot_stakes, self.duel.bot_queue)
 
     async def _card(self) -> None:
         # A duelist with no card left (decks and hand exhausted near the end) simply plays nothing
-        # and scores on their base stats — the reference instead crashed on the empty choice.
+        # and scores on their base stats (playing nothing avoids crashing on an empty choice).
         player_playable = self._playable(self.state.player, self.duel.player_stakes)
         if player_playable:
             player_card = await self.choices.card(player_playable)
@@ -231,7 +230,7 @@ class Duel:
         return [c for c in player.whole_hand if c.power.trigger == "boost"]
 
     def _playable(self, player: Player, staked: list[Card]) -> list[Card]:
-        # regular play draws from the hand only (the inalienable Wu is boost-only, per the reference)
+        # regular play draws from the hand only (the inalienable Wu is boost-only)
         return [c for c in player.hand if c not in staked]
 
     def _commit_boost(self, card: Card, stakes: list[Card], queue: list[Card]) -> None:

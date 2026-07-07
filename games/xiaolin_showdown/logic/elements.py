@@ -1,6 +1,6 @@
 """The five Xiaolin elements and their opposition, used by duel scoring.
 
-Ported from the reference ``UTILS.opposites``: water⇄fire and wind⇄earth are opposites;
+water⇄fire and wind⇄earth are opposites;
 ``metal`` is neutral (no opposite). During a duel a card's element scores +1 with a matching
 background, −1 against the opposite (or when the background is metal), 0 otherwise.
 """

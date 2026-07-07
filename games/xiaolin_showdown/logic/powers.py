@@ -1,17 +1,17 @@
-"""In-duel card power resolution — the port of ``ENGINE.powers`` (the ``is_duel`` half).
+"""In-duel card power resolution — how a played card enters the scoring queues.
 
 When a card is played in a showdown it does not enter the scoring queue as itself: it enters
 as an inert *stand-in* (a copy wearing a neutral power) so the queue is never re-scanned for
-its power. Three things happen here, faithfully mirroring the reference:
+its power. Three things happen here:
 
 - a **boost** card (``boost``/+1) lends no stats of its own — it amplifies the card played after it;
 - a **"Moby Morpher"** (``play``/+1) turns all stats to 1 and lets the caster choose its element;
 - a **negative** card curses the opponent: a mirror of it lands on *their* queue and the caster's
   copy is zeroed.
 
-Pure: no rendering, no I/O. The reference's ``duel_table``/``_info`` side effects are dropped —
-that is the screen's job. The Morpher's element is resolved by the caller and passed in as
-``element`` (a human's chosen element, or the background for the bot).
+Pure: no rendering, no I/O. Rendering side effects are the screen's job. The Morpher's element
+is resolved by the caller and passed in as ``element`` (a human's chosen element, or the
+background for the bot).
 """
 
 from __future__ import annotations
@@ -29,12 +29,11 @@ if TYPE_CHECKING:  # annotation only — avoids a runtime cycle with the stage m
 _NEUTRAL_POWER = Power(id=0, name="", trigger="hand", effect=0, description="")
 
 # The opponent's mirror of a negative card carries no element (it must earn no elemental bonus).
-# The reference used ``None``; "" scores identically in ``count_end_stats`` and keeps ``Card.element``
-# a plain ``str``.
+# "" (not ``None``) scores identically in ``count_end_stats`` and keeps ``Card.element`` a plain ``str``.
 _NO_ELEMENT = ""
 
-# Which in-duel powers act, keyed by (effect, trigger) — the ``is_duel`` slice of the reference
-# switchboard. Everything else resolves as a plain (or negative) card.
+# Which in-duel powers act, keyed by (effect, trigger). Everything else resolves as a plain
+# (or negative) card.
 _BOOST = 0  # boost/+1: amplifies the card played after it
 _MORPH = 1  # play/+1 ("Moby Morpher"): all stats become 1, caster picks the element
 _DUEL_CONDITIONS = {(1, "boost"): _BOOST, (1, "play"): _MORPH}
@@ -135,8 +134,8 @@ def _stand_in(card: Card) -> Card:
 def _min_stat(card: Card) -> int:
     """Lowest real stat, ``None`` treated as absent (0 when the card has no stats at all).
 
-    The reference does ``min(card.stats.values())``, which crashes on XS's None-stat cards;
-    ignoring ``None`` also keeps a non-combat card from ever reading as 'negative'.
+    Filtering ``None`` guards against null-stat cards, where ``min()`` would otherwise crash;
+    it also keeps a non-combat card from ever reading as 'negative'.
     """
     values = [v for v in card.stats.values() if v is not None]
     return min(values) if values else 0

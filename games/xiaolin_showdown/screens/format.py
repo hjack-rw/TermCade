@@ -1,7 +1,7 @@
 """Presentation helpers for XS cards — element colors, type icons, stat strings.
 
-Ported from the reference ``UTILS.colors`` / ``UTILS.icons`` / ``UTILS.number``. Colors are
-emitted as Textual/Rich markup (``[blue]…[/]``); stats show ``?`` for the null-stat cards.
+Colors are emitted as Textual/Rich markup (``[blue]…[/]``); stats show ``?`` for the null-stat
+cards.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from rich.text import Text
 
 from ..logic.models import Card, Character, Power
 
-# element -> Rich colour (reference used bright ANSI 94/91/93/92/37)
+# element -> Rich colour (bright ANSI 94/91/93/92/37)
 COLORS = {
     "water": "bright_blue",
     "fire": "bright_red",

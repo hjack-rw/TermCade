@@ -3,8 +3,8 @@
 Implements the engine's ``GameState`` protocol (``schema_version`` / ``snapshot`` /
 ``restore``). Saving is menu-only, so this captures exactly the state that exists at the
 vault menu (``duel_stage == 0``): both duelists' hands/decks/points/character, the draw
-pile, and the cross-duel challenge/background history. Transient in-duel scratch
-(``duel_stuff``) is never here — it does not exist between duels.
+pile, and the cross-duel challenge/background history. Transient in-duel scratch is never
+here — it does not exist between duels.
 
 Serialization stores card/character *ids*; :meth:`restore` rehydrates fresh instances
 from the catalog. The RNG stream and the run's frozen settings (``XiaolinSettings``) are

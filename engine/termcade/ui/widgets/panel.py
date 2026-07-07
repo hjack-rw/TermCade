@@ -1,7 +1,6 @@
 """``BoxedPanel`` — a double-bordered container with a centered title.
 
-The engine's reusable replacement for the reference's ``fancify()`` border-char hacks:
-a real Textual border (``border: double``) with a centered title, themed by tokens so a
+A real Textual border (``border: double``) with a centered title, themed by tokens so a
 game reskins it by overriding CSS variables.
 """
 

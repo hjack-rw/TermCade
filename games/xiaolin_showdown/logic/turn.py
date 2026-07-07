@@ -1,9 +1,9 @@
 """The vault turn — what happens on each return to the vault, between showdowns.
 
-Ported from ``ENGINE.show__header`` + ``oversee__hand_size``: it keeps both hands at their size
-limit (surplus discarded to the personal deck, a short hand drawn back up) and flags the run
-finished when a point limit is reached or the draw pile runs dry. This is the **loop terminator** —
-without a vault turn between showdowns the duel loop can strand on a hand that emptied out.
+Keeps both hands at their size limit (surplus discarded to the personal deck, a short hand
+drawn back up) and flags the run finished when a point limit is reached or the draw pile runs
+dry. This is the **loop terminator** — without a vault turn between showdowns the duel loop can
+strand on a hand that emptied out.
 
 Pure and TTY-free: the player's over-limit discard is an injected callback; the bot discards at
 random via ``rng``. The bot's *own* vault actions (deposit / power-up) are a separate slice.
@@ -29,10 +29,10 @@ def refill_hands(
     pick_discard: PickDiscard,
     rng: Rng,
 ) -> None:
-    """Bring both hands back to size and update ``has_ended`` — the reference vault header.
+    """Bring both hands back to size and update ``has_ended``.
 
     Runs each time control returns to the vault (between showdowns). Re-balances until both hands
-    are stable, mirroring ``show__header``'s ``while`` loop over :func:`oversee_hand_size`.
+    are stable — loops :func:`oversee_hand_size` over both until neither reports more work.
     """
     if state.player.points >= settings.point_limit or state.bot.points >= settings.point_limit:
         state.has_ended = True
@@ -57,7 +57,7 @@ def oversee_hand_size(
     Over the limit → move surplus to the personal deck (player picks, bot random). Under → draw
     back up from the personal deck (capped by ``draw_limit``), or from the main pile only while the
     hand is empty (capped by ``empty_draw_limit``). Returns ``False`` when it did work and wants a
-    re-check, ``True`` when balanced or unable to change further — the reference's contract.
+    re-check, ``True`` when balanced or unable to change further.
     """
     player = state.player if is_player else state.bot
     difference = len(player.whole_hand) - max_hand_size(player, settings.max_hand_size)
@@ -82,7 +82,7 @@ def oversee_hand_size(
 
 
 def bot_turn(state: XiaolinState, settings: XiaolinSettings) -> None:
-    """The bot's between-showdown vault turn (``ENGINE.show__header`` → ``BotAI._turn``).
+    """The bot's between-showdown vault turn.
 
     Up to ``deposit_limit`` actions: first swap each ``deposit``/+1 Wu for a fresh draw, then cash
     plain ``deposit``/0 Wu for their points. This is how the bot banks points toward the win — the
@@ -114,7 +114,7 @@ def max_hand_size(player: Player, base: int) -> int:
 
 
 def _draw_from_main(state: XiaolinState, player: Player) -> None:
-    """Emergency draw from the shared pile; emptying it ends the run (``add__card__to__hand``)."""
+    """Emergency draw from the shared pile; emptying it ends the run."""
     player.hand.append(state.card_deck.pop(0))
     if not state.card_deck:
         state.has_ended = True

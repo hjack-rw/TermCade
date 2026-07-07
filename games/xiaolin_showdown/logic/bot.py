@@ -1,8 +1,8 @@
-"""The opponent's duel decisions — pure, RNG-injected (ported from ``BOT.py``).
+"""The opponent's duel decisions — pure, RNG-injected.
 
 Each function scores the options by ``own stat + card contribution − opponent stat`` and picks
-the best, falling back to a random legal choice. Two reference crashes on ``None`` card stats are
-guarded here (they count as 0), since XS ships null-stat cards.
+the best, falling back to a random legal choice. ``None`` card stats count as 0, guarding the two
+spots where they would otherwise crash a comparison.
 """
 
 from __future__ import annotations

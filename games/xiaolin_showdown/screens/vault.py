@@ -1,7 +1,6 @@
-"""Vault screen — the between-duel menu, styled after the reference layout.
+"""Vault screen — the between-duel menu.
 
-Three stacked panels: game state, both hands (element-coloured), and actions. The duel and
-card actions arrive with the duel state machine; for now they show greyed and Esc returns.
+Three stacked panels: game state, both hands (element-coloured), and actions.
 """
 
 from __future__ import annotations

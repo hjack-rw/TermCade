@@ -1,7 +1,7 @@
-"""Domain models, ported from the reference ``src/DATA.py`` and ``Player`` in ``ENGINE.py``.
+"""Domain models — cards, powers, characters, and a duelist.
 
-Plain data only. The reference's ``_info`` ANSI formatters are intentionally dropped —
-rendering belongs to screens. Rows come from the bundled card DB via :mod:`catalog`.
+Plain data only; any display formatting is intentionally left out — rendering belongs to
+screens. Rows come from the bundled card DB via :mod:`catalog`.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
-# In the reference a card/character's 6th column is a *power id*; resolution is a lookup.
+# A card/character row's 6th column is a *power id*; resolution is a lookup.
 ResolvePower = Callable[[int], "Power"]
 
 
@@ -25,7 +25,7 @@ class Power:
     @classmethod
     def from_row(cls, row: tuple) -> "Power":
         pid, name, trigger, effect, description = row
-        # initiative bonus is encoded after a "~" only on passive hand powers (DATA.py:14-20)
+        # initiative bonus is encoded after a "~" only on passive hand powers
         bonus = int(description.split("~")[1]) if (trigger == "hand" and effect == 0) else 0
         return cls(pid, name, trigger, effect, description.split("~")[0], bonus)
 
@@ -65,7 +65,7 @@ class Character:
 
 @dataclass
 class Player:
-    """A duelist's persistent, between-duel state (ENGINE.py Player, minus in-duel scratch)."""
+    """A duelist's persistent, between-duel state (no in-duel scratch)."""
 
     character: Character
     hand: list[Card] = field(default_factory=list)
@@ -75,13 +75,13 @@ class Player:
 
     @property
     def initiative(self) -> list[int]:
-        """Derived, never stored: each hand card's passive initiative bonus (ENGINE.py:27)."""
+        """Derived, never stored: each hand card's passive initiative bonus."""
         return [card.power.initiative_bonus for card in self.hand]
 
     @property
     def whole_hand(self) -> list[Card]:
-        """Playable cards — the inalienable Wu (if any) ahead of the drawn hand
-        (``ENGINE.show__whole__hand``). Initiative stays hand-only; the Wu never joins it."""
+        """Playable cards — the inalienable Wu (if any) ahead of the drawn hand.
+        Initiative stays hand-only; the Wu never joins it."""
         return self.inalienable_hand + self.hand
 
 
@@ -89,7 +89,7 @@ def remove_card_from_hand(player: Player, card: Card) -> None:
     """Remove the exact ``card`` from the player's hand or inalienable slot.
 
     Identity, not equality: the draw pile is padded with value-equal blank cards, so
-    ``list.remove`` (value equality, as the reference used) can drop the wrong instance.
+    ``list.remove`` (which matches by value equality) can drop the wrong instance.
     """
     for holder in (player.hand, player.inalienable_hand):
         for index, held in enumerate(holder):

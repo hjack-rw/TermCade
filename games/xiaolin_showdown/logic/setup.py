@@ -1,9 +1,9 @@
-"""Build a fresh game — ported from ``GameData.__init__`` in the reference ``ENGINE.py``.
+"""Build a fresh game.
 
-Two things the reference took implicitly are injected here: the RNG (it seeded the global
-``random``) and the player's chosen character (it prompted interactively). The RNG call
-order is preserved exactly — shuffle the draw pile, then pick the bot's character — so a
-given seed reproduces the identical game. Card pops consume no randomness.
+The RNG and the player's chosen character are injected explicitly — not a seeded global RNG,
+not an interactive prompt — so a run stays deterministic and testable. The RNG call order is
+preserved exactly — shuffle the draw pile, then pick the bot's character — so a given seed
+reproduces the identical game. Card pops consume no randomness.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def new_game(
     cards = catalog.cards
 
     # Draw pile = the non-reserved cards, padded with blanks (card 0) to full size.
-    # Hannibal Roy Bean (power id -5) reserves one extra card (ENGINE.py:44-45).
+    # Hannibal Roy Bean (power id -5) reserves one extra card.
     start = FIRST_DECK_CARD + (1 if player_character.power.id == -5 else 0)
     card_order = list(range(start, len(cards)))
     card_order += [0] * (settings.max_deck_size - len(card_order))

@@ -2,8 +2,11 @@
 
 A reusable **Textual** TUI engine for terminal games, plus the games that run on it, in one monorepo. The engine is the long-lived *cabinet*; each game is a finite *cartridge* that plugs into it.
 
-The engine layers with a one-directional purity boundary — `core` (TUI-agnostic
-services: saves, settings, rng, state) never imports Textual, so it stays unit-testable without a terminal; only `ui` touches Textual.
+The engine layers with a one-directional purity boundary — `core` (TUI-agnostic services: saves, settings, rng, state) never imports Textual, so it stays unit-testable without a terminal; only `ui` touches Textual.
+
+## Games
+
+- **Xiaolin Showdown** — a terminal card duel. Pick a dragon, then duel a bot Shen Gong Wu by Wu across a seven-phase showdown — commit stakes, name the challenge stat and elemental background, play your cards, and race to the point limit. Deterministic runs, saveable between duels, tunable settings.
 
 ## Layout
 
@@ -16,11 +19,13 @@ games/              # the games (first: xiaolin_showdown)
 tests/              # core (no TTY) + Pilot UI tests
 ```
 
-## Develop
+## Develop & play
 
 ```bash
 python -m venv .venv
 .venv/Scripts/pip install -e ".[dev]"     # Windows; use bin/ on POSIX
 pytest
-python -m termcade                         # boot the engine
+
+python -m termcade                         # boot the engine attract scene
+xiaolin                                    # play Xiaolin Showdown (needs a real terminal)
 ```

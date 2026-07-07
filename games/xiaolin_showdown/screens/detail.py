@@ -1,4 +1,4 @@
-"""Detail screen — one card's or character's full info (ported from ``more__info``)."""
+"""Detail screen — one card's or character's full info."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ class DetailScreen(EngineScreen):
                 yield Static(f"Affiliation: {target.affiliation.capitalize()}")
                 yield Static(f"Stats (F/A/I): {char_stats(target)}")
 
-            # An inalienable player Wu (power id −5..−1) keeps its power hidden, like the reference.
+            # An inalienable player Wu (power id −5..−1) keeps its power hidden.
             hidden = self._is_card and -5 < power.id < 0
             if power.id and not hidden:
                 yield Static(f"Power: {power.name}  ({trigger_label(power)})", classes="power")

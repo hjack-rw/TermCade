@@ -1,4 +1,4 @@
-"""Rules screen — static info explaining how the game plays (ported from ``rule__view``).
+"""Rules screen — static info explaining how the game plays.
 
 Distinct from the Settings screen: this only informs, it changes nothing.
 """

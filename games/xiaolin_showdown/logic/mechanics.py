@@ -1,4 +1,4 @@
-"""Pure game calculations (no I/O), ported from the reference ``ENGINE``/``UTILS`` math."""
+"""Pure game calculations (no I/O)."""
 
 from collections.abc import Mapping, Sequence
 
@@ -9,8 +9,8 @@ from .models import Card, Player
 def initiative(player: Player, bot: Player) -> tuple[int, int]:
     """Each side's initiative — own positive bonuses plus the opponent's negatives.
 
-    Ported from ``sum__initiative`` (ENGINE.py:185-189): a duelist keeps their own positive
-    initiative and inherits the opponent's negatives, summed over the distinct values.
+    A duelist keeps their own positive initiative and inherits the opponent's negatives,
+    summed over the distinct values.
     """
     player_side = [v for v in set(player.initiative) if v > 0] + [v for v in set(bot.initiative) if v < 0]
     bot_side = [v for v in set(bot.initiative) if v > 0] + [v for v in set(player.initiative) if v < 0]
@@ -39,9 +39,8 @@ def count_end_stats(
 ) -> int:
     """A duelist's end value for one stat: base + queued card stats + elemental bonus.
 
-    Ported from ``count__end_stats`` (UTILS.py:290-312). ``None`` card stats count as 0; with
-    ``absolute=False`` negatives count as 0 too. The "Serpent's Tail" play card (effect −1)
-    cancels the elemental bonus.
+    ``None`` card stats count as 0; with ``absolute=False`` negatives count as 0 too. The
+    "Serpent's Tail" play card (effect −1) cancels the elemental bonus.
     """
     if any(c.power.effect == -1 and c.power.trigger == "play" for c in target_queue):
         elemental_bonus = 0
