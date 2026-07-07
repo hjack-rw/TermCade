@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from termcade.ui.app import EngineApp
 
 from textual.widgets import Input
@@ -9,9 +11,12 @@ from textual.widgets import Input
 from xiaolin_showdown.game import build_game
 from xiaolin_showdown.screens.character_select import CharacterSelectScreen
 from xiaolin_showdown.screens.detail import DetailScreen
+from xiaolin_showdown.screens.duel import ChoiceModal, DuelScreen
 from xiaolin_showdown.screens.lookup import LookUpScreen
+from xiaolin_showdown.screens.outcome import OutcomeScreen
 from xiaolin_showdown.screens.rules import RulesScreen
 from xiaolin_showdown.screens.start import StartScreen
+from xiaolin_showdown.screens.use_power import UsePowerScreen
 from xiaolin_showdown.screens.vault import VaultScreen
 
 
@@ -109,6 +114,66 @@ async def test_deposit_banks_a_card_for_points(tmp_path):
         assert isinstance(app.screen, VaultScreen)
         assert len(app.ctx.state.player.hand) == hand_before - 1
         assert app.ctx.state.player.points == points_before + gained
+
+
+async def test_gong_yi_tanpai_plays_a_showdown_and_returns_to_the_vault(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test() as pilot:
+        await _new_game_at_vault(app, pilot)
+        assert isinstance(app.screen, VaultScreen)
+
+        await pilot.press("g")  # Gong Yi Tanpai — the showdown runs in an async worker
+        assert isinstance(app.screen, (DuelScreen, ChoiceModal))
+
+        # Drive the stepped showdown: press Continue on the board, take the first option on any
+        # decision dialog. One showdown steps through ~7 phases with three choices in between.
+        landed = None
+        for _ in range(300):
+            await pilot.pause()
+            if isinstance(app.screen, ChoiceModal):
+                await pilot.click("#opt-0")
+            elif isinstance(app.screen, DuelScreen):
+                await pilot.press("space")  # advance a phase
+            else:
+                landed = app.screen
+                break
+
+        # One showdown does not exhaust the deck, so control returns to a fresh vault.
+        assert isinstance(landed, VaultScreen)
+        assert app.ctx.state.card_deck  # the run is not over
+
+
+async def test_use_a_power_opens_the_picker_and_returns_to_the_vault(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test() as pilot:
+        await _new_game_at_vault(app, pilot)
+        cat = app.ctx.state.catalog
+        bras = deepcopy(next(card for card in cat.cards if card.name == "Bras Finger"))
+        app.ctx.state.player.hand.append(bras)  # ensure a usable-power Wu is in hand
+
+        await pilot.press("p")  # Use a Power → picker
+        await pilot.pause()
+        assert isinstance(app.screen, UsePowerScreen)
+
+        await pilot.click("#pow-0")  # spend the first usable Wu, back to the vault
+        await pilot.pause()
+        assert isinstance(app.screen, VaultScreen)
+
+
+async def test_game_over_shows_the_outcome_and_can_play_again(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test() as pilot:
+        await _new_game_at_vault(app, pilot)  # a live game state to score
+        app.ctx.state.has_ended = True
+        app.ctx.state.player.points = 4
+
+        app.push_screen(OutcomeScreen())
+        await pilot.pause()
+        assert isinstance(app.screen, OutcomeScreen)
+
+        await pilot.click("#again")  # Play Again → pick a new dragon
+        await pilot.pause()
+        assert isinstance(app.screen, CharacterSelectScreen)
 
 
 async def test_settings_change_flows_into_a_new_game(tmp_path):

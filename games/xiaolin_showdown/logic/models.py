@@ -77,3 +77,22 @@ class Player:
     def initiative(self) -> list[int]:
         """Derived, never stored: each hand card's passive initiative bonus (ENGINE.py:27)."""
         return [card.power.initiative_bonus for card in self.hand]
+
+    @property
+    def whole_hand(self) -> list[Card]:
+        """Playable cards — the inalienable Wu (if any) ahead of the drawn hand
+        (``ENGINE.show__whole__hand``). Initiative stays hand-only; the Wu never joins it."""
+        return self.inalienable_hand + self.hand
+
+
+def remove_card_from_hand(player: Player, card: Card) -> None:
+    """Remove the exact ``card`` from the player's hand or inalienable slot.
+
+    Identity, not equality: the draw pile is padded with value-equal blank cards, so
+    ``list.remove`` (value equality, as the reference used) can drop the wrong instance.
+    """
+    for holder in (player.hand, player.inalienable_hand):
+        for index, held in enumerate(holder):
+            if held is card:
+                del holder[index]
+                return

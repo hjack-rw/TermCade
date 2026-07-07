@@ -82,6 +82,22 @@ LookUpScreen Button {
     margin: 1 0;
 }
 
+/* --- Use a Power (pick a Wu to spend) ------------------------------------ */
+UsePowerScreen {
+    align: center middle;
+}
+UsePowerScreen BoxedPanel {
+    width: 52;
+    height: auto;
+    max-height: 90%;
+    overflow-y: auto;
+    padding: 1 2;
+}
+UsePowerScreen Button {
+    width: 100%;
+    margin: 1 0;
+}
+
 /* --- Detail -------------------------------------------------------------- */
 DetailScreen {
     align: center middle;
@@ -118,4 +134,62 @@ RulesScreen BoxedPanel {
 RulesScreen Static {
     width: 100%;
     padding: 1 1 0 1;
+}
+
+/* --- Duel ---------------------------------------------------------------- */
+DuelScreen {
+    align: center top;
+}
+DuelScreen > BoxedPanel {
+    width: 84%;
+    height: auto;
+    margin: 1 0 0 0;
+}
+DuelScreen #duel-body {
+    width: 100%;
+    padding: 1;
+}
+DuelScreen #duel-prompt {
+    width: 100%;
+    padding: 0 1;
+    color: $text-accent;
+}
+
+/* The per-decision dialog raised over the duel board. */
+ChoiceModal {
+    align: center middle;
+}
+ChoiceModal BoxedPanel {
+    width: 60;
+    height: auto;
+    max-height: 90%;
+    overflow-y: auto;
+    padding: 1 2;
+    background: $surface;
+}
+ChoiceModal Button {
+    width: 100%;
+    margin: 1 0;
+}
+
+/* --- Outcome ------------------------------------------------------------- */
+OutcomeScreen {
+    align: center middle;
+}
+OutcomeScreen BoxedPanel {
+    width: 48;
+    height: auto;
+    padding: 1 2;
+}
+OutcomeScreen #final-points,
+OutcomeScreen #verdict {
+    width: 100%;
+    text-align: center;
+}
+OutcomeScreen #verdict {
+    margin-bottom: 1;
+}
+OutcomeScreen Button {
+    width: 100%;
+    margin: 1 0 0 0;
 }

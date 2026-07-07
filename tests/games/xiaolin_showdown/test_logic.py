@@ -7,14 +7,24 @@ makes XS a cartridge the engine can save.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from termcade.core.rng import Rng
 from termcade.core.saves import SaveManager, SqliteBackend
 
-from xiaolin_showdown.logic.actions import can_deposit, deposit
+from xiaolin_showdown.logic.actions import (
+    DRAW_MESSAGE,
+    FIZZLE_MESSAGE,
+    can_deposit,
+    deposit,
+    usable_powers,
+    use_power,
+)
 from xiaolin_showdown.logic.bot import choose_background, choose_card, choose_challenge
 from xiaolin_showdown.logic.catalog import load_catalog
 from xiaolin_showdown.logic.mechanics import count_end_stats, initiative
 from xiaolin_showdown.logic.models import Card, Character, Player, Power
+from xiaolin_showdown.logic.outcome import final_score
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.state import XiaolinState
@@ -201,3 +211,82 @@ def test_custom_settings_freeze_into_the_save(tmp_path):
     restored = XiaolinSettings.from_settings(loaded)
     assert restored.point_limit == 20
     assert restored.starting_hand_player == 3
+
+
+def test_final_score_cashes_leftover_hand_cards_when_the_pile_is_empty():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    state.player.points = 5
+    state.card_deck.clear()  # the pile ran dry — hand cards now count
+    hand_points = sum(card.points for card in state.player.whole_hand)
+
+    assert final_score(state).player_points == 5 + hand_points
+
+
+def test_final_score_ignores_hand_cards_while_the_pile_still_has_cards():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    state.player.points = 9  # a point-limit ending: the pile is not empty, so hands are not counted
+
+    assert final_score(state).player_points == 9
+
+
+def test_final_score_names_the_higher_scoring_duelist():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    state.player.points = 5  # pile still full, so bot stays at 0
+
+    assert final_score(state).winner is state.player.character
+
+
+def test_final_score_reports_a_tie_when_points_are_level():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))  # both at 0, pile full
+
+    assert final_score(state).winner is None
+
+
+def _named(cat, name: str) -> Card:
+    return deepcopy(next(card for card in cat.cards if card.name == name))
+
+
+def test_use_power_draws_a_wu_and_banks_no_points():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    bras = _named(cat, "Bras Finger")  # deposit/+1 — Chronokinesis draws a card
+    state.player.hand.append(bras)
+    hand_size, deck_before = len(state.player.hand), len(state.card_deck)
+
+    message = use_power(state, bras)
+
+    assert message == DRAW_MESSAGE
+    assert all(card is not bras for card in state.player.hand)  # spent, not banked
+    assert len(state.player.hand) == hand_size  # a drawn Wu replaced it
+    assert len(state.card_deck) == deck_before - 1
+    assert state.player.points == 0  # using a power never gives points
+
+
+def test_use_power_on_the_gag_wu_fizzles_for_no_points():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    ohwah = _named(cat, "Ohwah Tegu Saim")  # deposit/0 — the "? ? ?" gag power
+    state.player.hand.append(ohwah)
+    deck_before = len(state.card_deck)
+
+    message = use_power(state, ohwah)
+
+    assert message == FIZZLE_MESSAGE
+    assert all(card is not ohwah for card in state.player.hand)  # discarded
+    assert len(state.card_deck) == deck_before  # nothing drawn
+    assert state.player.points == 0  # unlike depositing it, which would bank its point
+
+
+def test_usable_powers_respects_the_deposit_limit():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    bras = _named(cat, "Bras Finger")
+    state.player.hand.append(bras)
+
+    assert any(card is bras for card in usable_powers(state, deposit_limit=1))
+    state.deposit_counter = 1  # the turn's deposit is spent → the deposit Wu is no longer usable
+    assert all(card is not bras for card in usable_powers(state, deposit_limit=1))
