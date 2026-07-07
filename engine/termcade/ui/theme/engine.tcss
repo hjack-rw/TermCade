@@ -1,0 +1,40 @@
+/* Base look shared by every termcade game. Games override tokens and classes. */
+
+Screen {
+    align: center middle;
+    background: $background;
+}
+
+/* Reusable double-bordered panel with a centred title (the BoxedPanel widget). */
+BoxedPanel {
+    border: double $accent;
+    border-title-align: center;
+    border-title-color: $accent;
+    padding: 1 2;
+    width: auto;
+    height: auto;
+    background: $panel;
+}
+
+#title {
+    text-style: bold;
+    color: $accent;
+    text-align: center;
+    width: 100%;
+    padding: 1 0 0 0;
+}
+
+.subtitle {
+    color: $text-muted;
+    text-align: center;
+    width: 100%;
+}
+
+.disabled {
+    color: $text-disabled;
+}
+
+Button {
+    margin: 1 2;
+    min-width: 20;
+}

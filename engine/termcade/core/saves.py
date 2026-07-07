@@ -2,7 +2,8 @@
 
 Menu-only by design: saving happens between runs, never mid-duel. A game can
 disable saving entirely or cap the slot count. The on-disk envelope is
-``{meta, rng, state}``; the engine never inspects the ``state`` payload.
+``{meta, rng, settings, state}``: the run's settings are frozen into the save so it
+remembers the ruleset it was created with. The engine never inspects the ``state`` payload.
 
 ``SaveManager`` depends on the ``SaveBackend`` protocol, not a concrete store, so
 the storage medium is swappable: ``JsonFileBackend`` (one file per slot) and
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from .rng import Rng
+from .settings import Settings
 from .state import GameState, SaveMeta
 
 if TYPE_CHECKING:
@@ -47,7 +49,7 @@ class SlotEmpty(SaveError):
 class SaveBackend(Protocol):
     """Storage seam for save slots.
 
-    Moves the ``{meta, rng, state}`` envelope in and out, keyed by slot. The
+    Moves the ``{meta, rng, settings, state}`` envelope in and out, keyed by slot. The
     implementation owns the medium (files, SQLite, …); none of them inspect the
     ``state`` payload. ``SaveManager`` depends on this, never on a concrete store.
     """
@@ -105,13 +107,12 @@ class SqliteBackend:
     """One indexed row per slot in a single SQLite database (``saves.db``).
 
     Save *metadata* lands in real columns, so listing and lookups are SQL rather
-    than a directory scan, and the schema has room to grow query-shaped data
-    (history, stats) without reshaping how saves are stored. The game's ``rng``
-    and ``state`` payloads ride along as opaque JSON text — still uninspected.
-    Uses only the stdlib ``sqlite3`` module (no new dependency).
+    than a directory scan. Everything else in the envelope (``rng``, ``settings``,
+    ``state``, and any future key) rides in one opaque JSON ``payload`` column, so
+    the envelope can grow without a schema change. Uses only the stdlib ``sqlite3``.
     """
 
-    _COLUMNS = "slot, game_id, title, schema_version, seed, saved_at, rng, state"
+    _COLUMNS = "slot, game_id, title, schema_version, seed, saved_at, payload"
 
     def __init__(self, path: Path) -> None:
         self._path = path
@@ -126,8 +127,7 @@ class SqliteBackend:
                     schema_version INTEGER NOT NULL,
                     seed           TEXT    NOT NULL,  -- 64-bit unsigned; TEXT dodges SQLite's signed cap
                     saved_at       TEXT    NOT NULL,
-                    rng            TEXT    NOT NULL,
-                    state          TEXT    NOT NULL
+                    payload        TEXT    NOT NULL  -- {rng, settings, state, …} as JSON
                 )
                 """
             )
@@ -138,6 +138,9 @@ class SqliteBackend:
 
     def write(self, slot: int, envelope: dict[str, Any]) -> None:
         meta = envelope["meta"]
+        # Meta lands in indexed columns; everything else rides in one JSON payload,
+        # so a new envelope key needs no schema change.
+        payload = {key: value for key, value in envelope.items() if key != "meta"}
         row = (
             slot,
             meta["game_id"],
@@ -145,16 +148,15 @@ class SqliteBackend:
             meta["schema_version"],
             str(meta["seed"]),
             meta["saved_at"],
-            json.dumps(envelope["rng"]),
-            json.dumps(envelope["state"]),
+            json.dumps(payload),
         )
         with closing(self._connect()) as conn:
             conn.execute(
-                f"INSERT INTO saves ({self._COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                f"INSERT INTO saves ({self._COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(slot) DO UPDATE SET "
                 "game_id=excluded.game_id, title=excluded.title, "
                 "schema_version=excluded.schema_version, seed=excluded.seed, "
-                "saved_at=excluded.saved_at, rng=excluded.rng, state=excluded.state",
+                "saved_at=excluded.saved_at, payload=excluded.payload",
                 row,
             )
             conn.commit()
@@ -166,18 +168,16 @@ class SqliteBackend:
             ).fetchone()
         if row is None:
             raise SlotEmpty(f"no save in slot {slot}")
-        return {
-            "meta": {
-                "slot": row[0],
-                "game_id": row[1],
-                "title": row[2],
-                "schema_version": row[3],
-                "seed": int(row[4]),
-                "saved_at": row[5],
-            },
-            "rng": json.loads(row[6]),
-            "state": json.loads(row[7]),
+        envelope: dict[str, Any] = json.loads(row[6])
+        envelope["meta"] = {
+            "slot": row[0],
+            "game_id": row[1],
+            "title": row[2],
+            "schema_version": row[3],
+            "seed": int(row[4]),
+            "saved_at": row[5],
         }
+        return envelope
 
     def delete(self, slot: int) -> None:
         with closing(self._connect()) as conn:
@@ -223,7 +223,15 @@ class SaveManager:
         if not 0 <= slot < self._max_slots:
             raise SlotOutOfRange(f"slot {slot} outside 0..{self._max_slots - 1}")
 
-    def save(self, slot: int, state: GameState, rng: Rng, *, title: str) -> SaveMeta:
+    def save(
+        self,
+        slot: int,
+        state: GameState,
+        rng: Rng,
+        *,
+        title: str,
+        settings: Settings | None = None,
+    ) -> SaveMeta:
         self._guard(slot)
         meta = SaveMeta(
             slot=slot,
@@ -233,20 +241,29 @@ class SaveManager:
             seed=rng.seed,
             saved_at=datetime.now(timezone.utc).isoformat(),
         )
-        envelope = {"meta": asdict(meta), "rng": rng.get_state(), "state": state.snapshot()}
+        envelope = {
+            "meta": asdict(meta),
+            "rng": rng.get_state(),
+            "settings": settings.to_dict() if settings is not None else {},
+            "state": state.snapshot(),
+        }
         self._backend.write(slot, envelope)
         return meta
 
     def load(
         self, slot: int, state_cls: type[GameState], ctx: "GameContext"
-    ) -> tuple[GameState, Rng, SaveMeta]:
+    ) -> tuple[GameState, Rng, SaveMeta, Settings]:
         self._guard(slot)
         envelope = self._backend.read(slot)
         meta = SaveMeta(**envelope["meta"])
         rng = Rng(meta.seed)
         rng.set_state(envelope["rng"])
+        # The save's frozen settings win, merged over the game's current defaults so an
+        # option added since the save is filled in (forward-compatible).
+        defaults = ctx.game.default_settings if ctx is not None else Settings()
+        settings = Settings.from_dict(envelope.get("settings", {}), defaults)
         state = state_cls.restore(envelope["state"], ctx)
-        return state, rng, meta
+        return state, rng, meta, settings
 
     def list(self) -> list[SaveMeta | None]:
         """One entry per slot; ``None`` for an empty slot. Length == ``max_slots``."""

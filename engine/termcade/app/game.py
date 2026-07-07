@@ -16,22 +16,28 @@ from termcade.core.paths import app_dir
 from termcade.core.rng import Rng
 from termcade.core.saves import SaveBackend, SaveManager, SqliteBackend
 from termcade.core.settings import Settings, SettingsStore
+from termcade.core.state import GameState
 
 
 @dataclass
 class Game:
     game_id: str
     title: str
-    state_cls: type
+    state_cls: type[GameState]
     default_settings: Settings = field(default_factory=Settings)
     saves_enabled: bool = True
     max_slots: int = 6
     # Zero-arg callable returning the game's root Screen. Opaque here (UI-free).
     root_screen: Callable[[], Any] | None = None
+    # Absolute paths to the game's TCSS theme files; the engine app loads them app-wide.
+    theme_paths: list[Path] = field(default_factory=list)
 
 
 class GameContext:
-    """Runtime services handed to every screen. TUI-agnostic."""
+    """Runtime services handed to every screen, plus the game's current ``state``.
+
+    TUI-agnostic — built from ``core`` only.
+    """
 
     def __init__(
         self,
@@ -58,3 +64,6 @@ class GameContext:
         )
 
         self.rng = Rng(seed)
+
+        # The game's current live state (opaque GameState); set by the game on new-game/load.
+        self.state: GameState | None = None

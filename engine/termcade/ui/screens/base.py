@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
 from textual.screen import Screen
+
+from termcade.app.game import GameContext
+
+if TYPE_CHECKING:
+    from ..app import EngineApp
 
 
 class EngineScreen(Screen[None]):
     """Common base for every termcade screen.
 
-    A thin marker for now, so engine and game screens share one base type; typed
-    ``ctx`` access (the ``GameContext``) and helper dialogs (``show_message`` /
-    ``await confirm(...)``) land on it later.
+    Exposes the running :class:`GameContext` as ``self.ctx`` (settings, saves, rng, and the
+    game's current state). Helper dialogs (``show_message`` / ``await confirm(...)``) land
+    here later.
     """
+
+    @property
+    def ctx(self) -> GameContext:
+        ctx = cast("EngineApp", self.app).ctx
+        assert ctx is not None, "screen has no GameContext (running without a Game)"
+        return ctx
