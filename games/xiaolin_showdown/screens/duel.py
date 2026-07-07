@@ -28,7 +28,7 @@ from ..logic.models import Card, Player, remove_card_from_hand
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
 from ..logic.turn import bot_turn, max_hand_size, refill_hands
-from .format import stats_line
+from .format import char_stats, stats_line
 
 Option = tuple[str, object]
 
@@ -80,6 +80,13 @@ class DuelScreen(EngineScreen):
         await self._continue.wait()
         self.query_one("#duel-prompt", Static).update("")
 
+    async def _reveal_coin_toss(self, player_won: bool) -> None:
+        """Tied initiative — a coin toss decided priority; reveal it as a beat."""
+        who = "You win" if player_won else "The opponent wins"
+        await self.app.push_screen_wait(
+            ChoiceModal(f"Tied initiative — coin toss!  {who} priority.", [("Continue", None)])
+        )
+
     @work
     async def _run_showdown(self) -> None:
         state = cast(XiaolinState, self.ctx.state)
@@ -92,6 +99,8 @@ class DuelScreen(EngineScreen):
         while True:
             stage = await duel.advance()  # one phase; a choice phase raises its modal inline
             self._show_board(duel)
+            if stage == 2 and duel.duel.player_initiative == duel.duel.bot_initiative:
+                await self._reveal_coin_toss(duel.duel.player_priority is True)
             if stage == 0:  # the end phase (the loser's stakes change hands) has run
                 break
             await self._await_continue("Continue")
@@ -101,7 +110,7 @@ class DuelScreen(EngineScreen):
         # hands settle (which may flag the run over on the point limit). Skip once the pile is spent.
         if not state.has_ended:
             await self._discard_surplus(state, settings)
-            bot_turn(state, settings)
+            self.app.notify("\n".join(bot_turn(state, settings)), title="Opponent's turn")
             refill_hands(state, settings, rng=rng)
         self._leave()
 
@@ -185,25 +194,29 @@ def _won(duel: DuelState) -> str:
 
 
 def _board_text(duel: DuelState, state: XiaolinState) -> str:
-    stakes = duel.stakes.name if duel.stakes else "—"
+    prize = f"{duel.stakes.name} ({stats_line(duel.stakes.stats)})" if duel.stakes else "—"
     lines = [
         f"— {_PHASE_NAMES.get(duel.stage, '')} —",
         "",
-        f"Prize: {stakes}      Challenge: {(duel.challenge or '—').upper()}"
+        f"Prize: {prize}      Challenge: {(duel.challenge or '—').upper()}"
         f"      Background: {(duel.background or '—').upper()}",
         f"Initiative — P1 {duel.player_initiative}   P2 {duel.bot_initiative}",
         "",
-        _side_line("P1", state.player, duel.player_queue, duel.player_result),
-        _side_line("P2", state.bot, duel.bot_queue, duel.bot_result),
+        _side_line("P1", state.player, duel.player_queue, duel.player_result, leads=duel.player_priority is True),
+        _side_line("P2", state.bot, duel.bot_queue, duel.bot_result, leads=duel.player_priority is False),
     ]
     if duel.winner_character:
-        prize = "  (won the prize!)" if duel.card_won else ""
-        lines += ["", f"{_won(duel)} WINS!{prize}"]
+        won = "  (won the prize!)" if duel.card_won else ""
+        lines += ["", f"{_won(duel)} WINS!{won}"]
     return "\n".join(lines)
 
 
-def _side_line(label: str, player: Player, queue: list[Card], result: list[int]) -> str:
+def _side_line(label: str, player: Player, queue: list[Card], result: list[int], *, leads: bool) -> str:
     name = player.character.name.split("_")[0]
-    played = ", ".join(card.name for card in queue) or "—"
+    marker = " ✫" if leads else ""  # holds priority: names the challenge, breaks a tied duel
+    # a boost Wu keeps its ``boost`` power in the queue; a played Wu enters as an inert ``hand`` stand-in
+    boosts = [card.name for card in queue if card.power.trigger == "boost"]
+    played = [card.name for card in queue if card.power.trigger != "boost"] or ["—"]
+    cards = (f"boost {', '.join(boosts)} + " if boosts else "") + ", ".join(played)
     score = "/".join(str(value) for value in result) if result else "—"
-    return f"{label} {name}: {played}    →  {score}"
+    return f"{label}{marker} {name} (base {char_stats(player.character)}): {cards}    →  {score}"

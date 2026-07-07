@@ -215,6 +215,25 @@ def test_custom_settings_freeze_into_the_save(tmp_path):
     assert restored.starting_hand_player == 3
 
 
+def test_settings_clamp_impossible_values_to_a_playable_range():
+    # Whatever a player types on the Settings screen, a game must still be dealable.
+    s = XiaolinSettings(
+        max_hand_size=0,
+        starting_hand_player=0,
+        starting_hand_bot=0,
+        max_deck_size=1,
+        point_limit=0,
+        starting_points_player=99,
+        draw_limit=0,
+    )
+    assert s.max_hand_size == 1
+    assert s.starting_hand_player == 1 and s.starting_hand_bot == 1
+    assert s.point_limit == 2
+    assert s.starting_points_player == s.point_limit - 1  # capped below the point limit
+    assert s.draw_limit == 1
+    assert s.max_deck_size >= s.starting_hand_player + s.starting_hand_bot + 1  # deck fits both hands
+
+
 def test_final_score_cashes_leftover_hand_cards_when_the_pile_is_empty():
     cat = load_catalog()
     state = new_game(cat, Rng(1), _omi(cat))

@@ -1,4 +1,4 @@
-"""Look-up — pick one card (from your hand) or a character (you / opponent), then see its detail."""
+"""Look-up — pick a card (from either hand) or a character (you / opponent), then see its detail."""
 
 from __future__ import annotations
 
@@ -24,16 +24,18 @@ class LookUpScreen(EngineScreen):
     def __init__(self, kind: Kind) -> None:
         super().__init__()
         self._kind = kind
-        self._hand: list[Card] = []
+        self._cards: list[Card] = []
 
     def compose(self) -> ComposeResult:
         state = cast(XiaolinState, self.ctx.state)
         yield Header()
         if self._kind == "cards":
-            self._hand = state.player.inalienable_hand + state.player.hand
+            self._cards = state.player.whole_hand + state.bot.whole_hand
+            mine = len(state.player.whole_hand)  # first this many are the player's
             with BoxedPanel(title="LOOK UP — CHOOSE A CARD"):
-                for index, card in enumerate(self._hand):
-                    yield Button(f"{card.name}   {stats_line(card.stats)}", id=f"look-{index}")
+                for index, card in enumerate(self._cards):
+                    who = "You" if index < mine else "Opp"
+                    yield Button(f"{who}: {card.name}   {stats_line(card.stats)}", id=f"look-{index}")
         else:
             with BoxedPanel(title="LOOK UP — CHOOSE A CHARACTER"):
                 yield Button(f"You — {state.player.character.name}", id="look-player")
@@ -44,7 +46,7 @@ class LookUpScreen(EngineScreen):
         assert event.button.id is not None
         state = cast(XiaolinState, self.ctx.state)
         if self._kind == "cards":
-            card = self._hand[int(event.button.id.removeprefix("look-"))]
+            card = self._cards[int(event.button.id.removeprefix("look-"))]
             self.app.push_screen(DetailScreen(card, is_card=True))
         else:
             character = state.player.character if event.button.id == "look-player" else state.bot.character

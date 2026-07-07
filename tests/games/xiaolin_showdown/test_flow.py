@@ -176,6 +176,51 @@ async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):
         assert not app.ctx.state.player.deck
 
 
+async def test_reaching_the_point_limit_ends_the_game_instead_of_dueling(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test() as pilot:
+        await _new_game_at_vault(app, pilot)
+        app.ctx.state.player.points = 999  # already past the point limit
+
+        await pilot.press("g")  # try Gong Yi Tanpai
+        await pilot.pause()
+
+        assert isinstance(app.screen, OutcomeScreen)  # the run ends now, no extra duel
+
+
+async def test_depositing_a_power_wu_asks_to_confirm_first(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(100, 50)) as pilot:  # tall enough that every card button is on-screen
+        await _new_game_at_vault(app, pilot)
+        bras = deepcopy(next(c for c in app.ctx.state.catalog.cards if c.name == "Bras Finger"))
+        app.ctx.state.player.hand.append(bras)  # a deposit-power Wu
+
+        await pilot.press("d")  # deposit
+        await pilot.pause()
+        await pilot.click(f"#dep-{len(app.ctx.state.player.hand) - 1}")  # pick the power Wu
+        await pilot.pause()
+        assert isinstance(app.screen, ChoiceModal)  # forfeit-the-power confirmation
+
+        await pilot.click("#opt-1")  # "No, keep it"
+        await pilot.pause()
+        assert any(card is bras for card in app.ctx.state.player.hand)  # kept, not banked
+
+
+async def test_look_up_can_inspect_the_opponents_cards(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(100, 50)) as pilot:  # both hands listed — keep every button on-screen
+        await _new_game_at_vault(app, pilot)
+        await pilot.press("c")  # look up cards
+        await pilot.pause()
+        assert isinstance(app.screen, LookUpScreen)
+
+        state = app.ctx.state
+        last = len(state.player.whole_hand) + len(state.bot.whole_hand) - 1  # the last is an opponent card
+        await pilot.click(f"#look-{last}")
+        await pilot.pause()
+        assert isinstance(app.screen, DetailScreen)  # opponent card detail opens
+
+
 async def test_game_over_shows_the_outcome_and_can_play_again(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test() as pilot:

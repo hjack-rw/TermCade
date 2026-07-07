@@ -67,13 +67,22 @@ def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettin
         _draw_from_main(state, player)
 
 
-def bot_turn(state: XiaolinState, settings: XiaolinSettings) -> None:
-    """The bot's between-showdown vault turn.
+def bot_turn(state: XiaolinState, settings: XiaolinSettings) -> list[str]:
+    """The bot's between-showdown vault turn; returns a short log of what it did, for the player.
 
-    Up to ``deposit_limit`` actions: first swap each ``deposit``/+1 Wu for a fresh draw, then cash
-    plain ``deposit``/0 Wu for their points. This is how the bot banks points toward the win — the
-    player already deposits from the vault menu. No draw is attempted once the pile is empty.
+    It deposits (see :func:`_bot_deposits` — how it banks points toward the win) then refills one
+    card toward the hand limit from its own deck, since it has no manual Draw as the player does.
     """
+    log = _bot_deposits(state, settings)
+    _bot_refill(state, settings)
+    return log or [f"{state.bot.character.name.split('_')[0]} passed"]
+
+
+def _bot_deposits(state: XiaolinState, settings: XiaolinSettings) -> list[str]:
+    """Up to ``deposit_limit`` deposits: swap each ``deposit``/+1 Wu for a fresh draw, then cash
+    plain ``deposit``/0 Wu for their points."""
+    name = state.bot.character.name.split("_")[0]
+    log: list[str] = []
     deposits = 0
 
     for card in list(state.bot.whole_hand):  # snapshot: the hand mutates as cards leave
@@ -83,6 +92,7 @@ def bot_turn(state: XiaolinState, settings: XiaolinSettings) -> None:
             _draw_from_main(state, state.bot)  # trade the power card for a fresh one
             remove_card_from_hand(state.bot, card)
             deposits += 1
+            log.append(f"{name} played {card.name} and drew a Wu")
 
     for card in list(state.bot.whole_hand):
         if deposits >= settings.deposit_limit:
@@ -91,6 +101,14 @@ def bot_turn(state: XiaolinState, settings: XiaolinSettings) -> None:
             state.bot.points += card.points
             remove_card_from_hand(state.bot, card)
             deposits += 1
+            log.append(f"{name} deposited {card.name} for {card.points} pt{'s' if card.points != 1 else ''}")
+    return log
+
+
+def _bot_refill(state: XiaolinState, settings: XiaolinSettings) -> None:
+    """Quietly recover one shed card from the bot's personal deck (it has no manual Draw)."""
+    if state.bot.deck and len(state.bot.whole_hand) < max_hand_size(state.bot, settings.max_hand_size):
+        state.bot.hand.append(state.bot.deck.pop(0))
 
 
 def max_hand_size(player: Player, base: int) -> int:

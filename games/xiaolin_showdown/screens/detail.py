@@ -42,4 +42,6 @@ class DetailScreen(EngineScreen):
                 yield Static(f"Power: {power.name}  ({trigger_label(power)})", classes="power")
                 if power.description:
                     yield Static(power.description, classes="description")
+            if power.initiative_bonus:
+                yield Static(f"Initiative bonus: {power.initiative_bonus:+d}", classes="power")
         yield Footer()

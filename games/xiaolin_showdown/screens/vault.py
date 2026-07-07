@@ -69,6 +69,15 @@ class VaultScreen(EngineScreen):
         yield Footer()
 
     def action_gong_yi_tanpai(self) -> None:
+        state = cast(XiaolinState, self.ctx.state)
+        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
+        if state.has_ended or max(state.player.points, state.bot.points) >= settings.point_limit:
+            state.has_ended = True  # someone already reached the point limit — end now, no more duels
+            from .outcome import OutcomeScreen
+
+            self.app.switch_screen(OutcomeScreen())
+            return
+
         from .duel import DuelScreen  # lazy: DuelScreen returns here, so a top import would cycle
 
         self.app.switch_screen(DuelScreen())

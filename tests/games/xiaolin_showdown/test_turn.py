@@ -122,3 +122,23 @@ def test_bot_turn_stops_at_the_deposit_limit():
 
     assert state.bot.points == 2  # only one deposit, though three Wu could be cashed
     assert len(bot.hand) == 2
+
+
+def test_bot_turn_recovers_one_card_from_its_own_deck():
+    bot = _player(2, deck=2)  # under the limit, with cards shelved in its personal deck
+    state = _state(_player(3), bot, main=0)
+
+    bot_turn(state, _SETTINGS)  # nothing to deposit — it just tops up (it has no manual Draw)
+
+    assert len(bot.hand) == 3
+    assert len(bot.deck) == 1
+
+
+def test_bot_turn_reports_what_it_did():
+    idle = _state(_player(3), _player(3))  # nothing to deposit, empty deck
+    assert bot_turn(idle, _SETTINGS) == ["C passed"]
+
+    banker = _player(2)
+    banker.hand.append(_card(trigger="deposit", effect=0, points=3))
+    log = bot_turn(_state(_player(3), banker, main=5), _SETTINGS)
+    assert any("deposited" in line for line in log)

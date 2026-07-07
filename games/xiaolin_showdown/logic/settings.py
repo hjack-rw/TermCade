@@ -28,6 +28,20 @@ class XiaolinSettings:
     deposit_limit: int = 1
     empty_draw_limit: int = 3
 
+    def __post_init__(self) -> None:
+        """Clamp player-entered values to a playable range, so an edited Settings screen can never
+        deal a broken game (e.g. a deck smaller than the two hands, or a zero-card hand)."""
+        clamp = object.__setattr__  # the dataclass is frozen; this is the sanctioned way to write
+        clamp(self, "point_limit", max(2, self.point_limit))
+        for hand in ("max_hand_size", "starting_hand_player", "starting_hand_bot"):
+            clamp(self, hand, max(1, getattr(self, hand)))
+        for limit in ("draw_limit", "deposit_limit", "empty_draw_limit"):
+            clamp(self, limit, max(1, getattr(self, limit)))
+        for points in ("starting_points_player", "starting_points_bot"):
+            clamp(self, points, max(0, min(getattr(self, points), self.point_limit - 1)))
+        min_deck = self.starting_hand_player + self.starting_hand_bot + 1
+        clamp(self, "max_deck_size", max(self.max_deck_size, min_deck))
+
     @classmethod
     def from_settings(cls, settings: Settings) -> "XiaolinSettings":
         """Read the values out of an engine ``Settings``' ``options`` (defaults fill any gaps)."""
