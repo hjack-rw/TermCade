@@ -1,0 +1,80 @@
+/* Xiaolin Showdown theme — layout for the game's screens (loaded app-wide via the Game). */
+
+/* --- Start --------------------------------------------------------------- */
+StartScreen {
+    align: center middle;
+}
+#start-root {
+    width: auto;
+    height: auto;
+}
+#start-root #title,
+#start-root .subtitle {
+    width: 100%;
+    text-align: center;
+}
+#start-root BoxedPanel {
+    margin-top: 2;
+}
+
+/* --- Vault --------------------------------------------------------------- */
+VaultScreen {
+    align: center top;
+}
+VaultScreen > BoxedPanel {
+    width: 84%;
+    margin: 1 0 0 0;
+}
+VaultScreen > #hands {
+    width: 84%;
+    height: auto;
+    margin: 1 0 0 0;
+}
+#hands > BoxedPanel {
+    width: 1fr;
+    margin: 0 1;
+}
+#points {
+    margin-bottom: 1;
+}
+
+/* --- Settings ------------------------------------------------------------ */
+SettingsScreen {
+    align: center middle;
+}
+SettingsScreen BoxedPanel {
+    height: auto;
+    max-height: 90%;
+    overflow-y: auto;
+}
+SettingsScreen .setting-row {
+    height: 1;
+    width: auto;
+}
+SettingsScreen .setting-label {
+    width: 26;
+    height: 1;
+    content-align: left middle;
+}
+SettingsScreen Input {
+    width: 12;
+    height: 1;
+    border: none;
+    background: $boost;
+}
+SettingsScreen #save {
+    margin-top: 1;
+}
+
+/* --- Rules --------------------------------------------------------------- */
+RulesScreen {
+    align: center middle;
+}
+RulesScreen BoxedPanel {
+    width: 72;
+    height: auto;
+}
+RulesScreen Static {
+    width: 100%;
+    padding: 1 1 0 1;
+}
