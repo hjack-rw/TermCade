@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "termcade"
+version = "0.0.1"
+description = "Reusable Textual TUI engine for terminal games (engine = the cabinet, games = cartridges)."
+requires-python = ">=3.12"
+dependencies = ["textual>=0.80"]
+
+[project.optional-dependencies]
+serve = ["textual-web"]
+dev = ["pytest", "pytest-asyncio", "textual-dev", "ruff", "mypy"]
+
+[project.scripts]
+termcade = "termcade.__main__:main"
+xiaolin = "xiaolin_showdown.__main__:main"
+
+# Monorepo: engine package + games as separate top-level packages in one wheel.
+[tool.hatch.build.targets.wheel]
+packages = ["engine/termcade", "games/xiaolin_showdown"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.12"
+# Core must stay clean; relax nothing here until it hurts.
+warn_unused_ignores = true
+warn_redundant_casts = true

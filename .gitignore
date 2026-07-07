@@ -1,0 +1,28 @@
+# Python bytecode & caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+.venv/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Packaging & build artifacts
+*.egg-info/
+dist/
+build/
+
+# Runtime data (TERMCADE_DATA_DIR — saves & settings)
+/data/
+
+# OS cruft
+.DS_Store
+
+# Local, kept out of the repo
+.claude/
+docs/
+CLAUDE.md
