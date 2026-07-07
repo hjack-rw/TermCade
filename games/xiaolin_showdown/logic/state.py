@@ -30,6 +30,7 @@ class XiaolinState:
     previous_challenge: list[str] = field(default_factory=list)
     previous_background: list[str] = field(default_factory=list)
     has_ended: bool = False
+    deposit_counter: int = 0  # deposits used this turn (reset by the duel end phase)
 
     schema_version: int = 1
 
@@ -42,6 +43,7 @@ class XiaolinState:
             "previous_challenge": list(self.previous_challenge),
             "previous_background": list(self.previous_background),
             "has_ended": self.has_ended,
+            "deposit_counter": self.deposit_counter,
         }
 
     @classmethod
@@ -55,6 +57,7 @@ class XiaolinState:
             previous_challenge=list(data["previous_challenge"]),
             previous_background=list(data["previous_background"]),
             has_ended=data["has_ended"],
+            deposit_counter=data.get("deposit_counter", 0),
         )
 
 

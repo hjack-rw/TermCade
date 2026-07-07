@@ -10,8 +10,10 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 from termcade.core.saves import SaveManager, SqliteBackend
 
+from xiaolin_showdown.logic.actions import can_deposit, deposit
+from xiaolin_showdown.logic.bot import choose_background, choose_card, choose_challenge
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.mechanics import initiative
+from xiaolin_showdown.logic.mechanics import count_end_stats, initiative
 from xiaolin_showdown.logic.models import Card, Character, Player, Power
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
@@ -83,6 +85,88 @@ def test_snapshot_round_trips_through_savemanager(tmp_path):
     assert loaded.player.character.id == state.player.character.id
     assert loaded.bot.character.id == state.bot.character.id
     assert meta.schema_version == state.schema_version
+
+
+def _card(force, agility, intellect, element="metal", *, trigger="hand", effect=0):
+    stats = {"force": force, "agility": agility, "intellect": intellect}
+    return Card(0, "", stats, Power(0, "", trigger, effect, ""), element, "wudai", 0)
+
+
+_NO_STATS = {"force": 0, "agility": 0, "intellect": 0}
+_STATS = ["force", "agility", "intellect"]
+_ELEMENTS = ["water", "fire", "wind", "earth", "metal"]
+
+
+def test_bot_picks_the_challenge_where_it_is_strongest():
+    strong_force = {"force": 5, "agility": 1, "intellect": 1}
+    hand = [_card(3, 0, 0)]  # a card that boosts force
+    assert choose_challenge(strong_force, _STATS, hand, _NO_STATS, Rng(1)) == "force"
+
+
+def test_bot_plays_the_strongest_card_for_the_challenge():
+    weak, strong = _card(1, 0, 0), _card(5, 0, 0)
+    chosen = choose_card(_NO_STATS, "force", "metal", [weak, strong], _NO_STATS, Rng(1))
+    assert chosen is strong
+
+
+def test_bot_background_favours_its_own_boosting_element():
+    strong_force = {"force": 5, "agility": 0, "intellect": 0}
+    bot_hand = [_card(3, 0, 0, "water")]
+    player_hand = [_card(0, 0, 0, "fire")]
+    chosen = choose_background(strong_force, _ELEMENTS, (bot_hand, player_hand), _NO_STATS, Rng(1))
+    assert chosen == "water"
+
+
+def test_count_end_stats_adds_base_and_queued_card_stats():
+    queue = [_card(2, 0, 0), _card(3, 0, 0)]
+    char = {"force": 5, "agility": 5, "intellect": 2}
+    assert count_end_stats("force", 0, queue, char, "metal") == 5 + 2 + 3
+
+
+def test_count_end_stats_counts_none_stats_as_zero():
+    queue = [_card(None, None, None)]  # a non-combat card
+    assert count_end_stats("force", 0, queue, {"force": 3, "agility": 0, "intellect": 0}, "metal") == 3
+
+
+def test_count_end_stats_absolute_false_ignores_negatives():
+    queue = [_card(-4, 0, 0)]
+    char = {"force": 5, "agility": 0, "intellect": 0}
+    assert count_end_stats("force", 0, queue, char, "metal", absolute=True) == 1
+    assert count_end_stats("force", 0, queue, char, "metal", absolute=False) == 5
+
+
+def test_count_end_stats_elemental_bonus_rewards_match_penalises_opposite():
+    same = [_card(0, 0, 0, "water")]
+    opposite = [_card(0, 0, 0, "fire")]  # fire is water's opposite
+    assert count_end_stats("force", 2, same, _NO_STATS, "water") == 2
+    assert count_end_stats("force", 2, opposite, _NO_STATS, "water") == -2
+
+
+def test_serpents_tail_play_card_cancels_the_elemental_bonus():
+    queue = [_card(0, 0, 0, "water"), _card(0, 0, 0, "water", trigger="play", effect=-1)]
+    # without the cancel this would be 2 * (1 + 1) = 4; the play/−1 card forces it to 0
+    assert count_end_stats("force", 2, queue, _NO_STATS, "water") == 0
+
+
+def test_deposit_cashes_a_card_for_its_points():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    card = state.player.hand[0]
+    points_before = state.player.points
+
+    deposit(state, card)
+
+    assert state.player.points == points_before + card.points
+    assert card not in state.player.hand
+    assert state.deposit_counter == 1
+
+
+def test_can_deposit_respects_the_turn_limit():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    assert can_deposit(state, 1) is True
+    state.deposit_counter = 1
+    assert can_deposit(state, 1) is False
 
 
 def test_initiative_keeps_own_positives_and_inherits_opponent_negatives():

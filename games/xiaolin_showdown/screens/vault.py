@@ -16,14 +16,24 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel
 
+from ..logic.actions import can_deposit
 from ..logic.mechanics import initiative
 from ..logic.models import Player
+from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
+from .deposit import DepositScreen
 from .format import affiliation_icon, char_stats, hands_lines
+from .lookup import LookUpScreen
 
 
 class VaultScreen(EngineScreen):
-    BINDINGS = [("s", "save_game", "Save"), ("escape", "app.pop_screen", "Menu")]
+    BINDINGS = [
+        ("d", "deposit", "Deposit"),
+        ("c", "lookup_cards", "Cards"),
+        ("h", "lookup_characters", "Characters"),
+        ("s", "save_game", "Save"),
+        ("escape", "app.pop_screen", "Menu"),
+    ]
 
     def compose(self) -> ComposeResult:
         state = cast(XiaolinState, self.ctx.state)
@@ -49,10 +59,23 @@ class VaultScreen(EngineScreen):
             yield _hand_panel(bot.character.name, bot_rows)
 
         with BoxedPanel(title="ACTIONS"):
-            yield Static("1. Gong Yi Tanpai!   (duel — coming soon)", classes="disabled")
-            yield Static("S. Save game        Esc. Return to menu")
+            yield Static("Gong Yi Tanpai! — duel (coming soon)", classes="disabled")
+            yield Static("D. Deposit a card    C. Look up cards    H. Look up characters")
+            yield Static("S. Save game         Esc. Return to menu")
 
         yield Footer()
+
+    def action_deposit(self) -> None:
+        state = cast(XiaolinState, self.ctx.state)
+        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
+        if can_deposit(state, settings.deposit_limit):
+            self.app.push_screen(DepositScreen())
+
+    def action_lookup_cards(self) -> None:
+        self.app.push_screen(LookUpScreen("cards"))
+
+    def action_lookup_characters(self) -> None:
+        self.app.push_screen(LookUpScreen("characters"))
 
     def action_save_game(self) -> None:
         state = cast(XiaolinState, self.ctx.state)

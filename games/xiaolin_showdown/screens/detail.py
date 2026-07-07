@@ -1,0 +1,45 @@
+"""Detail screen — one card's or character's full info (ported from ``more__info``)."""
+
+from __future__ import annotations
+
+from textual.app import ComposeResult
+from textual.widgets import Footer, Header, Static
+
+from termcade.ui.screens.base import EngineScreen
+from termcade.ui.widgets import BoxedPanel
+
+from ..logic.models import Card, Character
+from .format import card_name_text, char_stats, stats_line, trigger_label
+
+
+class DetailScreen(EngineScreen):
+    BINDINGS = [("escape", "app.pop_screen", "Back")]
+
+    def __init__(self, target: Card | Character, *, is_card: bool) -> None:
+        super().__init__()
+        self._target = target
+        self._is_card = is_card
+
+    def compose(self) -> ComposeResult:
+        target = self._target
+        power = target.power
+        yield Header()
+        with BoxedPanel(title=target.name.upper().replace("_", " ")):
+            if isinstance(target, Card):
+                yield Static(card_name_text(target))
+                yield Static(
+                    f"Element: {target.element.capitalize()}    "
+                    f"Type: {target.type.capitalize()}    Points: {target.points}"
+                )
+                yield Static(f"Stats (F/A/I): {stats_line(target.stats)}")
+            else:
+                yield Static(f"Affiliation: {target.affiliation.capitalize()}")
+                yield Static(f"Stats (F/A/I): {char_stats(target)}")
+
+            # An inalienable player Wu (power id −5..−1) keeps its power hidden, like the reference.
+            hidden = self._is_card and -5 < power.id < 0
+            if power.id and not hidden:
+                yield Static(f"Power: {power.name}  ({trigger_label(power)})", classes="power")
+                if power.description:
+                    yield Static(power.description, classes="description")
+        yield Footer()

@@ -8,9 +8,19 @@ from textual.widgets import Input
 
 from xiaolin_showdown.game import build_game
 from xiaolin_showdown.screens.character_select import CharacterSelectScreen
+from xiaolin_showdown.screens.detail import DetailScreen
+from xiaolin_showdown.screens.lookup import LookUpScreen
 from xiaolin_showdown.screens.rules import RulesScreen
 from xiaolin_showdown.screens.start import StartScreen
 from xiaolin_showdown.screens.vault import VaultScreen
+
+
+async def _new_game_at_vault(app, pilot):
+    """Boot → Play → pick Omi → land on the vault."""
+    await pilot.click("#play")
+    await pilot.pause()
+    await pilot.click("#char-1")
+    await pilot.pause()
 
 
 async def test_boots_to_start_screen(tmp_path):
@@ -68,6 +78,37 @@ async def test_save_then_continue_restores_the_hand(tmp_path):
         await pilot.pause()
         assert isinstance(app.screen, VaultScreen)
         assert [card.id for card in app.ctx.state.player.hand] == saved_hand
+
+
+async def test_lookup_picks_a_card_and_shows_its_detail(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test() as pilot:
+        await _new_game_at_vault(app, pilot)
+        await pilot.press("c")  # Look up cards -> pick list
+        await pilot.pause()
+        assert isinstance(app.screen, LookUpScreen)
+
+        await pilot.click("#look-0")  # pick the first card
+        await pilot.pause()
+        assert isinstance(app.screen, DetailScreen)
+
+
+async def test_deposit_banks_a_card_for_points(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test() as pilot:
+        await _new_game_at_vault(app, pilot)
+        hand_before = len(app.ctx.state.player.hand)
+        points_before = app.ctx.state.player.points
+        gained = app.ctx.state.player.hand[0].points
+
+        await pilot.press("d")  # Deposit
+        await pilot.pause()
+        await pilot.click("#dep-0")  # cash the first card, back to the vault
+        await pilot.pause()
+
+        assert isinstance(app.screen, VaultScreen)
+        assert len(app.ctx.state.player.hand) == hand_before - 1
+        assert app.ctx.state.player.points == points_before + gained
 
 
 async def test_settings_change_flows_into_a_new_game(tmp_path):

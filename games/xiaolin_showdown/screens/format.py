@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from ..logic.models import Card, Character
+from rich.text import Text
+
+from ..logic.models import Card, Character, Power
 
 # element -> Rich colour (reference used bright ANSI 94/91/93/92/37)
 COLORS = {
@@ -56,6 +58,23 @@ def card_markup(card: Card) -> str:
     colour = COLORS.get(card.element, "white")
     icon = ICONS.get(card.type, "")
     return f"[{colour}]{card.name}[/]  {stats_line(card.stats)}  {icon}"
+
+
+def power_label(item: Card | Character) -> str:
+    """The power's name, or an em-dash for the blank/no-op power (power id 0)."""
+    return item.power.name if item.power.id else "—"
+
+
+def card_name_text(card: Card) -> Text:
+    """The card's name as element-coloured Rich text."""
+    return Text(card.name, style=COLORS.get(card.element, "white"))
+
+
+def trigger_label(power: Power) -> str:
+    """When a power fires, e.g. ``On Play`` — or ``? ? ?`` for a hidden deposit power."""
+    if power.trigger == "deposit" and power.effect == 0:
+        return "? ? ?"
+    return f"On {power.trigger.capitalize()}"
 
 
 _STAT_KEYS = ("force", "agility", "intellect")

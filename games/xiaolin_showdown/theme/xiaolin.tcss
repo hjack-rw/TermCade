@@ -66,6 +66,47 @@ SettingsScreen #save {
     margin-top: 1;
 }
 
+/* --- Look-up (pick a card / character) ----------------------------------- */
+LookUpScreen {
+    align: center middle;
+}
+LookUpScreen BoxedPanel {
+    width: 48;
+    height: auto;
+    max-height: 90%;
+    overflow-y: auto;
+    padding: 1 2;
+}
+LookUpScreen Button {
+    width: 100%;
+    margin: 1 0;
+}
+
+/* --- Detail -------------------------------------------------------------- */
+DetailScreen {
+    align: center middle;
+}
+DetailScreen BoxedPanel {
+    width: 64;
+    height: auto;
+}
+DetailScreen Static {
+    width: 100%;
+}
+DetailScreen .description {
+    color: $text-muted;
+}
+
+/* --- Deposit ------------------------------------------------------------- */
+DepositScreen {
+    align: center middle;
+}
+DepositScreen BoxedPanel {
+    height: auto;
+    max-height: 90%;
+    overflow-y: auto;
+}
+
 /* --- Rules --------------------------------------------------------------- */
 RulesScreen {
     align: center middle;
