@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path, PurePath
 
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.timer import Timer
 from textual.widgets import Footer, Header, Static
@@ -43,7 +44,12 @@ class TooSmallScreen(EngineScreen):
     the only instruction that always makes sense."""
 
     def compose(self) -> ComposeResult:
-        yield Static("Window too small.\n\nMake it bigger to play.", id="too-small")
+        # Both levers: a bigger window adds rows only up to the screen; a smaller font is what
+        # actually fits more rows in a maxed terminal (or zooms out the browser).
+        yield Static(
+            "Window too small.\n\nMake it bigger — or shrink the font (Ctrl+minus).",
+            id="too-small",
+        )
 
 
 class EngineApp(App[None]):
@@ -56,6 +62,17 @@ class EngineApp(App[None]):
     """
 
     TITLE = "TERMCADE"
+
+    # Keyboard navigation for every screen and modal. Tab is a *toggle* into "focus mode" — press it
+    # once to highlight the first option, again to step back out (no option highlighted); up/down move
+    # within the mode. Tab is `priority` so it overrides Textual's built-in Screen tab binding (plain
+    # focus-next) app-wide, modals included. Arrows are app-level, so they yield to a widget that uses
+    # the key itself (an Input keeps its own cursor). All hidden from the footer to keep it uncluttered.
+    BINDINGS = [
+        Binding("tab", "toggle_focus", "Focus", show=False, priority=True),
+        Binding("up", "focus_previous", "Previous", show=False),
+        Binding("down", "focus_next", "Next", show=False),
+    ]
 
     def __init__(
         self,
@@ -84,6 +101,14 @@ class EngineApp(App[None]):
             self.push_screen(self.game.root_screen())
         else:
             self.push_screen(HelloScreen())
+
+    def action_toggle_focus(self) -> None:
+        """Tab toggles keyboard-nav mode: focus the first option if nothing is focused, or clear focus
+        (step out of the mode) if something already is."""
+        if self.screen.focused is None:
+            self.screen.focus_next()
+        else:
+            self.screen.set_focus(None)
 
     def on_resize(self) -> None:
         # A drag-resize fires a burst of events; coalesce to one check after it settles, so we never

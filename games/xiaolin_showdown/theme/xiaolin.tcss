@@ -20,17 +20,13 @@ StartScreen {
 }
 #start-root #title,
 #start-root .subtitle {
-    width: 100%;  /* fill the root (the menu's width) so text-align can centre the text over the menu */
-    text-align: center;
+    width: auto;  /* fit the ASCII wordmark; the Center wrapper handles the horizontal centring */
 }
 #start-root BoxedPanel {
     margin-top: 2;
 }
 
 /* --- Vault --------------------------------------------------------------- */
-VaultScreen {
-    align: center top;
-}
 VaultScreen > BoxedPanel {
     width: 84%;
     margin: 1 0 0 0;
@@ -64,9 +60,6 @@ VaultScreen > #hands {
 }
 
 /* --- Settings ------------------------------------------------------------ */
-SettingsScreen {
-    align: center middle;
-}
 SettingsScreen BoxedPanel {
     width: 44;  /* wider than the rows so align-horizontal has room to centre them */
     height: auto;
@@ -94,9 +87,6 @@ SettingsScreen #save {
 }
 
 /* --- Look-up (pick a card / character) ----------------------------------- */
-LookUpScreen {
-    align: center middle;
-}
 LookUpScreen BoxedPanel {
     width: 48;
     height: auto;
@@ -111,9 +101,6 @@ LookUpScreen Button {
 }
 
 /* --- Character select ---------------------------------------------------- */
-CharacterSelectScreen {
-    align: center middle;
-}
 CharacterSelectScreen BoxedPanel {
     align-horizontal: center;  /* centre the uniform-width character buttons */
 }
@@ -130,9 +117,6 @@ CharacterSelectScreen Button {
 .elem-metal { color: #ced4da; }
 
 /* --- Use a Power (pick a Wu to spend) ------------------------------------ */
-UsePowerScreen {
-    align: center middle;
-}
 UsePowerScreen BoxedPanel {
     width: 52;
     height: auto;
@@ -146,9 +130,6 @@ UsePowerScreen Button {
 }
 
 /* --- Detail -------------------------------------------------------------- */
-DetailScreen {
-    align: center middle;
-}
 DetailScreen BoxedPanel {
     width: 64;
     height: auto;
@@ -163,19 +144,14 @@ DetailScreen .description {
 }
 
 /* --- Deposit ------------------------------------------------------------- */
-DepositScreen {
-    align: center middle;
-}
 DepositScreen BoxedPanel {
     height: auto;
     max-height: 90%;
     overflow-y: auto;
+    align-horizontal: center;  /* centre the auto-width card buttons under the centred "Choose a card" */
 }
 
 /* --- Rules --------------------------------------------------------------- */
-RulesScreen {
-    align: center middle;
-}
 RulesScreen BoxedPanel {
     width: 72;
     height: auto;
@@ -186,9 +162,6 @@ RulesScreen Static {
 }
 
 /* --- Duel ---------------------------------------------------------------- */
-DuelScreen {
-    align: center top;
-}
 DuelScreen > BoxedPanel {
     width: 84%;
     height: auto;
@@ -227,9 +200,6 @@ ChoiceModal .modal-prompt {
 }
 
 /* --- Outcome ------------------------------------------------------------- */
-OutcomeScreen {
-    align: center middle;
-}
 OutcomeScreen BoxedPanel {
     width: 48;
     height: auto;

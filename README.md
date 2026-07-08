@@ -6,7 +6,14 @@ The engine layers with a one-directional purity boundary — `core` (TUI-agnosti
 
 ## Games
 
-- **Xiaolin Showdown** — Terminal Deck builder. Pick a Character and duel a Bot across a seven-phase showdown: commit stakes, name the Challenge stat and elemental Background, play your Cards, and race to the Point limit. Only the winner gets the Shen Gong Wu!
+- **Xiaolin Showdown** — Terminal Deck builder. Pick a Character and duel a Bot across a seven-phase showdown: commit stakes, name the Challenge stat and elemental Background, play your cards, and race to the Point limit. Only the winner gets the Shen Gong Wu!
+
+![The menu](screenshots/menu.png)
+![The vault board](screenshots/board.png)
+
+**Under the hood:** characters and Shen Gong Wu carry Force / Agility / Intellect stats, an element, and per-card Powers (deposit / hand / play triggers). The bot names its Challenge stat, elemental Background, and cards by weighing stat deltas against you, with elemental counter-play. All card and game data lives in a bundled SQLite database (`xs_game.db`).
+
+**Controls:** click any option, or drive it from the keyboard — **Tab** enters focus mode (highlights the first option; press Tab again to leave it), then **↑ / ↓** move the highlight and **Enter** selects. In-game actions also have single-key shortcuts, shown along the footer.
 
 ## Play — no terminal, no Docker
 

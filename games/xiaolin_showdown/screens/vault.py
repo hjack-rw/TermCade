@@ -32,13 +32,13 @@ from .use_power import UsePowerScreen
 
 class VaultScreen(EngineScreen):
     BINDINGS = [
-        ("g", "gong_yi_tanpai", "Duel"),
-        ("p", "use_power", "Power"),
-        ("d", "deposit", "Deposit"),
-        ("w", "draw", "Draw"),
-        ("c", "lookup_cards", "Cards"),
-        ("h", "lookup_characters", "Characters"),
-        ("s", "save_game", "Save"),
+        ("1", "gong_yi_tanpai", "Duel"),
+        ("2", "draw", "Draw"),
+        ("3", "deposit", "Deposit"),
+        ("4", "use_power", "Power"),
+        ("5", "lookup_cards", "Cards"),
+        ("6", "lookup_characters", "Characters"),
+        ("0", "save_game", "Save"),
         ("escape", "app.pop_screen", "Menu"),
     ]
 
@@ -63,11 +63,11 @@ class VaultScreen(EngineScreen):
             yield _hand_panel(bot.character.name, bot_rows)
 
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        available = {
-            "G": not state.has_ended,
-            "P": bool(usable_powers(state, settings.deposit_limit)),
-            "D": can_deposit(state, settings.deposit_limit),
-            "W": can_draw(state, settings),
+        available = {  # keyed by the shown number so greying matches the labels in _ACTIONS
+            "1": not state.has_ended,
+            "2": can_draw(state, settings),
+            "3": can_deposit(state, settings.deposit_limit),
+            "4": bool(usable_powers(state, settings.deposit_limit)),
         }
         with BoxedPanel(title="ACTIONS"):
             yield Static(_actions_grid(available), id="actions")
@@ -132,13 +132,13 @@ class VaultScreen(EngineScreen):
 
 # Vault actions, laid out row-major into three columns that fill the panel (see _actions_grid).
 _ACTIONS = [
-    'G. "Gong Yi Tanpai!"',
-    "W. Draw a Card",
-    "D. Deposit a Card",
-    "P. Use a Power",
-    "C. Look up Cards",
-    "H. Look up Characters",
-    "S. Save game",
+    '1. "Gong Yi Tanpai!"',
+    "2. Draw a Card",
+    "3. Deposit a Card",
+    "4. Use a Power",
+    "5. Look up Cards",
+    "6. Look up Characters",
+    "0. Save game",
     "Esc. Return to menu",
 ]
 

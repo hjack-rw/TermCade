@@ -20,8 +20,10 @@ class EngineScreen(Screen[None]):
     here later.
     """
 
-    # Don't auto-focus the first widget — no option should look pre-selected on a fresh screen.
-    AUTO_FOCUS = None
+    # Don't auto-focus the first widget — no option should look pre-selected on a fresh screen. This
+    # must be "" (not None): Textual reads AUTO_FOCUS=None as "inherit the app default", which is "*"
+    # (focus the first focusable); only the empty string truly disables auto-focus.
+    AUTO_FOCUS = ""
 
     @property
     def ctx(self) -> GameContext:

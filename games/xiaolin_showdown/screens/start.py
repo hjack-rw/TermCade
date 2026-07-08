@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Center, Vertical
 from textual.widgets import Button, Footer, Header, Static
 
+from termcade.ui.app import BANNER
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel
 
+from ._logo import SUBTITLE_ART, TITLE_ART
 from .character_select import CharacterSelectScreen
 from .rules import RulesScreen
 from .settings import SettingsScreen
@@ -20,14 +22,19 @@ class StartScreen(EngineScreen):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="start-root"):
-            yield Static("XIAOLIN SHOWDOWN", id="title")
-            yield Static("The Fangame", classes="subtitle")
-            with BoxedPanel(title="MENU"):
-                yield Button("Play", id="play", variant="primary")
-                yield Button("Continue", id="continue")
-                yield Button("Rules", id="rules")
-                yield Button("Settings", id="settings")
-                yield Button("Quit", id="quit")
+            with Center():
+                yield Static(BANNER, id="banner")
+            with Center():
+                yield Static(TITLE_ART, id="title")
+            with Center():
+                yield Static(SUBTITLE_ART, classes="subtitle")
+            with Center():
+                with BoxedPanel(title="MENU"):
+                    yield Button("Play", id="play", variant="primary")
+                    yield Button("Continue", id="continue")
+                    yield Button("Rules", id="rules")
+                    yield Button("Settings", id="settings")
+                    yield Button("Quit", id="quit")
         yield Static(f"v{self.game.version}", id="version")
         yield Footer()
 

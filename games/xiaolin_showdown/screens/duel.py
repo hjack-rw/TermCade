@@ -40,6 +40,11 @@ class ChoiceModal(ModalScreen[object]):
     """A list of buttons; dismisses with the value behind the chosen one. With ``title`` set, that is
     the border label and ``prompt`` shows inside; otherwise ``prompt`` is the border label itself."""
 
+    # No pre-selected option on open — same rule as EngineScreen, but ModalScreen doesn't inherit it.
+    # Must be "" (not None): None makes Textual fall back to the app's "*" and auto-focus the first
+    # button; the empty string is what actually leaves the modal un-highlighted until the player tabs.
+    AUTO_FOCUS = ""
+
     def __init__(self, prompt: str, options: list[Option], *, title: str | None = None) -> None:
         super().__init__()
         self._prompt = prompt

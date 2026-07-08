@@ -67,7 +67,7 @@ async def test_save_then_continue_restores_the_hand(tmp_path):
         await pilot.pause()
         saved_hand = [card.id for card in app.ctx.state.player.hand]
 
-        await pilot.press("s")  # vault Save action -> slot picker
+        await pilot.press("0")  # vault Save action -> slot picker
         await pilot.pause()
         await pilot.click("#slot-0")  # save, back to vault
         await pilot.pause()
@@ -89,7 +89,7 @@ async def test_lookup_picks_a_card_and_shows_its_detail(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)
-        await pilot.press("c")  # Look up cards -> pick list
+        await pilot.press("5")  # Look up cards -> pick list
         await pilot.pause()
         assert isinstance(app.screen, LookUpScreen)
 
@@ -106,7 +106,7 @@ async def test_deposit_banks_a_card_for_points(tmp_path):
         points_before = app.ctx.state.player.points
         gained = app.ctx.state.player.hand[0].points
 
-        await pilot.press("d")  # Deposit
+        await pilot.press("3")  # Deposit
         await pilot.pause()
         await pilot.click("#dep-0")  # cash the first card, back to the vault
         await pilot.pause()
@@ -122,7 +122,7 @@ async def test_gong_yi_tanpai_plays_a_showdown_and_returns_to_the_vault(tmp_path
         await _new_game_at_vault(app, pilot)
         assert isinstance(app.screen, VaultScreen)
 
-        await pilot.press("g")  # Gong Yi Tanpai — the showdown runs in an async worker
+        await pilot.press("1")  # Gong Yi Tanpai — the showdown runs in an async worker
         assert isinstance(app.screen, (DuelScreen, ChoiceModal))
 
         # Drive the stepped showdown: press Continue on the board, take the first option on any
@@ -151,7 +151,7 @@ async def test_use_a_power_opens_the_picker_and_returns_to_the_vault(tmp_path):
         bras = deepcopy(next(card for card in cat.cards if card.name == "Bras Finger"))
         app.ctx.state.player.hand.append(bras)  # ensure a usable-power Wu is in hand
 
-        await pilot.press("p")  # Use a Power → picker
+        await pilot.press("4")  # Use a Power → picker
         await pilot.pause()
         assert isinstance(app.screen, UsePowerScreen)
 
@@ -168,7 +168,7 @@ async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):
         app.ctx.state.player.deck.append(deepcopy(cat.card(6)))  # a Wu waiting in the personal deck
         hand_before = len(app.ctx.state.player.hand)
 
-        await pilot.press("w")  # Draw a card
+        await pilot.press("2")  # Draw a card
         await pilot.pause()
 
         assert isinstance(app.screen, VaultScreen)  # a fresh vault reflecting the draw
@@ -182,7 +182,7 @@ async def test_reaching_the_point_limit_ends_the_game_instead_of_dueling(tmp_pat
         await _new_game_at_vault(app, pilot)
         app.ctx.state.player.points = 999  # already past the point limit
 
-        await pilot.press("g")  # try Gong Yi Tanpai
+        await pilot.press("1")  # try Gong Yi Tanpai
         await pilot.pause()
 
         assert isinstance(app.screen, OutcomeScreen)  # the run ends now, no extra duel
@@ -195,7 +195,7 @@ async def test_depositing_a_power_wu_asks_to_confirm_first(tmp_path):
         bras = deepcopy(next(c for c in app.ctx.state.catalog.cards if c.name == "Bras Finger"))
         app.ctx.state.player.hand.append(bras)  # a deposit-power Wu
 
-        await pilot.press("d")  # deposit
+        await pilot.press("3")  # deposit
         await pilot.pause()
         await pilot.click(f"#dep-{len(app.ctx.state.player.hand) - 1}")  # pick the power Wu
         await pilot.pause()
@@ -210,7 +210,7 @@ async def test_look_up_can_inspect_the_opponents_cards(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:  # both hands listed — keep every button on-screen
         await _new_game_at_vault(app, pilot)
-        await pilot.press("c")  # look up cards
+        await pilot.press("5")  # look up cards
         await pilot.pause()
         assert isinstance(app.screen, LookUpScreen)
 
@@ -241,6 +241,13 @@ async def test_start_screen_shows_the_cartridge_version(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:
         await pilot.pause()
+        # The pushed start screen can need an extra tick to land on the stack; wait for it so the
+        # query never races an empty stack ("No screens on stack"). screen_stack first — short-circuit
+        # keeps us off app.screen while the stack is still empty.
+        for _ in range(20):
+            if app.screen_stack and isinstance(app.screen, StartScreen):
+                break
+            await pilot.pause()
         assert str(app.screen.query_one("#version", Static).render()) == "v1.0"
 
 

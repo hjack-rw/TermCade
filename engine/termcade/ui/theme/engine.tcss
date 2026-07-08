@@ -52,13 +52,12 @@ Button {
     color: $text;
 }
 
-/* Focus must NOT highlight: the first option is auto-focused on every screen and the user wants all
-   options equal there. Focus mirrors resting (also cancels Textual's default reverse-focus); hover
-   is the only per-option highlight. */
-Button:focus {
-    border: round $surface-lighten-2;
-    text-style: none;
-    /* no `color` here — keep the resting colour (e.g. an elem-* class) so focus doesn't blank it */
+/* Focus is the arrow-key navigation cursor, so it must be unmistakable: a negative (reverse-video)
+   highlight — bright fill, dark text. Nothing auto-focuses (AUTO_FOCUS=None on EngineScreen), so this
+   only shows once the player starts navigating; no option looks pre-selected on a fresh screen. Also
+   claims the primary button (via `.-primary:focus`) so the cursor looks identical on every option. */
+Button:focus, Button.-primary:focus {
+    text-style: reverse bold;  /* reverse swaps fg/bg on the label glyphs only — the box stays unfilled */
 }
 Button:hover {
     border: round $accent;
@@ -66,10 +65,10 @@ Button:hover {
     text-style: bold;
 }
 
-/* The primary action (first button) stands out in white so it reads as the default; only an actual
-   hover turns it gold. `.-primary:focus` keeps it white while it holds initial focus, and outranks
-   the gold `Button:focus` rule above. */
-Button.-primary, Button.-primary:focus {
+/* The primary action (first button) stands out in white at rest so it reads as the default; only an
+   actual hover turns it gold. When focused it takes the negative cursor highlight above, like every
+   other option — so arrow-navigating onto it looks the same as any other stop. */
+Button.-primary {
     border: round $foreground;  /* $foreground is solid; $text carries alpha, which borders reject */
     color: $foreground;
     text-style: bold;

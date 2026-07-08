@@ -26,5 +26,3 @@ build/
 # Local, kept out of the repo
 .claude/
 docs/
-CLAUDE.md
-xiaolin.exe.lnk
