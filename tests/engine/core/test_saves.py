@@ -14,6 +14,7 @@ import pytest
 from termcade.core.rng import Rng
 from termcade.core.saves import (
     JsonFileBackend,
+    SaveCorrupt,
     SaveManager,
     SavesDisabled,
     SlotEmpty,
@@ -110,6 +111,21 @@ def test_read_missing_slot_raises_slot_empty(backend):
         backend.read(0)
 
 
+def test_read_meta_returns_meta_without_the_payload(backend, fake_state_cls):
+    mgr = _manager(backend)
+    mgr.save(0, fake_state_cls(points=7, hand=["a"]), Rng("seed"), title="meta only")
+
+    meta = backend.read_meta(0)
+    assert meta["title"] == "meta only"
+    assert meta["slot"] == 0
+    assert {"state", "rng", "settings"}.isdisjoint(meta)  # listing never pulls the state blob
+
+
+def test_read_meta_missing_slot_raises_slot_empty(backend):
+    with pytest.raises(SlotEmpty):
+        backend.read_meta(0)
+
+
 def test_settings_are_frozen_into_the_save(backend, fake_state_cls):
     mgr = _manager(backend)
     frozen = Settings(difficulty=Difficulty.HARD, options={"point_limit": 20})
@@ -137,7 +153,30 @@ def test_load_fills_new_defaults_over_frozen_settings(backend, fake_state_cls):
     assert loaded.options["hand_size"] == 6  # the new default fills the gap
 
 
-def test_sqlite_stores_metadata_in_queryable_columns(tmp_path, fake_state_cls):
+def test_sqlite_read_raises_save_corrupt_on_bad_payload(tmp_path, fake_state_cls):
+    """A row whose payload JSON is garbage surfaces as SaveCorrupt, not a raw JSONDecodeError."""
+    db = tmp_path / "saves.db"
+    mgr = _manager(SqliteBackend(db))
+    mgr.save(0, fake_state_cls(), Rng(1), title="x")
+    with sqlite3.connect(db) as conn:
+        conn.execute("UPDATE saves SET payload = 'not json' WHERE slot = 0")
+
+    with pytest.raises(SaveCorrupt):
+        SqliteBackend(db).read(0)
+
+
+def test_list_skips_a_corrupt_slot_instead_of_crashing(tmp_path, fake_state_cls):
+    """One unreadable save must not blank the picker — the good slots still list."""
+    root = tmp_path / "saves"
+    backend = JsonFileBackend(root)
+    mgr = _manager(backend, max_slots=3)
+    mgr.save(0, fake_state_cls(points=1), Rng(1), title="good")
+    mgr.save(1, fake_state_cls(points=2), Rng(2), title="doomed")
+    (root / "slot_1.json").write_text("{ broken", encoding="utf-8")
+
+    listing = mgr.list()
+    assert listing[0].title == "good"  # survivor still listed
+    assert listing[1] is None  # corrupt slot shows as a hole, no exception
     """The DB's edge over files: metadata is real SQL, not an opaque blob."""
     db = tmp_path / "saves.db"
     mgr = _manager(SqliteBackend(db))

@@ -19,8 +19,7 @@ from rich.table import Table
 from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
-from textual.screen import ModalScreen
-from textual.widgets import Button, Footer, Header, Static
+from textual.widgets import Footer, Header, Static
 
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
@@ -32,35 +31,6 @@ from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
 from ..logic.turn import bot_turn, max_hand_size, refill_hands
 from .format import char_stats, display_name, stats_line
-
-Option = tuple[str, object]
-
-
-class ChoiceModal(ModalScreen[object]):
-    """A list of buttons; dismisses with the value behind the chosen one. With ``title`` set, that is
-    the border label and ``prompt`` shows inside; otherwise ``prompt`` is the border label itself."""
-
-    # No pre-selected option on open — same rule as EngineScreen, but ModalScreen doesn't inherit it.
-    # Must be "" (not None): None makes Textual fall back to the app's "*" and auto-focus the first
-    # button; the empty string is what actually leaves the modal un-highlighted until the player tabs.
-    AUTO_FOCUS = ""
-
-    def __init__(self, prompt: str, options: list[Option], *, title: str | None = None) -> None:
-        super().__init__()
-        self._prompt = prompt
-        self._options = options
-        self._title = title
-
-    def compose(self) -> ComposeResult:
-        with BoxedPanel(title=self._title or self._prompt):
-            if self._title is not None:
-                yield Static(self._prompt, classes="modal-prompt")
-            for index, (label, _value) in enumerate(self._options):
-                yield Button(label, id=f"opt-{index}")
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        assert event.button.id is not None
-        self.dismiss(self._options[int(event.button.id.removeprefix("opt-"))][1])
 
 
 class DuelScreen(EngineScreen):
@@ -105,26 +75,15 @@ class DuelScreen(EngineScreen):
 
     async def _reveal_coin_toss(self, player_won: bool) -> None:
         """Tied initiative — the player calls the coin, then learns whether they hold priority."""
-        call = cast(
-            str,
-            await self._ask(
-                ChoiceModal(
-                    "Tied initiative — call the coin.",
-                    [("Heads", "heads"), ("Tails", "tails")],
-                    title="COIN TOSS",
-                )
-            ),
+        call = await self.choose(
+            "Tied initiative — call the coin.",
+            [("Heads", "heads"), ("Tails", "tails")],
+            title="COIN TOSS",
         )
         # Priority was already decided; reveal a face consistent with it — a matching call wins.
         face = call if player_won else ("tails" if call == "heads" else "heads")
         outcome = "You win priority!" if player_won else "You lose priority."
-        await self.app.push_screen_wait(
-            ChoiceModal(
-                f"The coin lands {face.upper()}.  {outcome}",
-                [("Continue", None)],
-                title="COIN TOSS",
-            )
-        )
+        await self.show_message(f"The coin lands {face.upper()}.  {outcome}", title="COIN TOSS")
 
     @work
     async def _run_showdown(self) -> None:
@@ -166,15 +125,10 @@ class DuelScreen(EngineScreen):
         while not state.has_ended:
             if len(state.player.whole_hand) <= max_hand_size(state.player, settings.max_hand_size):
                 return
-            card = cast(
-                Card,
-                await self._ask(
-                    ChoiceModal(
-                        "Too many Wu — shelve one to your deck",
-                        _card_options(state.player.hand),
-                        title="DISPOSE",
-                    )
-                ),
+            card = await self.choose(
+                "Too many Wu — shelve one to your deck",
+                _card_options(state.player.hand),
+                title="DISPOSE",
             )
             remove_card_from_hand(state.player, card)
             state.player.deck.append(card)
@@ -210,35 +164,27 @@ class DuelScreen(EngineScreen):
         )
 
     async def _pick_challenge(self, options: list[str]) -> str:
-        modal = ChoiceModal("Choose the challenge stat", _stat_options(options), title="CHALLENGE")
-        return cast(str, await self._ask(modal))
+        return await self.choose("Choose the challenge stat", _stat_options(options), title="CHALLENGE")
 
     async def _pick_background(self, options: list[str]) -> str:
-        modal = ChoiceModal("Choose the background element", _stat_options(options), title="BACKGROUND")
-        return cast(str, await self._ask(modal))
+        return await self.choose("Choose the background element", _stat_options(options), title="BACKGROUND")
 
     async def _pick_element(self, _background: str) -> str:
-        modal = ChoiceModal("Choose an element", _stat_options(list(ELEMENTS)), title="ELEMENT")
-        return cast(str, await self._ask(modal))
+        return await self.choose("Choose an element", _stat_options(list(ELEMENTS)), title="ELEMENT")
 
     async def _pick_boost(self, cards: list[Card]) -> Card | None:
-        options = _card_options(cards) + [("Don't play", None)]
-        modal = ChoiceModal("Play a boost Wu?", options, title="BOOST")
-        return cast("Card | None", await self._ask(modal))
+        options: list[tuple[str, Card | None]] = [*_card_options(cards), ("Don't play", None)]
+        return await self.choose("Play a boost Wu?", options, title="BOOST")
 
     async def _pick_card(self, cards: list[Card]) -> Card:
-        modal = ChoiceModal("Play a card", _card_options(cards), title="CARD")
-        return cast(Card, await self._ask(modal))
-
-    async def _ask(self, modal: ChoiceModal) -> object:
-        return await self.app.push_screen_wait(modal)
+        return await self.choose("Play a card", _card_options(cards), title="CARD")
 
 
-def _stat_options(values: list[str]) -> list[Option]:
+def _stat_options(values: list[str]) -> list[tuple[str, str]]:
     return [(value.upper(), value) for value in values]
 
 
-def _card_options(cards: list[Card]) -> list[Option]:
+def _card_options(cards: list[Card]) -> list[tuple[str, Card]]:
     return [(f"{card.name}  ({stats_line(card.stats)})", card) for card in cards]
 
 

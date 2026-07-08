@@ -5,11 +5,7 @@ Feeds the chosen character into ``new_game`` with the current (settings-derived)
 
 from __future__ import annotations
 
-from textual.app import ComposeResult
-from textual.widgets import Button, Footer, Header
-
-from termcade.ui.screens.base import EngineScreen
-from termcade.ui.widgets import BoxedPanel
+from termcade.ui.screens.menu import MenuItem, MenuScreen
 
 from ..logic.catalog import Catalog, load_catalog
 from ..logic.settings import XiaolinSettings
@@ -18,28 +14,26 @@ from .format import affiliation_icon, char_stats, display_name
 from .vault import VaultScreen
 
 
-class CharacterSelectScreen(EngineScreen):
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+class CharacterSelectScreen(MenuScreen):
+    menu_title = "CHOOSE YOUR CHARACTER"
 
     def __init__(self) -> None:
         super().__init__()
         self._catalog: Catalog = load_catalog()
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with BoxedPanel(title="CHOOSE YOUR CHARACTER"):
-            for character in self._catalog.playable_characters:
-                parts = character.power.name.split()  # the dragon's power names its element
-                element = parts[-1].lower() if parts else ""
-                # A plain-string label (not Rich Text) takes the button's CSS colour, so the
-                # `elem-*` class tints it and the hover/focus highlight can still override it.
-                label = f"{affiliation_icon(character)} {display_name(character.name).upper()}  ({char_stats(character)})"
-                yield Button(label, id=f"char-{character.id}", classes=f"elem-{element}")
-        yield Footer()
+    def menu_items(self) -> list[MenuItem]:
+        items = []
+        for character in self._catalog.playable_characters:
+            parts = character.power.name.split()  # the dragon's power names its element
+            element = parts[-1].lower() if parts else ""
+            # A plain-string label (not Rich Text) takes the button's CSS colour, so the
+            # `elem-*` class tints it and the hover/focus highlight can still override it.
+            label = f"{affiliation_icon(character)} {display_name(character.name).upper()}  ({char_stats(character)})"
+            items.append(MenuItem(f"char-{character.id}", label, classes=f"elem-{element}"))
+        return items
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        assert event.button.id is not None
-        character = self._catalog.character(int(event.button.id.removeprefix("char-")))
+    def on_select(self, item_id: str) -> None:
+        character = self._catalog.character(int(item_id.removeprefix("char-")))
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
         self.ctx.state = new_game(self._catalog, self.ctx.rng, character, settings=settings)
         self.app.switch_screen(VaultScreen())

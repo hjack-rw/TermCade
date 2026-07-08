@@ -45,6 +45,12 @@ class SlotEmpty(SaveError):
     """Raised when reading a slot that holds no save. Same across all backends."""
 
 
+class SaveCorrupt(SaveError):
+    """A slot holds data that can't be parsed (bad JSON, malformed meta). The row exists but is
+    unreadable — distinct from :class:`SlotEmpty`. Backends raise this instead of leaking a raw
+    ``JSONDecodeError``/``ValueError``, so callers catch one save-domain type."""
+
+
 @runtime_checkable
 class SaveBackend(Protocol):
     """Storage seam for save slots.
@@ -57,6 +63,10 @@ class SaveBackend(Protocol):
     def write(self, slot: int, envelope: dict[str, Any]) -> None: ...
 
     def read(self, slot: int) -> dict[str, Any]: ...
+
+    def read_meta(self, slot: int) -> dict[str, Any]:
+        """Return just the ``meta`` block for a slot — no payload. Lets listing skip the state blob."""
+        ...
 
     def delete(self, slot: int) -> None: ...
 
@@ -91,7 +101,17 @@ class JsonFileBackend:
         path = self._path(slot)
         if not path.exists():
             raise SlotEmpty(f"no save in slot {slot}")
-        return json.loads(path.read_text(encoding="utf-8"))
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise SaveCorrupt(f"save in slot {slot} is unreadable: {e}") from e
+
+    def read_meta(self, slot: int) -> dict[str, Any]:
+        # The file is one blob — meta lives inside it, so there's no cheaper path than a full read.
+        try:
+            return self.read(slot)["meta"]
+        except KeyError as e:
+            raise SaveCorrupt(f"save in slot {slot} has no meta block") from e
 
     def delete(self, slot: int) -> None:
         self._path(slot).unlink(missing_ok=True)
@@ -112,7 +132,8 @@ class SqliteBackend:
     the envelope can grow without a schema change. Uses only the stdlib ``sqlite3``.
     """
 
-    _COLUMNS = "slot, game_id, title, schema_version, seed, saved_at, payload"
+    _META_COLUMNS = "slot, game_id, title, schema_version, seed, saved_at"
+    _COLUMNS = f"{_META_COLUMNS}, payload"
 
     def __init__(self, path: Path) -> None:
         self._path = path
@@ -161,6 +182,18 @@ class SqliteBackend:
             )
             conn.commit()
 
+    @staticmethod
+    def _meta_from_row(row: tuple[Any, ...]) -> dict[str, Any]:
+        # Row shape is the _META_COLUMNS order, which _COLUMNS extends — so this reads both.
+        return {
+            "slot": row[0],
+            "game_id": row[1],
+            "title": row[2],
+            "schema_version": row[3],
+            "seed": int(row[4]),  # stored as TEXT (64-bit unsigned); back to int here
+            "saved_at": row[5],
+        }
+
     def read(self, slot: int) -> dict[str, Any]:
         with closing(self._connect()) as conn:
             row = conn.execute(
@@ -168,16 +201,25 @@ class SqliteBackend:
             ).fetchone()
         if row is None:
             raise SlotEmpty(f"no save in slot {slot}")
-        envelope: dict[str, Any] = json.loads(row[6])
-        envelope["meta"] = {
-            "slot": row[0],
-            "game_id": row[1],
-            "title": row[2],
-            "schema_version": row[3],
-            "seed": int(row[4]),
-            "saved_at": row[5],
-        }
+        try:
+            envelope: dict[str, Any] = json.loads(row[6])
+            envelope["meta"] = self._meta_from_row(row)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise SaveCorrupt(f"save in slot {slot} is unreadable: {e}") from e
         return envelope
+
+    def read_meta(self, slot: int) -> dict[str, Any]:
+        # Meta-only: select the indexed columns and never touch the payload blob.
+        with closing(self._connect()) as conn:
+            row = conn.execute(
+                f"SELECT {self._META_COLUMNS} FROM saves WHERE slot = ?", (slot,)
+            ).fetchone()
+        if row is None:
+            raise SlotEmpty(f"no save in slot {slot}")
+        try:
+            return self._meta_from_row(row)
+        except ValueError as e:
+            raise SaveCorrupt(f"save in slot {slot} has malformed meta: {e}") from e
 
     def delete(self, slot: int) -> None:
         with closing(self._connect()) as conn:
@@ -272,7 +314,12 @@ class SaveManager:
             return slots
         for slot in self._backend.list_slots():
             if 0 <= slot < self._max_slots:
-                slots[slot] = SaveMeta(**self._backend.read(slot)["meta"])
+                try:
+                    slots[slot] = SaveMeta(**self._backend.read_meta(slot))
+                except SaveError:
+                    # A single unreadable slot must not blank the whole picker — leave it as a
+                    # hole so the other saves still list (and the slot can be overwritten).
+                    slots[slot] = None
         return slots
 
     def delete(self, slot: int) -> None:

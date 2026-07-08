@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from textual import work
 from textual.app import ComposeResult
 from textual.widgets import Button, Footer, Header, Static
 
@@ -18,7 +19,6 @@ from ..logic.actions import deposit
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
-from .duel import ChoiceModal
 
 
 class DepositScreen(EngineScreen):
@@ -36,18 +36,20 @@ class DepositScreen(EngineScreen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         assert event.button.id is not None
         state = cast(XiaolinState, self.ctx.state)
-        card = state.player.hand[int(event.button.id.removeprefix("dep-"))]
+        self._choose(state.player.hand[int(event.button.id.removeprefix("dep-"))])
+
+    @work
+    async def _choose(self, card: Card) -> None:
         if card.power.trigger == "deposit":  # banking it forfeits its power — confirm first
-            self.app.push_screen(
-                ChoiceModal(
-                    "This Wu has a power on Deposit — forfeit it for points?",
-                    [("Yes, forfeit for points", True), ("No, keep it", False)],
-                    title="FORFEIT",
-                ),
-                lambda forfeit: self._bank(card) if forfeit else None,
+            forfeit = await self.confirm(
+                "This Wu has a power on Deposit — forfeit it for points?",
+                title="FORFEIT",
+                yes="Yes, forfeit for points",
+                no="No, keep it",
             )
-        else:
-            self._bank(card)
+            if not forfeit:
+                return
+        self._bank(card)
 
     def _bank(self, card: Card) -> None:
         state = cast(XiaolinState, self.ctx.state)

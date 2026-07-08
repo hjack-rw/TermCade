@@ -145,10 +145,15 @@ DetailScreen .description {
 
 /* --- Deposit ------------------------------------------------------------- */
 DepositScreen BoxedPanel {
+    width: 52;
     height: auto;
     max-height: 90%;
     overflow-y: auto;
-    align-horizontal: center;  /* centre the auto-width card buttons under the centred "Choose a card" */
+    padding: 1 2;
+}
+DepositScreen Button {
+    width: 100%;
+    margin: 1 0;
 }
 
 /* --- Rules --------------------------------------------------------------- */

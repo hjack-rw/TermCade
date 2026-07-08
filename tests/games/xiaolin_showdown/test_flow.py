@@ -11,7 +11,9 @@ from textual.widgets import Input, Static
 from xiaolin_showdown.game import build_game
 from xiaolin_showdown.screens.character_select import CharacterSelectScreen
 from xiaolin_showdown.screens.detail import DetailScreen
-from xiaolin_showdown.screens.duel import ChoiceModal, DuelScreen
+from termcade.ui.screens.dialog import ChoiceModal
+
+from xiaolin_showdown.screens.duel import DuelScreen
 from xiaolin_showdown.screens.lookup import LookUpScreen
 from xiaolin_showdown.screens.outcome import OutcomeScreen
 from xiaolin_showdown.screens.rules import RulesScreen

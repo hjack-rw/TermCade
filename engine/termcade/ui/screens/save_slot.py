@@ -11,20 +11,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Literal
 
-from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Static
 
+from termcade.core.saves import SaveError
 from termcade.core.state import GameState
-from termcade.ui.widgets import BoxedPanel
 
-from .base import EngineScreen
+from .menu import MenuItem, MenuScreen
 
 Mode = Literal["save", "load"]
 
 
-class SaveSlotScreen(EngineScreen):
+class SaveSlotScreen(MenuScreen):
     BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+    menu_description = "Select a slot"
 
     def __init__(
         self,
@@ -37,25 +36,20 @@ class SaveSlotScreen(EngineScreen):
         self._mode = mode
         self._title = title
         self._next_screen = next_screen
+        self.menu_title = "SAVE" if mode == "save" else "LOAD"
 
-    def compose(self) -> ComposeResult:
-        heading = "SAVE" if self._mode == "save" else "LOAD"
-        yield Header()
-        with BoxedPanel(title=heading):
-            yield Static("Select a slot", classes="panel-desc")
-            for slot, meta in enumerate(self.ctx.saves.list()):
-                if meta is None:
-                    label = f"{slot + 1}.  — empty —"
-                    disabled = self._mode == "load"  # nothing to restore
-                else:
-                    label = f"{slot + 1}.  {meta.title}"
-                    disabled = False
-                yield Button(label, id=f"slot-{slot}", disabled=disabled)
-        yield Footer()
+    def menu_items(self) -> list[MenuItem]:
+        items = []
+        for slot, meta in enumerate(self.ctx.saves.list()):
+            if meta is None:
+                # An empty slot can't be loaded from, but is a valid save target.
+                items.append(MenuItem(f"slot-{slot}", f"{slot + 1}.  — empty —", disabled=self._mode == "load"))
+            else:
+                items.append(MenuItem(f"slot-{slot}", f"{slot + 1}.  {meta.title}"))
+        return items
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        assert event.button.id is not None
-        slot = int(event.button.id.removeprefix("slot-"))
+    def on_select(self, item_id: str) -> None:
+        slot = int(item_id.removeprefix("slot-"))
         if self._mode == "save":
             self._save(slot)
         else:
@@ -71,7 +65,12 @@ class SaveSlotScreen(EngineScreen):
 
     def _load(self, slot: int) -> None:
         state_cls: type[GameState] = self.ctx.game.state_cls
-        state, rng, _meta, _settings = self.ctx.saves.load(slot, state_cls, self.ctx)
+        try:
+            state, rng, _meta, _settings = self.ctx.saves.load(slot, state_cls, self.ctx)
+        except SaveError as e:
+            # A corrupt or unreadable save must not crash the picker — flag it and stay put.
+            self.app.notify(str(e), title="Load failed", severity="error")
+            return
         self.ctx.state = state
         self.ctx.rng = rng
         if self._next_screen is not None:
