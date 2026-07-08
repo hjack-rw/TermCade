@@ -14,7 +14,7 @@ from termcade.ui.widgets import BoxedPanel
 from ..logic.catalog import Catalog, load_catalog
 from ..logic.settings import XiaolinSettings
 from ..logic.setup import new_game
-from .format import affiliation_icon, char_stats
+from .format import affiliation_icon, char_stats, display_name
 from .vault import VaultScreen
 
 
@@ -27,11 +27,14 @@ class CharacterSelectScreen(EngineScreen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with BoxedPanel(title="CHOOSE YOUR DRAGON"):
+        with BoxedPanel(title="CHOOSE YOUR CHARACTER"):
             for character in self._catalog.playable_characters:
-                icon = affiliation_icon(character)
-                label = f"{icon} {character.name.upper()}   {char_stats(character)}"
-                yield Button(label, id=f"char-{character.id}")
+                parts = character.power.name.split()  # the dragon's power names its element
+                element = parts[-1].lower() if parts else ""
+                # A plain-string label (not Rich Text) takes the button's CSS colour, so the
+                # `elem-*` class tints it and the hover/focus highlight can still override it.
+                label = f"{affiliation_icon(character)} {display_name(character.name).upper()}  ({char_stats(character)})"
+                yield Button(label, id=f"char-{character.id}", classes=f"elem-{element}")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

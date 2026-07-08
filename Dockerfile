@@ -22,7 +22,7 @@ ENV TERMCADE_DATA_DIR=/data \
 
 # Install the wheel plus textual-serve (browser mode); the terminal mode needs only the wheel.
 COPY --from=builder /dist/*.whl /tmp/
-RUN pip install --no-cache-dir /tmp/*.whl textual-serve && rm -rf /tmp/*.whl
+RUN pip install --no-cache-dir /tmp/*.whl textual-serve==1.1.3 && rm -rf /tmp/*.whl
 
 RUN useradd --create-home --uid 1000 player && mkdir -p /data && chown player /data
 VOLUME ["/data"]

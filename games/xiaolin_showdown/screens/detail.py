@@ -9,7 +9,7 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
 
 from ..logic.models import Card, Character
-from .format import card_name_text, char_stats, stats_line, trigger_label
+from .format import char_stats, stats_line, trigger_label
 
 
 class DetailScreen(EngineScreen):
@@ -26,7 +26,6 @@ class DetailScreen(EngineScreen):
         yield Header()
         with BoxedPanel(title=target.name.upper().replace("_", " ")):
             if isinstance(target, Card):
-                yield Static(card_name_text(target))
                 yield Static(
                     f"Element: {target.element.capitalize()}    "
                     f"Type: {target.type.capitalize()}    Points: {target.points}"

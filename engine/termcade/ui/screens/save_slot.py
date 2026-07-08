@@ -13,7 +13,7 @@ from typing import Literal
 
 from textual.app import ComposeResult
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header
+from textual.widgets import Button, Footer, Header, Static
 
 from termcade.core.state import GameState
 from termcade.ui.widgets import BoxedPanel
@@ -41,7 +41,8 @@ class SaveSlotScreen(EngineScreen):
     def compose(self) -> ComposeResult:
         heading = "SAVE" if self._mode == "save" else "LOAD"
         yield Header()
-        with BoxedPanel(title=f"{heading} — SELECT A SLOT"):
+        with BoxedPanel(title=heading):
+            yield Static("Select a slot", classes="panel-desc")
             for slot, meta in enumerate(self.ctx.saves.list()):
                 if meta is None:
                     label = f"{slot + 1}.  — empty —"

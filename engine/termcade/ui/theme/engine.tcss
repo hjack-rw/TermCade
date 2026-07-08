@@ -9,7 +9,7 @@ Screen {
 BoxedPanel {
     border: double $accent;
     border-title-align: center;
-    border-title-color: $accent;
+    border-title-color: $accent-lighten-2;  /* titles a touch lighter than the border accent */
     padding: 1 2;
     width: auto;
     height: auto;
@@ -18,7 +18,7 @@ BoxedPanel {
 
 #title {
     text-style: bold;
-    color: $accent;
+    color: $accent-lighten-2;  /* match the section titles */
     text-align: center;
     width: 100%;
     padding: 1 0 0 0;
@@ -34,7 +34,81 @@ BoxedPanel {
     color: $text-disabled;
 }
 
+/* A short description shown inside a panel, beneath its short all-caps border title. */
+.panel-desc {
+    width: 100%;
+    text-align: center;
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+/* Outline buttons: transparent fill so each reads as a rounded shape on the black bg, not a filled
+   rectangle. */
 Button {
-    margin: 1 2;
+    margin: 0 2;  /* tight vertical gap so button lists (e.g. the menu) fit without scrolling */
     min-width: 20;
+    background: transparent;
+    border: round $surface-lighten-2;
+    color: $text;
+}
+
+/* Focus must NOT highlight: the first option is auto-focused on every screen and the user wants all
+   options equal there. Focus mirrors resting (also cancels Textual's default reverse-focus); hover
+   is the only per-option highlight. */
+Button:focus {
+    border: round $surface-lighten-2;
+    text-style: none;
+    /* no `color` here — keep the resting colour (e.g. an elem-* class) so focus doesn't blank it */
+}
+Button:hover {
+    border: round $accent;
+    color: $accent;
+    text-style: bold;
+}
+
+/* The primary action (first button) stands out in white so it reads as the default; only an actual
+   hover turns it gold. `.-primary:focus` keeps it white while it holds initial focus, and outranks
+   the gold `Button:focus` rule above. */
+Button.-primary, Button.-primary:focus {
+    border: round $foreground;  /* $foreground is solid; $text carries alpha, which borders reject */
+    color: $foreground;
+    text-style: bold;
+}
+Button.-primary:hover {
+    border: round $accent;
+    color: $accent;
+}
+
+/* Attract scene — the brand banner centred over a one-line status. */
+#hello-root {
+    width: auto;
+    height: auto;
+    align: center middle;
+}
+
+#banner {
+    width: auto;
+    color: $accent;
+    text-style: bold;
+}
+
+#hello {
+    width: 100%;
+    text-align: center;
+    color: $text-muted;
+    padding-top: 1;
+}
+
+/* "Terminal too small" overlay. */
+#too-small {
+    width: auto;
+    text-align: center;
+    color: $warning;
+    text-style: bold;
+}
+
+/* Notifications (bot-turn log, draw toasts) live top-right, not the default bottom-right. */
+ToastRack {
+    dock: top;
+    align: right top;
 }

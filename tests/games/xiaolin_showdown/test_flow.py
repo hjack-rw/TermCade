@@ -6,7 +6,7 @@ from copy import deepcopy
 
 from termcade.ui.app import EngineApp
 
-from textual.widgets import Input
+from textual.widgets import Input, Static
 
 from xiaolin_showdown.game import build_game
 from xiaolin_showdown.screens.character_select import CharacterSelectScreen
@@ -30,14 +30,14 @@ async def _new_game_at_vault(app, pilot):
 
 async def test_boots_to_start_screen(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await pilot.pause()
         assert isinstance(app.screen, StartScreen)
 
 
 async def test_rules_screen_opens_from_the_menu(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await pilot.click("#rules")
         await pilot.pause()
         assert isinstance(app.screen, RulesScreen)
@@ -45,7 +45,7 @@ async def test_rules_screen_opens_from_the_menu(tmp_path):
 
 async def test_play_selects_a_character_then_deals_into_the_vault(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await pilot.click("#play")
         await pilot.pause()
         assert isinstance(app.screen, CharacterSelectScreen)
@@ -60,7 +60,7 @@ async def test_play_selects_a_character_then_deals_into_the_vault(tmp_path):
 
 async def test_save_then_continue_restores_the_hand(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await pilot.click("#play")
         await pilot.pause()
         await pilot.click("#char-1")  # Omi -> vault
@@ -87,7 +87,7 @@ async def test_save_then_continue_restores_the_hand(tmp_path):
 
 async def test_lookup_picks_a_card_and_shows_its_detail(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)
         await pilot.press("c")  # Look up cards -> pick list
         await pilot.pause()
@@ -100,7 +100,7 @@ async def test_lookup_picks_a_card_and_shows_its_detail(tmp_path):
 
 async def test_deposit_banks_a_card_for_points(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)
         hand_before = len(app.ctx.state.player.hand)
         points_before = app.ctx.state.player.points
@@ -118,7 +118,7 @@ async def test_deposit_banks_a_card_for_points(tmp_path):
 
 async def test_gong_yi_tanpai_plays_a_showdown_and_returns_to_the_vault(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)
         assert isinstance(app.screen, VaultScreen)
 
@@ -145,7 +145,7 @@ async def test_gong_yi_tanpai_plays_a_showdown_and_returns_to_the_vault(tmp_path
 
 async def test_use_a_power_opens_the_picker_and_returns_to_the_vault(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)
         cat = app.ctx.state.catalog
         bras = deepcopy(next(card for card in cat.cards if card.name == "Bras Finger"))
@@ -162,7 +162,7 @@ async def test_use_a_power_opens_the_picker_and_returns_to_the_vault(tmp_path):
 
 async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)
         cat = app.ctx.state.catalog
         app.ctx.state.player.deck.append(deepcopy(cat.card(6)))  # a Wu waiting in the personal deck
@@ -178,7 +178,7 @@ async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):
 
 async def test_reaching_the_point_limit_ends_the_game_instead_of_dueling(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)
         app.ctx.state.player.points = 999  # already past the point limit
 
@@ -190,7 +190,7 @@ async def test_reaching_the_point_limit_ends_the_game_instead_of_dueling(tmp_pat
 
 async def test_depositing_a_power_wu_asks_to_confirm_first(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test(size=(100, 50)) as pilot:  # tall enough that every card button is on-screen
+    async with app.run_test(size=(150, 60)) as pilot:  # tall enough that every card button is on-screen
         await _new_game_at_vault(app, pilot)
         bras = deepcopy(next(c for c in app.ctx.state.catalog.cards if c.name == "Bras Finger"))
         app.ctx.state.player.hand.append(bras)  # a deposit-power Wu
@@ -208,7 +208,7 @@ async def test_depositing_a_power_wu_asks_to_confirm_first(tmp_path):
 
 async def test_look_up_can_inspect_the_opponents_cards(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test(size=(100, 50)) as pilot:  # both hands listed — keep every button on-screen
+    async with app.run_test(size=(150, 60)) as pilot:  # both hands listed — keep every button on-screen
         await _new_game_at_vault(app, pilot)
         await pilot.press("c")  # look up cards
         await pilot.pause()
@@ -223,7 +223,7 @@ async def test_look_up_can_inspect_the_opponents_cards(tmp_path):
 
 async def test_game_over_shows_the_outcome_and_can_play_again(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)  # a live game state to score
         app.ctx.state.has_ended = True
         app.ctx.state.player.points = 4
@@ -237,9 +237,40 @@ async def test_game_over_shows_the_outcome_and_can_play_again(tmp_path):
         assert isinstance(app.screen, CharacterSelectScreen)
 
 
+async def test_start_screen_shows_the_cartridge_version(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await pilot.pause()
+        assert str(app.screen.query_one("#version", Static).render()) == "v1.0"
+
+
+async def test_settings_flags_an_out_of_range_value_instead_of_saving(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await pilot.click("#settings")
+        await pilot.pause()
+        settings_screen = app.screen
+        app.screen.query_one("#set-max_hand_size", Input).value = "4"  # below the 5-card starting hand
+        await pilot.click("#save")
+        await pilot.pause()
+        assert app.screen is settings_screen  # rejected — stays on settings, doesn't pop
+        assert any("Max Hand Size" in n.message for n in app._notifications)  # flagged as a toast
+
+
+async def test_settings_rejected_value_is_not_persisted(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await pilot.click("#settings")
+        await pilot.pause()
+        app.screen.query_one("#set-max_hand_size", Input).value = "4"
+        await pilot.click("#save")
+        await pilot.pause()
+        assert app.ctx.settings.current.options["max_hand_size"] == 6  # unchanged default, not saved
+
+
 async def test_settings_change_flows_into_a_new_game(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(150, 60)) as pilot:
         await pilot.click("#settings")
         await pilot.pause()
         app.screen.query_one("#set-starting_hand_player", Input).value = "3"

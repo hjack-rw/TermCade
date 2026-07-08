@@ -21,13 +21,14 @@ class StartScreen(EngineScreen):
         yield Header()
         with Vertical(id="start-root"):
             yield Static("XIAOLIN SHOWDOWN", id="title")
-            yield Static("The Card Game", classes="subtitle")
+            yield Static("The Fangame", classes="subtitle")
             with BoxedPanel(title="MENU"):
                 yield Button("Play", id="play", variant="primary")
                 yield Button("Continue", id="continue")
                 yield Button("Rules", id="rules")
                 yield Button("Settings", id="settings")
                 yield Button("Quit", id="quit")
+        yield Static(f"v{self.game.version}", id="version")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

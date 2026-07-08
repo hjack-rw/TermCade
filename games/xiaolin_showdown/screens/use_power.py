@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import cast
 
 from textual.app import ComposeResult
-from textual.widgets import Button, Footer, Header
+from textual.widgets import Button, Footer, Header, Static
 
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
@@ -30,7 +30,8 @@ class UsePowerScreen(EngineScreen):
         self._usable: list[Card] = usable_powers(state, deposit_limit)
 
         yield Header()
-        with BoxedPanel(title="USE A POWER — CHOOSE A WU"):
+        with BoxedPanel(title="USE A POWER"):
+            yield Static("Choose a Wu", classes="panel-desc")
             for index, card in enumerate(self._usable):
                 yield Button(f"{card.name}   ({trigger_label(card.power)})", id=f"pow-{index}")
         yield Footer()

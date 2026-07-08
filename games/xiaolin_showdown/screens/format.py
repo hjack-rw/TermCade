@@ -12,27 +12,32 @@ from rich.text import Text
 
 from ..logic.models import Card, Character, Power
 
-# element -> Rich colour (bright ANSI 94/91/93/92/37)
+# element -> colour, as explicit hex so the theme's ANSI palette can't remap it (the OG mapping:
+# water blue, fire red, wind/air yellow, earth green, metal a neutral grey).
 COLORS = {
-    "water": "bright_blue",
-    "fire": "bright_red",
-    "wind": "bright_yellow",
-    "earth": "bright_green",
-    "metal": "white",
+    "water": "#4a9eff",
+    "fire": "#ff5555",
+    "wind": "#ffd43b",
+    "earth": "#51cf66",
+    "metal": "#ced4da",
 }
 
-# card type -> glyph
+# Card / affiliation icons — plain Unicode symbols, deliberately picked for *text* presentation
+# (each has Emoji_Presentation=No), so any renderer that owns a glyph for them draws them monochrome,
+# never as colour emoji. They do need a comprehensive symbol font, though: on Windows that is Segoe
+# UI Symbol (reached automatically via font fallback), and the browser build embeds a covering font
+# in serve.py so xterm.js always has the glyphs. Written as \u/\U escapes so the source stays ASCII.
 ICONS = {
-    "wudai": "🗡",
-    "head": "♔",
-    "torso": "🖀",
-    "amulet": "🎖",
-    "arms": "🖑",
-    "boots": "⛸",
-    "item": "🛠",
-    "xiaolin": "☯",
-    "heylin": "☸",
-    "construct": "⚙",
+    "wudai": "\U0001f5e1",  # dagger — the elemental warrior Wu
+    "head": "♔",  # chess king
+    "torso": "\U0001f580",  # telephone-on-modem (reads as an armoured torso)
+    "amulet": "\U0001f396",  # military medal
+    "arms": "\U0001f591",  # raised hand
+    "boots": "⛸",  # ice skate
+    "item": "\U0001f6e0",  # hammer & wrench
+    "xiaolin": "☯",  # yin-yang — the light-side monks
+    "heylin": "☸",  # dharma wheel — the dark side
+    "construct": "⚙",  # gear
     "empty": "",
 }
 
@@ -47,6 +52,11 @@ def stats_line(stats: Mapping[str, int | None]) -> str:
 
 def char_stats(character: Character) -> str:
     return stats_line(character.stats)
+
+
+def display_name(name: str) -> str:
+    """A stored name shown for humans: underscores become spaces (``Salvador_Cumo`` -> ``Salvador Cumo``)."""
+    return name.replace("_", " ")
 
 
 def affiliation_icon(character: Character) -> str:
@@ -80,18 +90,24 @@ def trigger_label(power: Power) -> str:
 _STAT_KEYS = ("force", "agility", "intellect")
 
 
-def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list[str]:
+def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list[Text]:
     rows = []
     for index, card in enumerate(cards, 1):
         colour = COLORS.get(card.element, "white")
         icon = ICONS.get(card.type, "")
         name = card.name.rjust(name_width)
         stats = "/".join(_stat(card.stats[key]).rjust(col_width[key]) for key in _STAT_KEYS)
-        rows.append(f"{index}. [{colour}]{name}[/]  {stats}  {icon}")
+        # Built as styled Text (not markup) so the element colour renders reliably in a Static:
+        # dim list number, bright element-coloured Wu name, plain stats + type glyph.
+        row = Text()
+        row.append(f"{index}. ", style="dim")
+        row.append(name, style=f"bold {colour}")
+        row.append(f"  {stats}  {icon}")
+        rows.append(row)
     return rows
 
 
-def hands_lines(hand_a: list[Card], hand_b: list[Card]) -> tuple[list[str], list[str]]:
+def hands_lines(hand_a: list[Card], hand_b: list[Card]) -> tuple[list[Text], list[Text]]:
     """Format both hands with *shared* name and per-column widths, so the two panels come out
     the same size and every name / ``/`` separator / icon lines up down and across the columns."""
     both = hand_a + hand_b

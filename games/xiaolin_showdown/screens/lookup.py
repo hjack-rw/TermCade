@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal, cast
 
 from textual.app import ComposeResult
-from textual.widgets import Button, Footer, Header
+from textual.widgets import Button, Footer, Header, Static
 
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
@@ -13,7 +13,7 @@ from termcade.ui.widgets import BoxedPanel
 from ..logic.models import Card
 from ..logic.state import XiaolinState
 from .detail import DetailScreen
-from .format import stats_line
+from .format import char_stats, display_name, stats_line
 
 Kind = Literal["cards", "characters"]
 
@@ -32,14 +32,17 @@ class LookUpScreen(EngineScreen):
         if self._kind == "cards":
             self._cards = state.player.whole_hand + state.bot.whole_hand
             mine = len(state.player.whole_hand)  # first this many are the player's
-            with BoxedPanel(title="LOOK UP — CHOOSE A CARD"):
+            with BoxedPanel(title="LOOK UP"):
+                yield Static("Choose a card", classes="panel-desc")
                 for index, card in enumerate(self._cards):
                     who = "You" if index < mine else "Opp"
-                    yield Button(f"{who}: {card.name}   {stats_line(card.stats)}", id=f"look-{index}")
+                    yield Button(f"{who}: {display_name(card.name)}  ({stats_line(card.stats)})", id=f"look-{index}")
         else:
-            with BoxedPanel(title="LOOK UP — CHOOSE A CHARACTER"):
-                yield Button(f"You — {state.player.character.name}", id="look-player")
-                yield Button(f"Opponent — {state.bot.character.name}", id="look-bot")
+            with BoxedPanel(title="LOOK UP"):
+                yield Static("Choose a character", classes="panel-desc")
+                you, opp = state.player.character, state.bot.character
+                yield Button(f"You: {display_name(you.name)}  ({char_stats(you)})", id="look-player")
+                yield Button(f"Opp: {display_name(opp.name)}  ({char_stats(opp)})", id="look-bot")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

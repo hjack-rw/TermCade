@@ -21,10 +21,12 @@ def build_game() -> Game:
     return Game(
         game_id="xiaolin_showdown",
         title="Xiaolin Showdown",
+        version="1.0",
         state_cls=XiaolinState,
         default_settings=default_settings(),
         saves_enabled=True,
-        max_slots=6,
+        max_slots=4,
         root_screen=StartScreen,
         theme_paths=[THEME],
+        min_size=(140, 56),  # tall enough for a full 6-Wu hand; ~= the browser's 1400x1250 window
     )

@@ -19,6 +19,14 @@ from termcade.ui.widgets import BoxedPanel
 from ..logic.settings import XiaolinSettings
 
 
+def _out_of_range_message(adjusted: dict[str, tuple[int, int]]) -> str:
+    """A human line per value the clamp had to change, for the invalid-settings toast."""
+    return "\n".join(
+        f"{name.replace('_', ' ').title()}: {entered} isn't allowed — nearest valid is {ok}."
+        for name, (entered, ok) in adjusted.items()
+    )
+
+
 class SettingsScreen(EngineScreen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
@@ -43,6 +51,13 @@ class SettingsScreen(EngineScreen):
         for field in fields(XiaolinSettings):
             raw = self.query_one(f"#set-{field.name}", Input).value
             values[field.name] = int(raw) if raw else getattr(XiaolinSettings(), field.name)
-        edited = XiaolinSettings(**values).to_settings(self.ctx.settings.current)
-        self.ctx.settings.save(edited)
+        coerced, adjusted = XiaolinSettings.coerce(values)
+        if adjusted:
+            # Don't silently accept an out-of-range value (which would just do nothing) — flag it as
+            # a toast, like the bot-turn log, and keep the screen open so the player can fix it.
+            self.app.notify(
+                _out_of_range_message(adjusted), title="Invalid settings", severity="warning"
+            )
+            return
+        self.ctx.settings.save(coerced.to_settings(self.ctx.settings.current))
         self.app.pop_screen()

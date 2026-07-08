@@ -3,14 +3,24 @@
 /* --- Start --------------------------------------------------------------- */
 StartScreen {
     align: center middle;
+    layers: base version;  /* the version tag floats over the corner without shifting the layout */
 }
 #start-root {
     width: auto;
     height: auto;
+    align-horizontal: center;  /* keep the title/subtitle centred over the menu panel */
+}
+/* Version tag, pinned to the bottom-left corner and dimmed so it stays out of the way. */
+#version {
+    layer: version;
+    dock: bottom;
+    width: auto;
+    color: $text-disabled;
+    padding: 0 1;
 }
 #start-root #title,
 #start-root .subtitle {
-    width: 100%;
+    width: 100%;  /* fill the root (the menu's width) so text-align can centre the text over the menu */
     text-align: center;
 }
 #start-root BoxedPanel {
@@ -24,6 +34,19 @@ VaultScreen {
 VaultScreen > BoxedPanel {
     width: 84%;
     margin: 1 0 0 0;
+    align-horizontal: center;  /* centre the auto-width children (summary line, actions block) */
+}
+VaultScreen #state {
+    width: 100%;  /* the state grid fills the panel; summary + actions stay auto-width and centre */
+    padding-right: 2;  /* keep the Deck column off the border */
+}
+VaultScreen #summary {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 1;
+}
+VaultScreen #actions {
+    width: auto;
 }
 VaultScreen > #hands {
     width: 84%;
@@ -33,9 +56,11 @@ VaultScreen > #hands {
 #hands > BoxedPanel {
     width: 1fr;
     margin: 0 1;
+    align-horizontal: center;  /* centre the rows block; each row keeps its own left alignment */
 }
-#points {
-    margin-bottom: 1;
+#hands .hand-block {
+    width: auto;
+    height: auto;
 }
 
 /* --- Settings ------------------------------------------------------------ */
@@ -43,21 +68,23 @@ SettingsScreen {
     align: center middle;
 }
 SettingsScreen BoxedPanel {
+    width: 44;  /* wider than the rows so align-horizontal has room to centre them */
     height: auto;
     max-height: 90%;
     overflow-y: auto;
+    align-horizontal: center;  /* centre the setting rows and the Save button */
 }
 SettingsScreen .setting-row {
     height: 1;
     width: auto;
 }
 SettingsScreen .setting-label {
-    width: 26;
+    width: 24;
     height: 1;
     content-align: left middle;
 }
 SettingsScreen Input {
-    width: 12;
+    width: 6;
     height: 1;
     border: none;
     background: $boost;
@@ -80,7 +107,27 @@ LookUpScreen BoxedPanel {
 LookUpScreen Button {
     width: 100%;
     margin: 1 0;
+    content-align-horizontal: left;  /* labels start at the left; the buttons themselves stay centred */
 }
+
+/* --- Character select ---------------------------------------------------- */
+CharacterSelectScreen {
+    align: center middle;
+}
+CharacterSelectScreen BoxedPanel {
+    align-horizontal: center;  /* centre the uniform-width character buttons */
+}
+CharacterSelectScreen Button {
+    width: 44;
+    content-align-horizontal: left;
+}
+/* Element colours for the character buttons — plain-class specificity, so the Button:hover /
+   Button:focus highlight (higher specificity) overrides them. */
+.elem-water { color: #4a9eff; }
+.elem-fire { color: #ff5555; }
+.elem-wind { color: #ffd43b; }
+.elem-earth { color: #51cf66; }
+.elem-metal { color: #ced4da; }
 
 /* --- Use a Power (pick a Wu to spend) ------------------------------------ */
 UsePowerScreen {
@@ -108,6 +155,8 @@ DetailScreen BoxedPanel {
 }
 DetailScreen Static {
     width: 100%;
+    text-align: center;
+    margin-bottom: 1;  /* a blank line between each field */
 }
 DetailScreen .description {
     color: $text-muted;
@@ -170,6 +219,11 @@ ChoiceModal BoxedPanel {
 ChoiceModal Button {
     width: 100%;
     margin: 1 0;
+}
+ChoiceModal .modal-prompt {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 1;
 }
 
 /* --- Outcome ------------------------------------------------------------- */

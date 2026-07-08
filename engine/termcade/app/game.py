@@ -24,6 +24,7 @@ class Game:
     game_id: str
     title: str
     state_cls: type[GameState]
+    version: str = "0.0.0"  # the cartridge's own version, shown in the menu corner
     default_settings: Settings = field(default_factory=Settings)
     saves_enabled: bool = True
     max_slots: int = 6
@@ -31,6 +32,8 @@ class Game:
     root_screen: Callable[[], Any] | None = None
     # Absolute paths to the game's TCSS theme files; the engine app loads them app-wide.
     theme_paths: list[Path] = field(default_factory=list)
+    # Minimum terminal (cols, rows); below it the engine shows a "too small" overlay. None = no floor.
+    min_size: tuple[int, int] | None = None
 
 
 class GameContext:

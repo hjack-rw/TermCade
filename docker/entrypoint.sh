@@ -10,10 +10,10 @@
 set -e
 
 if [ "${1:-}" = "serve" ]; then
-    # Bind all interfaces, but the browser's websocket URL must be a *connectable* host, not
-    # 0.0.0.0 — public_url drives that. Override PUBLIC_URL when serving behind a real hostname.
-    port="${PORT:-8000}"
-    exec python -c "from textual_serve.server import Server; Server('${GAME:-xiaolin}', host='0.0.0.0', port=${port}, title='TermCade', public_url='${PUBLIC_URL:-http://localhost:${port}}').serve()"
+    # Browser mode. termcade.serve embeds the bundled font (glyphs render with no host install) and
+    # reads GAME / PORT / PUBLIC_URL from the environment. PUBLIC_URL must be a *connectable* host,
+    # not 0.0.0.0, or the browser's websocket can't connect back — override it behind a real hostname.
+    exec python -m termcade.serve
 fi
 
 exec "${@:-xiaolin}"

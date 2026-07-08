@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import cast
 
 from textual.app import ComposeResult
-from textual.widgets import Button, Footer, Header
+from textual.widgets import Button, Footer, Header, Static
 
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
@@ -27,7 +27,8 @@ class DepositScreen(EngineScreen):
     def compose(self) -> ComposeResult:
         state = cast(XiaolinState, self.ctx.state)
         yield Header()
-        with BoxedPanel(title="DEPOSIT — CHOOSE A CARD"):
+        with BoxedPanel(title="DEPOSIT"):
+            yield Static("Choose a card", classes="panel-desc")
             for index, card in enumerate(state.player.hand):
                 yield Button(f"{card.name}   +{card.points} pts", id=f"dep-{index}")
         yield Footer()
@@ -41,6 +42,7 @@ class DepositScreen(EngineScreen):
                 ChoiceModal(
                     "This Wu has a power on Deposit — forfeit it for points?",
                     [("Yes, forfeit for points", True), ("No, keep it", False)],
+                    title="FORFEIT",
                 ),
                 lambda forfeit: self._bank(card) if forfeit else None,
             )

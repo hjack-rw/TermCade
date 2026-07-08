@@ -9,6 +9,7 @@ player choice.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, fields
 from typing import Any
 
@@ -35,6 +36,12 @@ class XiaolinSettings:
         clamp(self, "point_limit", max(2, self.point_limit))
         for hand in ("max_hand_size", "starting_hand_player", "starting_hand_bot"):
             clamp(self, hand, max(1, getattr(self, hand)))
+        # a hand is dealt to its full starting size, so its cap can't sit below either starting hand
+        clamp(
+            self,
+            "max_hand_size",
+            max(self.max_hand_size, self.starting_hand_player, self.starting_hand_bot),
+        )
         for limit in ("draw_limit", "deposit_limit", "empty_draw_limit"):
             clamp(self, limit, max(1, getattr(self, limit)))
         for points in ("starting_points_player", "starting_points_bot"):
@@ -52,6 +59,22 @@ class XiaolinSettings:
         """Write these values into an engine ``Settings``' ``options`` (keeps other options)."""
         base = settings or Settings()
         return Settings(difficulty=base.difficulty, options={**base.options, **asdict(self)})
+
+    @classmethod
+    def coerce(
+        cls, values: Mapping[str, int]
+    ) -> tuple["XiaolinSettings", dict[str, tuple[int, int]]]:
+        """Build settings from raw entered ints, clamping to a playable range. Returns the clamped
+        instance plus a report ``{field: (entered, clamped)}`` naming every value the clamp had to
+        change — empty when the input was already valid. Lets the UI reject/flag out-of-range input
+        instead of silently accepting a value that does nothing."""
+        coerced = cls(**dict(values))
+        adjusted = {
+            name: (values[name], getattr(coerced, name))
+            for name in values
+            if values[name] != getattr(coerced, name)
+        }
+        return coerced, adjusted
 
 
 def default_settings() -> Settings:
