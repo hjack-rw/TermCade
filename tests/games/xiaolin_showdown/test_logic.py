@@ -51,7 +51,7 @@ def test_catalog_loads_all_tables():
     cat = load_catalog()
     assert len(cat.powers) == 25
     assert len(cat.cards) == 25
-    assert len(cat.characters) == 7
+    assert len(cat.characters) == 10  # 4 playable + two opponent rosters of 3
     assert cat.character(1).name == "Omi"
     assert cat.opponent_characters  # the bot must have someone to be
 
@@ -338,3 +338,40 @@ def test_usable_powers_respects_the_deposit_limit():
     assert any(card is bras for card in usable_powers(state, deposit_limit=1))
     state.deposit_counter = 1  # the turn's deposit is spent → the deposit Wu is no longer usable
     assert all(card is not bras for card in usable_powers(state, deposit_limit=1))
+
+
+def test_the_two_opponent_rosters_are_disjoint():
+    catalog = load_catalog()
+    easy = {c.id for c in catalog.opponents(hard=False)}
+    hard = {c.id for c in catalog.opponents(hard=True)}
+
+    assert easy and hard  # both tiers are populated
+    assert easy.isdisjoint(hard)
+
+
+def test_no_playable_character_sits_on_an_opponent_roster():
+    catalog = load_catalog()
+    rosters = catalog.opponents(hard=False) + catalog.opponents(hard=True)
+
+    assert all(not c.is_playable for c in rosters)
+
+
+def test_a_normal_game_never_deals_a_hard_opponent():
+    catalog = load_catalog()
+    omi = catalog.character(1)
+
+    bots = {new_game(catalog, Rng(seed), omi).bot.character.id for seed in range(30)}
+
+    assert bots <= {c.id for c in catalog.opponents(hard=False)}
+
+
+def test_a_hard_game_only_deals_hard_opponents():
+    catalog = load_catalog()
+    omi = catalog.character(1)
+
+    bots = {
+        new_game(catalog, Rng(seed), omi, hard_opponents=True).bot.character.id
+        for seed in range(30)
+    }
+
+    assert bots <= {c.id for c in catalog.opponents(hard=True)}

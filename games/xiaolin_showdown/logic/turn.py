@@ -9,10 +9,15 @@ drawn from the main pile, so the duel loop can still terminate rather than stran
 from __future__ import annotations
 
 from termcade.core.rng import Rng
+from termcade.core.settings import Difficulty
 
-from .models import Player, remove_card_from_hand
-from .settings import XiaolinSettings
+from .models import Card, Player, remove_card_from_hand
+from .settings import XiaolinSettings, is_hard
 from .state import XiaolinState
+
+# What a booster (``boost``/+1) or the Morpher (``play``/+1) is worth in a showdown. They carry no
+# stats of their own, so without this premium a skilled bot would happily bank them for points.
+BOOSTER_PREMIUM = 4
 
 
 def refill_hands(state: XiaolinState, settings: XiaolinSettings, *, rng: Rng) -> None:
@@ -67,20 +72,59 @@ def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettin
         _draw_from_main(state, player)
 
 
-def bot_turn(state: XiaolinState, settings: XiaolinSettings) -> list[str]:
+def duel_value(card: Card) -> int:
+    """Roughly what ``card`` is worth held in a showdown.
+
+    Stat magnitude, not signed value: a negative stat is a *weapon* (``powers`` mirrors it onto the
+    opponent's queue), so it is as worth keeping as a positive one. Boosters and the Morpher carry no
+    stats but decide duels, hence the premium.
+    """
+    stats = sum(abs(v) for v in card.stats.values() if v is not None)
+    special = card.power.effect == 1 and card.power.trigger in ("boost", "play")
+    return stats + (BOOSTER_PREMIUM if special else 0)
+
+
+def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
+    """Which Wu the bot banks this turn — its deposit skill, dialled by difficulty.
+
+    Both bots always race for points (a bot that hoards can never reach ``point_limit``); they
+    differ in *what* they give up. An easy bot chases the biggest number and cheerfully cashes the
+    Wu it needed, which is what makes it lean so hard on whatever it keeps. The hard bot sheds its
+    least useful Wu instead — the gag card, deck filler, a 1-point trinket — and holds its weapons.
+
+    Returns ``None`` when nothing in hand is worth points.
+    """
+    candidates = [card for card in hand if card.points > 0]
+    if not candidates:
+        return None
+    if is_hard(difficulty):
+        return min(candidates, key=lambda c: (duel_value(c), -c.points))
+    return max(candidates, key=lambda c: c.points)
+
+
+def bot_turn(
+    state: XiaolinState, settings: XiaolinSettings, *, difficulty: Difficulty = Difficulty.NORMAL
+) -> list[str]:
     """The bot's between-showdown vault turn; returns a short log of what it did, for the player.
 
     It deposits (see :func:`_bot_deposits` — how it banks points toward the win) then refills one
     card toward the hand limit from its own deck, since it has no manual Draw as the player does.
     """
-    log = _bot_deposits(state, settings)
+    log = _bot_deposits(state, settings, difficulty)
     _bot_refill(state, settings)
     return log or [f"{state.bot.character.name.split('_')[0]} passed"]
 
 
-def _bot_deposits(state: XiaolinState, settings: XiaolinSettings) -> list[str]:
-    """Up to ``deposit_limit`` deposits: swap each ``deposit``/+1 Wu for a fresh draw, then cash
-    plain ``deposit``/0 Wu for their points."""
+def _bot_deposits(
+    state: XiaolinState, settings: XiaolinSettings, difficulty: Difficulty
+) -> list[str]:
+    """Up to ``deposit_limit`` deposits: swap each ``deposit``/+1 Wu for a fresh draw, then bank the
+    card :func:`pick_deposit` chooses.
+
+    Banks *any* card, matching the rule the player's Deposit screen offers (:func:`~.actions.deposit`).
+    Restricting the bot to ``deposit``-trigger Wu left it with exactly one bankable card in the whole
+    pile, so it could never race the player to ``point_limit``.
+    """
     name = state.bot.character.name.split("_")[0]
     log: list[str] = []
     deposits = 0
@@ -94,14 +138,16 @@ def _bot_deposits(state: XiaolinState, settings: XiaolinSettings) -> list[str]:
             deposits += 1
             log.append(f"{name} played {card.name} and drew a Wu")
 
-    for card in list(state.bot.whole_hand):
-        if deposits >= settings.deposit_limit:
+    # Mirrors `can_deposit`: never cash the last card out of the hand.
+    while deposits < settings.deposit_limit and len(state.bot.hand) > 1:
+        banked = pick_deposit(state.bot.hand, difficulty)
+        if banked is None:  # nothing in hand is worth points
             break
-        if card.power.trigger == "deposit" and card.power.effect == 0:
-            state.bot.points += card.points
-            remove_card_from_hand(state.bot, card)
-            deposits += 1
-            log.append(f"{name} deposited {card.name} for {card.points} pt{'s' if card.points != 1 else ''}")
+        state.bot.points += banked.points
+        remove_card_from_hand(state.bot, banked)
+        deposits += 1
+        points = banked.points
+        log.append(f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}")
     return log
 
 

@@ -82,6 +82,11 @@ SettingsScreen Input {
     border: none;
     background: $boost;
 }
+/* The Easy/Hard toggle sits under the numeric rows, above Save; it cycles rather than submits. */
+SettingsScreen #difficulty {
+    width: 100%;
+    margin-top: 1;
+}
 SettingsScreen #save {
     margin-top: 1;
 }

@@ -55,12 +55,23 @@ class Character:
     power: Power
     affiliation: str # xiaolin | heylin | construct | empty
     is_playable: bool
+    # Which opponent roster this belongs to: the easy tier (False) or the hard one (True).
+    # ``None`` on a playable character, which is on no opponent roster at all.
+    is_hard: bool | None = None
 
     @classmethod
     def from_row(cls, row: tuple, resolve_power: ResolvePower) -> "Character":
-        cid, name, force, agility, intellect, power_id, affiliation, is_playable = row
+        cid, name, force, agility, intellect, power_id, affiliation, is_playable, is_hard = row
         stats = {"force": force, "agility": agility, "intellect": intellect}
-        return cls(cid, name, stats, resolve_power(power_id), affiliation, bool(is_playable))
+        return cls(
+            cid,
+            name,
+            stats,
+            resolve_power(power_id),
+            affiliation,
+            bool(is_playable),
+            None if is_hard is None else bool(is_hard),
+        )
 
 
 @dataclass

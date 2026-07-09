@@ -25,9 +25,11 @@ def new_game(
     player_character: Character,
     *,
     settings: XiaolinSettings | None = None,
+    hard_opponents: bool = False,
 ) -> XiaolinState:
     """A fresh vault-menu state: shuffled draw pile, both hands dealt, starting points.
     ``settings`` are the (player-chosen) settings for this run; defaults are used when omitted.
+    ``hard_opponents`` picks the bot from the tougher roster instead of the easy one.
     """
     settings = settings or XiaolinSettings()
     cards = catalog.cards
@@ -52,7 +54,7 @@ def new_game(
     if has_inalienable:
         player.inalienable_hand.append(deepcopy(catalog.card(abs(player_character.power.id))))
 
-    bot_character = rng.choice(catalog.opponent_characters)  # RNG call 2
+    bot_character = rng.choice(catalog.opponents(hard=hard_opponents))  # RNG call 2
     bot = _deal(
         draw_pile,
         count=settings.starting_hand_bot,

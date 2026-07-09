@@ -116,7 +116,10 @@ class DuelScreen(EngineScreen):
         # hands settle (which may flag the run over on the point limit). Skip once the pile is spent.
         if not state.has_ended:
             await self._discard_surplus(state, settings)
-            self.app.notify("\n".join(bot_turn(state, settings)), title="Opponent's turn")
+            difficulty = self.ctx.settings.current.difficulty  # the bot's deposit skill follows it
+            self.app.notify(
+                "\n".join(bot_turn(state, settings, difficulty=difficulty)), title="Opponent's turn"
+            )
             refill_hands(state, settings, rng=rng)
         self._leave()
 

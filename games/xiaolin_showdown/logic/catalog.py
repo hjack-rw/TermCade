@@ -34,7 +34,12 @@ class Catalog:
 
     @property
     def opponent_characters(self) -> list[Character]:
+        """Every non-playable character, across both opponent rosters."""
         return [c for c in self.characters if not c.is_playable]
+
+    def opponents(self, *, hard: bool) -> list[Character]:
+        """One opponent roster: the easy tier, or the tougher stat blocks (``is_hard``)."""
+        return [c for c in self.opponent_characters if bool(c.is_hard) is hard]
 
     # Built lazily so the dataclass stays a plain data container.
     @property

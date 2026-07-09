@@ -1,22 +1,24 @@
 """Settings screen — edit the ruleset before starting a game.
 
-Each ``XiaolinSettings`` field is an integer input. Saving writes the values back through the
-engine's ``SettingsStore`` (global defaults for new games); a new game then reads them via
+Each ``XiaolinSettings`` field is an integer input, plus the Easy/Hard difficulty toggle (which
+picks both the opponent roster and the bot's deposit skill). Saving writes the values back through
+the engine's ``SettingsStore`` (global defaults for new games); a new game then reads them via
 ``XiaolinSettings.from_settings`` and the engine freezes them into that save.
 """
 
 from __future__ import annotations
 
-from dataclasses import fields
+from dataclasses import fields, replace
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Button, Footer, Header, Input, Static
 
+from termcade.core.settings import Difficulty
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
 
-from ..logic.settings import XiaolinSettings
+from ..logic.settings import XiaolinSettings, is_hard
 
 
 def _out_of_range_message(adjusted: dict[str, tuple[int, int]]) -> str:
@@ -27,11 +29,20 @@ def _out_of_range_message(adjusted: dict[str, tuple[int, int]]) -> str:
     )
 
 
+def _difficulty_label(difficulty: Difficulty) -> str:
+    return f"Difficulty:  {difficulty.value.upper()}"
+
+
 class SettingsScreen(EngineScreen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
+    # The pending choice, toggled by the button and only written on Save. Two states, never NORMAL.
+    _difficulty: Difficulty = Difficulty.EASY
+
     def compose(self) -> ComposeResult:
-        rules = XiaolinSettings.from_settings(self.ctx.settings.current)
+        current = self.ctx.settings.current
+        self._difficulty = Difficulty.HARD if is_hard(current.difficulty) else Difficulty.EASY
+        rules = XiaolinSettings.from_settings(current)
         yield Header()
         with BoxedPanel(title="SETTINGS"):
             for field in fields(XiaolinSettings):
@@ -41,10 +52,14 @@ class SettingsScreen(EngineScreen):
                     Input(value=str(getattr(rules, field.name)), id=f"set-{field.name}", type="integer"),
                     classes="setting-row",
                 )
+            yield Button(_difficulty_label(self._difficulty), id="difficulty")
             yield Button("Save", id="save", variant="primary")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "difficulty":
+            self._toggle_difficulty()
+            return
         if event.button.id != "save":
             return
         values = {}
@@ -59,5 +74,11 @@ class SettingsScreen(EngineScreen):
                 _out_of_range_message(adjusted), title="Invalid settings", severity="warning"
             )
             return
-        self.ctx.settings.save(coerced.to_settings(self.ctx.settings.current))
+        # The toggle only lands here, on Save — an abandoned screen changes nothing.
+        base = replace(self.ctx.settings.current, difficulty=self._difficulty)
+        self.ctx.settings.save(coerced.to_settings(base))
         self.app.pop_screen()
+
+    def _toggle_difficulty(self) -> None:
+        self._difficulty = Difficulty.EASY if self._difficulty is Difficulty.HARD else Difficulty.HARD
+        self.query_one("#difficulty", Button).label = _difficulty_label(self._difficulty)

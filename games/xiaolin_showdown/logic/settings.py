@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass, fields
 from typing import Any
 
-from termcade.core.settings import Settings
+from termcade.core.settings import Difficulty, Settings
 
 
 @dataclass(frozen=True)
@@ -77,6 +77,21 @@ class XiaolinSettings:
         return coerced, adjusted
 
 
+def is_hard(difficulty: Difficulty) -> bool:
+    """The game runs two tiers, not three: only HARD is the hard tier.
+
+    Picks the opponent roster (``Catalog.opponents``) and the bot's deposit skill alike, so the two
+    can never disagree. Folds a stale ``NORMAL`` (an older settings file, or the engine default)
+    into Easy.
+    """
+    return difficulty is Difficulty.HARD
+
+
 def default_settings() -> Settings:
-    """The game's shipped defaults — the starting point for the Settings screen."""
-    return XiaolinSettings().to_settings()
+    """The game's shipped defaults — the starting point for the Settings screen.
+
+    XS runs two tiers, Easy and Hard, so it pins the difficulty rather than inheriting the engine's
+    three-valued ``NORMAL`` default — the Settings screen would otherwise offer two states while a
+    third sat unreachable behind them. ``turn.is_hard`` still folds any stale ``NORMAL`` into Easy.
+    """
+    return XiaolinSettings().to_settings(Settings(difficulty=Difficulty.EASY))

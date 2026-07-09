@@ -7,6 +7,7 @@ This is the loop terminator, so the emphasis is the draw/discard edges that keep
 from __future__ import annotations
 
 from termcade.core.rng import Rng
+from termcade.core.settings import Difficulty
 
 from xiaolin_showdown.logic.models import Card, Character, Player, Power
 from xiaolin_showdown.logic.settings import XiaolinSettings
@@ -14,9 +15,12 @@ from xiaolin_showdown.logic.state import XiaolinState
 from xiaolin_showdown.logic.turn import bot_turn, max_hand_size, oversee_hand_size, refill_hands
 
 
-def _card(*, trigger="hand", effect=0, points=0) -> Card:
-    stats = {"force": 1, "agility": 1, "intellect": 1}
+def _card(*, trigger="hand", effect=0, points=0, stats=None) -> Card:
+    stats = {"force": 1, "agility": 1, "intellect": 1} if stats is None else stats
     return Card(0, "Wu", stats, Power(0, "", trigger, effect, ""), "metal", "item", points)
+
+
+_JUNK = {"force": 0, "agility": 0, "intellect": 0}  # no duel value — a hard bot banks this first
 
 
 def _player(hand: int, *, deck: int = 0) -> Player:
@@ -89,15 +93,46 @@ def test_refill_sheds_an_over_hand_and_leaves_a_short_one():
     assert len(state.bot.hand) == 2  # a short hand is left as-is (no auto-top-up)
 
 
-def test_bot_turn_cashes_a_deposit_wu_for_points():
+def test_an_easy_bot_cashes_its_most_valuable_wu_for_points():
+    """EASY reads only the points — it will happily bank a Wu it needs in the duel."""
     bot = _player(2)
     bot.hand.append(_card(trigger="deposit", effect=0, points=3))
     state = _state(_player(3), bot, main=5)
 
-    bot_turn(state, _SETTINGS)  # deposit_limit is 1
+    bot_turn(state, _SETTINGS, difficulty=Difficulty.EASY)  # deposit_limit is 1
 
     assert state.bot.points == 3
     assert len(bot.hand) == 2  # the deposited Wu left the hand
+
+
+def test_a_hard_bot_sheds_its_least_useful_wu_not_its_biggest():
+    bot = _player(2)
+    weapon = _card(points=3)  # 3 pts, but 1/1/1 of duel value
+    bot.hand.extend([weapon, _card(points=1, stats=_JUNK)])  # a statless 1-pt trinket
+
+    bot_turn(_state(_player(3), bot, main=5), _SETTINGS, difficulty=Difficulty.HARD)
+
+    assert bot.points == 1  # banked the trinket, kept the weapon
+    assert any(card is weapon for card in bot.hand)
+
+
+def test_a_hard_bot_never_banks_a_booster():
+    bot = _player(2)
+    booster = _card(trigger="boost", effect=1, points=3, stats=_JUNK)  # statless but decisive
+    bot.hand.extend([booster, _card(points=1, stats=_JUNK)])
+
+    bot_turn(_state(_player(3), bot, main=5), _SETTINGS, difficulty=Difficulty.HARD)
+
+    assert any(card is booster for card in bot.hand)  # the premium keeps it out of the bank
+
+
+def test_a_hard_bot_passes_when_nothing_in_hand_is_worth_points():
+    bot = _player(3)  # every filler card is worth 0 points
+
+    log = bot_turn(_state(_player(3), bot, main=5), _SETTINGS, difficulty=Difficulty.HARD)
+
+    assert bot.points == 0
+    assert log == ["C passed"]
 
 
 def test_bot_turn_swaps_a_deposit_power_wu_for_a_fresh_draw():
@@ -118,7 +153,7 @@ def test_bot_turn_stops_at_the_deposit_limit():
     bot.hand.extend(_card(trigger="deposit", effect=0, points=2) for _ in range(3))
     state = _state(_player(3), bot, main=0)
 
-    bot_turn(state, XiaolinSettings(max_hand_size=6, deposit_limit=1))
+    bot_turn(state, XiaolinSettings(max_hand_size=6, deposit_limit=1), difficulty=Difficulty.EASY)
 
     assert state.bot.points == 2  # only one deposit, though three Wu could be cashed
     assert len(bot.hand) == 2
@@ -140,5 +175,5 @@ def test_bot_turn_reports_what_it_did():
 
     banker = _player(2)
     banker.hand.append(_card(trigger="deposit", effect=0, points=3))
-    log = bot_turn(_state(_player(3), banker, main=5), _SETTINGS)
+    log = bot_turn(_state(_player(3), banker, main=5), _SETTINGS, difficulty=Difficulty.EASY)
     assert any("deposited" in line for line in log)
