@@ -28,16 +28,16 @@ COLORS = {
 # UI Symbol (reached automatically via font fallback), and the browser build embeds a covering font
 # in serve.py so xterm.js always has the glyphs. Written as \u/\U escapes so the source stays ASCII.
 ICONS = {
-    "wudai": "\U0001f5e1",  # dagger — the elemental warrior Wu
-    "head": "♔",  # chess king
-    "torso": "\U0001f580",  # telephone-on-modem (reads as an armoured torso)
-    "amulet": "\U0001f396",  # military medal
-    "arms": "\U0001f591",  # raised hand
-    "boots": "⛸",  # ice skate
-    "item": "\U0001f6e0",  # hammer & wrench
+    "wudai": "\U0001f5e1",  # weapon — the elemental warrior Wu
+    "head": "♔",  # crown
+    "torso": "\U0001f580",  # armor
+    "amulet": "\U0001f396",  # neckless
+    "arms": "\U0001f591",  # hand
+    "boots": "⛸",  # feet
+    "item": "\U0001f6e0",  # tools
     "xiaolin": "☯",  # yin-yang — the light-side monks
-    "heylin": "☸",  # dharma wheel — the dark side
-    "construct": "⚙",  # gear
+    "heylin": "☸",  # dharma wheel — the dark-side villains
+    "construct": "⚙",  # robot gear
     "empty": "",
 }
 

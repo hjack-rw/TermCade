@@ -18,7 +18,7 @@ class Power:
     id: int
     name: str
     trigger: str  # "hand" | "deposit" | "boost" | "play"
-    effect: int  # -1 | 0 | 1
+    effect: int  # -1 | 0 | 1 | ...
     description: str
     initiative_bonus: int = 0
 
@@ -34,10 +34,10 @@ class Power:
 class Card:
     id: int
     name: str
-    stats: dict[str, int | None]  # force / agility / intellect (None for non-combat cards)
+    stats: dict[str, int | None]  # force / agility / intellect
     power: Power
     element: str  # water | fire | wind | earth | metal
-    type: str  # wudai | head | torso | amulet | arms | boots | item | xiaolin | heylin | construct | empty
+    type: str  # wudai | head | torso | amulet | arms | boots | item | empty
     points: int
 
     @classmethod
@@ -53,7 +53,7 @@ class Character:
     name: str
     stats: dict[str, int]
     power: Power
-    affiliation: str
+    affiliation: str # xiaolin | heylin | construct | empty
     is_playable: bool
 
     @classmethod

@@ -27,7 +27,6 @@ def new_game(
     settings: XiaolinSettings | None = None,
 ) -> XiaolinState:
     """A fresh vault-menu state: shuffled draw pile, both hands dealt, starting points.
-
     ``settings`` are the (player-chosen) settings for this run; defaults are used when omitted.
     """
     settings = settings or XiaolinSettings()
