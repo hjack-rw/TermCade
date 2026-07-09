@@ -33,8 +33,8 @@ VaultScreen > BoxedPanel {
     align-horizontal: center;  /* centre the auto-width children (summary line, actions block) */
 }
 VaultScreen #state {
-    width: 100%;  /* the state grid fills the panel; summary + actions stay auto-width and centre */
-    padding-right: 2;  /* keep the Deck column off the border */
+    width: 100%;  /* the state grid fills the panel; the summary stays auto-width and centres */
+    padding: 0 8;  /* inset both edges — the duelist rows shouldn't run into the border */
 }
 VaultScreen #summary {
     width: 100%;
@@ -42,7 +42,8 @@ VaultScreen #summary {
     margin-bottom: 1;
 }
 VaultScreen #actions {
-    width: auto;
+    width: 100%;  /* the three action columns spread across the panel rather than clustering */
+    padding: 0 4;
 }
 VaultScreen > #hands {
     width: 84%;

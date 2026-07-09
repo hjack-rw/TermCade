@@ -180,9 +180,12 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
 
 
 def _actions_grid(available: dict[str, bool]) -> Table:
-    grid = Table.grid(padding=(0, 4))  # natural width so the panel can centre the whole block
+    # Expand to the panel and split it into three equal columns, so the actions spread across the
+    # width instead of huddling in a natural-width block in the middle. Each entry is centred in its
+    # own column, which keeps the block balanced left-to-right at any panel width.
+    grid = Table.grid(expand=True, padding=(0, 2))
     for _ in range(3):
-        grid.add_column(justify="left")
+        grid.add_column(ratio=1, justify="center")
     for start in range(0, len(_ACTIONS), 3):
         cells: list[Text] = [_action_cell(entry, available) for entry in _ACTIONS[start : start + 3]]
         cells += [Text("")] * (3 - len(cells))

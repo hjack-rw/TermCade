@@ -12,9 +12,9 @@ from typing import TypeVar
 
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
-from textual.widgets import Button, Static
+from textual.widgets import Static
 
-from termcade.ui.widgets import BoxedPanel
+from termcade.ui.widgets import BoxedPanel, Button
 
 T = TypeVar("T")
 

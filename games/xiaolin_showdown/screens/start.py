@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import Center, Vertical
-from textual.widgets import Button, Footer, Header, Static
+from textual.widgets import Footer, Header, Static
 
 from termcade.ui.app import BANNER
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
-from termcade.ui.widgets import BoxedPanel
+from termcade.ui.widgets import BoxedPanel, Button
 
 from ._logo import SUBTITLE_ART, TITLE_ART
 from .character_select import CharacterSelectScreen

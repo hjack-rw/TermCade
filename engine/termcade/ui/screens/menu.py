@@ -13,10 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from textual.app import ComposeResult
-from textual.widgets import Button, Footer, Header, Static
+from textual.widgets import Footer, Header, Static
 from textual.widgets.button import ButtonVariant
 
-from termcade.ui.widgets import BoxedPanel
+from termcade.ui.widgets import BoxedPanel, Button
 
 from .base import EngineScreen
 

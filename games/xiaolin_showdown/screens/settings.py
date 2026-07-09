@@ -12,11 +12,11 @@ from dataclasses import fields, replace
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Button, Footer, Header, Input, Static
+from textual.widgets import Footer, Header, Input, Static
 
 from termcade.core.settings import Difficulty
 from termcade.ui.screens.base import EngineScreen
-from termcade.ui.widgets import BoxedPanel
+from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.settings import XiaolinSettings, is_hard
 

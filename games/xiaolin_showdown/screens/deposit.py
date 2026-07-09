@@ -10,10 +10,10 @@ from typing import cast
 
 from textual import work
 from textual.app import ComposeResult
-from textual.widgets import Button, Footer, Header, Static
+from textual.widgets import Footer, Header, Static
 
 from termcade.ui.screens.base import EngineScreen
-from termcade.ui.widgets import BoxedPanel
+from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.actions import deposit
 from ..logic.models import Card
