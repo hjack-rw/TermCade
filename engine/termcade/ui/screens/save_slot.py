@@ -4,6 +4,9 @@ Driven entirely by the ``SaveManager`` on the context, so any game reuses it. It
 save or load against the context (generic) and hands navigation back to the caller: on load it
 switches to an injected ``next_screen`` factory (the game's play screen), staying UI-neutral so
 this module never imports a game.
+
+Loading also offers a per-slot ``✕`` that deletes that save (after confirming) — deleting is a thing
+you do *to* a slot you can see, so it needs no screen of its own.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Literal
 
+from textual import work
 from textual.screen import Screen
 
 from termcade.core.saves import SaveError
@@ -19,6 +23,8 @@ from termcade.core.state import GameState
 from .menu import MenuItem, MenuScreen
 
 Mode = Literal["save", "load"]
+
+DELETE_GLYPH = "✕"  # text-presentation, so it stays monochrome like the rest of the icons
 
 
 class SaveSlotScreen(MenuScreen):
@@ -41,19 +47,51 @@ class SaveSlotScreen(MenuScreen):
     def menu_items(self) -> list[MenuItem]:
         items = []
         for slot, meta in enumerate(self.ctx.saves.list()):
-            if meta is None:
-                # An empty slot can't be loaded from, but is a valid save target.
-                items.append(MenuItem(f"slot-{slot}", f"{slot + 1}.  — empty —", disabled=self._mode == "load"))
+            # `list()` hides an unreadable save as a hole, so ask the store whether the slot is
+            # really free — otherwise a corrupt save could never be seen, let alone deleted.
+            occupied = meta is not None or self.ctx.saves.exists(slot)
+            if meta is not None:
+                label = f"{slot + 1}.  {meta.title}"
+            elif occupied:
+                label = f"{slot + 1}.  — unreadable save —"
             else:
-                items.append(MenuItem(f"slot-{slot}", f"{slot + 1}.  {meta.title}"))
+                label = f"{slot + 1}.  — empty —"
+            items.append(
+                MenuItem(
+                    f"slot-{slot}",
+                    label,
+                    # An empty slot is a valid save target, but there's nothing there to load.
+                    disabled=not occupied and self._mode == "load",
+                    # Only an occupied slot can be cleared, and only while loading — the save picker
+                    # is reached mid-game, where a stray click shouldn't destroy a run.
+                    action_id=f"del-{slot}" if occupied and self._mode == "load" else None,
+                    action_label=DELETE_GLYPH,
+                )
+            )
         return items
 
     def on_select(self, item_id: str) -> None:
+        if item_id.startswith("del-"):
+            self._delete(int(item_id.removeprefix("del-")))
+            return
         slot = int(item_id.removeprefix("slot-"))
         if self._mode == "save":
             self._save(slot)
         else:
             self._load(slot)
+
+    @work
+    async def _delete(self, slot: int) -> None:
+        if not await self.confirm(
+            f"Delete the save in slot {slot + 1}? This cannot be undone.",
+            title="DELETE SAVE",
+            yes="Yes, delete it",
+            no="Keep it",
+        ):
+            return
+        self.ctx.saves.delete(slot)
+        self.app.notify(f"Slot {slot + 1} deleted.")
+        self.refresh(recompose=True)  # the freed slot shows as empty at once
 
     def _save(self, slot: int) -> None:
         state = self.ctx.state

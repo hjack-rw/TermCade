@@ -144,3 +144,86 @@ async def test_loading_a_slot_with_corrupt_payload_toasts_and_stays(make_app):
 
         assert isinstance(app.screen, SaveSlotScreen)  # stayed on the picker, no crash
         assert any("unreadable" in n.message.lower() for n in app._notifications)
+
+
+async def test_the_load_picker_offers_a_delete_button_per_occupied_slot(make_app):
+    app = make_app(_Blank)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.ctx.state = app.ctx.game.state_cls()
+        app.ctx.saves.save(0, app.ctx.state, app.ctx.rng, title="run one")
+
+        app.push_screen(SaveSlotScreen("load", next_screen=_Blank))
+        await pilot.pause()
+        assert app.screen.query_one("#del-0", Button)  # occupied slot got its ✕
+        assert not app.screen.query("#del-1")  # the empty slot did not
+
+
+async def test_the_save_picker_offers_no_delete_buttons(make_app):
+    """Saving happens mid-game; a stray click there must not be able to destroy a run."""
+    app = make_app(_Blank)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.ctx.state = app.ctx.game.state_cls()
+        app.ctx.saves.save(0, app.ctx.state, app.ctx.rng, title="run one")
+
+        app.push_screen(SaveSlotScreen("save"))
+        await pilot.pause()
+        assert not app.screen.query(".menu-action")
+
+
+async def test_confirming_the_delete_button_frees_the_slot(make_app):
+    app = make_app(_Blank)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.ctx.state = app.ctx.game.state_cls()
+        app.ctx.saves.save(0, app.ctx.state, app.ctx.rng, title="run one")
+
+        app.push_screen(SaveSlotScreen("load", next_screen=_Blank))
+        await pilot.pause()
+        await pilot.click("#del-0")
+        await pilot.pause()
+        await pilot.click("#opt-0")  # "Yes, delete it"
+        await pilot.pause()
+
+        assert app.ctx.saves.exists(0) is False
+
+
+async def test_declining_the_delete_keeps_the_save(make_app):
+    app = make_app(_Blank)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.ctx.state = app.ctx.game.state_cls()
+        app.ctx.saves.save(0, app.ctx.state, app.ctx.rng, title="run one")
+
+        app.push_screen(SaveSlotScreen("load", next_screen=_Blank))
+        await pilot.pause()
+        await pilot.click("#del-0")
+        await pilot.pause()
+        await pilot.click("#opt-1")  # "Keep it"
+        await pilot.pause()
+
+        assert app.ctx.saves.exists(0) is True
+
+
+# --- min-size overlay ----------------------------------------------------------
+
+
+async def test_the_min_size_check_survives_an_empty_screen_stack(make_app):
+    """`on_resize` arms a 0.15s timer. Quitting inside that window used to land the callback on a
+    torn-down app, where `self.screen` raises ScreenStackError."""
+    app = make_app(_Blank, min_size=(10, 10))
+    async with app.run_test(size=(40, 20)) as pilot:
+        await pilot.pause()
+
+    assert not app.screen_stack  # the app is down
+    app._enforce_min_size()  # the late timer callback: must be a no-op, not a crash
+
+
+async def test_leaving_the_app_disarms_the_resize_timer(make_app):
+    app = make_app(_Blank, min_size=(10, 10))
+    async with app.run_test(size=(40, 20)) as pilot:
+        await pilot.pause()
+        assert app._resize_timer is not None  # the boot resize armed it
+
+    assert app._resize_timer is None

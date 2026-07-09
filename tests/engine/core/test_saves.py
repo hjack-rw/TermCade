@@ -177,6 +177,9 @@ def test_list_skips_a_corrupt_slot_instead_of_crashing(tmp_path, fake_state_cls)
     listing = mgr.list()
     assert listing[0].title == "good"  # survivor still listed
     assert listing[1] is None  # corrupt slot shows as a hole, no exception
+
+
+def test_sqlite_stores_metadata_in_queryable_columns(tmp_path, fake_state_cls):
     """The DB's edge over files: metadata is real SQL, not an opaque blob."""
     db = tmp_path / "saves.db"
     mgr = _manager(SqliteBackend(db))
@@ -185,3 +188,19 @@ def test_list_skips_a_corrupt_slot_instead_of_crashing(tmp_path, fake_state_cls)
     with sqlite3.connect(db) as conn:
         title = conn.execute("SELECT title FROM saves WHERE slot = 0").fetchone()[0]
     assert title == "queryable"
+
+
+def test_exists_sees_a_slot_that_list_hides_as_corrupt(tmp_path, fake_state_cls):
+    """A corrupt save must stay reachable — otherwise it can never be deleted."""
+    root = tmp_path / "saves"
+    backend = JsonFileBackend(root)
+    mgr = _manager(backend, max_slots=3)
+    mgr.save(0, fake_state_cls(), Rng(1), title="doomed")
+    (root / "slot_0.json").write_text("{ broken", encoding="utf-8")
+
+    assert mgr.list()[0] is None  # listing shows a hole...
+    assert mgr.exists(0) is True  # ...but the slot is occupied
+
+
+def test_exists_is_false_for_an_empty_slot(backend):
+    assert _manager(backend).exists(0) is False

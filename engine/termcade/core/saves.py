@@ -322,6 +322,16 @@ class SaveManager:
                     slots[slot] = None
         return slots
 
+    def exists(self, slot: int) -> bool:
+        """Does the slot hold anything at all — even something unreadable?
+
+        ``list()`` reports a corrupt slot as a hole, so a delete screen that trusted it could never
+        clear the one save the player most wants gone. This asks the backend directly.
+        """
+        if not self._enabled or not 0 <= slot < self._max_slots:
+            return False
+        return self._backend.exists(slot)
+
     def delete(self, slot: int) -> None:
         self._guard(slot)
         self._backend.delete(slot)

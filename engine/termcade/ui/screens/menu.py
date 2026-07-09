@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from textual.app import ComposeResult
+from textual.containers import Horizontal
 from textual.widgets import Footer, Header, Static
 from textual.widgets.button import ButtonVariant
 
@@ -23,11 +24,15 @@ from .base import EngineScreen
 
 @dataclass(frozen=True)
 class MenuItem:
-    """One button in a :class:`MenuScreen`.
+    """One row of a :class:`MenuScreen` — a button, optionally with a small trailing one.
 
     ``id`` is the button's full DOM id — it is handed back verbatim to
     :meth:`MenuScreen.on_select`, so encode whatever the handler needs to decode (e.g.
     ``f"slot-{n}"``).
+
+    ``action_id`` adds a narrow button beside the main one for a secondary verb on that row (delete,
+    rename, …). It dispatches through :meth:`MenuScreen.on_select` like any other button, so the
+    handler tells them apart by their id prefix.
     """
 
     id: str
@@ -35,6 +40,8 @@ class MenuItem:
     disabled: bool = False
     variant: ButtonVariant = "default"
     classes: str = ""
+    action_id: str | None = None
+    action_label: str = ""
 
 
 class MenuScreen(EngineScreen):
@@ -57,14 +64,34 @@ class MenuScreen(EngineScreen):
         with BoxedPanel(title=self.menu_title):
             if self.menu_description is not None:
                 yield Static(self.menu_description, classes="panel-desc")
-            for item in self.menu_items():
-                yield Button(
+            items = self.menu_items()
+            # One item with a trailing button puts every item in a row: a bare button keeps its
+            # auto width and would sit short of the others, and the rows' main buttons must line up.
+            # Rows only once something needs a trailing button — otherwise every item would reserve
+            # an empty column for a button that isn't there.
+            rows = any(item.action_id for item in items)
+            for item in items:
+                button = Button(
                     item.label,
                     id=item.id,
                     disabled=item.disabled,
                     variant=item.variant,
                     classes=item.classes or None,
                 )
+                if not rows:
+                    yield button
+                elif item.action_id is not None:
+                    yield Horizontal(
+                        button,
+                        Button(item.action_label, id=item.action_id, classes="menu-action"),
+                        classes="menu-row",
+                    )
+                else:
+                    # A spacer the size of the trailing button, so this row's main button ends where
+                    # the others' do.
+                    yield Horizontal(
+                        button, Static(classes="menu-action"), classes="menu-row"
+                    )
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

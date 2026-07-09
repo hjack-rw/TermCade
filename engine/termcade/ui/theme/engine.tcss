@@ -78,6 +78,41 @@ Button.-primary:hover {
     color: $accent;
 }
 
+/* A menu row carrying a secondary verb (MenuItem.action_id): the main button takes the space, the
+   trailing one stays a small square. The panel must have a definite width for `1fr` to divide —
+   inside a `width: auto` BoxedPanel the row would size to the main button and push the trailing one
+   out past the border. */
+MenuScreen .menu-row {
+    width: 100%;
+    height: auto;
+}
+MenuScreen .menu-row > Button {
+    width: 1fr;
+}
+/* Matches both the trailing button and the blank Static standing in for it on a row that has none,
+   so every row's main button ends at the same column. */
+MenuScreen .menu-row > .menu-action {
+    width: 7;
+    min-width: 7;
+    margin: 0 2 0 0;
+}
+MenuScreen .menu-row > Button.menu-action {
+    color: $text-muted;
+}
+MenuScreen .menu-row > Button.menu-action:hover {
+    border: round $error;
+    color: $error;  /* destructive: hovering it should never look like the safe option */
+}
+
+/* The slot picker carries per-row delete buttons, so it needs a definite width (see above). Its
+   slot buttons stretch to that width — an auto-width button would leave the panel half empty. */
+SaveSlotScreen BoxedPanel {
+    width: 48;
+}
+SaveSlotScreen Button {
+    width: 1fr;
+}
+
 /* Attract scene — the brand banner centred over a one-line status. */
 #hello-root {
     width: auto;

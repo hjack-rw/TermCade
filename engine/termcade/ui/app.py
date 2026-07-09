@@ -123,12 +123,20 @@ class EngineApp(App[None]):
             self._resize_timer.stop()
         self._resize_timer = self.set_timer(0.15, self._enforce_min_size)
 
+    def on_unmount(self) -> None:
+        # Don't leave the coalescing timer armed past shutdown — it would fire into a torn-down app.
+        if self._resize_timer is not None:
+            self._resize_timer.stop()
+            self._resize_timer = None
+
     def _enforce_min_size(self) -> None:
         """Show the overlay while the window is below the game's minimum, hide it once it fits.
         Keyed off the *actual* top screen, not a bool that drifts out of sync with the stack — that
         drift was the "grow the window back and the game never returns" bug (a stale flag popped the
         game screen instead of the overlay)."""
-        if self._min_size is None:
+        if self._min_size is None or not self.screen_stack:
+            # The resize timer outlives the screens: a resize within 0.15s of quitting lands here
+            # after the stack is gone, where `self.screen` raises ScreenStackError.
             return
         min_width, min_height = self._min_size
         too_small = self.size.width < min_width or self.size.height < min_height
