@@ -28,5 +28,12 @@ def build_game() -> Game:
         max_slots=4,
         root_screen=StartScreen,
         theme_paths=[THEME],
-        min_size=(140, 56),  # tall enough for a full 6-Wu hand; ~= the browser's 1400x1250 window
+        # No floor. Every screen scrolls once its content outgrows the window (Textual's `Screen`
+        # defaults to `overflow-y: auto`), verified reachable down to 60x14 — so a "too small"
+        # overlay would only ever hide a board the player can already scroll. Zooming in past the
+        # fit is a choice, not an error.
+        min_size=None,
+        # The browser sizes its font to fit this grid, so it must cover the *tallest* screen, not
+        # the board: the start menu (banner + wordmark + 5 buttons) measures 42 rows, the vault 30.
+        fit_size=(110, 44),
     )

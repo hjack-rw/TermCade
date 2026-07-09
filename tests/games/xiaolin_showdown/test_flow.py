@@ -10,6 +10,9 @@ from termcade.ui.app import EngineApp
 from textual.widgets import Button, Input, Static
 
 from xiaolin_showdown.game import build_game
+from termcade.core.rng import Rng
+from xiaolin_showdown.logic.catalog import load_catalog
+from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.screens.character_select import CharacterSelectScreen
 from xiaolin_showdown.screens.detail import DetailScreen
 from termcade.ui.screens.dialog import ChoiceModal
@@ -369,3 +372,65 @@ async def test_saving_hard_difficulty_deals_a_hard_opponent(tmp_path):
         await pilot.click("#char-1")  # Omi
         await pilot.pause()
         assert app.ctx.state.bot.character.is_hard is True
+
+
+async def test_a_wide_vault_lays_the_hands_side_by_side(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await _boot(app, pilot)
+        await _new_game_at_vault(app, pilot)
+        rows = {p.region.y for p in app.screen.query("#hands > BoxedPanel")}
+        assert len(rows) == 1  # both panels share a row
+
+
+async def test_a_narrow_vault_stacks_the_hands(tmp_path):
+    """Below the engine's `-wide` breakpoint the panels can't sit side by side, so they stack —
+    which is what lets a zoomed-in (fewer-cells) board keep playing."""
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(90, 44)) as pilot:
+        await _boot(app, pilot)
+        await _new_game_at_vault(app, pilot)
+        assert app.screen.has_class("-narrow")
+        rows = {p.region.y for p in app.screen.query("#hands > BoxedPanel")}
+        assert len(rows) == 2  # one panel per row
+
+
+async def test_a_zoomed_in_board_scrolls_instead_of_gating(tmp_path):
+    """Auto-fit sizes the board to the window; zooming past it is the player's choice, so the
+    screen scrolls rather than blocking with a "too small" overlay."""
+    # Deal the game straight onto the board: at this size the start menu itself needs scrolling,
+    # which a player can do but `pilot.click` cannot.
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(85, 20)) as pilot:  # far below the floor this used to gate at
+        await pilot.pause()
+        catalog = load_catalog()
+        app.ctx.state = new_game(catalog, Rng(1234), catalog.character(1))
+        app.push_screen(VaultScreen())
+        await pilot.pause()
+        await pilot.pause()
+
+        assert isinstance(app.screen, VaultScreen)  # no "too small" overlay took over
+        assert app.screen.show_vertical_scrollbar
+        assert app.screen.max_scroll_y > 0
+
+        app.screen.scroll_end(animate=False)
+        await pilot.pause()
+        actions = app.screen.query_one("#actions").parent
+        assert actions.region.bottom <= 20  # the bottom panel is reachable by scrolling
+
+
+async def test_the_game_declares_no_size_floor():
+    assert build_game().min_size is None
+
+
+async def test_the_fit_size_covers_the_tallest_screen(tmp_path):
+    """Auto-fit sizes the browser font to `fit_size`. If any screen is taller, the game opens
+    already scrolled — which is what happened when it was tuned to the vault, not the start menu.
+    """
+    game = build_game()
+    fit_cols, fit_rows = game.fit_size
+    app = EngineApp(game, data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(fit_cols, fit_rows)) as pilot:
+        await _boot(app, pilot)
+        assert not app.screen.show_vertical_scrollbar, "the start menu does not fit the fit_size"
+        assert app.screen.virtual_size.height <= fit_rows

@@ -60,6 +60,30 @@ VaultScreen > #hands {
     height: auto;
 }
 
+/* Narrow terminals (engine breakpoint `-narrow`): the hand panels can't sit side by side. */
+VaultScreen.-narrow > BoxedPanel,
+VaultScreen.-narrow > #hands {
+    width: 100%;
+}
+VaultScreen.-narrow > #hands {
+    layout: vertical;
+    height: auto;
+}
+VaultScreen.-narrow {
+    align-vertical: top;  /* stacking is taller than the window; start at the top, then scroll */
+}
+VaultScreen.-narrow #hands > BoxedPanel {
+    width: 100%;
+    margin: 0 0 1 0;
+}
+VaultScreen.-narrow #state,
+VaultScreen.-narrow #actions {
+    padding: 0 1;
+}
+DuelScreen.-narrow > BoxedPanel {
+    width: 100%;
+}
+
 /* --- Settings ------------------------------------------------------------ */
 SettingsScreen BoxedPanel {
     width: 44;  /* wider than the rows so align-horizontal has room to centre them */

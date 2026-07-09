@@ -163,8 +163,8 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
     grid = Table.grid(expand=True, padding=(0, 1))
     grid.add_column(ratio=3, justify="left")  # Player n
     grid.add_column(ratio=6, justify="left")  # affiliation icon + name (stats)
-    grid.add_column(ratio=4, justify="left")  # initiative
-    grid.add_column(ratio=3, justify="right")  # deck
+    grid.add_column(ratio=3, justify="left")  # deck
+    grid.add_column(ratio=4, justify="right")  # initiative
     for label, duelist, init in (("Player 1", player, init_player), ("Player 2", bot, init_bot)):
         char = duelist.character
         name = Text(f"{affiliation_icon(char)} ")
@@ -173,8 +173,8 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
         grid.add_row(
             Text(f"{label}:", style="dim"),
             name,
-            _labelled("Initiative", str(init)),
             _labelled("Deck", str(len(duelist.deck))),
+            _labelled("Initiative", str(init)),
         )
     return grid
 

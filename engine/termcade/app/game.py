@@ -32,8 +32,11 @@ class Game:
     root_screen: Callable[[], Any] | None = None
     # Absolute paths to the game's TCSS theme files; the engine app loads them app-wide.
     theme_paths: list[Path] = field(default_factory=list)
-    # Minimum terminal (cols, rows); below it the engine shows a "too small" overlay. None = no floor.
+    # Minimum terminal (cols, rows); below it the engine shows a "too small" overlay. None = no
+    # floor, for a game whose screens scroll.
     min_size: tuple[int, int] | None = None
+    # The grid the browser build sizes its font to fit — the layout the game wants at rest.
+    fit_size: tuple[int, int] | None = None
 
 
 class GameContext:

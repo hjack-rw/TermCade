@@ -136,7 +136,18 @@ def main() -> None:
         print(f"TermCade is starting — your browser will open at {url}")
         print("Keep this window open while you play; close it to stop.")
         _log("serving")
-        serve.make_server(port=port, public_url=url, game=game, host="127.0.0.1").serve()
+        # Size the page from the cartridge's own descriptor, so the browser can't disagree with it.
+        from .game import build_game
+
+        card = build_game()
+        serve.make_server(
+            port=port,
+            public_url=url,
+            game=game,
+            host="127.0.0.1",
+            fit_size=card.fit_size or serve.DEFAULT_FIT_SIZE,
+            min_size=card.min_size,
+        ).serve()
         _log("serve() returned (server stopped)")
     except Exception:
         _log("MAIN ERROR:\n" + traceback.format_exc())

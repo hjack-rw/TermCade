@@ -26,6 +26,9 @@ BANNER = """\
     █████   ░░██████  █████     █████░███ █████ ░░█████████ ░░████████░░████████░░██████
    ░░░░░     ░░░░░░  ░░░░░     ░░░░░ ░░░ ░░░░░   ░░░░░░░░░   ░░░░░░░░  ░░░░░░░░  ░░░░░░"""
 
+# At or above this width a screen is "-wide" (room for side-by-side panels); below it, "-narrow".
+WIDE_COLS = 100
+
 
 class HelloScreen(EngineScreen):
     """Attract scene for the empty cabinet — shown when no game is loaded."""
@@ -62,6 +65,9 @@ class EngineApp(App[None]):
     """
 
     TITLE = "TERMCADE"
+
+    # Responsive classes, stamped on the active screen by width, so a game's TCSS can reflow.
+    HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (WIDE_COLS, "-wide")]
 
     # Keyboard navigation for every screen and modal. Tab is a *toggle* into "focus mode" — press it
     # once to highlight the first option, again to step back out (no option highlighted); up/down move

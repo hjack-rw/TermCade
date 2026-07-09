@@ -14,11 +14,13 @@ FROM python:3.12-slim
 LABEL org.opencontainers.image.title="TermCade" \
       org.opencontainers.image.description="Textual TUI game engine + Xiaolin Showdown"
 
-# Box-drawing + truecolour need a real terminal profile; saves live on a volume.
+# Box-drawing + truecolour need a real terminal profile; saves live on a volume. GAME_FACTORY lets
+# `serve` size the browser page from the cartridge's own descriptor rather than a copy of it.
 ENV TERMCADE_DATA_DIR=/data \
     TERM=xterm-256color \
     COLORTERM=truecolor \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    GAME_FACTORY=xiaolin_showdown.game:build_game
 
 # Install the wheel plus textual-serve (browser mode); the terminal mode needs only the wheel.
 COPY --from=builder /dist/*.whl /tmp/
