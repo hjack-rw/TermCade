@@ -47,6 +47,7 @@ class DuelScreen(EngineScreen):
         self._continue = asyncio.Event()
         self._duel: Duel | None = None
         self._retreating = False
+        self._committed = False  # once the showdown begins there is no walking away
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -62,10 +63,16 @@ class DuelScreen(EngineScreen):
         self._continue.set()
 
     def action_retreat(self) -> None:
-        """Back out before committing (before the prize card is drawn) — return to the vault."""
-        if self._duel is not None and self._duel.duel.stakes is None:
-            self._retreating = True
-            self._continue.set()
+        """Back out before the showdown begins — return to the vault.
+
+        Only the opening board offers this: from the first "Continue" the priority is locked (or the
+        coin is thrown) and the prize is drawn, so there is nothing left to walk away from.
+        """
+        if self._committed:
+            self.app.notify("Gong Yi Tanpai! There is no retreat from a showdown.")
+            return
+        self._retreating = True
+        self._continue.set()
 
     async def _await_continue(self, prompt: str) -> None:
         self.query_one("#duel-prompt", Static).update(f"▶  {prompt}")
@@ -76,7 +83,7 @@ class DuelScreen(EngineScreen):
     async def _reveal_coin_toss(self, player_won: bool) -> None:
         """Tied initiative — the player calls the coin, then learns whether they hold priority."""
         call = await self.choose(
-            "Tied initiative — call the coin.",
+            "Tied initiative —  call the coin.",  # the em-dash eats the space to its right
             [("Heads", "heads"), ("Tails", "tails")],
             title="COIN TOSS",
         )
@@ -98,10 +105,12 @@ class DuelScreen(EngineScreen):
         if self._retreating:
             self._retreat_to_vault()
             return
+        self._committed = True
+
         while True:
             stage = await duel.advance()  # one phase; a choice phase raises its modal inline
             self._show_board(duel)
-            if stage == 2 and duel.duel.player_initiative == duel.duel.bot_initiative:
+            if stage == 1 and duel.duel.player_initiative == duel.duel.bot_initiative:
                 await self._reveal_coin_toss(duel.duel.player_priority is True)
             if stage == 0:  # the end phase (the loser's stakes change hands) has run
                 break
@@ -191,6 +200,12 @@ def _card_options(cards: list[Card]) -> list[tuple[str, Card]]:
     return [(f"{card.name}  ({stats_line(card.stats)})", card) for card in cards]
 
 
+def _card_options(cards: list[Card]) -> list[tuple[str, Card]]:
+    return [(f"{card.name}  ({stats_line(card.stats)})", card) for card in cards]
+
+
+_SETUP_STAGE = 2  # named for what *you* do there: pick the challenge, or answer with the background
+
 _PHASE_NAMES = {
     0: "End",
     1: "Initiative",
@@ -206,6 +221,10 @@ def _phase_name(duel: DuelState) -> str:
     # stage 0 is reused: the fresh pre-showdown board (no winner yet) vs the closing end phase.
     if duel.stage == 0 and duel.winner_character is None:
         return "Gong Yi Tanpai!"
+    if duel.stage == _SETUP_STAGE:
+        # Setup is one stage but two moves: the priority holder names the contested stat, the other
+        # answers with the element. Title it with the move *this* duelist made.
+        return "Challenge" if duel.player_priority else "Background"
     return _PHASE_NAMES.get(duel.stage, "")
 
 
@@ -239,7 +258,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
     )
 
     parts: list[RenderableType] = [
-        Text(f"— {_phase_name(duel)} —", style="bold", justify="center"),
+        Text(f"—  {_phase_name(duel)} —", style="bold", justify="center"),  # the em-dash eats the space to its right
         "",
         prize_line,
         "",

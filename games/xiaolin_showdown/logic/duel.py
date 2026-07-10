@@ -3,13 +3,17 @@
 A duel is a *loop of showdowns* over the shared draw pile until it runs dry. One showdown walks
 stages 1→6 then a closing stage 0:
 
-    1 Initiative   → who commits first (priority; a tie is a coin toss at stage 2)
-    2 Commitment   → draw the prize card; the priority holder's side names the challenge stat
-    3 Challenge/BG → the other side names the background element
-    4 Power        → each duelist may play a boost Wu
-    5 Card         → each plays one card; :func:`~.powers.resolve_played_power` resolves it
-    6 Resolvement  → score every staked stat, decide the winner, maybe award the prize card
+    1 Commitment   → draw the prize card; a tied initiative is settled by a coin toss here
+    2 Setup        → the priority holder names the challenge stat, the other the background element
+    3 Boost        → each duelist may play a boost Wu, in addition to their card
+    4 Card         → each plays one card; :func:`~.mechanics.resolve.resolve_played_power` resolves it
+    5 Resolvement  → score every staked stat, decide the winner, maybe award the prize card
     0 End          → the loser's staked cards change hands; reset for the next showdown
+
+**Initiative is not a stage.** It is a property of the two hands, so a showdown opens with it already
+resolved and on the board: the first "Continue" either commits you to the priority you can see, or
+draws the coin toss that breaks a tie. Nothing is staked until then, so that press is the point of no
+return.
 
 **Transient — never saved.** The machine mutates deep-copied scratch cards in place; a save's
 ``snapshot()`` is valid only at the vault (no active duel). Every human decision is an injected
@@ -33,7 +37,7 @@ from .mechanics.scoring import contributing, count_end_stats, initiative
 from .models import Card, Player
 from .state import XiaolinState
 
-LAST_STAGE = 6  # the showdown cycles stages 0..6
+LAST_STAGE = 5  # the showdown cycles stages 0..5
 
 
 @dataclass
@@ -89,7 +93,18 @@ class Duel:
         self.state = state
         self.rng = rng
         self.choices = choices
-        self.duel = DuelState()
+        self.duel = self._new_round()
+
+    def _new_round(self) -> DuelState:
+        """A fresh showdown with initiative already read off the two hands.
+
+        Priority is ``None`` only on a tie, which :meth:`_commitment` settles with a coin.
+        """
+        duel = DuelState()
+        duel.player_initiative, duel.bot_initiative = initiative(self.state.player, self.state.bot)
+        if duel.player_initiative != duel.bot_initiative:
+            duel.player_priority = duel.player_initiative > duel.bot_initiative
+        return duel
 
     @property
     def is_over(self) -> bool:
@@ -103,23 +118,17 @@ class Duel:
         stage 0) always runs on the *finished* showdown before the reset wipes it.
         """
         if self.duel.stage == 0:
-            self.duel = DuelState()
+            self.duel = self._new_round()  # hands have changed; initiative is read afresh
         self.duel.stage = 0 if self.duel.stage >= LAST_STAGE else self.duel.stage + 1
         await self._STAGES[self.duel.stage](self)
         return self.duel.stage
 
     # --- stages ---------------------------------------------------------------------------
-    async def _initiative(self) -> None:
-        player_init, bot_init = initiative(self.state.player, self.state.bot)
-        self.duel.player_initiative = player_init
-        self.duel.bot_initiative = bot_init
-        self.duel.player_priority = None if player_init == bot_init else player_init > bot_init
-
     async def _commitment(self) -> None:
         self.duel.stakes = self.state.card_deck.pop(0)
         if self.duel.player_priority is None:  # tie → a fair coin decides who leads
             self.duel.player_priority = self.rng.choice([True, False])
-        # only when the bot leads does it name the challenge here; a leading player waits for stage 3
+        # only when the bot leads does it name the challenge here; a leading player waits for stage 2
         if not self.duel.player_priority:
             self.duel.challenge = bot.choose_challenge(
                 self.state.bot.character.stats,
@@ -139,7 +148,7 @@ class Duel:
                 self.state.player.character.stats,
                 self.rng,
             )
-        else:  # the bot led and chose the challenge at stage 2; the player answers the background
+        else:  # the bot led and chose the challenge at stage 1; the player answers the background
             self.duel.background = await self.choices.background(self._background_options())
 
     async def _power(self) -> None:
@@ -230,12 +239,11 @@ class Duel:
 
     _STAGES: dict[int, Callable[["Duel"], Awaitable[None]]] = {
         0: _end,
-        1: _initiative,
-        2: _commitment,
-        3: _setup,
-        4: _power,
-        5: _card,
-        6: _resolvement,
+        1: _commitment,
+        2: _setup,
+        3: _power,
+        4: _card,
+        5: _resolvement,
     }
 
     # --- helpers --------------------------------------------------------------------------

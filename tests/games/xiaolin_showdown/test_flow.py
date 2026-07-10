@@ -434,3 +434,64 @@ async def test_the_fit_size_covers_the_tallest_screen(tmp_path):
         await _boot(app, pilot)
         assert not app.screen.show_vertical_scrollbar, "the start menu does not fit the fit_size"
         assert app.screen.virtual_size.height <= fit_rows
+
+
+# --- a showdown opens with initiative resolved, and commits on the first Continue ---
+
+
+async def _open_showdown(app, pilot):
+    await _boot(app, pilot)
+    await pilot.click("#play")
+    await pilot.pause()
+    await pilot.click("#char-1")
+    await pilot.pause()
+    await pilot.press("1")  # Gong Yi Tanpai
+    await pilot.pause()
+    return app.screen
+
+
+async def test_a_showdown_opens_showing_initiative_before_anything_is_pressed(tmp_path):
+    """Initiative is a property of the hands, not a phase to click through."""
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        screen = await _open_showdown(app, pilot)
+
+        assert screen._duel.duel.stage == 0  # nothing has advanced
+        assert screen._duel.duel.bot_initiative == 1
+        assert screen._duel.duel.player_priority is False  # already known, no coin needed
+
+
+async def test_the_opening_board_stakes_nothing_so_you_may_retreat(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        screen = await _open_showdown(app, pilot)
+        assert screen._duel.duel.stakes is None
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert isinstance(app.screen, VaultScreen)
+
+
+async def test_the_first_continue_draws_the_prize_and_locks_you_in(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await _open_showdown(app, pilot)
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert app.screen._duel.duel.stakes is not None
+
+
+async def test_there_is_no_retreat_once_the_showdown_has_begun(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await _open_showdown(app, pilot)
+        await pilot.press("enter")
+        await pilot.pause()
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert isinstance(app.screen, DuelScreen)
