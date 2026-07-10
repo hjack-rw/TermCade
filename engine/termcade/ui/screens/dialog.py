@@ -8,9 +8,12 @@ value, so ``await``-ing it yields the option's type with no cast. The convenienc
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from typing import TypeVar
 
 from textual.app import ComposeResult
+from textual.content import ContentText
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
@@ -28,10 +31,12 @@ class ChoiceModal(ModalScreen[T]):
     # button; the empty string is what actually leaves the modal un-highlighted until the player tabs.
     AUTO_FOCUS = ""
 
-    def __init__(self, prompt: str, options: list[tuple[str, T]], *, title: str | None = None) -> None:
+    def __init__(
+        self, prompt: str, options: Sequence[tuple[ContentText, T]], *, title: str | None = None
+    ) -> None:
         super().__init__()
         self._prompt = prompt
-        self._options = options
+        self._options = list(options)
         self._title = title
 
     def compose(self) -> ComposeResult:

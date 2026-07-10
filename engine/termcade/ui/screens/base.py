@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from typing import TYPE_CHECKING, TypeVar, cast
 
+from textual.content import ContentText
 from textual.screen import Screen
 
 from termcade.app.game import Game, GameContext
@@ -42,7 +45,9 @@ class EngineScreen(Screen[None]):
         assert game is not None, "screen has no Game"
         return game
 
-    async def choose(self, prompt: str, options: list[tuple[str, _T]], *, title: str | None = None) -> _T:
+    async def choose(
+        self, prompt: str, options: Sequence[tuple[ContentText, _T]], *, title: str | None = None
+    ) -> _T:
         """Ask the player to pick one option; resolves with the value behind their choice."""
         return await self.app.push_screen_wait(ChoiceModal(prompt, options, title=title))
 
