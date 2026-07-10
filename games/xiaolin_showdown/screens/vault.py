@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 from textual.app import ComposeResult
@@ -17,15 +18,23 @@ from textual.widgets import Footer, Header, Static
 
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
-from termcade.ui.widgets import BoxedPanel
+from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
-from ..logic.actions import can_deposit, can_draw, draw, usable_powers
-from ..logic.mechanics.scoring import initiative
+from ..logic.actions import (
+    can_deposit,
+    can_draw,
+    deposit_blocked,
+    draw,
+    draw_blocked,
+    usable_powers,
+    use_power_blocked,
+)
+from ..logic.mechanics.scoring import initiative, initiative_sources
 from ..logic.models import Player
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
 from .deposit import DepositScreen
-from .format import affiliation_icon, char_stats, display_name, hands_lines
+from .format import affiliation_icon, bonus_tooltip, char_stats, display_name, hands_lines
 from .lookup import LookUpScreen
 from .use_power import UsePowerScreen
 
@@ -55,7 +64,7 @@ class VaultScreen(EngineScreen):
 
         with BoxedPanel(title="STATE OF THE GAME"):
             yield Static(_summary_line(player, bot, state), id="summary")
-            yield Static(_state_grid(player, bot, init_player, init_bot), id="state")
+            yield TooltipStatic(_state_grid(player, bot, init_player, init_bot), id="state")
 
         player_rows, bot_rows = hands_lines(player.whole_hand, bot.whole_hand)
         with Horizontal(id="hands"):
@@ -63,14 +72,15 @@ class VaultScreen(EngineScreen):
             yield _hand_panel(bot.character.name, bot_rows)
 
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        available = {  # keyed by the shown number so greying matches the labels in _ACTIONS
-            "1": not state.has_ended,
-            "2": can_draw(state, settings),
-            "3": can_deposit(state, settings.deposit_limit),
-            "4": bool(usable_powers(state, settings.deposit_limit)),
+        # Keyed by the shown number, so the greying and the hover reason come from the same source.
+        blocked: dict[str, str | None] = {
+            "1": "The run is over." if state.has_ended else None,
+            "2": draw_blocked(state, settings),
+            "3": deposit_blocked(state, settings.deposit_limit),
+            "4": use_power_blocked(state, settings.deposit_limit),
         }
         with BoxedPanel(title="ACTIONS"):
-            yield Static(_actions_grid(available), id="actions")
+            yield TooltipStatic(_actions_grid(blocked), id="actions")
 
         yield Footer()
 
@@ -142,12 +152,27 @@ _ACTIONS = [
     "Esc. Return to menu",
 ]
 
+# Hover text for an action that *is* available; a blocked one shows why instead (see _action_cell).
+_ACTION_HELP = {
+    "1": "Duel for the next Wu on the pile.",
+    "2": "Take a Wu from your personal deck.",
+    "3": "Cash a Wu from your hand for points.",
+    "4": "Spend a Wu for its power.",
+    "5": "Inspect any Wu in either hand.",
+    "6": "Inspect either duelist.",
+    "0": "Save this run to a slot.",
+    "Esc": "Back to the main menu.",
+}
 
-def _labelled(label: str, value: str) -> Text:
+
+def _labelled(label: str, value: str | Text) -> Text:
     """A dimmed label with its value — the muted-label pairing used across the state panel."""
     text = Text()
     text.append(f"{label}: ", style="dim")
-    text.append(value)
+    if isinstance(value, Text):
+        text.append_text(value)
+    else:
+        text.append(value)
     return text
 
 
@@ -160,26 +185,41 @@ def _summary_line(player: Player, bot: Player, state: XiaolinState) -> Text:
 
 
 def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) -> Table:
+    # The Wu behind each initiative: this duelist's own buffs plus the opponent's debuffs, which is
+    # why a card in your bracket may be sitting in their hand.
+    player_sources, bot_sources = initiative_sources(player, bot)
+
     grid = Table.grid(expand=True, padding=(0, 1))
     grid.add_column(ratio=3, justify="left")  # Player n
     grid.add_column(ratio=6, justify="left")  # affiliation icon + name (stats)
     grid.add_column(ratio=3, justify="left")  # deck
     grid.add_column(ratio=4, justify="right")  # initiative
-    for label, duelist, init in (("Player 1", player, init_player), ("Player 2", bot, init_bot)):
+    rows = (
+        ("Player 1", player, init_player, player_sources),
+        ("Player 2", bot, init_bot, bot_sources),
+    )
+    for label, duelist, init, sources in rows:
         char = duelist.character
         name = Text(f"{affiliation_icon(char)} ")
         name.append(display_name(char.name).upper(), style="bold")
         name.append(f" ({char_stats(char)})", style="dim")  # stats in brackets, next to the name
+        # The two rows share one Static, so a widget-level tooltip could not tell them apart — the
+        # bonuses ride on this cell's own span instead (see TooltipStatic). Always tagged, even with
+        # nothing applied, so a hover that shows nothing means the cursor missed, not that the
+        # duelist is unbuffed.
+        bonuses = [card.power.initiative_bonus for card in sources]
+        initiative_cell = _labelled("Initiative", str(init))
+        initiative_cell.stylize(Style(meta={"tooltip": bonus_tooltip(bonuses)}))
         grid.add_row(
             Text(f"{label}:", style="dim"),
             name,
             _labelled("Deck", str(len(duelist.deck))),
-            _labelled("Initiative", str(init)),
+            initiative_cell,
         )
     return grid
 
 
-def _actions_grid(available: dict[str, bool]) -> Table:
+def _actions_grid(blocked: dict[str, str | None]) -> Table:
     # Expand to the panel and split it into three equal columns, so the actions spread across the
     # width instead of huddling in a natural-width block in the middle. Each entry is centred in its
     # own column, which keeps the block balanced left-to-right at any panel width.
@@ -187,20 +227,24 @@ def _actions_grid(available: dict[str, bool]) -> Table:
     for _ in range(3):
         grid.add_column(ratio=1, justify="center")
     for start in range(0, len(_ACTIONS), 3):
-        cells: list[Text] = [_action_cell(entry, available) for entry in _ACTIONS[start : start + 3]]
+        cells: list[Text] = [_action_cell(entry, blocked) for entry in _ACTIONS[start : start + 3]]
         cells += [Text("")] * (3 - len(cells))
         grid.add_row(*cells)
     return grid
 
 
-def _action_cell(entry: str, available: dict[str, bool]) -> Text:
+def _action_cell(entry: str, blocked: dict[str, str | None]) -> Text:
     key, _, rest = entry.partition(". ")
+    reason = blocked.get(key)
     cell = Text()
-    if available.get(key, True):
+    if reason is None:
         cell.append(f"{key}. ", style="bold")
         cell.append(rest)
     else:
         cell.append(f"{key}. {rest}", style="dim")  # greyed out — you can't take this action now
+    # Every action is tagged, so hovering a live one confirms what it does and a greyed one says why
+    # it is out of reach (see TooltipStatic). Silence means the cursor missed the text.
+    cell.stylize(Style(meta={"tooltip": reason or _ACTION_HELP.get(key, rest)}))
     return cell
 
 

@@ -13,7 +13,7 @@ from termcade.ui.widgets import BoxedPanel, Button
 from ..logic.models import Card
 from ..logic.state import XiaolinState
 from .detail import DetailScreen
-from .format import char_stats, display_name, stats_line
+from .format import card_label, char_stats, display_name, stats_line
 
 Kind = Literal["cards", "characters"]
 
@@ -36,7 +36,8 @@ class LookUpScreen(EngineScreen):
                 yield Static("Choose a card", classes="panel-desc")
                 for index, card in enumerate(self._cards):
                     who = "You" if index < mine else "Opp"
-                    yield Button(f"{who}: {display_name(card.name)}  ({stats_line(card.stats)})", id=f"look-{index}")
+                    label = card_label(card, f"  ({stats_line(card.stats)})", prefix=f"{who}: ")
+                    yield Button(label, id=f"look-{index}")
         else:
             with BoxedPanel(title="LOOK UP"):
                 yield Static("Choose a character", classes="panel-desc")

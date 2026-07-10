@@ -19,6 +19,7 @@ from ..logic.actions import deposit
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
+from .format import card_label
 
 
 class DepositScreen(EngineScreen):
@@ -30,7 +31,7 @@ class DepositScreen(EngineScreen):
         with BoxedPanel(title="DEPOSIT"):
             yield Static("Choose a card", classes="panel-desc")
             for index, card in enumerate(state.player.hand):
-                yield Button(f"{card.name}   +{card.points} pts", id=f"dep-{index}")
+                yield Button(card_label(card, f"   +{card.points} pts"), id=f"dep-{index}")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

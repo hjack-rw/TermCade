@@ -18,7 +18,7 @@ from ..logic.actions import usable_powers, use_power
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
-from .format import trigger_label
+from .format import card_label, trigger_label
 
 
 class UsePowerScreen(EngineScreen):
@@ -33,7 +33,7 @@ class UsePowerScreen(EngineScreen):
         with BoxedPanel(title="USE A POWER"):
             yield Static("Choose a Wu", classes="panel-desc")
             for index, card in enumerate(self._usable):
-                yield Button(f"{card.name}   ({trigger_label(card.power)})", id=f"pow-{index}")
+                yield Button(card_label(card, f"   ({trigger_label(card.power)})"), id=f"pow-{index}")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

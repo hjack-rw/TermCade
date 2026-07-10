@@ -14,6 +14,7 @@ from termcade.ui.widgets import BoxedPanel
 RULES = [
     'Same "Initiative Bonuses" don\'t stack — different ones do.',
     "Two Showdowns in a row can't use the exact same Challenge and/or Background (when possible).",
+    "A Wu with a negative stat curses your Opponent: it lands on their side instead.",
 ]
 
 
