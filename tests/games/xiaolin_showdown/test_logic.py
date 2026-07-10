@@ -24,7 +24,7 @@ from xiaolin_showdown.logic.actions import (
 )
 from xiaolin_showdown.logic.bot import choose_background, choose_card, choose_challenge
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.mechanics import count_end_stats, initiative
+from xiaolin_showdown.logic.mechanics.scoring import count_end_stats, initiative
 from xiaolin_showdown.logic.models import Card, Character, Player, Power
 from xiaolin_showdown.logic.outcome import final_score
 from xiaolin_showdown.logic.settings import XiaolinSettings
@@ -107,6 +107,7 @@ def _card(force, agility, intellect, element="metal", *, trigger="hand", effect=
 _NO_STATS = {"force": 0, "agility": 0, "intellect": 0}
 _STATS = ["force", "agility", "intellect"]
 _ELEMENTS = ["water", "fire", "wind", "earth", "metal"]
+_NO_POWER = Power(0, "", "none", 0, "")
 
 
 def test_bot_picks_the_challenge_where_it_is_strongest():
@@ -154,10 +155,15 @@ def test_count_end_stats_elemental_bonus_rewards_match_penalises_opposite():
     assert count_end_stats("force", 2, opposite, _NO_STATS, "water") == -2
 
 
-def test_serpents_tail_play_card_cancels_the_elemental_bonus():
-    queue = [_card(0, 0, 0, "water"), _card(0, 0, 0, "water", trigger="play", effect=-1)]
-    # without the cancel this would be 2 * (1 + 1) = 4; the play/−1 card forces it to 0
-    assert count_end_stats("force", 2, queue, _NO_STATS, "water") == 0
+def test_count_end_stats_does_not_inspect_powers():
+    """Whether the elemental bonus applies is the caller's call (see `DuelState`).
+
+    This used to scan the queue for a `play`/-1 card — a state the duel never produces, since a
+    played card enters as a stand-in wearing a neutral power. The scan was dead, and the test that
+    covered it built a queue by hand.
+    """
+    tail = _card(0, 0, 0, "water", trigger="play", effect=-1)
+    assert count_end_stats("force", 2, [tail], _NO_STATS, "water") == 2
 
 
 def test_deposit_cashes_a_card_for_its_points():
@@ -375,3 +381,24 @@ def test_a_hard_game_only_deals_hard_opponents():
     }
 
     assert bots <= {c.id for c in catalog.opponents(hard=True)}
+
+
+# --- the elemental bonus reads two sets of cards, in opposite directions ------------
+
+
+def test_a_curse_mirror_costs_you_the_bonus_it_would_have_earned_its_caster():
+    """A resonant curse cast at you bites deeper: the ±1 is negated, not ignored."""
+    water_curse = Card(1, "Curse", {"force": 0, "agility": 0, "intellect": 0}, _NO_POWER, "water", "item", 0)
+
+    assert count_end_stats("force", 1, [water_curse], _NO_STATS, "water", earns_bonus=[]) == 0
+    assert (
+        count_end_stats("force", 1, [water_curse], _NO_STATS, "water", earns_bonus=[], suffers_bonus=[water_curse])
+        == -1
+    )
+
+
+def test_the_same_wu_earns_the_bonus_when_you_are_the_one_who_played_it():
+    """Guards the sign: identical card, opposite side of the table, opposite result."""
+    water_wu = Card(1, "Wu", {"force": 0, "agility": 0, "intellect": 0}, _NO_POWER, "water", "item", 0)
+
+    assert count_end_stats("force", 1, [water_wu], _NO_STATS, "water", earns_bonus=[water_wu]) == 1

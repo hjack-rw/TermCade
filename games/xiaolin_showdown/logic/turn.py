@@ -11,7 +11,7 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 from termcade.core.settings import Difficulty
 
-from .models import Card, Player, remove_card_from_hand
+from .models import Card, Player
 from .settings import XiaolinSettings, is_hard
 from .state import XiaolinState
 
@@ -58,7 +58,7 @@ def oversee_hand_size(
 
     for _ in range(over):
         card = rng.choice(player.hand)
-        remove_card_from_hand(player, card)
+        player.remove_card(card)
         player.deck.append(card)
     return False
 
@@ -134,7 +134,7 @@ def _bot_deposits(
             break
         if card.power.trigger == "deposit" and card.power.effect == 1 and state.card_deck:
             _draw_from_main(state, state.bot)  # trade the power card for a fresh one
-            remove_card_from_hand(state.bot, card)
+            state.bot.remove_card(card)
             deposits += 1
             log.append(f"{name} played {card.name} and drew a Wu")
 
@@ -144,7 +144,7 @@ def _bot_deposits(
         if banked is None:  # nothing in hand is worth points
             break
         state.bot.points += banked.points
-        remove_card_from_hand(state.bot, banked)
+        state.bot.remove_card(banked)
         deposits += 1
         points = banked.points
         log.append(f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}")

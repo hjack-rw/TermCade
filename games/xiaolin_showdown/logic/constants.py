@@ -1,11 +1,23 @@
-"""Structural constants — values tied to the card-data layout, not player knobs.
+"""Frozen game data — the element wheel and the card-layout constants.
 
-Player-tunable rules (hand sizes, deck size, point limit, draw/deposit limits, starting
-points) live in :mod:`settings` as ``XiaolinSettings`` and are edited as engine settings. Only
-genuinely structural values remain here.
+Not player knobs: hand sizes, deck size, point limit, draw/deposit limits and starting points are
+tunable and live in :mod:`settings` as ``XiaolinSettings``. Everything here is fixed by the rules or
+by the shape of the bundled card DB.
 """
 
 from __future__ import annotations
+
+ELEMENTS = ("water", "fire", "wind", "earth", "metal")
+
+# water⇄fire and wind⇄earth oppose each other; ``metal`` is neutral and has no opposite. In a duel a
+# card scores +1 with a matching background, −1 against its opposite (or when the background is
+# metal), 0 otherwise — see ``mechanics.scoring._element_score``.
+OPPOSITES = {
+    "water": "fire",
+    "fire": "water",
+    "wind": "earth",
+    "earth": "wind",
+}
 
 # "Beginning Wu" cards (power_id < 0) are tied to a character by id == abs(power_id):
 #   0     blank — the template/dummy card and deck filler/padding

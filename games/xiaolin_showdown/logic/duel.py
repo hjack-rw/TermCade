@@ -26,10 +26,11 @@ from dataclasses import dataclass, field
 from termcade.core.rng import Rng
 
 from . import bot
-from .elements import ELEMENTS
-from .mechanics import count_end_stats, initiative
-from .models import Card, Player, remove_card_from_hand
-from .powers import resolve_played_power
+from .constants import ELEMENTS
+from .mechanics.powers import is_boost_slot
+from .mechanics.resolve import resolve_played_power
+from .mechanics.scoring import contributing, count_end_stats, initiative
+from .models import Card, Player
 from .state import XiaolinState
 
 LAST_STAGE = 6  # the showdown cycles stages 0..6
@@ -48,11 +49,22 @@ class DuelState:
     bot_stakes: list[Card] = field(default_factory=list)
     player_queue: list[Card] = field(default_factory=list)  # resolved cards feeding scoring
     bot_queue: list[Card] = field(default_factory=list)
+    # The curse mirrors a *negative* Wu landed on this side: the very objects sitting in the queue
+    # above, so the board can tell "I played this" from "this was done to me". Display only.
+    player_suffered: list[Card] = field(default_factory=list)
+    bot_suffered: list[Card] = field(default_factory=list)
+    # Which of the mirrors above are a booster's share of a curse. A mirror is inert — its power is
+    # stripped — so nothing else can tell, and the board must join it to what it boosts. Display only.
+    player_amplifiers: list[Card] = field(default_factory=list)
+    bot_amplifiers: list[Card] = field(default_factory=list)
     player_result: list[int] = field(default_factory=list)  # per-stat end values (for display)
     bot_result: list[int] = field(default_factory=list)
     winner: bool | None = None  # True = player won, False = bot won
     winner_character: str | None = None
     card_won: bool = False
+    # A "Serpent's Tail" (play/−1) played by *either* duelist voids the elemental bonus for the whole
+    # showdown — a condition of the duel, not of the queue it was played into.
+    elemental_bonus_cancelled: bool = False
 
 
 @dataclass
@@ -177,11 +189,19 @@ class Duel:
         score = 0
         for stat in stats:
             elemental_bonus, point = (1, 2) if stat == challenge else (0, 1)
+            if self.duel.elemental_bonus_cancelled:  # a Serpent's Tail is on the table
+                elemental_bonus = 0
             player_end = count_end_stats(
-                stat, elemental_bonus, self.duel.player_queue, self.state.player.character.stats, background
+                stat, elemental_bonus, self.duel.player_queue, self.state.player.character.stats,
+                background,
+                earns_bonus=self._earns_bonus(self.duel.player_queue, self.duel.player_suffered),
+                suffers_bonus=contributing(self.duel.player_suffered),
             )
             bot_end = count_end_stats(
-                stat, elemental_bonus, self.duel.bot_queue, self.state.bot.character.stats, background
+                stat, elemental_bonus, self.duel.bot_queue, self.state.bot.character.stats,
+                background,
+                earns_bonus=self._earns_bonus(self.duel.bot_queue, self.duel.bot_suffered),
+                suffers_bonus=contributing(self.duel.bot_suffered),
             )
             player_result.append(player_end)
             bot_result.append(bot_end)
@@ -205,7 +225,7 @@ class Duel:
         winner, loser = self._winner_and_loser()
         forfeit = self.duel.bot_stakes if self.duel.winner else self.duel.player_stakes
         for card in forfeit:
-            remove_card_from_hand(loser, card)
+            loser.remove_card(card)
             winner.hand.append(card)
 
     _STAGES: dict[int, Callable[["Duel"], Awaitable[None]]] = {
@@ -227,7 +247,7 @@ class Duel:
         return [e for e in ELEMENTS if e not in self.state.previous_background]
 
     def _boost_options(self, player: Player) -> list[Card]:
-        return [c for c in player.whole_hand if c.power.trigger == "boost"]
+        return [c for c in player.whole_hand if is_boost_slot(c.power)]
 
     def _playable(self, player: Player, staked: list[Card]) -> list[Card]:
         # regular play draws from the hand only (the inalienable Wu is boost-only)
@@ -237,6 +257,16 @@ class Duel:
         if card.power.effect > 0:  # a positive boost can be lost, so it joins the stakes
             stakes.append(card)
         queue.append(deepcopy(card))  # a private scratch copy the resolver may amplify
+
+    @staticmethod
+    def _earns_bonus(queue: list[Card], suffered: list[Card]) -> list[Card]:
+        """The Wu this duelist played that still contribute — the only cards the background rewards.
+
+        A curse mirror in the queue is the *opponent's* Wu. It reads the background too, but against
+        this duelist — see ``suffers_bonus`` in :func:`~.mechanics.scoring.count_end_stats`.
+        """
+        mine = [card for card in queue if not any(card is mirror for mirror in suffered)]
+        return contributing(mine)
 
     def _contested(self) -> tuple[str, str]:
         assert self.duel.challenge is not None and self.duel.background is not None

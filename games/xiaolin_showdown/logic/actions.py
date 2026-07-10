@@ -6,7 +6,7 @@ hand limit. Together, shelving a card and drawing a fresh one is how the player 
 
 from __future__ import annotations
 
-from .models import Card, remove_card_from_hand
+from .models import Card
 from .settings import XiaolinSettings
 from .state import XiaolinState
 from .turn import max_hand_size
@@ -16,10 +16,23 @@ FIZZLE_MESSAGE = "You feel like something should have happened..."
 DRAW_MESSAGE = "Chronokinesis warps time — you draw a Wu!"
 
 
+def deposit_blocked(state: XiaolinState, deposit_limit: int) -> str | None:
+    """Why a deposit is disallowed right now, or ``None`` when it is allowed.
+
+    The ``can_*`` predicates are defined as "no reason", so a greyed action and the explanation for
+    it can never disagree.
+    """
+    if state.deposit_counter >= deposit_limit:
+        return "Already deposited this turn."
+    if len(state.player.hand) <= 1:
+        return "Only one Wu left in hand."
+    return None
+
+
 def can_deposit(state: XiaolinState, deposit_limit: int) -> bool:
     """A hand card may be cashed for points, unless it would empty the hand or the turn's
     deposit limit is spent."""
-    return len(state.player.hand) > 1 and state.deposit_counter < deposit_limit
+    return deposit_blocked(state, deposit_limit) is None
 
 
 def deposit(state: XiaolinState, card: Card) -> None:
@@ -32,14 +45,21 @@ def deposit(state: XiaolinState, card: Card) -> None:
     state.deposit_counter += 1
 
 
+def draw_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | None:
+    """Why a draw is disallowed right now, or ``None`` when it is allowed."""
+    if state.draw_counter >= settings.draw_limit:
+        return "Already drawn this turn."
+    if not state.player.deck:
+        return "Your personal deck is empty."
+    if len(state.player.whole_hand) >= max_hand_size(state.player, settings.max_hand_size):
+        return "Your hand is full."
+    return None
+
+
 def can_draw(state: XiaolinState, settings: XiaolinSettings) -> bool:
     """The player may pull one Wu from their personal deck — if the deck holds one, this turn's
     draw is unspent, and the hand has room under the size limit."""
-    return (
-        bool(state.player.deck)
-        and state.draw_counter < settings.draw_limit
-        and len(state.player.whole_hand) < max_hand_size(state.player, settings.max_hand_size)
-    )
+    return draw_blocked(state, settings) is None
 
 
 def draw(state: XiaolinState) -> Card:
@@ -62,6 +82,19 @@ def usable_powers(state: XiaolinState, deposit_limit: int) -> list[Card]:
     ]
 
 
+def use_power_blocked(state: XiaolinState, deposit_limit: int) -> str | None:
+    """Why no power can be used right now, or ``None`` when one can."""
+    if usable_powers(state, deposit_limit):
+        return None
+    # A `deposit`-trigger Wu only counts while a deposit is still allowed, so a spent deposit is the
+    # more useful thing to say than "no Wu with a power".
+    if state.deposit_counter >= deposit_limit and any(
+        card.power.trigger == "deposit" for card in state.player.whole_hand
+    ):
+        return "Already deposited this turn."
+    return "No Wu with a usable power."
+
+
 def use_power(state: XiaolinState, card: Card) -> str:
     """Fire ``card``'s power, then discard it for **no points**; return a line describing what
     happened.
@@ -78,5 +111,5 @@ def use_power(state: XiaolinState, card: Card) -> str:
         if not state.card_deck:
             state.has_ended = True
     state.deposit_counter += 1
-    remove_card_from_hand(state.player, card)  # discarded, no points
+    state.player.remove_card(card)  # discarded, no points
     return DRAW_MESSAGE if drew else FIZZLE_MESSAGE

@@ -11,9 +11,9 @@ from termcade.core.rng import Rng
 
 from xiaolin_showdown.logic.catalog import load_catalog
 from xiaolin_showdown.logic.duel import Duel, DuelChoices, DuelState
-from xiaolin_showdown.logic.elements import ELEMENTS
+from xiaolin_showdown.logic.constants import ELEMENTS
 from xiaolin_showdown.logic.models import Card, Power
-from xiaolin_showdown.logic.powers import resolve_played_power
+from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.turn import refill_hands
@@ -71,7 +71,7 @@ def test_a_negative_card_curses_the_opponent_and_is_spent_on_your_side():
     # ...while a mirror lands on the opponent, stripped of its element so it earns no bonus.
     mirror = duel.bot_queue[0]
     assert mirror.stats == {"force": -2, "agility": 0, "intellect": 0}
-    assert mirror.element == ""
+    assert mirror.element == "water"
 
 
 def test_a_boost_lends_no_stats_of_its_own():
@@ -102,9 +102,21 @@ def test_a_queued_booster_flips_to_the_opponent_on_a_negative_card():
     resolve_played_power(duel, _card(-3, -1, 0, element="water"), is_player=True, element="water")
 
     assert booster.stats == {"force": 0, "agility": 0, "intellect": 0}  # spent on your side
-    opponent_booster = duel.bot_queue[-1]
-    assert opponent_booster.stats == {"force": -1, "agility": -1, "intellect": 0}
-    assert opponent_booster.element == ""
+    amplifier, curse = duel.bot_queue  # the booster lands left of the curse it doubled
+    assert amplifier.stats == {"force": -1, "agility": -1, "intellect": 0}
+    assert amplifier.element == "water"  # a mirror keeps what it is; only its power is stripped
+    assert curse.stats == {"force": -3, "agility": -1, "intellect": 0}
+
+
+def test_a_mirrored_booster_cannot_boost_the_duelist_it_lands_on():
+    """It keeps the booster's *name*, never its power — else the victim's next card is amplified
+    by their attacker's Wu, because it sits at the head of their queue."""
+    duel = DuelState(background="water")
+    duel.player_queue.append(_card(0, 0, 0, element="water", trigger="boost", effect=1))
+
+    resolve_played_power(duel, _card(-3, -1, 0, element="water"), is_player=True, element="water")
+
+    assert all(card.power.trigger == "none" for card in duel.bot_queue)
 
 
 # --- the stage machine (scripted, headless) ----------------------------------------------

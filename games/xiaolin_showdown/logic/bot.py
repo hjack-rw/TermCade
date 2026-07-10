@@ -11,8 +11,9 @@ from collections.abc import Mapping, Sequence
 
 from termcade.core.rng import Rng
 
-from .elements import OPPOSITES
-from .mechanics import count_end_stats
+from .constants import OPPOSITES
+from .mechanics.powers import Mechanic, mechanic_of
+from .mechanics.scoring import count_end_stats
 from .models import Card
 
 
@@ -89,9 +90,12 @@ def choose_card(
     best: Card | None = None
     best_value = 0
     for card in bot_hand:
+        mechanic = mechanic_of(card.power)
         for stat in bot_stats:
             elemental_bonus = 1 if stat == challenge else 0
-            if card.power.trigger == "play" and card.power.effect == 1:
+            if mechanic is Mechanic.INTANGIBLE:
+                elemental_bonus = 0  # playing it voids the bonus it would otherwise earn
+            if mechanic is Mechanic.MORPH:
                 add = 2 if stat == challenge else 1  # "moby morpher" stand-in
             else:
                 value = card.stats[stat]

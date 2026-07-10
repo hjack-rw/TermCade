@@ -25,8 +25,8 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
 
 from ..logic.duel import Duel, DuelChoices, DuelState
-from ..logic.elements import ELEMENTS
-from ..logic.models import Card, Player, remove_card_from_hand
+from ..logic.constants import ELEMENTS
+from ..logic.models import Card, Player
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
 from ..logic.turn import bot_turn, max_hand_size, refill_hands
@@ -133,7 +133,7 @@ class DuelScreen(EngineScreen):
                 _card_options(state.player.hand),
                 title="DISPOSE",
             )
-            remove_card_from_hand(state.player, card)
+            state.player.remove_card(card)
             state.player.deck.append(card)
 
     def _leave(self) -> None:

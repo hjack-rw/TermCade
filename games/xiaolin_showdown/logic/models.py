@@ -1,16 +1,12 @@
 """Domain models — cards, powers, characters, and a duelist.
 
-Plain data only; any display formatting is intentionally left out — rendering belongs to
-screens. Rows come from the bundled card DB via :mod:`catalog`.
+Plain data only. Display formatting belongs to screens; decoding a DB row belongs to
+:mod:`catalog`, which is the one module that knows the column order.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable
-
-# A card/character row's 6th column is a *power id*; resolution is a lookup.
-ResolvePower = Callable[[int], "Power"]
 
 
 @dataclass
@@ -22,13 +18,6 @@ class Power:
     description: str
     initiative_bonus: int = 0
 
-    @classmethod
-    def from_row(cls, row: tuple) -> "Power":
-        pid, name, trigger, effect, description = row
-        # initiative bonus is encoded after a "~" only on passive hand powers
-        bonus = int(description.split("~")[1]) if (trigger == "hand" and effect == 0) else 0
-        return cls(pid, name, trigger, effect, description.split("~")[0], bonus)
-
 
 @dataclass
 class Card:
@@ -39,12 +28,6 @@ class Card:
     element: str  # water | fire | wind | earth | metal
     type: str  # wudai | head | torso | amulet | arms | boots | item | empty
     points: int
-
-    @classmethod
-    def from_row(cls, row: tuple, resolve_power: ResolvePower) -> "Card":
-        cid, name, force, agility, intellect, power_id, element, type_, points = row
-        stats = {"force": force, "agility": agility, "intellect": intellect}
-        return cls(cid, name, stats, resolve_power(power_id), element, type_, points)
 
 
 @dataclass
@@ -58,20 +41,6 @@ class Character:
     # Which opponent roster this belongs to: the easy tier (False) or the hard one (True).
     # ``None`` on a playable character, which is on no opponent roster at all.
     is_hard: bool | None = None
-
-    @classmethod
-    def from_row(cls, row: tuple, resolve_power: ResolvePower) -> "Character":
-        cid, name, force, agility, intellect, power_id, affiliation, is_playable, is_hard = row
-        stats = {"force": force, "agility": agility, "intellect": intellect}
-        return cls(
-            cid,
-            name,
-            stats,
-            resolve_power(power_id),
-            affiliation,
-            bool(is_playable),
-            None if is_hard is None else bool(is_hard),
-        )
 
 
 @dataclass
@@ -95,15 +64,14 @@ class Player:
         Initiative stays hand-only; the Wu never joins it."""
         return self.inalienable_hand + self.hand
 
+    def remove_card(self, card: Card) -> None:
+        """Remove the exact ``card`` from the hand or the inalienable slot.
 
-def remove_card_from_hand(player: Player, card: Card) -> None:
-    """Remove the exact ``card`` from the player's hand or inalienable slot.
-
-    Identity, not equality: the draw pile is padded with value-equal blank cards, so
-    ``list.remove`` (which matches by value equality) can drop the wrong instance.
-    """
-    for holder in (player.hand, player.inalienable_hand):
-        for index, held in enumerate(holder):
-            if held is card:
-                del holder[index]
-                return
+        Identity, not equality: the draw pile is padded with value-equal blank cards, so
+        ``list.remove`` (which matches by value equality) can drop the wrong instance.
+        """
+        for holder in (self.hand, self.inalienable_hand):
+            for index, held in enumerate(holder):
+                if held is card:
+                    del holder[index]
+                    return

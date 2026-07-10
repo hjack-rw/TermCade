@@ -20,7 +20,7 @@ from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel
 
 from ..logic.actions import can_deposit, can_draw, draw, usable_powers
-from ..logic.mechanics import initiative
+from ..logic.mechanics.scoring import initiative
 from ..logic.models import Player
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
