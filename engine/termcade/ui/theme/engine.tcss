@@ -141,6 +141,17 @@ SaveSlotScreen Button {
     text-style: bold;
 }
 
+/* Tooltip: negative (reverse-video) — a bright chip on the black cabinet, the same trick the focus
+   cursor uses. Textual's default is `background: $panel`, which is near-invisible on pure black.
+   Leave `margin` alone: the default 1-row gap keeps the tooltip off the cursor's own row. Drawn on
+   top of it, the tooltip takes the hover, Textual hides it, the cell is hovered again — a flicker. */
+Tooltip {
+    background: $foreground;  /* $foreground is solid; $text carries alpha */
+    color: $background;
+    text-style: bold;
+    padding: 0 1;
+}
+
 /* Notifications (bot-turn log, draw toasts) live top-right, not the default bottom-right. */
 ToastRack {
     dock: top;

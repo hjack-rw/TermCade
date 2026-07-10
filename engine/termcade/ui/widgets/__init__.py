@@ -2,5 +2,6 @@
 
 from .button import Button
 from .panel import BoxedPanel
+from .tooltip import TooltipStatic
 
-__all__ = ["BoxedPanel", "Button"]
+__all__ = ["BoxedPanel", "Button", "TooltipStatic"]

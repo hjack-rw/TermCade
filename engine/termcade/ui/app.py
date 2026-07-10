@@ -69,6 +69,10 @@ class EngineApp(App[None]):
     # Responsive classes, stamped on the active screen by width, so a game's TCSS can reflow.
     HORIZONTAL_BREAKPOINTS = [(0, "-narrow"), (WIDE_COLS, "-wide")]
 
+    # A tooltip hides whenever the pointer moves and reappears once it rests. Textual's 0.5s makes
+    # that read as a flicker; a shorter rest feels like the tooltip is simply following the cursor.
+    TOOLTIP_DELAY = 0.2
+
     # Keyboard navigation for every screen and modal. Tab is a *toggle* into "focus mode" — press it
     # once to highlight the first option, again to step back out (no option highlighted); up/down move
     # within the mode. Tab is `priority` so it overrides Textual's built-in Screen tab binding (plain

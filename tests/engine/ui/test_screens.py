@@ -5,14 +5,17 @@ from __future__ import annotations
 
 import sqlite3
 
+from rich.style import Style
+from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
-from textual.widgets import Button, Static
+from textual.widgets import Button, Static, Tooltip
 
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.screens.dialog import ChoiceModal
 from termcade.ui.screens.menu import MenuItem, MenuScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
+from termcade.ui.widgets import TooltipStatic
 
 
 class _MenuProbe(MenuScreen):
@@ -227,3 +230,68 @@ async def test_leaving_the_app_disarms_the_resize_timer(make_app):
         assert app._resize_timer is not None  # the boot resize armed it
 
     assert app._resize_timer is None
+
+
+# --- TooltipStatic -------------------------------------------------------------
+
+
+class _TooltipProbe(EngineScreen):
+    def compose(self) -> ComposeResult:
+        text = Text("plain ")
+        text.append("tagged", style=Style(meta={"tooltip": "the answer"}))
+        yield TooltipStatic(text, id="tip")
+
+
+async def test_a_tagged_span_sets_the_widgets_tooltip(make_app, hover_tooltip):
+    """Textual's tooltip is per widget; the meta on the hovered span picks which one to show."""
+    app = make_app(_TooltipProbe)
+    async with app.run_test(tooltips=True) as pilot:
+        await pilot.pause()
+        assert await hover_tooltip(app, pilot, "#tip") == "the answer"
+
+
+async def test_an_untagged_span_clears_the_tooltip(make_app):
+    app = make_app(_TooltipProbe)
+    async with app.run_test(tooltips=True) as pilot:
+        await pilot.pause()
+        widget = app.screen.query_one("#tip", TooltipStatic)
+        widget.hover_style = Style(meta={"tooltip": "the answer"})
+        await pilot.pause()
+        widget.hover_style = Style()
+        await pilot.pause()
+        assert widget.tooltip is None
+
+
+async def test_the_tooltip_is_reverse_video(make_app):
+    """Textual's default `background: $panel` is near-invisible on the cabinet's pure black."""
+    app = make_app(_TooltipProbe)
+    async with app.run_test(tooltips=True) as pilot:
+        await pilot.pause()
+        tooltip = app.screen.query_one(Tooltip)
+        variables = app.get_css_variables()
+        assert tooltip.styles.background.hex.upper() == variables["foreground"].upper()
+        assert tooltip.styles.color.hex.upper() == variables["background"].upper()
+
+
+async def test_the_tooltip_returns_after_the_pointer_moves(make_app):
+    """Textual hides a tooltip on any move inside its widget and only re-arms when a *different*
+    widget is hovered. A per-span panel is one widget, so without a re-arm it never came back."""
+    app = make_app(_TooltipProbe)
+    async with app.run_test(tooltips=True) as pilot:
+        await pilot.pause()
+        widget = app.screen.query_one("#tip", TooltipStatic)
+        tooltip = app.screen.query_one(Tooltip)
+        region = widget.region
+        tagged = [
+            x for x in range(region.x, region.right)
+            if app.screen.get_style_at(x, region.y).meta.get("tooltip")
+        ]
+        rest = app.TOOLTIP_DELAY + 0.15
+
+        await pilot.hover("#tip", offset=(tagged[0] - region.x, 0))
+        await pilot.pause(rest)
+        assert tooltip.display
+
+        await pilot.hover("#tip", offset=(tagged[1] - region.x, 0))  # same span, one cell over
+        await pilot.pause(rest)
+        assert tooltip.display, "the tooltip never came back after the pointer moved"
