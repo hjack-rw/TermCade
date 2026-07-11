@@ -36,6 +36,7 @@ from ..logic.state import XiaolinState
 from .deposit import DepositScreen
 from .format import affiliation_icon, bonus_tooltip, char_stats, display_name, hands_lines
 from .lookup import LookUpScreen
+from .rules import RulesScreen
 from .use_power import UsePowerScreen
 
 
@@ -47,6 +48,7 @@ class VaultScreen(EngineScreen):
         ("4", "use_power", "Power"),
         ("5", "lookup_cards", "Cards"),
         ("6", "lookup_characters", "Characters"),
+        ("7", "rules", "Rules"),
         ("0", "save_game", "Save"),
         ("escape", "app.pop_screen", "Menu"),
     ]
@@ -134,6 +136,9 @@ class VaultScreen(EngineScreen):
     def action_lookup_characters(self) -> None:
         self.app.push_screen(LookUpScreen("characters"))
 
+    def action_rules(self) -> None:
+        self.app.push_screen(RulesScreen())
+
     def action_save_game(self) -> None:
         state = cast(XiaolinState, self.ctx.state)
         title = f"{state.player.character.name} — {state.player.points} pts"
@@ -148,6 +153,7 @@ _ACTIONS = [
     "4. Use a Power",
     "5. Look up Cards",
     "6. Look up Characters",
+    "7. Rules",
     "0. Save game",
     "Esc. Return to menu",
 ]
@@ -160,6 +166,7 @@ _ACTION_HELP = {
     "4": "Spend a Wu for its power.",
     "5": "Inspect any Wu in either hand.",
     "6": "Inspect either duelist.",
+    "7": "Rulebook for the game.",
     "0": "Save this run to a slot.",
     "Esc": "Back to the main menu.",
 }

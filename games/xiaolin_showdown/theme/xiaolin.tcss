@@ -252,3 +252,17 @@ OutcomeScreen Button {
     width: 100%;
     margin: 1 0 0 0;
 }
+
+/* Rules screen: the section reads as a heading (accent, like every panel title), the rule itself in
+   plain body text. Colour carries the hierarchy, so the eye can skip to the group it needs. */
+RulesScreen .rule-heading {
+    color: $accent-lighten-2;
+    text-style: bold;
+    margin: 1 0 0 0;  /* flush to the panel edge; the rules beneath it are the indented part */
+}
+
+RulesScreen .rules {
+    color: $text;
+    margin: 0 1 0 3;  /* the whole bullet block sits under its heading */
+    height: auto;
+}

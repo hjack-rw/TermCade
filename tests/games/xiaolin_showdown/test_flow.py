@@ -495,3 +495,24 @@ async def test_there_is_no_retreat_once_the_showdown_has_begun(tmp_path):
         await pilot.pause()
 
         assert isinstance(app.screen, DuelScreen)
+
+
+async def test_rules_open_from_the_vault(tmp_path):
+    """The rules are needed mid-run, not only from the main menu."""
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await _new_game_at_vault(app, pilot)
+
+        await pilot.press("7")
+        await pilot.pause()
+
+        assert isinstance(app.screen, RulesScreen)
+
+
+async def test_every_vault_action_says_what_it_does(tmp_path):
+    """A greyed action shows why; an available one shows what it is for. Neither can be silent."""
+    from xiaolin_showdown.screens.vault import _ACTION_HELP, _ACTIONS
+
+    keys = [action.split(".")[0] for action in _ACTIONS]
+
+    assert set(keys) == set(_ACTION_HELP)
