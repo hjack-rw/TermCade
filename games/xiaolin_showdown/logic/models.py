@@ -44,6 +44,24 @@ class Character:
 
 
 @dataclass
+class Background:
+    """A named place a showdown can be fought in — flavour over an element, never a rule.
+
+    A place belongs to a pool for *each* element it names: ``element`` and, when it has one,
+    ``sec_element``. The two are a set of tags, not a rank — ``Sunflower Field`` is fire and earth,
+    and either name can summon it. What scores is the element the duelist *named*, never the place.
+    """
+
+    id: int
+    name: str
+    element: str
+    sec_element: str | None = None
+
+    def belongs_to(self, element: str) -> bool:
+        return element in (self.element, self.sec_element)
+
+
+@dataclass
 class Player:
     """A duelist's persistent, between-duel state (no in-duel scratch)."""
 

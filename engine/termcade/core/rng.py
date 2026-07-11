@@ -1,8 +1,9 @@
 """Deterministic, JSON-serializable RNG.
 
 Wraps ``random.Random`` (never the global ``random``) so a game's randomness is
-reproducible from a seed and can be snapshotted into a save file. One stream for
-now; independent sub-streams (``spawn``) are deferred until a game needs them.
+reproducible from a seed and can be snapshotted into a save file. :meth:`Rng.spawn` gives an
+independent sub-stream for randomness that must not perturb play — decoration, flavour, anything a
+rules change would be embarrassed by.
 """
 
 from __future__ import annotations
@@ -45,6 +46,21 @@ class Rng:
 
     def shuffle(self, seq: MutableSequence[Any]) -> None:
         self._random.shuffle(seq)
+
+    def spawn(self, label: str) -> "Rng":
+        """An independent stream, deterministic from this one but drawing from it *without*
+        consuming it.
+
+        Anything cosmetic must use one of these. Drawing decoration off the main stream would shift
+        every roll after it, so adding a purely visual flourish would silently change how the game
+        plays — the seed would stop meaning what it meant.
+
+        Derived from the seed, the label, and the parent's *current* state, so successive spawns as
+        play advances give different streams, and the same seed always replays the same ones.
+        """
+        version, internal, gauss_next = self._random.getstate()
+        material = f"{self._seed}:{label}:{version}:{internal}:{gauss_next}"
+        return Rng(int.from_bytes(hashlib.sha256(material.encode()).digest()[:8], "big"))
 
     def get_state(self) -> RngState:
         """JSON-safe snapshot of the internal generator state."""

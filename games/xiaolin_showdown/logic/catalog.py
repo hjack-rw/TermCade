@@ -15,7 +15,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Callable
 
-from .models import Card, Character, Power
+from .models import Background, Card, Character, Power
 
 # Bundled alongside the package: games/xiaolin_showdown/data/xs_game.db
 DEFAULT_DB = Path(__file__).resolve().parents[1] / "data" / "xs_game.db"
@@ -29,6 +29,11 @@ class Catalog:
     powers: list[Power]
     cards: list[Card]
     characters: list[Character]
+    backgrounds: list[Background]
+
+    def backgrounds_for(self, element: str) -> list[Background]:
+        """Every place that element can summon — its own, and the ones that merely name it too."""
+        return [b for b in self.backgrounds if b.belongs_to(element)]
 
     def card(self, card_id: int) -> Card:
         return self._cards_by_id[card_id]
@@ -68,9 +73,15 @@ def load_catalog(db_path: Path | str = DEFAULT_DB) -> Catalog:
         resolve = by_id.__getitem__  # card/character power_id -> Power
         cards = [_card(row, resolve) for row in con.execute("SELECT * FROM card")]
         characters = [_character(row, resolve) for row in con.execute("SELECT * FROM character")]
+        backgrounds = [_background(row) for row in con.execute("SELECT * FROM background")]
     finally:
         con.close()
-    return Catalog(powers=powers, cards=cards, characters=characters)
+    return Catalog(powers=powers, cards=cards, characters=characters, backgrounds=backgrounds)
+
+
+def _background(row: tuple) -> Background:
+    bg_id, name, element, sec_element = row
+    return Background(bg_id, name, element, sec_element or None)
 
 
 def _power(row: tuple) -> Power:

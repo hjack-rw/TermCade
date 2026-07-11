@@ -289,7 +289,9 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         _labelled("Challenge", (duel.challenge or "—").upper(), strong=bool(duel.challenge)),
         _labelled(
             "Background",
-            (duel.background or "—").upper(),
+            # The place, not the element — but coloured by the element, which is what scores. A place
+            # can serve two pools, so the same name may read green today and red tomorrow.
+            (duel.background_name or duel.background or "—").upper(),
             strong=bool(duel.background),
             style=COLORS.get(duel.background or "", ""),
         ),

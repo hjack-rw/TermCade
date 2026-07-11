@@ -46,6 +46,9 @@ class DuelState:
     stakes: Card | None = None  # the prize card for this showdown
     challenge: str | None = None  # the contested stat: force / agility / intellect
     background: str | None = None  # the contested element
+    # The place the showdown is fought in — flavour only. Drawn from the pool of the element the
+    # duelist named, off the seeded RNG, so a seed replays the same board. Never touches scoring.
+    background_name: str | None = None
     player_priority: bool | None = None  # who commits first (None = tie → coin toss)
     player_initiative: int = 0
     bot_initiative: int = 0
@@ -150,6 +153,18 @@ class Duel:
             )
         else:  # the bot led and chose the challenge at stage 1; the player answers the background
             self.duel.background = await self.choices.background(self._background_options())
+        self.duel.background_name = self._draw_place(self.duel.background)
+
+    def _draw_place(self, element: str | None) -> str | None:
+        """A named place from ``element``'s pool. Flavour: the *element* is what scores, always."""
+        if element is None:
+            return None
+        pool = self.state.catalog.backgrounds_for(element)
+        if not pool:
+            return None
+        # A sub-stream, never the duel's own: the place is decoration, and decoration that consumed
+        # the main stream would shift every roll after it — a cosmetic change that alters the game.
+        return self.rng.spawn("background").choice(pool).name
 
     async def _power(self) -> None:
         player_card = await self.choices.boost(self._boost_options(self.state.player))
