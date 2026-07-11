@@ -9,11 +9,18 @@ player choice.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, fields
 from typing import Any
 
 from termcade.core.settings import Difficulty, Settings
+
+from .constants import FIRST_DECK_CARD
+from .models import Card
+
+# A duelist wins by banking this share of every point on the table. Kept as a *share* so the target
+# grows with the card pool — a hardcoded number would quietly get easier every time a Wu is added.
+POINT_SHARE = 0.4
 
 
 @dataclass(frozen=True)
@@ -22,7 +29,7 @@ class XiaolinSettings:
     starting_hand_player: int = 5
     starting_hand_bot: int = 5
     max_deck_size: int = 20
-    point_limit: int = 13
+    point_limit: int = 14  # the shipped default; `default_settings` recomputes it from the cards
     starting_points_player: int = 0
     starting_points_bot: int = 0
     draw_limit: int = 1
@@ -87,6 +94,17 @@ def is_hard(difficulty: Difficulty) -> bool:
     return difficulty is Difficulty.HARD
 
 
+def point_limit_for(cards: Iterable[Card]) -> int:
+    """How many points win the run — a share of every point in the draw pool.
+
+    Derived, not hardcoded: the pool only ever grows, and a fixed target would quietly get easier
+    with every Wu added. The player can still override it on the Settings screen; this is only what
+    the game ships with.
+    """
+    total = sum(card.points for card in cards if card.id >= FIRST_DECK_CARD)
+    return max(2, round(total * POINT_SHARE))
+
+
 def default_settings() -> Settings:
     """The game's shipped defaults — the starting point for the Settings screen.
 
@@ -94,4 +112,7 @@ def default_settings() -> Settings:
     three-valued ``NORMAL`` default — the Settings screen would otherwise offer two states while a
     third sat unreachable behind them. ``turn.is_hard`` still folds any stale ``NORMAL`` into Easy.
     """
-    return XiaolinSettings().to_settings(Settings(difficulty=Difficulty.EASY))
+    from .catalog import load_catalog  # local: settings must not drag the DB into every import
+
+    defaults = XiaolinSettings(point_limit=point_limit_for(load_catalog().cards))
+    return defaults.to_settings(Settings(difficulty=Difficulty.EASY))

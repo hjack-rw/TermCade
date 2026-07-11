@@ -12,7 +12,7 @@ from termcade.core.settings import Difficulty
 from xiaolin_showdown.logic.models import Card, Character, Player, Power
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.state import XiaolinState
-from xiaolin_showdown.logic.turn import bot_turn, max_hand_size, oversee_hand_size, refill_hands
+from xiaolin_showdown.logic.turn import DUEL_FLOOR, bot_turn, max_hand_size, oversee_hand_size, refill_hands
 
 
 def _card(*, trigger="hand", effect=0, points=0, stats=None) -> Card:
@@ -93,40 +93,41 @@ def test_refill_sheds_an_over_hand_and_leaves_a_short_one():
     assert len(state.bot.hand) == 2  # a short hand is left as-is (no auto-top-up)
 
 
-def test_an_easy_bot_cashes_its_most_valuable_wu_for_points():
-    """EASY reads only the points — it will happily bank a Wu it needs in the duel."""
+def test_a_hard_bot_cashes_its_most_valuable_wu_for_points():
+    """The run is won on banked points, so chasing the biggest number is the STRONG play."""
     bot = _player(2)
     bot.hand.append(_card(trigger="deposit", effect=0, points=3))
     state = _state(_player(3), bot, main=5)
 
-    bot_turn(state, _SETTINGS, difficulty=Difficulty.EASY)  # deposit_limit is 1
+    bot_turn(state, _SETTINGS, difficulty=Difficulty.HARD)  # deposit_limit is 1
 
     assert state.bot.points == 3
     assert len(bot.hand) == 2  # the deposited Wu left the hand
 
 
-def test_a_hard_bot_sheds_its_least_useful_wu_not_its_biggest():
+def test_an_easy_bot_hoards_its_weapons_and_banks_the_trinket():
+    """Clinging to your Wu feels clever and loses: the trinket is 1 point, the weapon was 3."""
     bot = _player(2)
     weapon = _card(points=3)  # 3 pts, but 1/1/1 of duel value
     bot.hand.extend([weapon, _card(points=1, stats=_JUNK)])  # a statless 1-pt trinket
 
-    bot_turn(_state(_player(3), bot, main=5), _SETTINGS, difficulty=Difficulty.HARD)
+    bot_turn(_state(_player(3), bot, main=5), _SETTINGS, difficulty=Difficulty.EASY)
 
-    assert bot.points == 1  # banked the trinket, kept the weapon
+    assert bot.points == 1  # banked the trinket, kept the weapon — and scored almost nothing
     assert any(card is weapon for card in bot.hand)
 
 
-def test_a_hard_bot_never_banks_a_booster():
+def test_an_easy_bot_never_banks_a_booster():
     bot = _player(2)
     booster = _card(trigger="boost", effect=1, points=3, stats=_JUNK)  # statless but decisive
     bot.hand.extend([booster, _card(points=1, stats=_JUNK)])
 
-    bot_turn(_state(_player(3), bot, main=5), _SETTINGS, difficulty=Difficulty.HARD)
+    bot_turn(_state(_player(3), bot, main=5), _SETTINGS, difficulty=Difficulty.EASY)
 
     assert any(card is booster for card in bot.hand)  # the premium keeps it out of the bank
 
 
-def test_a_hard_bot_passes_when_nothing_in_hand_is_worth_points():
+def test_a_bot_passes_when_nothing_in_hand_is_worth_points():
     bot = _player(3)  # every filler card is worth 0 points
 
     log = bot_turn(_state(_player(3), bot, main=5), _SETTINGS, difficulty=Difficulty.HARD)
@@ -159,14 +160,16 @@ def test_bot_turn_stops_at_the_deposit_limit():
     assert len(bot.hand) == 2
 
 
-def test_bot_turn_recovers_one_card_from_its_own_deck():
+def test_bot_turn_fills_its_hand_from_its_own_deck():
+    """To the limit, not one card at a time — a duelist sitting on a deck it could be holding is
+    simply not playing the game."""
     bot = _player(2, deck=2)  # under the limit, with cards shelved in its personal deck
     state = _state(_player(3), bot, main=0)
 
     bot_turn(state, _SETTINGS)  # nothing to deposit — it just tops up (it has no manual Draw)
 
-    assert len(bot.hand) == 3
-    assert len(bot.deck) == 1
+    assert len(bot.hand) == 4
+    assert bot.deck == []
 
 
 def test_bot_turn_reports_what_it_did():
@@ -177,3 +180,28 @@ def test_bot_turn_reports_what_it_did():
     banker.hand.append(_card(trigger="deposit", effect=0, points=3))
     log = bot_turn(_state(_player(3), banker, main=5), _SETTINGS, difficulty=Difficulty.EASY)
     assert any("deposited" in line for line in log)
+
+
+def test_a_bot_never_banks_its_hand_below_the_duel_floor():
+    """It has no card income but winning, so an unfloored bot cashes its own bench and ends the run
+    holding a single Wu against a full hand. Measured: 5 -> 1.3 Wu over a run, before the floor."""
+    bot = _player(0)
+    bot.hand.extend(_card(trigger="deposit", effect=0, points=2) for _ in range(DUEL_FLOOR))
+    state = _state(_player(3), bot, main=0)
+
+    bot_turn(state, XiaolinSettings(max_hand_size=6, deposit_limit=9), difficulty=Difficulty.HARD)
+
+    assert len(bot.hand) == DUEL_FLOOR  # it banked nothing: everything it holds, it needs
+    assert state.bot.points == 0
+
+
+def test_a_bot_banks_whatever_sits_above_the_floor():
+    """Guards the test above: the floor must not become a reason never to deposit at all."""
+    bot = _player(0)
+    bot.hand.extend(_card(trigger="deposit", effect=0, points=2) for _ in range(DUEL_FLOOR + 1))
+    state = _state(_player(3), bot, main=0)
+
+    bot_turn(state, XiaolinSettings(max_hand_size=6, deposit_limit=9), difficulty=Difficulty.HARD)
+
+    assert len(bot.hand) == DUEL_FLOOR
+    assert state.bot.points == 2  # the one Wu above the floor

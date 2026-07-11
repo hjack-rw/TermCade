@@ -19,6 +19,12 @@ from .state import XiaolinState
 # stats of their own, so without this premium a skilled bot would happily bank them for points.
 BOOSTER_PREMIUM = 4
 
+# The bot never banks its hand below this. It may deposit one Wu a turn and its only income is
+# winning showdowns, so with no floor it cashes its own bench and ends the run holding a single Wu
+# against a full hand — measured at 5 -> 1.3 Wu over a run. Two is what a duelist needs to still be
+# an opponent; three starves it, because a hand that sits at three can never bank at all.
+DUEL_FLOOR = 2
+
 
 def refill_hands(state: XiaolinState, settings: XiaolinSettings, *, rng: Rng) -> None:
     """Bring both hands within their size limit and update ``has_ended``.
@@ -98,8 +104,8 @@ def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
     if not candidates:
         return None
     if is_hard(difficulty):
-        return min(candidates, key=lambda c: (duel_value(c), -c.points))
-    return max(candidates, key=lambda c: c.points)
+        return max(candidates, key=lambda c: c.points)
+    return min(candidates, key=lambda c: (duel_value(c), -c.points))
 
 
 def bot_turn(
@@ -139,7 +145,7 @@ def _bot_deposits(
             log.append(f"{name} played {card.name} and drew a Wu")
 
     # Mirrors `can_deposit`: never cash the last card out of the hand.
-    while deposits < settings.deposit_limit and len(state.bot.hand) > 1:
+    while deposits < settings.deposit_limit and len(state.bot.hand) > DUEL_FLOOR:
         banked = pick_deposit(state.bot.hand, difficulty)
         if banked is None:  # nothing in hand is worth points
             break
@@ -152,8 +158,14 @@ def _bot_deposits(
 
 
 def _bot_refill(state: XiaolinState, settings: XiaolinSettings) -> None:
-    """Quietly recover one shed card from the bot's personal deck (it has no manual Draw)."""
-    if state.bot.deck and len(state.bot.whole_hand) < max_hand_size(state.bot, settings.max_hand_size):
+    """Fill the bot's hand from its personal deck — it has no manual Draw of its own.
+
+    To the limit, not one card at a time: a duelist sitting on a deck while its hand has room is
+    simply not playing. (In practice the deck is usually empty — it is only fed by shedding surplus
+    over the hand limit — so this is the ceiling, not the bot's income.)
+    """
+    limit = max_hand_size(state.bot, settings.max_hand_size)
+    while state.bot.deck and len(state.bot.whole_hand) < limit:
         state.bot.hand.append(state.bot.deck.pop(0))
 
 
