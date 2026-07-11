@@ -1,8 +1,8 @@
 """In-duel power resolution (``resolve_played_power``) — how a played card fills the scoring queues.
 
-Pure and TTY-free: a card is played into a :class:`DuelState`'s queues and the resulting queue
-mutations are asserted directly. Covers the four core behaviours — plain card,
-Moby Morpher, boost amplification, and the negative-card curse.
+Pure and TTY-free: a card is played into a :class:`Round`'s queues and the resulting mutations are
+asserted directly. Covers the core behaviours — plain card, Moby Morpher, boost amplification, and
+the negative-card curse.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel, DuelChoices, DuelState
+from xiaolin_showdown.logic.duel import Duel, DuelChoices, Round
 from xiaolin_showdown.logic.constants import ELEMENTS
 from xiaolin_showdown.logic.models import Card, Power
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
@@ -27,7 +27,7 @@ def _card(force, agility, intellect, *, element="water", trigger="hand", effect=
 
 
 def test_a_plain_card_enters_the_caster_queue_as_an_inert_stand_in():
-    duel = DuelState(background="water")
+    duel = Round()
     card = _card(3, 1, 0, element="water")
 
     resolve_played_power(duel, card, is_player=True, element="water")
@@ -41,7 +41,7 @@ def test_a_plain_card_enters_the_caster_queue_as_an_inert_stand_in():
 
 
 def test_a_morpher_sets_every_stat_to_one_and_takes_the_chosen_element():
-    duel = DuelState(background="fire")
+    duel = Round()
     morpher = _card(None, None, None, element="metal", trigger="play", effect=1)
 
     resolve_played_power(duel, morpher, is_player=True, element="earth")
@@ -52,7 +52,7 @@ def test_a_morpher_sets_every_stat_to_one_and_takes_the_chosen_element():
 
 
 def test_a_bot_morpher_falls_back_to_the_background_element():
-    duel = DuelState(background="fire")
+    duel = Round()
     morpher = _card(None, None, None, element="metal", trigger="play", effect=1)
 
     resolve_played_power(duel, morpher, is_player=False, element="fire")
@@ -61,7 +61,7 @@ def test_a_bot_morpher_falls_back_to_the_background_element():
 
 
 def test_a_negative_card_curses_the_opponent_and_is_spent_on_your_side():
-    duel = DuelState(background="water")
+    duel = Round()
     curse = _card(-2, 0, 0, element="water")
 
     resolve_played_power(duel, curse, is_player=True, element="water")
@@ -76,7 +76,7 @@ def test_a_negative_card_curses_the_opponent_and_is_spent_on_your_side():
 
 
 def test_a_boost_lends_no_stats_of_its_own():
-    duel = DuelState(background="water")
+    duel = Round()
     boost = _card(9, 9, 9, element="water", trigger="boost", effect=1)
 
     resolve_played_power(duel, boost, is_player=True, element="water")
@@ -85,7 +85,7 @@ def test_a_boost_lends_no_stats_of_its_own():
 
 
 def test_a_queued_booster_amplifies_the_next_positive_card():
-    duel = DuelState(background="water")
+    duel = Round()
     booster = _card(0, 0, 0, element="water", trigger="boost", effect=1)
     duel.player_queue.append(booster)  # played in stage 4, keeps its real power at the head
 
@@ -96,7 +96,7 @@ def test_a_queued_booster_amplifies_the_next_positive_card():
 
 
 def test_a_queued_booster_flips_to_the_opponent_on_a_negative_card():
-    duel = DuelState(background="water")
+    duel = Round()
     booster = _card(0, 0, 0, element="water", trigger="boost", effect=1)
     duel.player_queue.append(booster)
 
@@ -112,7 +112,7 @@ def test_a_queued_booster_flips_to_the_opponent_on_a_negative_card():
 def test_a_mirrored_booster_cannot_boost_the_duelist_it_lands_on():
     """It keeps the booster's *name*, never its power — else the victim's next card is amplified
     by their attacker's Wu, because it sits at the head of their queue."""
-    duel = DuelState(background="water")
+    duel = Round()
     duel.player_queue.append(_card(0, 0, 0, element="water", trigger="boost", effect=1))
 
     resolve_played_power(duel, _card(-3, -1, 0, element="water"), is_player=True, element="water")
@@ -135,12 +135,19 @@ async def _no_boost(_options: list[Card]) -> Card | None:
     return None
 
 
+async def _one_wu(options: list[int]) -> int:
+    return options[0]  # the smallest legal stake
+
+
 async def _water(_background: str) -> str:
     return "water"
 
 
 def _auto_choices() -> DuelChoices:
-    return DuelChoices(challenge=_first, background=_first, boost=_no_boost, card=_first_card, element=_water)
+    return DuelChoices(
+        challenge=_first, background=_first, wager=_one_wu,
+        boost=_no_boost, card=_first_card, element=_water,
+    )
 
 
 async def test_a_scripted_showdown_walks_all_six_stages():
@@ -159,13 +166,17 @@ async def test_a_scripted_showdown_walks_all_six_stages():
     assert duel.duel.challenge in _STATS
     assert duel.duel.background in ELEMENTS
 
-    assert await duel.advance() == 3  # Power (both decline a boost here)
-    assert await duel.advance() == 4  # Card — each side plays, queues fill
-    assert duel.duel.player_queue and duel.duel.bot_queue
+    # Boost and Card repeat once per Wu wagered — a best-of-3 is three exchanges, not one.
+    for expected in range(1, duel.duel.wager + 1):
+        assert await duel.advance() == 3  # Boost (both decline here)
+        assert await duel.advance() == 4  # Card — each plays; the exchange is scored at once
+        assert duel.duel.round_number == expected
+        assert duel.duel.round.player_queue and duel.duel.round.bot_queue
+        assert len(duel.duel.round.player_result) == 3
 
-    assert await duel.advance() == 5  # Resolvement — a winner and a per-stat scoreline
+    assert await duel.advance() == 5  # Resolvement — the match is weighed
     assert isinstance(duel.duel.winner, bool)
-    assert len(duel.duel.player_result) == 3
+    assert len(duel.duel.rounds) == duel.duel.wager
     assert duel.duel.winner_character in (state.player.character.name, state.bot.character.name)
 
     assert await duel.advance() == 0  # End — the round's terms are recorded for the next showdown
@@ -253,8 +264,8 @@ async def test_a_new_showdown_re_reads_initiative_from_the_hands():
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
     duel = _duel_over(state)
-    for _ in range(6):  # walk to the closing End stage
-        await duel.advance()
+    while await duel.advance() != 0:  # the showdown runs as many rounds as were wagered
+        pass
     assert duel.duel.stage == 0
 
     _flatten_initiative(state)
@@ -318,7 +329,8 @@ async def test_resolvement_negates_the_bonus_a_curse_would_have_earned_its_caste
     base = state.player.character.stats["force"]
 
     # a water curse landed on the player: its resonance must count against them
-    resolve_played_power(duel.duel, cat.card(23), is_player=False, element="water")  # Silk Spitter
-    await duel._resolvement()
+    duel.duel.rounds.append(Round())
+    resolve_played_power(duel.duel.round, cat.card(23), is_player=False, element="water")  # Silk Spitter
+    duel._score_round(duel.duel.round)
 
-    assert duel.duel.player_result[0] == base - 1
+    assert duel.duel.round.player_result[0] == base - 1

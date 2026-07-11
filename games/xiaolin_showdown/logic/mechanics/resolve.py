@@ -6,8 +6,8 @@ applies is looked up once, by :func:`~.powers.mechanic_of`:
 
 - :attr:`~.powers.Mechanic.BOOST` — lends no stats; amplifies the card played after it.
 - :attr:`~.powers.Mechanic.MORPH` — every stat becomes 1; the caster picks its element.
-- :attr:`~.powers.Mechanic.INTANGIBLE` — voids the elemental bonus for both duelists. A
-  condition of the *showdown*, so it is flagged on the ``DuelState``; the card itself resolves plain.
+- :attr:`~.powers.Mechanic.INTANGIBLE` — voids the elemental bonus for both duelists. A condition of
+  the *showdown*, not of one round, so this reports it and the stage machine holds the flag.
 - anything else — the printed stats.
 
 Orthogonal to all of that: a **negative Wu** (any card whose lowest stat is below zero) curses the
@@ -28,25 +28,25 @@ from ..models import Card, Power
 from .powers import Mechanic, mechanic_of
 
 if TYPE_CHECKING:  # annotation only — avoids a runtime cycle with the stage machine
-    from ..duel import DuelState
+    from ..duel import Round
 
 # A played card joins the queue wearing this, so `_booster_at_head` never mistakes a stand-in for a
 # live booster and no power re-triggers.
 _NEUTRAL_POWER = Power(id=0, name="", trigger="none", effect=0, description="")
 
-def resolve_played_power(duel: DuelState, card: Card, *, is_player: bool, element: str) -> None:
-    """Resolve ``card`` played in the duel into the scoring queues (mutates ``duel`` in place)."""
-    own_queue = duel.player_queue if is_player else duel.bot_queue
+def resolve_played_power(round_: "Round", card: Card, *, is_player: bool, element: str) -> bool:
+    """Resolve ``card`` into this round's scoring queues; return whether it voided the elemental bonus.
+
+    The bonus is a condition of the whole *showdown*, not of one round, so the caller owns that flag
+    — a Serpent's Tail played in round one leaves the ground intangible for the rest of the match.
+    """
+    own_queue = round_.player_queue if is_player else round_.bot_queue
     opponent = _Opponent(
-        queue=duel.bot_queue if is_player else duel.player_queue,
-        suffered=duel.bot_suffered if is_player else duel.player_suffered,
-        amplifiers=duel.bot_amplifiers if is_player else duel.player_amplifiers,
+        queue=round_.bot_queue if is_player else round_.player_queue,
+        suffered=round_.bot_suffered if is_player else round_.player_suffered,
+        amplifiers=round_.bot_amplifiers if is_player else round_.player_amplifiers,
     )
     mechanic = mechanic_of(card.power)
-
-    if mechanic is Mechanic.INTANGIBLE:  # a duel-wide condition, not a queue one
-        duel.elemental_bonus_cancelled = True
-
     played = _stand_in(card)
     cursed = _apply_mechanic(mechanic, card, played, opponent, element)
 
@@ -58,6 +58,7 @@ def resolve_played_power(duel: DuelState, card: Card, *, is_player: bool, elemen
         played.stats = {stat: 0 for stat in card.stats}  # spent on the opponent's side
 
     own_queue.append(played)
+    return mechanic is Mechanic.INTANGIBLE
 
 
 @dataclass(frozen=True)

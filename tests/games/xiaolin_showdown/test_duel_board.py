@@ -14,7 +14,7 @@ import pytest
 from rich.console import RenderableType
 from rich.text import Text
 
-from xiaolin_showdown.logic.duel import DuelState
+from xiaolin_showdown.logic.duel import DuelState, Round
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.screens.duel import _board_text
 from xiaolin_showdown.screens.format import COLORS
@@ -62,7 +62,7 @@ def _plain(board: RenderableType) -> str:
 
 
 def test_a_played_wu_is_element_coloured_on_the_board(state, card):
-    duel = DuelState(stage=6, player_queue=[card(SILVER_MANTA_RAY)])
+    duel = DuelState(stage=6, rounds=[Round(player_queue=[card(SILVER_MANTA_RAY)])])
 
     styles = _styles_over(_board_text(duel, state), "Silver Manta Ray")
 
@@ -112,10 +112,10 @@ def _line(board: RenderableType, prefix: str, *, side: str = "P1") -> str:
 
 def _cursed_duel(card):
     """P1 boosts then plays a curse; P2 answers with a curse of its own."""
-    duel = DuelState(stage=6, challenge="force", background="wind")
-    duel.player_queue.append(card(WUSHU_BRACELET))
-    resolve_played_power(duel, card(SILK_SPITTER), is_player=True, element="wind")
-    resolve_played_power(duel, card(JU_JU_FLYTRAP), is_player=False, element="wind")
+    duel = DuelState(stage=6, challenge="force", background="wind", rounds=[Round()])
+    duel.round.player_queue.append(card(WUSHU_BRACELET))
+    resolve_played_power(duel.round, card(SILK_SPITTER), is_player=True, element="wind")
+    resolve_played_power(duel.round, card(JU_JU_FLYTRAP), is_player=False, element="wind")
     return duel
 
 
@@ -147,17 +147,17 @@ def test_a_curse_you_cast_shows_on_the_line_of_whoever_wears_it(state, card):
 
 def test_a_showdown_without_curses_still_shows_an_empty_defensive_line(state, card):
     """A dash reads as "nothing landed on me"; a missing line reads as a bug."""
-    duel = DuelState(stage=6, challenge="force", background="metal")
-    resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
+    duel = DuelState(stage=6, challenge="force", background="metal", rounds=[Round()])
+    resolve_played_power(duel.round, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
 
     assert _line(_board_text(duel, state), "Defensive:") == "Defensive: —"
 
 
 def test_a_booster_is_joined_to_the_wu_it_boosts(state, card):
     """One play, not two entries — the ``+`` says the pair resolved together, booster first."""
-    duel = DuelState(stage=6, challenge="force", background="metal")
-    duel.player_queue.append(card(WUSHU_BRACELET))  # queued at the boost stage, before the card
-    resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
+    duel = DuelState(stage=6, challenge="force", background="metal", rounds=[Round()])
+    duel.round.player_queue.append(card(WUSHU_BRACELET))  # queued at the boost stage, before the card
+    resolve_played_power(duel.round, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
 
     line = _line(_board_text(duel, state), "Offensive:")
 
@@ -166,9 +166,9 @@ def test_a_booster_is_joined_to_the_wu_it_boosts(state, card):
 
 def test_a_dragon_is_joined_to_the_wu_after_it_too(state, card):
     """The ``+`` marks the boost slot, not amplification: boost/0 lands there as much as boost/+1."""
-    duel = DuelState(stage=6, challenge="force", background="metal")
-    duel.player_queue.append(card(SILVER_MANTA_RAY))
-    resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
+    duel = DuelState(stage=6, challenge="force", background="metal", rounds=[Round()])
+    duel.round.player_queue.append(card(SILVER_MANTA_RAY))
+    resolve_played_power(duel.round, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
 
     assert "+ Fist of Tebigong" in _line(_board_text(duel, state), "Offensive:")
 
@@ -183,9 +183,9 @@ def test_a_mirrored_booster_is_joined_to_the_curse_it_doubled(state, card):
 
 def test_unrelated_wu_are_comma_separated(state, card):
     """Guards the two above: the ``+`` must mean boosting, not merely 'next to'."""
-    duel = DuelState(stage=6, challenge="force", background="wind")
-    resolve_played_power(duel, card(SILK_SPITTER), is_player=True, element="wind")
-    resolve_played_power(duel, card(JU_JU_FLYTRAP), is_player=False, element="wind")
+    duel = DuelState(stage=6, challenge="force", background="wind", rounds=[Round()])
+    resolve_played_power(duel.round, card(SILK_SPITTER), is_player=True, element="wind")
+    resolve_played_power(duel.round, card(JU_JU_FLYTRAP), is_player=False, element="wind")
 
     assert " + " not in _line(_board_text(duel, state), "Offensive:", side="P1")
 
@@ -194,22 +194,22 @@ def test_a_boosted_curse_lands_twice_the_harm(state, card):
     """Guards the ordering test above: without the booster's mirror there is nothing to order."""
     duel = _cursed_duel(card)
 
-    harm = sum(c.stats["agility"] for c in duel.bot_suffered)
+    harm = sum(c.stats["agility"] for c in duel.round.bot_suffered)
 
     assert harm == -2  # Silk Spitter's -1, doubled by the Wushu Bracelet
 
 
 def test_a_wu_that_moves_no_stat_is_left_off_the_board(state, card):
     """A booster that amplified nothing is noise — it has no stats and cursed no one."""
-    duel = DuelState(stage=6, challenge="force", background="metal", player_queue=[card(WUSHU_BRACELET)])
-    duel.player_queue[0].stats = {"force": 0, "agility": 0, "intellect": 0}
+    duel = DuelState(stage=6, challenge="force", background="metal", rounds=[Round(player_queue=[card(WUSHU_BRACELET)])])
+    duel.round.player_queue[0].stats = {"force": 0, "agility": 0, "intellect": 0}
 
     assert "Wushu Bracelet" not in _line(_board_text(duel, state), "Offensive:")
 
 
 def test_an_unresolved_booster_stays_on_the_board(state, card):
     """At the power stage its stats are ``None`` — unresolved, not zero. It must not vanish."""
-    duel = DuelState(stage=4, challenge="force", background="metal", player_queue=[card(WUSHU_BRACELET)])
+    duel = DuelState(stage=4, challenge="force", background="metal", rounds=[Round(player_queue=[card(WUSHU_BRACELET)])])
 
     assert "Wushu Bracelet" in _line(_board_text(duel, state), "Offensive:")
 
@@ -219,20 +219,20 @@ def test_an_unresolved_booster_stays_on_the_board(state, card):
 
 def test_a_resonant_wu_shows_the_value_the_background_lifts_it_to(state, card):
     """Printed 1 on the contested stat, worth 2 in water. The printed value is struck, not the name."""
-    duel = DuelState(stage=6, challenge="force", background="water", player_queue=[card(SILVER_MANTA_RAY)])
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(player_queue=[card(SILVER_MANTA_RAY)])])
 
     assert "Silver Manta Ray (1⌞₂/1/1)" in _line(_board_text(duel, state), "Offensive:")
 
 
 def test_an_opposed_wu_shows_the_value_the_background_drags_it_to(state, card):
-    duel = DuelState(stage=6, challenge="force", background="water", player_queue=[card(FIST_OF_TEBIGONG)])
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(player_queue=[card(FIST_OF_TEBIGONG)])])
 
     assert "Fist of Tebigong (4⌞₃/0/0)" in _line(_board_text(duel, state), "Offensive:")
 
 
 def test_the_struck_value_is_the_printed_one(state, card):
     """Guards the two above: strike what the card prints, subscript what it is worth."""
-    duel = DuelState(stage=6, challenge="force", background="water", player_queue=[card(FIST_OF_TEBIGONG)])
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(player_queue=[card(FIST_OF_TEBIGONG)])])
     board = _board_text(duel, state)
 
     assert "4⌞₃" in _line(board, "Offensive:")  # printed 4 struck, effective 3 beneath it
@@ -242,27 +242,24 @@ def test_the_struck_value_is_the_printed_one(state, card):
 
 def test_the_shift_lands_on_whichever_stat_is_contested(state, card):
     """The elemental bonus only touches the challenge stat — here agility, not force."""
-    duel = DuelState(stage=6, challenge="agility", background="water", player_queue=[card(SILVER_MANTA_RAY)])
+    duel = DuelState(stage=6, challenge="agility", background="water", rounds=[Round(player_queue=[card(SILVER_MANTA_RAY)])])
 
     assert "Silver Manta Ray (1/1⌞₂/1)" in _line(_board_text(duel, state), "Offensive:")
 
 
 def test_a_voided_elemental_bonus_shifts_nothing(state, card):
     """A played Serpent's Tail kills the bonus, so no Wu may show a value it will not score."""
-    duel = DuelState(
-        stage=6,
+    duel = DuelState(stage=6,
         challenge="force",
         background="water",
-        player_queue=[card(SILVER_MANTA_RAY)],
-        elemental_bonus_cancelled=True,
-    )
+        elemental_bonus_cancelled=True, rounds=[Round(player_queue=[card(SILVER_MANTA_RAY)])])
 
     assert "Silver Manta Ray (1/1/1)" in _line(_board_text(duel, state), "Offensive:")
 
 
 def test_a_wu_name_carries_no_underline_or_strike(state, card):
     """The mark belongs on the number the background changes, not on the name."""
-    duel = DuelState(stage=6, challenge="force", background="water", player_queue=[card(SILVER_MANTA_RAY)])
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(player_queue=[card(SILVER_MANTA_RAY)])])
 
     styles = _styles_over(_board_text(duel, state), "Silver Manta Ray")
 
@@ -337,23 +334,23 @@ def _contested_column(line: str) -> list[str]:
 
 def test_a_curse_resonating_with_the_background_bites_deeper(state, card):
     """Silk Spitter is water. Cast on a water background, its harm sharpens: 0 -> -1."""
-    duel = DuelState(stage=6, challenge="force", background="water")
-    resolve_played_power(duel, card(SILK_SPITTER), is_player=False, element="water")
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round()])
+    resolve_played_power(duel.round, card(SILK_SPITTER), is_player=False, element="water")
 
     assert "Silk Spitter (0⌞₋₁/-1/-1)" in _line(_board_text(duel, state), "Defensive:", side="P1")
 
 
 def test_a_curse_the_background_turns_against_lands_softer(state, card):
     """Two-Ton Tunic is metal. On water the background opposes it, so its harm eases: -4 -> -3."""
-    duel = DuelState(stage=6, challenge="force", background="water")
-    resolve_played_power(duel, card(TWO_TON_TUNIC), is_player=False, element="water")
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round()])
+    resolve_played_power(duel.round, card(TWO_TON_TUNIC), is_player=False, element="water")
 
     assert "Two-Ton Tunic (-4⌞₋₃/0/0)" in _line(_board_text(duel, state), "Defensive:", side="P1")
 
 
 def test_the_same_wu_shifts_the_other_way_when_you_play_it(state, card):
     """Guards the sign: what lifts a Wu you played must drag down the same Wu cast at you."""
-    duel = DuelState(stage=6, challenge="force", background="water", player_queue=[card(SILK_SPITTER)])
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(player_queue=[card(SILK_SPITTER)])])
 
     assert "Silk Spitter (0⌞₁/-1/-1)" in _line(_board_text(duel, state), "Offensive:")
 
@@ -364,20 +361,20 @@ def test_the_printed_shifts_sum_to_the_total_beside_base(state, card):
     The elemental bonus is earned only by the Offensive line, so the board can show its arithmetic.
     A player who adds up the numbers must reach the number we printed for them.
     """
-    duel = DuelState(stage=6, challenge="force", background="water")
-    duel.player_queue.append(card(SILVER_MANTA_RAY))  # water on water: 1 -> 2
-    resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="water")  # metal: 4 -> 3
-    resolve_played_power(duel, card(TWO_TON_TUNIC), is_player=False, element="water")  # cursed at P1
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round()])
+    duel.round.player_queue.append(card(SILVER_MANTA_RAY))  # water on water: 1 -> 2
+    resolve_played_power(duel.round, card(FIST_OF_TEBIGONG), is_player=True, element="water")  # metal: 4 -> 3
+    resolve_played_power(duel.round, card(TWO_TON_TUNIC), is_player=False, element="water")  # cursed at P1
 
     from xiaolin_showdown.logic.duel import Duel
     from xiaolin_showdown.logic.mechanics.scoring import contributing, count_end_stats
 
     total = count_end_stats(
-        "force", 1, duel.player_queue, state.player.character.stats, "water",
-        earns_bonus=Duel._earns_bonus(duel.player_queue, duel.player_suffered),
-        suffers_bonus=contributing(duel.player_suffered),
+        "force", 1, duel.round.player_queue, state.player.character.stats, "water",
+        earns_bonus=Duel._earns_bonus(duel.round.player_queue, duel.round.player_suffered),
+        suffers_bonus=contributing(duel.round.player_suffered),
     )
-    duel.player_result = [total, 0, 0]
+    duel.round.player_result = [total, 0, 0]
     board = _board_text(duel, state)
 
     # a shifted stat prints the struck original next to the real one; drop the struck half

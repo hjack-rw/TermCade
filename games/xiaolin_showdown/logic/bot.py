@@ -15,6 +15,7 @@ from .constants import OPPOSITES
 from .mechanics.powers import Mechanic, mechanic_of
 from .mechanics.scoring import count_end_stats
 from .models import Card
+from .turn import duel_value
 
 
 def choose_challenge(
@@ -115,3 +116,29 @@ def _most_common_element(hand: Sequence[Card]) -> str:
     for card in hand:
         counts[card.element] = counts.get(card.element, 0) + 1
     return max(counts, key=lambda e: counts[e])
+
+
+def choose_wager(options: Sequence[int], own_hand: Sequence[Card], opponent_hand: Sequence[Card]) -> int:
+    """How many Wu to stake — the answer to a challenge you did not call.
+
+    Both hands are face up, so this is a read, not a gamble. Raise when your bench is deeper: a
+    best-of-3 drags out a duelist's *third* Wu, and a hand that is one monster and two trinkets
+    loses a long match it would have won a short one.
+
+    Compared rung by rung, best against best, because that is the order they will be fielded in.
+    """
+    if not options:
+        return 1
+    mine = sorted((duel_value(card) for card in own_hand), reverse=True)
+    theirs = sorted((duel_value(card) for card in opponent_hand), reverse=True)
+
+    best = min(options)
+    for wager in options:
+        # every rung this wager reaches: am I ahead down there?
+        edge = sum(
+            (mine[i] if i < len(mine) else 0) - (theirs[i] if i < len(theirs) else 0)
+            for i in range(wager)
+        )
+        if edge > 0:
+            best = wager  # deeper bench — the longer the match, the better it goes
+    return best

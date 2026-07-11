@@ -35,6 +35,12 @@ class XiaolinSettings:
     draw_limit: int = 1
     deposit_limit: int = 1
     empty_draw_limit: int = 3
+    # The prize Wu is only claimed if the winner's Challenge stat clears this. It is the one number
+    # that decides whether Wu circulate or the pile just drains — measured, the prize moves in about
+    # one showdown in six. Tunable rather than derived: it turns on character stats AND card stats
+    # together, and that relationship is not something we can compute yet.
+    prize_threshold: int = 7
+    max_wager: int = 3  # the most Wu either duelist may be made to stake in one showdown
 
     def __post_init__(self) -> None:
         """Clamp player-entered values to a playable range, so an edited Settings screen can never
@@ -49,6 +55,8 @@ class XiaolinSettings:
             "max_hand_size",
             max(self.max_hand_size, self.starting_hand_player, self.starting_hand_bot),
         )
+        clamp(self, "prize_threshold", max(0, self.prize_threshold))
+        clamp(self, "max_wager", max(1, self.max_wager))
         for limit in ("draw_limit", "deposit_limit", "empty_draw_limit"):
             clamp(self, limit, max(1, getattr(self, limit)))
         for points in ("starting_points_player", "starting_points_bot"):

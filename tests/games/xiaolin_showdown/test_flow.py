@@ -273,7 +273,7 @@ async def test_start_screen_shows_the_cartridge_version(tmp_path):
     async with app.run_test(size=(150, 60)) as pilot:
         await _boot(app, pilot)
         await pilot.pause()
-        assert str(app.screen.query_one("#version", Static).render()) == "v1.0"
+        assert str(app.screen.query_one("#version", Static).render()) == "v1.1"
 
 
 async def test_settings_flags_an_out_of_range_value_instead_of_saving(tmp_path):
@@ -516,3 +516,33 @@ async def test_every_vault_action_says_what_it_does(tmp_path):
     keys = [action.split(".")[0] for action in _ACTIONS]
 
     assert set(keys) == set(_ACTION_HELP)
+
+
+def test_the_rulebook_prints_the_numbers_the_game_actually_uses():
+    """A rulebook that says 7 while the code checks 8 is worse than no rulebook.
+
+    Every tunable a rule mentions is read from the settings, so changing one number changes both the
+    behaviour and the page that explains it.
+    """
+    from xiaolin_showdown.logic.settings import XiaolinSettings
+    from xiaolin_showdown.screens.rules import rules_for
+
+    odd = XiaolinSettings(prize_threshold=99, max_wager=2, point_limit=42)
+    text = " ".join(rule for rules in rules_for(odd).values() for rule in rules)
+
+    assert "99" in text  # the prize threshold
+    assert "up to 2" in text  # the wager cap
+    assert "42 points" in text  # the point limit
+
+
+def test_the_rulebook_states_every_wager_rule():
+    """The wager is the newest rule and the easiest to leave undocumented."""
+    from xiaolin_showdown.logic.settings import XiaolinSettings
+    from xiaolin_showdown.screens.rules import rules_for
+
+    text = " ".join(rule for rules in rules_for(XiaolinSettings()).values() for rule in rules).lower()
+
+    assert "did not call the challenge" in text  # who names the stakes
+    assert "more than they hold" in text  # you cannot demand what they cannot field
+    assert "most rounds won" in text  # how a best-of-N is decided
+    assert "margin" in text  # ...and how a level match breaks

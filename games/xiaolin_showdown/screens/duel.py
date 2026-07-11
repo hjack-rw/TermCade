@@ -27,7 +27,7 @@ from textual.widgets import Footer, Header, Static
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
-from ..logic.duel import Duel, DuelChoices, DuelState
+from ..logic.duel import Duel, DuelChoices, DuelState, Round
 from ..logic.constants import ELEMENTS
 from ..logic.models import Card, Player
 from ..logic.settings import XiaolinSettings
@@ -186,6 +186,7 @@ class DuelScreen(EngineScreen):
         return DuelChoices(
             challenge=self._pick_challenge,
             background=self._pick_background,
+            wager=self._pick_wager,
             boost=self._pick_boost,
             card=self._pick_card,
             element=self._pick_element,
@@ -197,6 +198,16 @@ class DuelScreen(EngineScreen):
     async def _pick_background(self, options: list[str]) -> str:
         return await self.choose("Choose the background element", _element_options(options), title="BACKGROUND")
 
+    async def _pick_wager(self, options: list[int]) -> int:
+        """They named the challenge; you name the price. Both hands are face up — read them."""
+        if len(options) == 1:
+            return options[0]  # nothing to decide: one of you can only field the one Wu
+        return await self.choose(
+            "They called the Showdown. How many Wu will you stake?",
+            [(_wager_label(n), n) for n in options],
+            title="THE STAKES",
+        )
+
     async def _pick_element(self, _background: str) -> str:
         return await self.choose("Choose an element", _element_options(list(ELEMENTS)), title="ELEMENT")
 
@@ -206,6 +217,12 @@ class DuelScreen(EngineScreen):
 
     async def _pick_card(self, cards: list[Card]) -> Card:
         return await self.choose("Play a card", _card_options(cards), title="CARD")
+
+
+def _wager_label(wager: int) -> str:
+    if wager == 1:
+        return "1 Wu  —  a single exchange"
+    return f"{wager} Wu  —  best of {wager}"
 
 
 def _stat_options(values: list[str]) -> list[tuple[str, str]]:
@@ -269,6 +286,10 @@ _DIVIDER_WIDTH = 36  # a rule under the prize; deliberately short of the board's
 
 
 def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
+    # The exchange on the table. Before the first Boost there is none, so an empty stand-in keeps the
+    # board a pure function of the state rather than a special case at every line.
+    live = duel.rounds[-1] if duel.rounds else Round()
+
     prize_line = Text(justify="center")  # the prize sits on its own centred line
     prize_line.append("Prize: ", style="dim")
     if duel.stakes is None:
@@ -298,6 +319,17 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         _labelled("Initiative", f"P1: {duel.player_initiative}  P2: {duel.bot_initiative}"),
     )
 
+    # A best-of-1 has nothing to tally; anything more needs its running score on the board.
+    tally: list[RenderableType] = []
+    if duel.wager > 1:
+        player_rounds, bot_rounds = duel.rounds_won
+        line = Text(justify="center")
+        line.append(f"Round {max(1, duel.round_number)} of {duel.wager}", style="bold")
+        line.append("      ")
+        line.append("Rounds won: ", style="dim")
+        line.append(f"P1 {player_rounds}  P2 {bot_rounds}", style="bold")
+        tally = [line, ""]
+
     parts: list[RenderableType] = [
         Text(f"—  {_phase_name(duel)} —", style="bold", justify="center"),  # the em-dash eats the space to its right
         "",
@@ -306,16 +338,17 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         "",
         Align.center(meta),
         "",
+        *tally,
         _side_line(
-            "P1", state.player, duel.player_queue, duel.player_suffered,
-            duel.player_amplifiers, duel.player_result,
+            "P1", state.player, live.player_queue, live.player_suffered,
+            live.player_amplifiers, live.player_result,
             leads=duel.player_priority is True,
             challenge=duel.challenge, background=_resonant_background(duel),
         ),
         "",  # the two duelists' blocks are three lines each; a gap keeps them from reading as one
         _side_line(
-            "P2", state.bot, duel.bot_queue, duel.bot_suffered,
-            duel.bot_amplifiers, duel.bot_result,
+            "P2", state.bot, live.bot_queue, live.bot_suffered,
+            live.bot_amplifiers, live.bot_result,
             leads=duel.player_priority is False,
             challenge=duel.challenge, background=_resonant_background(duel),
         ),

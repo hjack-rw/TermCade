@@ -23,10 +23,13 @@ def _choices() -> DuelChoices:
     async def no_boost(_options):
         return None
 
+    async def wager(options):
+        return options[0]  # the smallest legal stake — one Wu, one exchange
+
     async def element(background):
         return background
 
-    return DuelChoices(first, first, no_boost, first, element)
+    return DuelChoices(first, first, wager, no_boost, first, element)
 
 
 async def _setup(catalog, seed: int) -> DuelState:
