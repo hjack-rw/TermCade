@@ -6,10 +6,12 @@ hand limit. Together, shelving a card and drawing a fresh one is how the player 
 
 from __future__ import annotations
 
+from termcade.core.rng import Rng
+
 from .models import Card
 from .settings import XiaolinSettings
 from .state import XiaolinState
-from .turn import max_hand_size
+from .turn import bank_value, max_hand_size
 
 # The gag Wu Ohwah Tegu Saim (deposit/0) has a "? ? ?" power that does nothing when used.
 FIZZLE_MESSAGE = "You feel like something should have happened..."
@@ -35,14 +37,19 @@ def can_deposit(state: XiaolinState, deposit_limit: int) -> bool:
     return deposit_blocked(state, deposit_limit) is None
 
 
-def deposit(state: XiaolinState, card: Card) -> None:
-    """Cash ``card`` from the player's hand for its points; counts against the turn limit.
+def deposit(state: XiaolinState, card: Card, *, rng: Rng) -> int:
+    """Cash ``card`` from the player's hand; counts against the turn limit. Returns what it paid.
+
+    Usually its printed points. A GAMBLE Wu is rolled instead, and can pay less than nothing — but
+    never below zero overall: a bad roll costs you your banked points, not your whole run.
 
     The derived ``Player.initiative`` updates itself when the hand changes.
     """
     state.player.hand.remove(card)
-    state.player.points += card.points
+    paid = bank_value(card, rng)
+    state.player.points = max(0, state.player.points + paid)
     state.deposit_counter += 1
+    return paid
 
 
 def draw_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | None:

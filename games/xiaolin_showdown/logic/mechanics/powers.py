@@ -16,6 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from termcade.core.rng import Rng
+
 from ..models import Power
 
 
@@ -26,7 +28,7 @@ class Mechanic(StrEnum):
     INITIATIVE = "initiative"
     HAND_SIZE = "hand_size"
     HAND_FIZZLE = "hand_fizzle"
-    POINTS_ONLY = "points_only"
+    GAMBLE = "gamble"
     CHRONOKINESIS = "chronokinesis"
     DRAGON = "dragon"
     BOOST = "boost"
@@ -51,6 +53,22 @@ class Rule:
     text: str
 
 
+# What a GAMBLE Wu pays when it is banked, inclusive. Nobody is told this: the card shows `?`.
+#
+# Its DB `points` is never shown to a player either — it is the card's *expected* value, and only two
+# things read it. `settings.point_limit_for` sizes the run from the deck's total points, and the bot
+# ranks what to bank by them. Both would be lied to by a number the card cannot pay. Here the true
+# average is 1.5 against a stored 1, so the bot slightly undervalues the card. That is the whole of
+# the discrepancy, and it is deliberate: it is one Wu, in the player's favour, and rounding it away
+# beats a DB migration. Widen the spread and the stored value must move with it.
+#
+# ⚠ THIS IS THE ONLY RANDOMNESS A DUELIST CANNOT SEE COMING, AND IT BELONGS TO EXACTLY ONE WU.
+# Everything else in this game is open hands and hard choices — that is the whole pitch, and it only
+# reads as a virtue while it stays true. A second card that rolls makes the first one ordinary and
+# the promise false. If you are about to give another Wu a random anything: don't.
+GAMBLE_SPREAD = (-2, 5)
+
+
 # Keyed by (trigger, effect) — the order the DB and `Power` use, so a reader never has to flip it.
 RULES: dict[tuple[str, int], Rule] = {
     ("none", 0): Rule(Mechanic.FILLER, Timing.NEVER, "Deck filler. Does nothing."),
@@ -69,9 +87,10 @@ RULES: dict[tuple[str, int], Rule] = {
         "Can be spent from the vault, but its power fizzles — it is discarded for no points.",
     ),
     ("deposit", 0): Rule(
-        Mechanic.POINTS_ONLY,
+        Mechanic.GAMBLE,
         Timing.AT_VAULT,
-        "Spending it does nothing. Deposit it instead, for its points.",
+        f"Nobody knows what it is worth. Deposit it and find out: anywhere from "
+        f"{GAMBLE_SPREAD[0]:+d} to {GAMBLE_SPREAD[1]:+d} points.",
     ),
     ("deposit", 1): Rule(
         Mechanic.CHRONOKINESIS,
@@ -121,6 +140,17 @@ def rule_of(power: Power) -> Rule:
 
 def mechanic_of(power: Power) -> Mechanic:
     return rule_of(power).mechanic
+
+
+def is_gamble(power: Power) -> bool:
+    """The joke Wu. Its stats, name and text are all ``? ? ?``, and so is what it pays."""
+    return mechanic_of(power) is Mechanic.GAMBLE
+
+
+def roll_gamble(rng: Rng) -> int:
+    """What a GAMBLE Wu actually pays. The only roll in the game the player cannot see coming."""
+    low, high = GAMBLE_SPREAD
+    return rng.randint(low, high)
 
 
 def is_boost_slot(power: Power) -> bool:

@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 
 from rich.text import Text
 
-from ..logic.mechanics.powers import Mechanic, mechanic_of
+from ..logic.mechanics.powers import Mechanic, is_gamble, mechanic_of
 from ..logic.models import Card, Character, Power
 
 # element -> colour, as explicit hex so the theme's ANSI palette can't remap it (the OG mapping:
@@ -115,7 +115,11 @@ def points_label(card: Card) -> str:
     A dragon Wu (``boost``/0) can never be staked, lost or banked, so ``0`` reads as "worth nothing"
     when it means "not for sale".
     """
-    return "X" if mechanic_of(card.power) is Mechanic.DRAGON else str(card.points)
+    if mechanic_of(card.power) is Mechanic.DRAGON:
+        return "X"
+    if is_gamble(card.power):  # nobody knows, and the card is not going to tell you
+        return "?"
+    return str(card.points)
 
 
 def power_name_text(power: Power) -> Text:
@@ -156,8 +160,8 @@ def bonus_tooltip(bonuses: Sequence[int]) -> str:
 
 
 def trigger_label(power: Power) -> str:
-    """When a power fires, e.g. ``On Play`` — or ``? ? ?`` for a hidden deposit power."""
-    if power.trigger == "deposit" and power.effect == 0:
+    """When a power fires, e.g. ``On Play`` — or ``? ? ?`` for the gamble Wu, which says nothing."""
+    if is_gamble(power):
         return "? ? ?"
     return f"On {power.trigger.capitalize()}"
 

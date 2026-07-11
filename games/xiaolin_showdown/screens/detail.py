@@ -10,7 +10,15 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
 
 from ..logic.models import Card, Character
-from .format import char_stats, element_text, points_label, power_name_text, stats_line, trigger_label
+from ..logic.mechanics.powers import is_gamble
+from .format import (
+    char_stats,
+    element_text,
+    points_label,
+    power_name_text,
+    stats_line,
+    trigger_label,
+)
 
 
 class DetailScreen(EngineScreen):
@@ -41,9 +49,12 @@ class DetailScreen(EngineScreen):
             if power.id and not hidden:
                 power_line = Text("Power: ")
                 power_line.append_text(power_name_text(power))
-                power_line.append(f"  ({trigger_label(power)})")
+                # The joke Wu's name, timing and text are the same three question marks. Printing all
+                # three says nothing, at length.
+                if not is_gamble(power):
+                    power_line.append(f"  ({trigger_label(power)})")
                 yield Static(power_line, classes="power")
-                if power.description:
+                if power.description and not is_gamble(power):
                     yield Static(power.description, classes="description")
             if power.initiative_bonus:
                 yield Static(f"Initiative bonus: {power.initiative_bonus:+d}", classes="power")

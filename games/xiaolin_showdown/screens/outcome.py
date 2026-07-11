@@ -20,7 +20,7 @@ from ..logic.state import XiaolinState
 
 class OutcomeScreen(EngineScreen):
     def compose(self) -> ComposeResult:
-        outcome = final_score(cast(XiaolinState, self.ctx.state))
+        outcome = final_score(cast(XiaolinState, self.ctx.state), self.ctx.rng)
         verdict = (
             "A TIE — NOBODY WINS!"
             if outcome.winner is None

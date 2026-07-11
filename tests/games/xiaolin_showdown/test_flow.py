@@ -17,7 +17,9 @@ from xiaolin_showdown.screens.character_select import CharacterSelectScreen
 from xiaolin_showdown.screens.detail import DetailScreen
 from termcade.ui.screens.dialog import ChoiceModal
 
+from xiaolin_showdown.logic.mechanics.powers import is_gamble
 from xiaolin_showdown.screens.duel import DuelScreen, _wager_terms
+from xiaolin_showdown.screens.format import card_label, points_label
 from xiaolin_showdown.screens.lookup import LookUpScreen
 from xiaolin_showdown.screens.outcome import OutcomeScreen
 from xiaolin_showdown.screens.rules import RulesScreen
@@ -575,3 +577,15 @@ def test_the_stakes_spell_out_what_they_cost():
     assert "forfeits it" in _wager_terms(1)
     assert "Best of 3" in _wager_terms(3)
     assert "forfeits all 3" in _wager_terms(3)
+
+
+def test_the_gamble_wu_never_shows_a_number_anywhere(catalog):
+    """The card refuses to say what it is worth. Every surface that prints points must agree.
+
+    The Deposit button is the one that got this wrong: it read `card.points` directly and cheerfully
+    offered "+1 pts" for a Wu whose whole point is that nobody knows.
+    """
+    gamble = next(c for c in catalog.cards if is_gamble(c.power))
+
+    assert points_label(gamble) == "?"
+    assert str(gamble.points) not in card_label(gamble, f"   +{points_label(gamble)} pts").plain

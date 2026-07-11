@@ -11,6 +11,7 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 from termcade.core.settings import Difficulty
 
+from .mechanics.powers import is_gamble, roll_gamble
 from .models import Card, Player
 from .settings import XiaolinSettings, is_hard
 from .state import XiaolinState
@@ -108,21 +109,35 @@ def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
     return min(candidates, key=lambda c: (duel_value(c), -c.points))
 
 
+def bank_value(card: Card, rng: Rng) -> int:
+    """What depositing this Wu pays. Its printed points — unless it is the gamble, which is rolled.
+
+    The bot banks on the same terms as the player. Neither is told what the gamble is worth, and
+    neither finds out until it is spent: the bot picks it by the expected value in the card DB (see
+    ``GAMBLE_SPREAD``), the same way a player eyeing a ``?`` has only the odds to go on.
+    """
+    return roll_gamble(rng) if is_gamble(card.power) else card.points
+
+
 def bot_turn(
-    state: XiaolinState, settings: XiaolinSettings, *, difficulty: Difficulty = Difficulty.NORMAL
+    state: XiaolinState,
+    settings: XiaolinSettings,
+    *,
+    rng: Rng,
+    difficulty: Difficulty = Difficulty.NORMAL,
 ) -> list[str]:
     """The bot's between-showdown vault turn; returns a short log of what it did, for the player.
 
     It deposits (see :func:`_bot_deposits` — how it banks points toward the win) then refills one
     card toward the hand limit from its own deck, since it has no manual Draw as the player does.
     """
-    log = _bot_deposits(state, settings, difficulty)
+    log = _bot_deposits(state, settings, rng, difficulty)
     _bot_refill(state, settings)
     return log or [f"{state.bot.character.name.split('_')[0]} passed"]
 
 
 def _bot_deposits(
-    state: XiaolinState, settings: XiaolinSettings, difficulty: Difficulty
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty
 ) -> list[str]:
     """Up to ``deposit_limit`` deposits: swap each ``deposit``/+1 Wu for a fresh draw, then bank the
     card :func:`pick_deposit` chooses.
@@ -149,10 +164,10 @@ def _bot_deposits(
         banked = pick_deposit(state.bot.hand, difficulty)
         if banked is None:  # nothing in hand is worth points
             break
-        state.bot.points += banked.points
+        points = bank_value(banked, rng)
+        state.bot.points = max(0, state.bot.points + points)  # a bad gamble cannot go below zero
         state.bot.remove_card(banked)
         deposits += 1
-        points = banked.points
         log.append(f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}")
     return log
 

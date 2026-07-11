@@ -172,7 +172,7 @@ def test_deposit_cashes_a_card_for_its_points():
     card = state.player.hand[0]
     points_before = state.player.points
 
-    deposit(state, card)
+    deposit(state, card, rng=Rng(1))
 
     assert state.player.points == points_before + card.points
     assert card not in state.player.hand
@@ -247,7 +247,7 @@ def test_final_score_cashes_leftover_hand_cards_when_the_pile_is_empty():
     state.card_deck.clear()  # the pile ran dry — hand cards now count
     hand_points = sum(card.points for card in state.player.whole_hand)
 
-    assert final_score(state).player_points == 5 + hand_points
+    assert final_score(state, Rng(1)).player_points == 5 + hand_points
 
 
 def test_final_score_ignores_hand_cards_while_the_pile_still_has_cards():
@@ -255,7 +255,7 @@ def test_final_score_ignores_hand_cards_while_the_pile_still_has_cards():
     state = new_game(cat, Rng(1), _omi(cat))
     state.player.points = 9  # a point-limit ending: the pile is not empty, so hands are not counted
 
-    assert final_score(state).player_points == 9
+    assert final_score(state, Rng(1)).player_points == 9
 
 
 def test_final_score_names_the_higher_scoring_duelist():
@@ -263,14 +263,14 @@ def test_final_score_names_the_higher_scoring_duelist():
     state = new_game(cat, Rng(1), _omi(cat))
     state.player.points = 5  # pile still full, so bot stays at 0
 
-    assert final_score(state).winner is state.player.character
+    assert final_score(state, Rng(1)).winner is state.player.character
 
 
 def test_final_score_reports_a_tie_when_points_are_level():
     cat = load_catalog()
     state = new_game(cat, Rng(1), _omi(cat))  # both at 0, pile full
 
-    assert final_score(state).winner is None
+    assert final_score(state, Rng(1)).winner is None
 
 
 def _named(cat, name: str) -> Card:

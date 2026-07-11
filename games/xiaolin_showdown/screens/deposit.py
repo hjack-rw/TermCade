@@ -16,10 +16,11 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.actions import deposit
+from ..logic.mechanics.powers import is_gamble
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
-from .format import card_label
+from .format import card_label, points_label
 
 
 class DepositScreen(EngineScreen):
@@ -31,7 +32,9 @@ class DepositScreen(EngineScreen):
         with BoxedPanel(title="DEPOSIT"):
             yield Static("Choose a card", classes="panel-desc")
             for index, card in enumerate(state.player.hand):
-                yield Button(card_label(card, f"   +{card.points} pts"), id=f"dep-{index}")
+                # `points_label`, not `card.points`: the gamble Wu is worth `?` and must read as one
+                # here too, or the button quietly tells you what the card refuses to.
+                yield Button(card_label(card, f"   +{points_label(card)} pts"), id=f"dep-{index}")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -42,8 +45,10 @@ class DepositScreen(EngineScreen):
     @work
     async def _choose(self, card: Card) -> None:
         if card.power.trigger == "deposit":  # banking it forfeits its power — confirm first
+            # Name the power the Wu actually has. The joke Wu's is "? ? ?" in the card DB, and that
+            # is the right thing to print: you are being asked to give up something unnamed.
             forfeit = await self.confirm(
-                "This Wu has a power on Deposit — forfeit it for points?",
+                f"This Wu has a power: {card.power.name}. Forfeit it for points?",
                 title="FORFEIT",
                 yes="Yes, forfeit for points",
                 no="No, keep it",
@@ -54,7 +59,9 @@ class DepositScreen(EngineScreen):
 
     def _bank(self, card: Card) -> None:
         state = cast(XiaolinState, self.ctx.state)
-        deposit(state, card)
+        paid = deposit(state, card, rng=self.ctx.rng)
+        if is_gamble(card.power):  # you banked a "? ? ?" — this is the moment you learn what it was
+            self.app.notify(_gamble_result(card, paid), title="? ? ?")
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
         if state.player.points >= settings.point_limit:  # crossing the line ends the game at once
             state.has_ended = True
@@ -63,3 +70,12 @@ class DepositScreen(EngineScreen):
             self.app.switch_screen(OutcomeScreen())
         else:
             self.app.pop_screen()
+
+
+def _gamble_result(card: Card, paid: int) -> str:
+    """What the mystery Wu turned out to be worth. It can cost you, so say which it did."""
+    if paid > 0:
+        return f"{card.name} was worth {paid} pt{'s' if paid != 1 else ''}!"
+    if paid == 0:
+        return f"{card.name} was worth nothing at all."
+    return f"{card.name} cost you {abs(paid)} pt{'s' if paid != -1 else ''}!"

@@ -155,7 +155,7 @@ class DuelScreen(EngineScreen):
             await self._discard_surplus(state, settings)
             difficulty = self.ctx.settings.current.difficulty  # the bot's deposit skill follows it
             self.app.notify(
-                "\n".join(bot_turn(state, settings, difficulty=difficulty)), title="Opponent's turn"
+                "\n".join(bot_turn(state, settings, rng=rng, difficulty=difficulty)), title="Opponent's turn"
             )
             refill_hands(state, settings, rng=rng)
         self._leave()
