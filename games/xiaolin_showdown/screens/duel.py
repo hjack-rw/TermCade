@@ -27,7 +27,7 @@ from textual.widgets import Footer, Header, Static
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
-from ..logic.duel import Duel, DuelChoices, DuelState, Round, Side
+from ..logic.duel import COMMITMENT, END, SETUP, Duel, DuelChoices, DuelState, Round, Side
 from ..logic.constants import ELEMENTS
 from ..logic.mechanics.cards import is_one_of
 from ..logic.models import Card, Player
@@ -109,12 +109,23 @@ class DuelScreen(EngineScreen):
         outcome = "You win priority!" if player_won else "You lose priority!"
         await self.show_message(f"The coin lands {face.upper()}.  {outcome}", title="COIN TOSS")
 
+    async def _announce_wager(self, duel: DuelState, state: XiaolinState) -> None:
+        """You called the challenge, so your opponent sets the price — and names it to your face.
+
+        Only when *they* named it: a wager you chose yourself needs no announcing.
+        """
+        name = display_name(state.bot.character.name)
+        await self.show_message(
+            f"{name} answers {duel.wager} v {duel.wager}.  {_wager_terms(duel.wager)}",
+            title="THE STAKES",
+        )
+
     @work
     async def _run_showdown(self) -> None:
         state = cast(XiaolinState, self.ctx.state)
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
         rng = self.ctx.rng
-        duel = Duel(state, rng, self._choices())
+        duel = Duel(state, rng, self._choices(), settings)
         self._duel = duel
 
         # Initiative is already on the board: this press commits you to the priority you can see, or
@@ -129,9 +140,11 @@ class DuelScreen(EngineScreen):
         while True:
             stage = await duel.advance()  # one phase; a choice phase raises its modal inline
             self._show_board(duel)
-            if stage == 1 and duel.duel.player.initiative == duel.duel.bot.initiative:
+            if stage == COMMITMENT and duel.duel.player.initiative == duel.duel.bot.initiative:
                 await self._reveal_coin_toss(duel.duel.player_priority is True)
-            if stage == 0:  # the end phase (the loser's stakes change hands) has run
+            if stage == SETUP and duel.duel.player_priority:  # they named the stakes — say so
+                await self._announce_wager(duel.duel, state)
+            if stage == END:  # the end phase (the loser's stakes change hands) has run
                 break
             await self._await_continue("Continue")
 
@@ -328,7 +341,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         line.append(f"Round {max(1, duel.round_number)} of {duel.wager}", style="bold")
         line.append("      ")
         line.append("Rounds won: ", style="dim")
-        line.append(f"P1 {player_rounds}  P2 {bot_rounds}", style="bold")
+        line.append(f"P1: {player_rounds}  P2: {bot_rounds}")
         tally = [line, ""]
 
     parts: list[RenderableType] = [
@@ -355,6 +368,13 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
     if duel.winner_character:
         parts += ["", Text(f"{_won(duel)} WINS!", style="bold")]
     return Group(*parts)
+
+
+def _wager_terms(wager: int) -> str:
+    """What the stakes actually cost you, in words — the board only shows the number."""
+    if wager == 1:
+        return "One Wu each. The loser forfeits it."
+    return f"Best of {wager} — field {wager} Wu each. The loser forfeits all {wager}."
 
 
 def _resonant_background(duel: DuelState) -> str | None:

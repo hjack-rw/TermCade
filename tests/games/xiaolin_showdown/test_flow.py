@@ -17,7 +17,7 @@ from xiaolin_showdown.screens.character_select import CharacterSelectScreen
 from xiaolin_showdown.screens.detail import DetailScreen
 from termcade.ui.screens.dialog import ChoiceModal
 
-from xiaolin_showdown.screens.duel import DuelScreen
+from xiaolin_showdown.screens.duel import DuelScreen, _wager_terms
 from xiaolin_showdown.screens.lookup import LookUpScreen
 from xiaolin_showdown.screens.outcome import OutcomeScreen
 from xiaolin_showdown.screens.rules import RulesScreen
@@ -546,3 +546,32 @@ def test_the_rulebook_states_every_wager_rule():
     assert "more than they hold" in text  # you cannot demand what they cannot field
     assert "most rounds won" in text  # how a best-of-N is decided
     assert "margin" in text  # ...and how a level match breaks
+
+
+async def test_the_showdown_is_fought_under_the_settings_you_chose(tmp_path):
+    """The duel must read the vault's settings, not a fresh set of defaults.
+
+    Vacuous while the defaults happen to agree — so this tunes one first. A duel built without its
+    settings ignores `max_wager` and `prize_threshold` entirely, and nothing else would notice.
+    """
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await _boot(app, pilot)
+        await pilot.click("#play")
+        await pilot.pause()
+        await pilot.click("#char-1")
+        await pilot.pause()
+
+        app.ctx.settings.current.options["max_wager"] = 1  # no showdown may run past a single Wu
+        await pilot.press("1")  # Gong Yi Tanpai
+        await pilot.pause()
+
+        assert app.screen._duel.settings.max_wager == 1
+        assert app.screen._duel._wager_options() == [1]
+
+
+def test_the_stakes_spell_out_what_they_cost():
+    """The board shows a number; the announcement has to say what losing it means."""
+    assert "forfeits it" in _wager_terms(1)
+    assert "Best of 3" in _wager_terms(3)
+    assert "forfeits all 3" in _wager_terms(3)
