@@ -334,3 +334,147 @@ async def test_resolvement_negates_the_bonus_a_curse_would_have_earned_its_caste
     duel._score_round(duel.duel.round)
 
     assert duel.duel.round.player_result[0] == base - 1
+
+
+# --- a boost is spent once a showdown, not once a round ------------------------------
+
+
+def _boost_card(name: str) -> Card:
+    return Card(9, name, {"force": None, "agility": None, "intellect": None},
+                Power(0, "", "boost", 1, ""), "water", "item", 0)
+
+
+async def test_a_boost_wu_cannot_be_played_twice_in_one_showdown():
+    """Choosing WHICH round to amplify is the decision. Replaying one boost every round is not."""
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    bracelet = _boost_card("Wushu Bracelet")
+    state.player.hand.append(bracelet)
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.rounds.append(Round())
+
+    offered_first = duel._boost_options(state.player, is_player=True)
+    duel._commit_boost(bracelet, is_player=True)
+    offered_again = duel._boost_options(state.player, is_player=True)
+
+    assert any(c is bracelet for c in offered_first)
+    assert not any(c is bracelet for c in offered_again)  # spent — never offered again
+
+
+async def test_a_dragon_is_spent_once_too():
+    """It is inalienable and never leaves the hand, so nothing else would stop it being replayed."""
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    dragon = next(c for c in state.player.inalienable_hand if c.power.trigger == "boost")
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.rounds.append(Round())
+
+    duel._commit_boost(dragon, is_player=True)
+
+    assert not any(c is dragon for c in duel._boost_options(state.player, is_player=True))
+
+
+async def test_holding_two_boosts_lets_you_amplify_two_rounds():
+    """Guards the rule above: spending one must not lock the other out."""
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    first, second = _boost_card("Bracelet A"), _boost_card("Bracelet B")
+    state.player.hand.extend([first, second])
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.rounds.append(Round())
+
+    duel._commit_boost(first, is_player=True)
+
+    assert any(c is second for c in duel._boost_options(state.player, is_player=True))
+
+
+async def test_a_spent_boost_stays_spent_across_rounds():
+    """The showdown is the unit, not the round — a new Round must not resurrect it."""
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    bracelet = _boost_card("Wushu Bracelet")
+    state.player.hand.append(bracelet)
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.rounds.append(Round())
+    duel._commit_boost(bracelet, is_player=True)
+
+    duel.duel.rounds.append(Round())  # round two opens
+
+    assert not any(c is bracelet for c in duel._boost_options(state.player, is_player=True))
+
+
+async def test_a_booster_fielded_as_an_ordinary_wu_cannot_also_boost():
+    """A best-of-3 can force a booster into the card slot. Once staked, it is gone.
+
+    Otherwise the same Wu is spent twice: played as a card in round one, and still lifting another
+    card in round two.
+    """
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    bracelet = _boost_card("Wushu Bracelet")
+    state.player.hand.append(bracelet)
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.rounds.append(Round())
+
+    duel.duel.player_stakes.append(bracelet)  # forced to play it as an ordinary Wu
+
+    assert not any(c is bracelet for c in duel._boost_options(state.player, is_player=True))
+
+
+async def test_a_booster_left_in_hand_is_still_offered():
+    """Guards the test above: staking one Wu must not lock every boost out."""
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    played, held = _boost_card("Bracelet A"), _boost_card("Bracelet B")
+    state.player.hand.extend([played, held])
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.rounds.append(Round())
+
+    duel.duel.player_stakes.append(played)
+
+    assert any(c is held for c in duel._boost_options(state.player, is_player=True))
+
+
+async def test_you_cannot_boost_with_a_wu_you_owe_to_a_round():
+    """Three Wu owed, three Wu in hand — the booster among them must be FIELDED, not spent.
+
+    Otherwise a duelist boosts with it and then has nothing to field in the last round, which is a
+    way of answering a best-of-3 with two Wu.
+    """
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    bracelet = _boost_card("Wushu Bracelet")
+    state.player.hand = state.player.hand[:2] + [bracelet]  # exactly three, one a booster
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.wager = 3
+    duel.duel.rounds.append(Round())
+
+    offered = duel._boost_options(state.player, is_player=True)
+
+    assert not any(c is bracelet for c in offered)
+
+
+async def test_the_inalienable_dragon_is_always_affordable():
+    """It can never be fielded as a card, so spending it costs you no round."""
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    state.player.hand = state.player.hand[:3]
+    dragon = next(c for c in state.player.inalienable_hand if c.power.trigger == "boost")
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.wager = 3
+    duel.duel.rounds.append(Round())
+
+    assert any(c is dragon for c in duel._boost_options(state.player, is_player=True))
+
+
+async def test_a_spare_wu_makes_the_booster_affordable_again():
+    """Guards the rule: the cost is what you OWE, not the mere presence of a booster."""
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    bracelet = _boost_card("Wushu Bracelet")
+    state.player.hand = state.player.hand[:3] + [bracelet]  # four Wu, three owed
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.wager = 3
+    duel.duel.rounds.append(Round())
+
+    assert any(c is bracelet for c in duel._boost_options(state.player, is_player=True))

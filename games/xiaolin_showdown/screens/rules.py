@@ -39,8 +39,8 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "The Challenge stat counts double; the other two still count.",
         ],
         "In the showdown:": [
-            "One Wu each, per Wu staked — a Boost may be spent alongside any of them, but each Boost "
-            "Wu is spent only once.",
+            "Every round staked gets one Wu. You may add a Boost to any round, but each Boost Wu "
+            "works once. Short on Wu? Your Boost gets played as a normal Wu instead.",
             "A Wu with a negative stat curses your Opponent: it lands on their side instead.",
             "The Background lifts a Wu of its element and drags down the one against it — and does "
             "the reverse to a curse cast at you.",

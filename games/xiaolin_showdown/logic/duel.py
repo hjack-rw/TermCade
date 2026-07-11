@@ -357,16 +357,28 @@ class Duel:
         return [e for e in ELEMENTS if e not in self.state.previous_background]
 
     def _boost_options(self, player: Player, *, is_player: bool) -> list[Card]:
-        """Boost Wu still in hand this showdown — a boost is spent once, not once a round.
+        """Boost Wu still available this showdown — a boost is spent once, not once a round.
 
-        You choose which Wu to lift, and a dragon cannot be replayed round after round. Holding two
-        boosts means two rounds you can amplify; the rest you fight bare.
+        A Wu is spent when it is used, whichever slot it went into. A best-of-3 can force you to
+        field a booster as an ordinary Wu; once you do, it is gone — you cannot stake the same Wu as
+        a card and then lift another card with it. And a dragon cannot be replayed round after round.
         """
         spent = self.duel.player_boosts_spent if is_player else self.duel.bot_boosts_spent
-        return [
+        staked = self.duel.player_stakes if is_player else self.duel.bot_stakes
+        used = spent + staked
+        available = [
             c for c in player.whole_hand
-            if is_boost_slot(c.power) and not any(c is used for used in spent)
+            if is_boost_slot(c.power) and not any(c is gone for gone in used)
         ]
+
+        # You owe a Wu for every round still to fight. Boosting with one out of HAND spends a Wu you
+        # would have fielded, so it is only offered while you can still cover what you owe. A Wu that
+        # lives in the inalienable slot is never fieldable as a card, so it always costs you nothing.
+        owed = self.duel.wager - self.duel.round_number + 1
+        playable = len(self._playable(player, staked))
+        if playable > owed:
+            return available
+        return [c for c in available if not any(c is held for held in player.hand)]
 
     def _playable(self, player: Player, staked: list[Card]) -> list[Card]:
         # regular play draws from the hand only (the inalienable Wu is boost-only)
