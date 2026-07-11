@@ -32,9 +32,9 @@ def test_a_plain_card_enters_the_caster_queue_as_an_inert_stand_in():
 
     resolve_played_power(duel, card, is_player=True, element="water")
 
-    assert len(duel.player_queue) == 1
-    assert not duel.bot_queue
-    stand_in = duel.player_queue[0]
+    assert len(duel.player.queue) == 1
+    assert not duel.bot.queue
+    stand_in = duel.player.queue[0]
     assert stand_in.stats == {"force": 3, "agility": 1, "intellect": 0}
     assert stand_in.stats is not card.stats  # a private copy, safe to mutate in the duel
     assert stand_in.power.effect == 0  # neutral power — never re-triggers, never seen as a booster
@@ -46,7 +46,7 @@ def test_a_morpher_sets_every_stat_to_one_and_takes_the_chosen_element():
 
     resolve_played_power(duel, morpher, is_player=True, element="earth")
 
-    stand_in = duel.player_queue[0]
+    stand_in = duel.player.queue[0]
     assert stand_in.stats == {"force": 1, "agility": 1, "intellect": 1}
     assert stand_in.element == "earth"
 
@@ -57,7 +57,7 @@ def test_a_bot_morpher_falls_back_to_the_background_element():
 
     resolve_played_power(duel, morpher, is_player=False, element="fire")
 
-    assert duel.bot_queue[0].element == "fire"
+    assert duel.bot.queue[0].element == "fire"
 
 
 def test_a_negative_card_curses_the_opponent_and_is_spent_on_your_side():
@@ -67,10 +67,10 @@ def test_a_negative_card_curses_the_opponent_and_is_spent_on_your_side():
     resolve_played_power(duel, curse, is_player=True, element="water")
 
     # your own copy contributes nothing...
-    assert duel.player_queue[0].stats == {"force": 0, "agility": 0, "intellect": 0}
+    assert duel.player.queue[0].stats == {"force": 0, "agility": 0, "intellect": 0}
     # ...while a mirror lands on the opponent, keeping the element it is (it earns them no bonus,
     # because the duel leaves it out of their `earns_bonus` set — see `Duel._earns_bonus`).
-    mirror = duel.bot_queue[0]
+    mirror = duel.bot.queue[0]
     assert mirror.stats == {"force": -2, "agility": 0, "intellect": 0}
     assert mirror.element == "water"
 
@@ -81,13 +81,13 @@ def test_a_boost_lends_no_stats_of_its_own():
 
     resolve_played_power(duel, boost, is_player=True, element="water")
 
-    assert duel.player_queue[0].stats == {"force": 0, "agility": 0, "intellect": 0}
+    assert duel.player.queue[0].stats == {"force": 0, "agility": 0, "intellect": 0}
 
 
 def test_a_queued_booster_amplifies_the_next_positive_card():
     duel = Round()
     booster = _card(0, 0, 0, element="water", trigger="boost", effect=1)
-    duel.player_queue.append(booster)  # played in stage 4, keeps its real power at the head
+    duel.player.queue.append(booster)  # played in stage 4, keeps its real power at the head
 
     resolve_played_power(duel, _card(4, 0, 2, element="water"), is_player=True, element="water")
 
@@ -98,12 +98,12 @@ def test_a_queued_booster_amplifies_the_next_positive_card():
 def test_a_queued_booster_flips_to_the_opponent_on_a_negative_card():
     duel = Round()
     booster = _card(0, 0, 0, element="water", trigger="boost", effect=1)
-    duel.player_queue.append(booster)
+    duel.player.queue.append(booster)
 
     resolve_played_power(duel, _card(-3, -1, 0, element="water"), is_player=True, element="water")
 
     assert booster.stats == {"force": 0, "agility": 0, "intellect": 0}  # spent on your side
-    amplifier, curse = duel.bot_queue  # the booster lands left of the curse it doubled
+    amplifier, curse = duel.bot.queue  # the booster lands left of the curse it doubled
     assert amplifier.stats == {"force": -1, "agility": -1, "intellect": 0}
     assert amplifier.element == "water"  # a mirror keeps what it is; only its power is stripped
     assert curse.stats == {"force": -3, "agility": -1, "intellect": 0}
@@ -113,11 +113,11 @@ def test_a_mirrored_booster_cannot_boost_the_duelist_it_lands_on():
     """It keeps the booster's *name*, never its power — else the victim's next card is amplified
     by their attacker's Wu, because it sits at the head of their queue."""
     duel = Round()
-    duel.player_queue.append(_card(0, 0, 0, element="water", trigger="boost", effect=1))
+    duel.player.queue.append(_card(0, 0, 0, element="water", trigger="boost", effect=1))
 
     resolve_played_power(duel, _card(-3, -1, 0, element="water"), is_player=True, element="water")
 
-    assert all(card.power.trigger == "none" for card in duel.bot_queue)
+    assert all(card.power.trigger == "none" for card in duel.bot.queue)
 
 
 # --- the stage machine (scripted, headless) ----------------------------------------------
@@ -171,8 +171,8 @@ async def test_a_scripted_showdown_walks_all_six_stages():
         assert await duel.advance() == 3  # Boost (both decline here)
         assert await duel.advance() == 4  # Card — each plays; the exchange is scored at once
         assert duel.duel.round_number == expected
-        assert duel.duel.round.player_queue and duel.duel.round.bot_queue
-        assert len(duel.duel.round.player_result) == 3
+        assert duel.duel.round.player.queue and duel.duel.round.bot.queue
+        assert len(duel.duel.round.player.result) == 3
 
     assert await duel.advance() == 5  # Resolvement — the match is weighed
     assert isinstance(duel.duel.winner, bool)
@@ -200,7 +200,7 @@ async def test_a_showdown_opens_with_initiative_already_resolved():
     duel = _duel_over(state)
 
     assert duel.duel.stage == 0  # the opening board, before any Continue
-    assert duel.duel.player_initiative == 2
+    assert duel.duel.player.initiative == 2
     assert duel.duel.player_priority is True
 
 
@@ -218,7 +218,7 @@ async def test_a_tied_initiative_leaves_priority_to_the_coin():
 
     duel = _duel_over(state)
 
-    assert duel.duel.player_initiative == duel.duel.bot_initiative == 0
+    assert duel.duel.player.initiative == duel.duel.bot.initiative == 0
     assert duel.duel.player_priority is None  # the coin is thrown at Commitment
 
 
@@ -272,7 +272,7 @@ async def test_a_new_showdown_re_reads_initiative_from_the_hands():
     state.player.hand[0].power = Power(9, "Buff", "hand", 0, "", 3)
     await duel.advance()  # resets the round, re-reading the hands
 
-    assert duel.duel.player_initiative == 3
+    assert duel.duel.player.initiative == 3
 
 
 async def test_the_loser_forfeits_staked_cards_to_the_winner():
@@ -286,7 +286,7 @@ async def test_the_loser_forfeits_staked_cards_to_the_winner():
 
     winner = state.player if duel.duel.winner else state.bot
     loser = state.bot if duel.duel.winner else state.player
-    forfeit = duel.duel.bot_stakes if duel.duel.winner else duel.duel.player_stakes
+    forfeit = duel.duel.bot.stakes if duel.duel.winner else duel.duel.player.stakes
 
     assert forfeit  # the loser staked at least the card they played
     # identity, not equality: duplicate blank cards make value-based membership meaningless
@@ -333,7 +333,7 @@ async def test_resolvement_negates_the_bonus_a_curse_would_have_earned_its_caste
     resolve_played_power(duel.duel.round, cat.card(23), is_player=False, element="water")  # Silk Spitter
     duel._score_round(duel.duel.round)
 
-    assert duel.duel.round.player_result[0] == base - 1
+    assert duel.duel.round.player.result[0] == base - 1
 
 
 # --- a boost is spent once a showdown, not once a round ------------------------------
@@ -416,7 +416,7 @@ async def test_a_booster_fielded_as_an_ordinary_wu_cannot_also_boost():
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.rounds.append(Round())
 
-    duel.duel.player_stakes.append(bracelet)  # forced to play it as an ordinary Wu
+    duel.duel.player.stakes.append(bracelet)  # forced to play it as an ordinary Wu
 
     assert not any(c is bracelet for c in duel._boost_options(state.player, is_player=True))
 
@@ -430,7 +430,7 @@ async def test_a_booster_left_in_hand_is_still_offered():
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.rounds.append(Round())
 
-    duel.duel.player_stakes.append(played)
+    duel.duel.player.stakes.append(played)
 
     assert any(c is held for c in duel._boost_options(state.player, is_player=True))
 

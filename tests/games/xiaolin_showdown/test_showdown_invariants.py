@@ -58,16 +58,16 @@ def _assert_invariants(duel, state, before_hand: list) -> None:
 
     # the stakes are answerable and honest
     assert 1 <= d.wager <= SETTINGS.max_wager
-    assert d.wager <= max(1, min(len(before_hand), len(state.bot.hand) + len(d.bot_stakes)))
+    assert d.wager <= max(1, min(len(before_hand), len(state.bot.hand) + len(d.bot.stakes)))
 
     # the match ran exactly as long as it was sold
     assert len(d.rounds) == d.wager, f"wagered {d.wager}, fought {len(d.rounds)}"
 
     # a Wu is spent once, in one slot
-    for stakes in (d.player_stakes, d.bot_stakes):
+    for stakes in (d.player.stakes, d.bot.stakes):
         assert len({id(c) for c in stakes}) == len(stakes), "a Wu was staked twice"
-    for spent, stakes in ((d.player_boosts_spent, d.player_stakes),
-                          (d.bot_boosts_spent, d.bot_stakes)):
+    for spent, stakes in ((d.player.boosts_spent, d.player.stakes),
+                          (d.bot.boosts_spent, d.bot.stakes)):
         assert len({id(c) for c in spent}) == len(spent), "a boost was spent twice"
 
     # somebody always wins: a Wu must belong to someone
@@ -148,6 +148,6 @@ async def test_the_loser_forfeits_exactly_what_they_staked(catalog, seed):
 
     d = duel.duel
     winner_hand = state.player.whole_hand if d.winner else state.bot.whole_hand
-    forfeited = d.bot_stakes if d.winner else d.player_stakes
+    forfeited = d.bot.stakes if d.winner else d.player.stakes
     for card in forfeited:
         assert any(card is held for held in winner_hand), f"{card.name} was staked but never handed over"

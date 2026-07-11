@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from xiaolin_showdown.logic.duel import Round
+from xiaolin_showdown.logic.duel import Round, Side
 from xiaolin_showdown.logic.mechanics.powers import (
     RULES,
     UNPRINTED,
@@ -64,37 +64,37 @@ SERPENTS_TAIL = 24  # play/-1, Intangibility
 def test_a_plain_wu_contributes_its_printed_stats(card):
     duel = Round()
     resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
-    assert duel.player_queue[0].stats["force"] == 4
+    assert duel.player.queue[0].stats["force"] == 4
 
 
 def test_a_morpher_turns_every_stat_to_one(card):
     duel = Round()
     resolve_played_power(duel, card(MOBY_MORPHER), is_player=True, element="fire")
-    assert list(duel.player_queue[0].stats.values()) == [1, 1, 1]
+    assert list(duel.player.queue[0].stats.values()) == [1, 1, 1]
 
 
 def test_a_morpher_takes_the_element_its_caster_chose(card):
     duel = Round()
     resolve_played_power(duel, card(MOBY_MORPHER), is_player=True, element="fire")
-    assert duel.player_queue[0].element == "fire"
+    assert duel.player.queue[0].element == "fire"
 
 
 def test_a_negative_wu_mirrors_onto_the_opponent(card):
     duel = Round()
     resolve_played_power(duel, card(TWO_TON_TUNIC), is_player=True, element="metal")
-    assert duel.bot_queue[0].stats["force"] == -4
+    assert duel.bot.queue[0].stats["force"] == -4
 
 
 def test_a_negative_wu_is_spent_on_the_casters_side(card):
     duel = Round()
     resolve_played_power(duel, card(TWO_TON_TUNIC), is_player=True, element="metal")
-    assert duel.player_queue[0].stats["force"] == 0
+    assert duel.player.queue[0].stats["force"] == 0
 
 
 def test_a_booster_amplifies_the_card_played_after_it(card):
-    duel = Round(player_queue=[card(WUSHU_BRACELET)])  # queued at the power stage
+    duel = Round(player=Side(queue=[card(WUSHU_BRACELET)]))  # queued at the power stage
     resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
-    assert duel.player_queue[0].stats["force"] == 1  # the booster took on the stat
+    assert duel.player.queue[0].stats["force"] == 1  # the booster took on the stat
 
 
 def test_a_dragon_wu_is_not_a_booster(card):
@@ -103,9 +103,9 @@ def test_a_dragon_wu_is_not_a_booster(card):
     Asserted on agility, not force: the Fist contributes force only, so an amplified dragon would
     still read force 1 while losing agility — a force assertion cannot tell the two apart.
     """
-    duel = Round(player_queue=[card(SILVER_MANTA_RAY)])
+    duel = Round(player=Side(queue=[card(SILVER_MANTA_RAY)]))
     resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="water")
-    assert duel.player_queue[0].stats["agility"] == 1  # printed stat kept, not zeroed by boosting
+    assert duel.player.queue[0].stats["agility"] == 1  # printed stat kept, not zeroed by boosting
 
 
 def test_intangibility_voids_the_elemental_bonus(card):

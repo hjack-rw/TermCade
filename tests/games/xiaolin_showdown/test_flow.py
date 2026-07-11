@@ -457,7 +457,7 @@ async def test_a_showdown_opens_showing_initiative_before_anything_is_pressed(tm
         screen = await _open_showdown(app, pilot)
 
         assert screen._duel.duel.stage == 0  # nothing has advanced
-        assert screen._duel.duel.bot_initiative == 1
+        assert screen._duel.duel.bot.initiative == 1
         assert screen._duel.duel.player_priority is False  # already known, no coin needed
 
 

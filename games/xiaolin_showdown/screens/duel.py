@@ -27,8 +27,9 @@ from textual.widgets import Footer, Header, Static
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
-from ..logic.duel import Duel, DuelChoices, DuelState, Round
+from ..logic.duel import Duel, DuelChoices, DuelState, Round, Side
 from ..logic.constants import ELEMENTS
+from ..logic.mechanics.cards import is_one_of
 from ..logic.models import Card, Player
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
@@ -128,7 +129,7 @@ class DuelScreen(EngineScreen):
         while True:
             stage = await duel.advance()  # one phase; a choice phase raises its modal inline
             self._show_board(duel)
-            if stage == 1 and duel.duel.player_initiative == duel.duel.bot_initiative:
+            if stage == 1 and duel.duel.player.initiative == duel.duel.bot.initiative:
                 await self._reveal_coin_toss(duel.duel.player_priority is True)
             if stage == 0:  # the end phase (the loser's stakes change hands) has run
                 break
@@ -316,7 +317,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             strong=bool(duel.background),
             style=COLORS.get(duel.background or "", ""),
         ),
-        _labelled("Initiative", f"P1: {duel.player_initiative}  P2: {duel.bot_initiative}"),
+        _labelled("Initiative", f"P1: {duel.player.initiative}  P2: {duel.bot.initiative}"),
     )
 
     # A best-of-1 has nothing to tally; anything more needs its running score on the board.
@@ -340,15 +341,13 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         "",
         *tally,
         _side_line(
-            "P1", state.player, live.player_queue, live.player_suffered,
-            live.player_amplifiers, live.player_result,
+            "P1", state.player, live.player,
             leads=duel.player_priority is True,
             challenge=duel.challenge, background=_resonant_background(duel),
         ),
         "",  # the two duelists' blocks are three lines each; a gap keeps them from reading as one
         _side_line(
-            "P2", state.bot, live.bot_queue, live.bot_suffered,
-            live.bot_amplifiers, live.bot_result,
+            "P2", state.bot, live.bot,
             leads=duel.player_priority is False,
             challenge=duel.challenge, background=_resonant_background(duel),
         ),
@@ -367,10 +366,7 @@ def _resonant_background(duel: DuelState) -> str | None:
 def _side_line(
     label: str,
     player: Player,
-    queue: list[Card],
-    suffered: list[Card],
-    amplifiers: list[Card],
-    result: list[int],
+    side: Side,
     *,
     leads: bool,
     challenge: str | None,
@@ -386,21 +382,23 @@ def _side_line(
     header.append(" (base ", style="dim")
     header.append_text(card_stats_text(player.character.stats, challenge))
     header.append(")", style="dim")
-    if result:  # score appears once scoring has run; joined to its arrow so they wrap as one unit
+    if side.result:  # score appears once scoring has run; joined to its arrow so they wrap as one unit
         header.append("   ")
         header.append("→  ", style="dim")
-        header.append_text(stats_text([str(value) for value in result], challenge))
+        header.append_text(stats_text([str(value) for value in side.result], challenge))
 
-    # The queue mixes two things. Split them, or a curse the opponent cast reads as a Wu you played.
-    mine = [card for card in queue if not any(card is mirror for mirror in suffered)]
+    # The queue mixes two things — Wu this duelist played and curses cast at them. `Side` already
+    # knows the difference; splitting it again here is how the board and the scorer drift apart.
     # Both lines always render — a dash reads as "nothing there", where a missing line reads as a
     # bug, and the two duelists' blocks stay the same height.
     # Both lines read the background, in opposite directions: what lifts a Wu you played drags down
     # a curse cast at you. Printed here exactly as scored, so the shifts sum to the total by `base`.
     return Group(
         header,
-        _cards_line("Offensive", contributing(mine), amplifiers, challenge, background),
-        _cards_line("Defensive", contributing(suffered), amplifiers, challenge, background, sign=-1),
+        _cards_line("Offensive", side.contributors(), side.amplifiers, challenge, background),
+        _cards_line(
+            "Defensive", contributing(side.suffered), side.amplifiers, challenge, background, sign=-1
+        ),
     )
 
 
@@ -484,6 +482,6 @@ def _from_the_boost_slot(card: Card, amplifiers: list[Card]) -> bool:
     when they land, and the ``+`` is about the slot. A mirrored amplifier is inert, its power
     stripped, so only the duel remembers what it was.
     """
-    return any(card is mirror for mirror in amplifiers) or is_boost_slot(card.power)
+    return is_one_of(card, amplifiers) or is_boost_slot(card.power)
 
 
