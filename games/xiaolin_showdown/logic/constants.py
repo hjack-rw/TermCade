@@ -9,6 +9,14 @@ from __future__ import annotations
 
 ELEMENTS = ("water", "fire", "wind", "earth", "metal")
 
+# A challenge names a stat — or TOURNAMENT, which names all three. The two are spent the same way:
+# three Wu is the most anyone may commit. A stat challenge fields them together in one battle; a
+# tournament spends them one at a time over three, contesting a different stat each. So the choice
+# is not "how many Wu" but "all at once, or spread out" — and a tournament may only be called when
+# both duelists can field all three.
+TOURNAMENT = "tournament"
+TOURNAMENT_BATTLES = 3
+
 # water⇄fire and wind⇄earth oppose each other; ``metal`` is neutral and has no opposite. In a duel a
 # card scores +1 with a matching background, −1 against its opposite (or when the background is
 # metal), 0 otherwise — see ``mechanics.scoring._element_score``.

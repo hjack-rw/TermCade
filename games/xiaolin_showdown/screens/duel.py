@@ -28,7 +28,7 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
 from ..logic.duel import COMMITMENT, END, SETUP, Duel, DuelChoices, DuelState, Round, Side
-from ..logic.constants import ELEMENTS
+from ..logic.constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from ..logic.mechanics.cards import is_one_of
 from ..logic.models import Card, Player
 from ..logic.settings import XiaolinSettings
@@ -142,7 +142,9 @@ class DuelScreen(EngineScreen):
             self._show_board(duel)
             if stage == COMMITMENT and duel.duel.player.initiative == duel.duel.bot.initiative:
                 await self._reveal_coin_toss(duel.duel.player_priority is True)
-            if stage == SETUP and duel.duel.player_priority:  # they named the stakes — say so
+            # They set the price only if you called a *stat*. A tournament prices itself — three
+            # battles of one Wu — so there is nothing they named and nothing to announce.
+            if stage == SETUP and duel.duel.player_priority and duel.duel.challenge != TOURNAMENT:
                 await self._announce_wager(duel.duel, state)
             if stage == END:  # the end phase (the loser's stakes change hands) has run
                 break
@@ -207,17 +209,25 @@ class DuelScreen(EngineScreen):
         )
 
     async def _pick_challenge(self, options: list[str]) -> str:
-        return await self.choose("Choose the challenge stat", _stat_options(options), title="CHALLENGE")
+        return await self.choose(
+            "Name the challenge — one stat, or all three.",
+            _challenge_options(options),
+            title="CHALLENGE",
+        )
 
     async def _pick_background(self, options: list[str]) -> str:
         return await self.choose("Choose the background element", _element_options(options), title="BACKGROUND")
 
     async def _pick_wager(self, options: list[int]) -> int:
-        """They named the challenge; you name the price. Both hands are face up — read them."""
+        """They named the stat; you name how wide the battle is. Both hands are face up — read them.
+
+        Never asked on a tournament: three battles of one Wu is the whole of it, and there is nothing
+        left to price.
+        """
         if len(options) == 1:
             return options[0]  # nothing to decide: one of you can only field the one Wu
         return await self.choose(
-            "They called the Showdown. How many Wu will you stake?",
+            "They called the Showdown. How many Wu will you field?",
             [(_wager_label(n), n) for n in options],
             title="THE STAKES",
         )
@@ -234,9 +244,19 @@ class DuelScreen(EngineScreen):
 
 
 def _wager_label(wager: int) -> str:
+    """Every wagered Wu goes down together, so this is the width of one battle, not a count of them."""
     if wager == 1:
-        return "1 Wu  —  a single exchange"
-    return f"{wager} Wu  —  best of {wager}"
+        return "1 Wu  —  one against one"
+    return f"{wager} Wu  —  all {wager} at once, summed"
+
+
+def _challenge_options(values: list[str]) -> list[tuple[str, str]]:
+    """The stats, and the tournament that takes all three. It is the last option because it is the
+    biggest: three Wu, spent one to a battle, instead of however many land in a single one."""
+    return [
+        ("TOURNAMENT  —  all three stats, a Wu each" if value == TOURNAMENT else value.upper(), value)
+        for value in values
+    ]
 
 
 def _stat_options(values: list[str]) -> list[tuple[str, str]]:
@@ -333,15 +353,22 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         _labelled("Initiative", f"P1: {duel.player.initiative}  P2: {duel.bot.initiative}"),
     )
 
-    # A best-of-1 has nothing to tally; anything more needs its running score on the board.
+    # A tournament runs three battles and needs its running score. A wagered stat challenge runs one
+    # battle and needs no tally — only a reminder of how wide it is. A plain 1v1 needs neither.
     tally: list[RenderableType] = []
-    if duel.wager > 1:
-        player_rounds, bot_rounds = duel.rounds_won
+    if duel.challenge == TOURNAMENT:
+        won_player, won_bot = duel.rounds_won
         line = Text(justify="center")
-        line.append(f"Round {max(1, duel.round_number)} of {duel.wager}", style="bold")
+        line.append(f"Battle {max(1, duel.round_number)} of {TOURNAMENT_BATTLES}", style="bold")
+        if live.stat:  # no battle on the table yet — an empty "()" would be worse than nothing
+            line.append(f" ({live.stat.upper()})", style="bold")
         line.append("      ")
-        line.append("Rounds won: ", style="dim")
-        line.append(f"P1: {player_rounds}  P2: {bot_rounds}")
+        line.append("Battles won: ", style="dim")
+        line.append(f"P1: {won_player}  P2: {won_bot}")
+        tally = [line, ""]
+    elif duel.wager > 1:
+        line = Text(justify="center")
+        line.append(f"{duel.wager} Wu each, fielded together", style="bold")
         tally = [line, ""]
 
     parts: list[RenderableType] = [
@@ -356,13 +383,13 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         _side_line(
             "P1", state.player, live.player,
             leads=duel.player_priority is True,
-            challenge=duel.challenge, background=_resonant_background(duel),
+            challenge=live.stat or None, background=_resonant_background(duel),
         ),
         "",  # the two duelists' blocks are three lines each; a gap keeps them from reading as one
         _side_line(
             "P2", state.bot, live.bot,
             leads=duel.player_priority is False,
-            challenge=duel.challenge, background=_resonant_background(duel),
+            challenge=live.stat or None, background=_resonant_background(duel),
         ),
     ]
     if duel.winner_character:
@@ -374,7 +401,7 @@ def _wager_terms(wager: int) -> str:
     """What the stakes actually cost you, in words — the board only shows the number."""
     if wager == 1:
         return "One Wu each. The loser forfeits it."
-    return f"Best of {wager} — field {wager} Wu each. The loser forfeits all {wager}."
+    return f"Field {wager} Wu each, all at once. The loser forfeits all {wager}."
 
 
 def _resonant_background(duel: DuelState) -> str | None:

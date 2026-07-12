@@ -4,11 +4,17 @@ A duel is a *loop of showdowns* over the shared draw pile until it runs dry. One
 stages 1→6 then a closing stage 0:
 
     1 Commitment   → draw the prize card; a tied initiative is settled by a coin toss here
-    2 Setup        → the priority holder names the challenge stat, the other the background element
-    3 Boost        → each duelist may play a boost Wu, in addition to their card
-    4 Card         → each plays one card; :func:`~.mechanics.resolve.resolve_played_power` resolves it
-    5 Resolvement  → score every staked stat, decide the winner, maybe award the prize card
+    2 Setup        → the challenger names the stat (or a tournament); the other the element and wager
+    3 Boost        → each duelist may lay a boost Wu ahead of the Wu they are about to field
+    4 Card         → each fields one Wu; :func:`~.mechanics.resolve.resolve_played_power` resolves it
+    5 Resolvement  → weigh the battles, decide the winner, maybe award the prize card
     0 End          → the loser's staked cards change hands; reset for the next showdown
+
+**Three Wu, spent one of two ways.** The challenger names a *stat* or a *tournament*. On a stat, the
+other duelist names the wager — one to three Wu, all fielded together in a single battle. A
+tournament asks nobody: it is three battles of one Wu, contesting force, then agility, then intellect,
+and may only be called when both duelists can field three. Either way Boost→Card loops once per Wu,
+each Wu optionally preceded by a boost, and no boost Wu serves twice.
 
 **Initiative is not a stage.** It is a property of the two hands, so a showdown opens with it already
 resolved and on the board: the first "Continue" either commits you to the priority you can see, or
@@ -30,7 +36,7 @@ from dataclasses import dataclass, field
 from termcade.core.rng import Rng
 
 from . import bot
-from .constants import ELEMENTS
+from .constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from .mechanics.cards import excluding
 from .mechanics.powers import is_boost_slot
 from .mechanics.resolve import resolve_played_power
@@ -67,11 +73,19 @@ class Side:
 
 @dataclass
 class Round:
-    """One Wu each, fought out. A showdown is a best-of-N over these."""
+    """One battle: both duelists field their Wu, and the ground is scored once.
 
+    A stat challenge is a single battle, fought with as many Wu as were wagered — all of them down
+    at once. A tournament is three battles of one Wu each, and ``stat`` is what changes between
+    them. Either way nobody commits more than three Wu; the choice is whether to spend them
+    together or apart.
+    """
+
+    stat: str = ""  # the stat this battle contests — the whole challenge, or one leg of a tournament
     player: Side = field(default_factory=Side)
     bot: Side = field(default_factory=Side)
-    score: int = 0  # from the player's side: +2 the challenge, +1 each other stat
+    fielded: int = 0  # Wu each duelist has laid down here (boosts ride along, they do not count)
+    score: int = 0  # from the player's side: +2 the contested stat, +1 each other
     winner: bool | None = None  # True player, False bot, None a dead heat
 
     def sides(self, is_player: bool) -> tuple[Side, Side]:
@@ -101,10 +115,11 @@ class DuelState:
     player_priority: bool | None = None  # who commits first (None = tie → coin toss)
     player: Duelist = field(default_factory=Duelist)
     bot: Duelist = field(default_factory=Duelist)
-    # How many Wu each duelist must field. Named by the duelist who did NOT call the challenge —
-    # you set the terms, I set the price — and capped by what both can actually play.
+    # How many Wu each duelist must field, all at once, in the one battle. Named by the duelist who
+    # did NOT call the challenge — you set the terms, I set the price — and capped by what both can
+    # actually play. A tournament does not ask: it is always one Wu in each of its three battles.
     wager: int = 1
-    rounds: list[Round] = field(default_factory=list)  # one per Wu wagered, in the order fought
+    rounds: list[Round] = field(default_factory=list)  # the battles fought, in order
     winner: bool | None = None  # True = player won, False = bot won
     winner_character: str | None = None
     card_won: bool = False
@@ -194,14 +209,45 @@ class Duel:
         await self._STAGES[self.duel.stage](self)
         return self.duel.stage
 
-    def _next_stage(self) -> int:
-        """The showdown walks 1..5, except that Boost and Card loop once per Wu wagered.
+    # --- the shape of the challenge ---------------------------------------------------------
+    def _is_tournament(self) -> bool:
+        return self.duel.challenge == TOURNAMENT
 
-        A best-of-3 is three exchanges, not one: Card falls back to Boost until every staked Wu has
-        been fought, and only then does Resolvement weigh the match.
+    def _battles(self) -> int:
+        """One battle for a stat challenge; three for a tournament, a stat apiece."""
+        return TOURNAMENT_BATTLES if self._is_tournament() else 1
+
+    def _wu_per_battle(self) -> int:
+        """A tournament fields one Wu a battle. A stat challenge fields the whole wager, at once."""
+        return 1 if self._is_tournament() else self.duel.wager
+
+    def _total_wu(self) -> int:
+        """Everything this showdown will cost you. Three, at the very most, either way."""
+        return self._battles() * self._wu_per_battle()
+
+    def _fielded(self) -> int:
+        return sum(battle.fielded for battle in self.duel.rounds)
+
+    def _stat_of(self, battle_index: int) -> str:
+        """What the battle at ``battle_index`` contests.
+
+        A tournament walks the stats left to right, in the order the card prints them: force, then
+        agility, then intellect. A stat challenge contests its one stat, once.
+        """
+        if not self._is_tournament():
+            return self.duel.challenge or ""
+        stats = list(self.duel.stakes.stats.keys()) if self.duel.stakes else []
+        return stats[battle_index] if battle_index < len(stats) else ""
+
+    def _next_stage(self) -> int:
+        """The showdown walks 1..5, except that Boost and Card loop once per Wu that must be fielded.
+
+        Every Wu goes down as a boost-then-Wu pair, so Card falls back to Boost until the showdown's
+        whole cost has been paid — three Wu into one battle, or one Wu into each of three. Only when
+        nothing is left to field does Resolvement weigh it.
         """
         stage = self.duel.stage
-        if stage == CARD and self.duel.round_number < self.duel.wager:
+        if stage == CARD and self._fielded() < self._total_wu():
             return BOOST
         return 0 if stage >= LAST_STAGE else stage + 1
 
@@ -230,24 +276,30 @@ class Duel:
                 self.state.player.character.stats,
                 self.rng,
             )
-            self.duel.wager = bot.choose_wager(
-                self._wager_options(), self.state.bot.whole_hand, self.state.player.whole_hand,
-            )
+            if not self._is_tournament():
+                self.duel.wager = bot.choose_wager(
+                    self._wager_options(), self.state.bot.whole_hand, self.state.player.whole_hand,
+                )
         else:  # the bot led and chose the challenge at stage 1; the player answers the background
             self.duel.background = await self.choices.background(self._background_options())
-            self.duel.wager = await self.choices.wager(self._wager_options())
+            if not self._is_tournament():
+                self.duel.wager = await self.choices.wager(self._wager_options())
         self.duel.background_name = self._draw_place(self.duel.background)
 
-    def _wager_options(self) -> list[int]:
-        """How many Wu the stakes may be — named by whoever did NOT call the challenge.
+    def _can_field(self) -> int:
+        """The most Wu both duelists could actually put down. Neither may be asked for more."""
+        return min(len(self.state.player.hand), len(self.state.bot.hand), self.settings.max_wager)
 
-        You set the terms, I set the price. Capped by what *both* can field: a wager one duelist
-        cannot answer is not a wager, it is a forfeit.
+    def _wager_options(self) -> list[int]:
+        """How many Wu go into the battle — named by whoever did NOT call the challenge.
+
+        You set the terms, I set the price. They all land at once, so this is the width of the field,
+        not a number of exchanges. Capped by what *both* can field: a wager one duelist cannot answer
+        is not a wager, it is a forfeit.
+
+        A tournament never asks. Its three battles cost one Wu each, and that is the whole of it.
         """
-        both_can_field = min(
-            len(self.state.player.hand), len(self.state.bot.hand), self.settings.max_wager
-        )
-        return list(range(1, max(1, both_can_field) + 1))
+        return list(range(1, max(1, self._can_field()) + 1))
 
     def _draw_place(self, element: str | None) -> str | None:
         """A named place from ``element``'s pool. Flavour: the *element* is what scores, always."""
@@ -261,7 +313,10 @@ class Duel:
         return self.rng.spawn("background").choice(pool).name
 
     async def _boost(self) -> None:
-        self.duel.rounds.append(Round())  # a new Wu, a new exchange
+        # A battle opens only when there is no room left in the last one: a wagered stat challenge
+        # lays all its Wu into a single battle, a tournament opens a fresh one for each.
+        if not self.duel.rounds or self.duel.round.fielded >= self._wu_per_battle():
+            self.duel.rounds.append(Round(stat=self._stat_of(len(self.duel.rounds))))
 
         player_card = await self.choices.boost(self._boost_options(self.state.player, is_player=True))
         if player_card is not None:
@@ -275,6 +330,7 @@ class Duel:
         # A duelist with no card left (decks and hand exhausted near the end) simply plays nothing
         # and scores on their base stats (playing nothing avoids crashing on an empty choice).
         current = self.duel.round
+        background = self.duel.background or ""
         player_playable = self._playable(self.state.player, is_player=True)
         if player_playable:
             player_card = await self.choices.card(player_playable)
@@ -283,12 +339,11 @@ class Duel:
             if resolve_played_power(current, player_card, is_player=True, element=element):
                 self.duel.elemental_bonus_cancelled = True
 
-        challenge, background = self._contested()
         bot_playable = self._playable(self.state.bot, is_player=False)
         if bot_playable:
             bot_card = bot.choose_card(
                 self.state.bot.character.stats,
-                challenge,
+                current.stat,
                 background,
                 bot_playable,
                 self.state.player.character.stats,
@@ -298,15 +353,18 @@ class Duel:
             if resolve_played_power(current, bot_card, is_player=False, element=background):
                 self.duel.elemental_bonus_cancelled = True
 
-        self._score_round(current)
+        current.fielded += 1
+        # Score only once the battle is full — a wagered field is weighed as a whole, not per Wu.
+        if current.fielded >= self._wu_per_battle():
+            self._score_round(current)
 
     def _score_round(self, current: Round) -> None:
-        """Weigh one exchange: the challenge stat counts double, the other two count once."""
-        challenge, background = self._contested()
+        """Weigh one battle: its contested stat counts double, the other two count once."""
+        background = self.duel.background or ""
         stats = list(self.duel.stakes.stats.keys()) if self.duel.stakes else []
         score = 0
         for stat in stats:
-            elemental_bonus, point = (1, 2) if stat == challenge else (0, 1)
+            elemental_bonus, point = (1, 2) if stat == current.stat else (0, 1)
             if self.duel.elemental_bonus_cancelled:  # a Serpent's Tail is on the table
                 elemental_bonus = 0
             player_end = self._end_stat(
@@ -358,9 +416,7 @@ class Duel:
             margin = sum(r.score for r in self.duel.rounds)
             self.duel.winner = margin > 0 if margin else bool(self.duel.player_priority)
 
-        challenge, _ = self._contested()
-        stats = list(self.duel.stakes.stats.keys()) if self.duel.stakes else []
-        self._award_prize(challenge, stats)
+        self._award_prize()
 
     async def _end(self) -> None:
         self.state.previous_challenge = [self.duel.challenge] if self.duel.challenge else []
@@ -387,27 +443,39 @@ class Duel:
 
     # --- helpers --------------------------------------------------------------------------
     def _challenge_options(self) -> list[str]:
+        """What the challenger may call: a stat, or the tournament that calls all three.
+
+        A tournament costs three Wu, one per battle, so it is only on the table when *both* duelists
+        can field three — like any wager, a challenge the other cannot answer is not a challenge.
+        """
         stats = self.duel.stakes.stats.keys() if self.duel.stakes else ()
-        return [s for s in stats if s not in self.state.previous_challenge]
+        options = [s for s in stats if s not in self.state.previous_challenge]
+        if (
+            TOURNAMENT not in self.state.previous_challenge
+            and min(len(self.state.player.hand), len(self.state.bot.hand)) >= TOURNAMENT_BATTLES
+        ):
+            options.append(TOURNAMENT)
+        return options
 
     def _background_options(self) -> list[str]:
         return [e for e in ELEMENTS if e not in self.state.previous_background]
 
     def _boost_options(self, player: Player, *, is_player: bool) -> list[Card]:
-        """Boost Wu still available this showdown — a boost is spent once, not once a round.
+        """Boost Wu still available — every Wu fielded may carry one, and each must be a different Wu.
 
-        A Wu is spent when it is used, whichever slot it went into. A best-of-3 can force you to
-        field a booster as an ordinary Wu; once you do, it is gone — you cannot stake the same Wu as
-        a card and then lift another card with it. And a dragon cannot be replayed round after round.
+        A boost is spent once a showdown, not once a battle. So a three-Wu field can be boosted three
+        times, but only by a duelist holding three distinct boost Wu — you cannot lift the whole field
+        with one dragon. And a Wu is spent whichever slot it went into: fielded as an ordinary Wu, it
+        is gone, and cannot come back to boost the next one.
         """
         duelist = self.duel.duelist(is_player)
         unused = excluding(player.whole_hand, duelist.boosts_spent + duelist.stakes)
         available = [card for card in unused if is_boost_slot(card.power)]
 
-        # You owe a Wu for every round still to fight. Boosting with one out of HAND spends a Wu you
-        # would have fielded, so it is only offered while you can still cover what you owe. A Wu that
-        # lives in the inalienable slot is never fieldable as a card, so it always costs you nothing.
-        owed = self.duel.wager - self.duel.round_number + 1
+        # You still owe a Wu for every one not yet fielded. Boosting with one out of HAND spends a Wu
+        # you would have put down, so it is only offered while you can still cover what you owe. A Wu
+        # in the inalienable slot is never fieldable as a card, so it always costs you nothing.
+        owed = self._total_wu() - self._fielded()
         if len(self._playable(player, is_player=is_player)) > owed:
             return available
         return excluding(available, player.hand)
@@ -424,29 +492,29 @@ class Duel:
         duelist.boosts_spent.append(card)  # one showdown, one use — even a dragon
         mine.queue.append(deepcopy(card))  # a private scratch copy the resolver may amplify
 
-    def _contested(self) -> tuple[str, str]:
-        assert self.duel.challenge is not None and self.duel.background is not None
-        return self.duel.challenge, self.duel.background
-
     def _winner_and_loser(self) -> tuple[Player, Player]:
         if self.duel.winner:
             return self.state.player, self.state.bot
         return self.state.bot, self.state.player
 
-    def _award_prize(self, challenge: str, stats: list[str]) -> None:
-        """The prize is claimed on the winner's BEST round — one decisive blow is enough."""
+    def _award_prize(self) -> None:
+        """The prize is claimed on the winner's BEST battle — one decisive blow is enough.
+
+        Measured on each battle's *own* contested stat, so a tournament is judged the same way: win
+        any one of its three legs hard enough and the Wu is yours. Win them all narrowly and it is not.
+        """
         winner, _loser = self._winner_and_loser()
         self.duel.winner_character = winner.character.name
-        if not self.duel.stakes or challenge not in stats:
+        stats = list(self.duel.stakes.stats.keys()) if self.duel.stakes else []
+        if not self.duel.stakes:
             self.duel.card_won = False
             return
 
-        column = stats.index(challenge)
-        best = max(
-            r.sides(bool(self.duel.winner))[0].result[column]
-            for r in self.duel.rounds
-            if r.player.result and r.bot.result
-        )
-        self.duel.card_won = best > self.settings.prize_threshold  # win small, and the Wu is lost
+        blows = [
+            battle.sides(bool(self.duel.winner))[0].result[stats.index(battle.stat)]
+            for battle in self.duel.rounds
+            if battle.player.result and battle.bot.result and battle.stat in stats
+        ]
+        self.duel.card_won = bool(blows) and max(blows) > self.settings.prize_threshold
         if self.duel.card_won:
             winner.hand.append(self.duel.stakes)

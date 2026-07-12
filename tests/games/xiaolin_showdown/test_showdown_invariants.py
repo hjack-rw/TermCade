@@ -12,6 +12,7 @@ import pytest
 
 from termcade.core.rng import Rng
 
+from xiaolin_showdown.logic.constants import TOURNAMENT, TOURNAMENT_BATTLES
 from xiaolin_showdown.logic.duel import Duel, DuelChoices
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
@@ -58,10 +59,24 @@ def _assert_invariants(duel, state, before_hand: list) -> None:
 
     # the stakes are answerable and honest
     assert 1 <= d.wager <= SETTINGS.max_wager
-    assert d.wager <= max(1, min(len(before_hand), len(state.bot.hand) + len(d.bot.stakes)))
 
-    # the match ran exactly as long as it was sold
-    assert len(d.rounds) == d.wager, f"wagered {d.wager}, fought {len(d.rounds)}"
+    # Three Wu, spent one of two ways. A stat challenge is ONE battle fielding the whole wager at
+    # once; a tournament is THREE battles of one Wu, a stat apiece. Battles are not the wager.
+    tournament = d.challenge == TOURNAMENT
+    battles = TOURNAMENT_BATTLES if tournament else 1
+    wu_each = 1 if tournament else d.wager
+
+    assert len(d.rounds) == battles, f"{d.challenge}: wanted {battles} battles, fought {len(d.rounds)}"
+    assert battles * wu_each <= SETTINGS.max_wager, "a showdown cost more than three Wu"
+    for battle in d.rounds:
+        assert battle.fielded == wu_each, f"battle on {battle.stat} fielded {battle.fielded} Wu"
+
+    # a tournament contests each stat once, left to right; a stat challenge contests only its own
+    fought = [battle.stat for battle in d.rounds]
+    if tournament:
+        assert fought == list(d.stakes.stats.keys())[:TOURNAMENT_BATTLES]
+    else:
+        assert set(fought) == {d.challenge}
 
     # a Wu is spent once, in one slot
     for stakes in (d.player.stakes, d.bot.stakes):
@@ -130,7 +145,11 @@ async def test_a_wager_is_never_larger_than_the_thinner_hand(catalog, seed):
     await duel.advance()  # Commitment
     await duel.advance()  # Setup — the stakes are named here
 
-    assert duel.duel.wager <= max(1, min(player_hand, bot_hand, SETTINGS.max_wager))
+    d = duel.duel
+    if d.challenge == TOURNAMENT:  # only callable when both can field three
+        assert min(player_hand, bot_hand) >= TOURNAMENT_BATTLES
+    else:
+        assert d.wager <= max(1, min(player_hand, bot_hand, SETTINGS.max_wager))
 
 
 @pytest.mark.parametrize("seed", range(1, 9))

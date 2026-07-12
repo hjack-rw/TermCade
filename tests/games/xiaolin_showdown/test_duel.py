@@ -7,11 +7,13 @@ the negative-card curse.
 
 from __future__ import annotations
 
+import pytest
+
 from termcade.core.rng import Rng
 
 from xiaolin_showdown.logic.catalog import load_catalog
 from xiaolin_showdown.logic.duel import Duel, DuelChoices, Round
-from xiaolin_showdown.logic.constants import ELEMENTS
+from xiaolin_showdown.logic.constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from xiaolin_showdown.logic.models import Card, Power
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.settings import XiaolinSettings
@@ -163,20 +165,26 @@ async def test_a_scripted_showdown_walks_all_six_stages():
     assert isinstance(duel.duel.player_priority, bool)
 
     assert await duel.advance() == 2  # Challenge / Background — both contested terms now set
-    assert duel.duel.challenge in _STATS
+    assert duel.duel.challenge in (*_STATS, TOURNAMENT)
     assert duel.duel.background in ELEMENTS
 
-    # Boost and Card repeat once per Wu wagered — a best-of-3 is three exchanges, not one.
-    for expected in range(1, duel.duel.wager + 1):
-        assert await duel.advance() == 3  # Boost (both decline here)
-        assert await duel.advance() == 4  # Card — each plays; the exchange is scored at once
-        assert duel.duel.round_number == expected
-        assert duel.duel.round.player.queue and duel.duel.round.bot.queue
-        assert len(duel.duel.round.player.result) == 3
+    # Boost and Card repeat once per Wu that must be fielded — three into one battle, or one into
+    # each of three. A battle is only scored once it is full, so `result` fills on its last Wu.
+    tournament = duel.duel.challenge == TOURNAMENT
+    battles = TOURNAMENT_BATTLES if tournament else 1
+    wu_per_battle = 1 if tournament else duel.duel.wager
 
-    assert await duel.advance() == 5  # Resolvement — the match is weighed
+    for wu in range(1, battles * wu_per_battle + 1):
+        assert await duel.advance() == 3  # Boost (both decline here)
+        assert await duel.advance() == 4  # Card — each fields one Wu
+        assert duel.duel.round_number == (wu - 1) // wu_per_battle + 1
+        assert duel.duel.round.player.queue and duel.duel.round.bot.queue
+        full = duel.duel.round.fielded == wu_per_battle
+        assert len(duel.duel.round.player.result) == (3 if full else 0)
+
+    assert await duel.advance() == 5  # Resolvement — the showdown is weighed
     assert isinstance(duel.duel.winner, bool)
-    assert len(duel.duel.rounds) == duel.duel.wager
+    assert len(duel.duel.rounds) == battles
     assert duel.duel.winner_character in (state.player.character.name, state.bot.character.name)
 
     assert await duel.advance() == 0  # End — the round's terms are recorded for the next showdown
@@ -329,7 +337,7 @@ async def test_resolvement_negates_the_bonus_a_curse_would_have_earned_its_caste
     base = state.player.character.stats["force"]
 
     # a water curse landed on the player: its resonance must count against them
-    duel.duel.rounds.append(Round())
+    duel.duel.rounds.append(Round(stat="force"))  # the battle contests force
     resolve_played_power(duel.duel.round, cat.card(23), is_player=False, element="water")  # Silk Spitter
     duel._score_round(duel.duel.round)
 
@@ -478,3 +486,85 @@ async def test_a_spare_wu_makes_the_booster_affordable_again():
     duel.duel.rounds.append(Round())
 
     assert any(c is bracelet for c in duel._boost_options(state.player, is_player=True))
+
+
+# --- three Wu, spent one of two ways -------------------------------------------------
+
+
+def test_a_second_boost_in_a_battle_lifts_the_second_wu_not_the_first():
+    """The bug this rebuild would have shipped: a battle can field three Wu, each with its own boost.
+
+    Boosts and Wu go down as pairs, so the live boost is the TAIL of the queue. Reading the head
+    instead would fire the first boost of the battle again and again and leave every later one inert.
+    """
+    duel = Round(stat="force")
+    first_boost = _card(0, 0, 0, element="water", trigger="boost", effect=1)
+    duel.player.queue.append(first_boost)
+    resolve_played_power(duel, _card(4, 0, 0, element="water"), is_player=True, element="water")
+    assert first_boost.stats == {"force": 1, "agility": 0, "intellect": 0}  # lifted Wu one
+
+    second_boost = _card(0, 0, 0, element="water", trigger="boost", effect=1)
+    duel.player.queue.append(second_boost)
+    resolve_played_power(duel, _card(0, 0, 3, element="water"), is_player=True, element="water")
+
+    assert second_boost.stats == {"force": 0, "agility": 0, "intellect": 1}, "the second boost was inert"
+    assert first_boost.stats == {"force": 1, "agility": 0, "intellect": 0}, "the first boost fired twice"
+
+
+async def _run(duel) -> None:
+    stage, guard = -1, 0
+    while stage != 0 and guard < 40:
+        stage = await duel.advance()
+        guard += 1
+
+
+def _forced(challenge: str, wager: int) -> DuelChoices:
+    """A player who always calls ``challenge`` and always answers ``wager``."""
+
+    async def pick_challenge(options):
+        return challenge if challenge in options else options[0]
+
+    async def pick_wager(options):
+        return wager if wager in options else options[-1]
+
+    return DuelChoices(pick_challenge, _first, pick_wager, _no_boost, _first_card, _water)
+
+
+async def _leading_player(cat, challenge: str, wager: int):
+    """A showdown on the first seed where the PLAYER holds priority — only then do they call the
+    challenge. Priority is read off the hands inside `advance`, so it cannot simply be assigned."""
+    for seed in range(1, 40):
+        rng = Rng(seed)
+        state = new_game(cat, rng, cat.character(1))
+        duel = Duel(state, rng, _forced(challenge, wager), XiaolinSettings())
+        await duel.advance()  # Commitment — priority is now a concrete side
+        if duel.duel.player_priority:
+            return duel
+    raise AssertionError("no seed in 1..40 gave the player priority")
+
+
+async def test_a_wagered_stat_challenge_is_one_battle_fielding_every_wu_at_once():
+    """Three Wu is not three fights. They land together, on one field, and are summed."""
+    cat = load_catalog()
+    duel = await _leading_player(cat, "force", 3)
+
+    await _run(duel)
+
+    assert duel.duel.challenge == "force"
+    assert len(duel.duel.rounds) == 1, "a wager bought extra battles — it must only widen the one"
+    assert duel.duel.round.fielded == duel.duel.wager
+    assert duel.duel.round.stat == "force"
+
+
+async def test_a_tournament_is_three_battles_contesting_each_stat_left_to_right():
+    cat = load_catalog()
+    duel = await _leading_player(cat, TOURNAMENT, 1)
+
+    await _run(duel)
+
+    if duel.duel.challenge != TOURNAMENT:
+        pytest.skip("a tournament was not on the table for this seed (a hand held under three Wu)")
+
+    assert [battle.stat for battle in duel.duel.rounds] == list(_STATS)
+    assert all(battle.fielded == 1 for battle in duel.duel.rounds), "a tournament fields one Wu a battle"
+    assert len(duel.duel.player.stakes) <= TOURNAMENT_BATTLES + 1  # three Wu, plus a boost at most

@@ -34,23 +34,28 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
         "Calling a showdown:": [
             "Two Showdowns in a row can't use the exact same Challenge and/or Background (when "
             "possible).",
-            "Whoever did NOT call the Challenge names the stakes: how many Wu each side must field, "
-            f"up to {settings.max_wager}. Neither duelist can be made to stake more than they hold.",
-            "The Challenge stat counts double; the other two still count.",
+            "The Challenge is one stat — or a Tournament, which fights all three. A Tournament can "
+            f"only be called when both sides hold {settings.max_wager} Wu.",
+            "On a stat, whoever did NOT call it names how many Wu each side fields, up to "
+            f"{settings.max_wager}. A Tournament sets its own price and asks nobody.",
+            "The contested stat counts double; the other two still count.",
         ],
         "In the showdown:": [
-            "Every round staked gets one Wu. You may add a Boost to any round, but each Boost Wu "
-            "works once. Short on Wu? Your Boost gets played as a normal Wu instead.",
+            f"A stat is ONE battle. Every Wu wagered goes down at once, on the same field, and they "
+            f"are all summed — {settings.max_wager} Wu is not {settings.max_wager} fights.",
+            "A Tournament is three battles of one Wu, contesting Force, then Agility, then Intellect.",
+            "Every Wu you field may carry a Boost, but each Boost Wu works once — you cannot lift a "
+            "whole field with one. Short on Wu? Your Boost gets played as a normal Wu instead.",
             "A Wu with a negative stat curses your Opponent: it lands on their side instead.",
             "The Background lifts a Wu of its element and drags down the one against it — and does "
             "the reverse to a curse cast at you.",
         ],
         "Who takes it:": [
-            "Most rounds won. Level, and the wider margin takes it. Level on that too, and it falls "
+            "Most battles won. Level, and the wider margin takes it. Level on that too, and it falls "
             "to whoever called the Challenge.",
             "The loser forfeits every Wu they staked in the Showdown.",
-            f"The prize Wu is only claimed if the winner's Challenge stat beats "
-            f"{settings.prize_threshold} in any round — win small and it is lost.",
+            f"The prize Wu is only claimed if the winner's contested stat beats "
+            f"{settings.prize_threshold} in any battle — win small and it is lost.",
         ],
     }
 

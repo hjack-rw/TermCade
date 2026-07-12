@@ -104,9 +104,15 @@ def _apply_mechanic(
 
 
 def _booster_at_head(own_queue: list[Card]) -> Card | None:
-    """The booster played this round, if any. It sits first, still wearing its real power."""
-    if own_queue and mechanic_of(own_queue[0].power) is Mechanic.BOOST:
-        return own_queue[0]
+    """The boost waiting on the Wu about to land, if any — the *last* thing queued, not the first.
+
+    A battle can field up to three Wu, each with its own boost, laid down as boost-then-Wu pairs. So
+    the live boost is always the tail: everything before it is a spent stand-in wearing the neutral
+    power. Reading the head instead would fire the first boost of the battle over and over and leave
+    every later one inert.
+    """
+    if own_queue and mechanic_of(own_queue[-1].power) is Mechanic.BOOST:
+        return own_queue[-1]
     return None
 
 

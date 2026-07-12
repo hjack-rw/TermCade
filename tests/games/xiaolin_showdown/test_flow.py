@@ -538,16 +538,24 @@ def test_the_rulebook_prints_the_numbers_the_game_actually_uses():
 
 
 def test_the_rulebook_states_every_wager_rule():
-    """The wager is the newest rule and the easiest to leave undocumented."""
+    """The wager and the tournament are the newest rules and the easiest to leave undocumented.
+
+    The one a player will get wrong on their own is that a wager widens a *single* battle rather than
+    buying more of them — so the rulebook has to say so outright, and must never call it a best-of-N.
+    """
     from xiaolin_showdown.logic.settings import XiaolinSettings
     from xiaolin_showdown.screens.rules import rules_for
 
     text = " ".join(rule for rules in rules_for(XiaolinSettings()).values() for rule in rules).lower()
 
-    assert "did not call the challenge" in text  # who names the stakes
-    assert "more than they hold" in text  # you cannot demand what they cannot field
-    assert "most rounds won" in text  # how a best-of-N is decided
-    assert "margin" in text  # ...and how a level match breaks
+    assert "did not call it" in text  # who names the stakes
+    assert "one battle" in text and "at once" in text  # the wager widens a battle, it does not add any
+    assert "tournament" in text  # the fourth challenge exists
+    assert "force, then agility, then intellect" in text  # ...and the order it contests them in
+    assert "each boost wu works once" in text  # a field of three cannot be lifted by one dragon
+    assert "most battles won" in text  # how a tournament is decided
+    assert "margin" in text  # ...and how a level showdown breaks
+    assert "best of" not in text  # the rule this rebuild existed to kill
 
 
 async def test_the_showdown_is_fought_under_the_settings_you_chose(tmp_path):
@@ -573,9 +581,14 @@ async def test_the_showdown_is_fought_under_the_settings_you_chose(tmp_path):
 
 
 def test_the_stakes_spell_out_what_they_cost():
-    """The board shows a number; the announcement has to say what losing it means."""
+    """The board shows a number; the announcement has to say what losing it means.
+
+    And it must not read as a best-of-N: three wagered Wu is one battle three Wu wide, not three
+    battles. Only a tournament fights more than once.
+    """
     assert "forfeits it" in _wager_terms(1)
-    assert "Best of 3" in _wager_terms(3)
+    assert "all at once" in _wager_terms(3)
+    assert "best of" not in _wager_terms(3).lower()
     assert "forfeits all 3" in _wager_terms(3)
 
 

@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 
 from termcade.core.rng import Rng
 
-from .constants import OPPOSITES
+from .constants import OPPOSITES, TOURNAMENT
 from .mechanics.powers import Mechanic, mechanic_of
 from .mechanics.scoring import count_end_stats
 from .models import Card
@@ -25,16 +25,35 @@ def choose_challenge(
     opponent_stats: Mapping[str, int],
     rng: Rng,
 ) -> str:
-    """Pick the contested stat where the bot is strongest; else a random legal one."""
-    best_stat = max(bot_stats, key=lambda s: bot_stats[s])
-    best_value = max(bot_stats.values())
-    for card in bot_hand:
-        for stat in bot_stats:
-            if stat in challenges:
-                value = (card.stats[stat] or 0) + bot_stats[stat] - opponent_stats[stat]
-                if value > best_value:
-                    best_stat, best_value = stat, value
-    return best_stat if best_stat in challenges else rng.choice(list(challenges))
+    """Call the stat the bot is strongest in — or a tournament, when it is strong in most of them.
+
+    The two challenges reward opposite hands, and this is the decision that says which one the bot
+    thinks it holds. A tournament is three battles on three stats, so it goes to the broad hand: call
+    it only when the bot leads on a *majority* of the stats, because leading on one and losing two
+    hands the opponent the match. A narrow hand does the reverse — it names its one good stat and
+    pours everything into that single battle.
+    """
+    edges = {stat: _edge(stat, bot_stats, bot_hand, opponent_stats) for stat in bot_stats}
+    if TOURNAMENT in challenges:
+        ahead = sum(1 for edge in edges.values() if edge > 0)
+        if ahead * 2 > len(edges):  # ahead on most of them — take all three
+            return TOURNAMENT
+
+    stats = [stat for stat in edges if stat in challenges]
+    if not stats:
+        return rng.choice(list(challenges))
+    return max(stats, key=lambda stat: edges[stat])
+
+
+def _edge(
+    stat: str,
+    bot_stats: Mapping[str, int],
+    bot_hand: Sequence[Card],
+    opponent_stats: Mapping[str, int],
+) -> int:
+    """How far ahead the bot is on ``stat`` once it plays its best Wu for it."""
+    best_card = max((card.stats[stat] or 0 for card in bot_hand), default=0)
+    return bot_stats[stat] + best_card - opponent_stats[stat]
 
 
 def choose_background(
@@ -119,13 +138,12 @@ def _most_common_element(hand: Sequence[Card]) -> str:
 
 
 def choose_wager(options: Sequence[int], own_hand: Sequence[Card], opponent_hand: Sequence[Card]) -> int:
-    """How many Wu to stake — the answer to a challenge you did not call.
+    """How wide to make the battle — the answer to a stat challenge you did not call.
 
-    Both hands are face up, so this is a read, not a gamble. Raise when your bench is deeper: a
-    best-of-3 drags out a duelist's *third* Wu, and a hand that is one monster and two trinkets
-    loses a long match it would have won a short one.
-
-    Compared rung by rung, best against best, because that is the order they will be fielded in.
+    Both hands are face up, so this is a read, not a gamble. Every wagered Wu lands at once and they
+    are all summed, so widening the field drags in a duelist's *second* and *third* best Wu. A hand
+    that is one monster and two trinkets wants the narrowest battle it can get; a deep bench wants
+    the widest. Compared rung by rung, best against best, since every rung ends up on the table.
     """
     if not options:
         return 1
