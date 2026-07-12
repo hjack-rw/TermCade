@@ -7,7 +7,15 @@ asking the widget what it now shows — three steps that every tooltip test woul
 
 from __future__ import annotations
 
+import os
+
 import pytest
+
+from termcade.core.audio import MUTE_ENV
+
+# Before any app is built: an app test on Windows would otherwise resolve a real player and start
+# the theme playing, once per test.
+os.environ[MUTE_ENV] = "1"
 
 
 @pytest.fixture

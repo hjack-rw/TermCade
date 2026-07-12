@@ -11,6 +11,8 @@ from textual.timer import Timer
 from textual.widgets import Footer, Header, Static
 
 from termcade.app.game import Game, GameContext
+from termcade.core import music
+from termcade.core.audio import MUSIC_OPTION, make_player
 
 from .screens.base import EngineScreen
 from .theme import TERMCADE_THEME
@@ -103,6 +105,10 @@ class EngineApp(App[None]):
         )
         self._min_size = game.min_size if game is not None else None
         self._resize_timer: Timer | None = None
+        # With no game there is no context to own the player, but the empty cabinet still hums.
+        self._player = self.ctx.audio if self.ctx is not None else make_player()
+        self._closing = False
+        self._theme: bytes | None = None  # rendered once, then kept — a toggle must be instant
 
     def on_mount(self) -> None:
         self.register_theme(TERMCADE_THEME)
@@ -111,6 +117,39 @@ class EngineApp(App[None]):
             self.push_screen(self.game.root_screen())
         else:
             self.push_screen(HelloScreen())
+        self.apply_music_setting()
+
+    @property
+    def music_on(self) -> bool:
+        """The live answer, re-read every time — this is what makes the toggle take effect now."""
+        if self.ctx is None:
+            return True
+        return bool(self.ctx.settings.current.options.get(MUSIC_OPTION, True))
+
+    def apply_music_setting(self) -> None:
+        """Start or stop the soundtrack to match the setting. Safe to call as often as you like."""
+        if not self.music_on:
+            self._player.stop()
+        elif self._theme is not None:
+            self._player.play_loop(self._theme)
+        else:
+            self.run_worker(self._start_theme, thread=True, group="theme")
+
+    def _start_theme(self) -> None:
+        """Synthesize and start the soundtrack off the UI thread — rendering it takes long enough
+        to be seen as a stutter on the first frame. Only ever runs once; the toggle replays the
+        bytes it left behind.
+
+        Seeded by ``game_id`` so a cartridge always sounds like itself, and *not* from ``ctx.rng``:
+        pulling decoration off the play stream is exactly the mistake ``Rng.spawn`` exists to
+        prevent, and a fixed string can't make it in the first place.
+        """
+        seed = self.game.game_id if self.game is not None else "termcade"
+        self._theme = music.theme(seed)
+        # The render outlives a fast quit, and a player who muted while it ran wants silence, not a
+        # late start — both would otherwise leave the OS looping a sound nobody asked for.
+        if not self._closing and self.music_on:
+            self._player.play_loop(self._theme)
 
     def action_toggle_focus(self) -> None:
         """Tab toggles keyboard-nav mode: focus the first option if nothing is focused, or clear focus
@@ -132,6 +171,9 @@ class EngineApp(App[None]):
         if self._resize_timer is not None:
             self._resize_timer.stop()
             self._resize_timer = None
+        # The OS keeps a looping sound playing after the process lets go of the terminal.
+        self._closing = True
+        self._player.stop()
 
     def _enforce_min_size(self) -> None:
         """Show the overlay while the window is below the game's minimum, hide it once it fits.

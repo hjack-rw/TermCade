@@ -9,12 +9,15 @@ the engine's ``SettingsStore`` (global defaults for new games); a new game then 
 from __future__ import annotations
 
 from dataclasses import fields, replace
+from typing import cast
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header, Input, Static
 
+from termcade.core.audio import MUSIC_OPTION
 from termcade.core.settings import Difficulty
+from termcade.ui.app import EngineApp
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, Button
 
@@ -33,15 +36,22 @@ def _difficulty_label(difficulty: Difficulty) -> str:
     return f"Difficulty:  {difficulty.value.upper()}"
 
 
+def _music_label(on: bool) -> str:
+    return f"Music:  {'ON' if on else 'OFF'}"
+
+
 class SettingsScreen(EngineScreen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
-    # The pending choice, toggled by the button and only written on Save. Two states, never NORMAL.
+    # The pending choices, toggled by their buttons and only written on Save. 
+    # Two states: never NORMAL.
     _difficulty: Difficulty = Difficulty.EASY
+    _music: bool = True
 
     def compose(self) -> ComposeResult:
         current = self.ctx.settings.current
         self._difficulty = Difficulty.HARD if is_hard(current.difficulty) else Difficulty.EASY
+        self._music = bool(current.options.get(MUSIC_OPTION, True))
         rules = XiaolinSettings.from_settings(current)
         yield Header()
         with BoxedPanel(title="SETTINGS"):
@@ -53,12 +63,16 @@ class SettingsScreen(EngineScreen):
                     classes="setting-row",
                 )
             yield Button(_difficulty_label(self._difficulty), id="difficulty")
+            yield Button(_music_label(self._music), id="music")
             yield Button("Save", id="save", variant="primary")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "difficulty":
             self._toggle_difficulty()
+            return
+        if event.button.id == "music":
+            self._toggle_music()
             return
         if event.button.id != "save":
             return
@@ -74,11 +88,21 @@ class SettingsScreen(EngineScreen):
                 _out_of_range_message(adjusted), title="Invalid settings", severity="warning"
             )
             return
-        # The toggle only lands here, on Save — an abandoned screen changes nothing.
-        base = replace(self.ctx.settings.current, difficulty=self._difficulty)
+        # The toggles only land here, on Save — an abandoned screen changes nothing.
+        base = replace(
+            self.ctx.settings.current,
+            difficulty=self._difficulty,
+            options={**self.ctx.settings.current.options, MUSIC_OPTION: self._music},
+        )
         self.ctx.settings.save(coerced.to_settings(base))
+        # Silence (or the theme) has to arrive with the Save, not the next launch.
+        cast(EngineApp, self.app).apply_music_setting()
         self.app.pop_screen()
 
     def _toggle_difficulty(self) -> None:
         self._difficulty = Difficulty.EASY if self._difficulty is Difficulty.HARD else Difficulty.HARD
         self.query_one("#difficulty", Button).label = _difficulty_label(self._difficulty)
+
+    def _toggle_music(self) -> None:
+        self._music = not self._music
+        self.query_one("#music", Button).label = _music_label(self._music)

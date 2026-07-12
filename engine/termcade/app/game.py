@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from termcade.core.audio import AudioPlayer, make_player
 from termcade.core.paths import app_dir
 from termcade.core.rng import Rng
 from termcade.core.saves import SaveBackend, SaveManager, SqliteBackend
@@ -52,12 +53,18 @@ class GameContext:
         data_dir: Path | None = None,
         seed: int | str | None = None,
         backend: SaveBackend | None = None,
+        player: AudioPlayer | None = None,
     ) -> None:
         self.game = game
         self.data_dir = data_dir or app_dir(game.game_id)
 
         self.settings = SettingsStore(self.data_dir / "settings.json", game.default_settings)
         self.settings.load()
+
+        # Always a real player where the platform has one. Whether it is *playing* is the music
+        # setting's business, checked at the point of play — resolving it here would freeze the
+        # answer at boot, and the toggle on the settings screen would do nothing until restart.
+        self.audio = player if player is not None else make_player(cache_dir=self.data_dir)
 
         # SQLite is the real store; pass ``backend=`` to override (e.g. JsonFileBackend).
         if backend is None:

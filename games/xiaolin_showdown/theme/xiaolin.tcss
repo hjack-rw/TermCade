@@ -107,9 +107,12 @@ SettingsScreen Input {
     border: none;
     background: $boost;
 }
-/* The Easy/Hard toggle sits under the numeric rows, above Save; it cycles rather than submits. */
-SettingsScreen #difficulty {
-    width: 100%;
+/* The toggles sit under the numeric rows, above Save; they cycle rather than submit. One width for
+   both, wide enough for the longer label — auto-sizing them would size each to its own text and
+   leave two buttons of different lengths stacked on each other. */
+SettingsScreen #difficulty,
+SettingsScreen #music {
+    width: 28;
     margin-top: 1;
 }
 SettingsScreen #save {
