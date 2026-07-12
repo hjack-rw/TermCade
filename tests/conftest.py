@@ -48,3 +48,14 @@ def tooltips_in():
         return found - {None}
 
     return _tooltips_in
+
+
+# Anything that drives a real app is `slow`; the rules layer is not. Marked by location rather than
+# by hand, so a new app test cannot quietly land in the fast lane and slow it down for everyone.
+_APP_TESTS = ("test_flow.py", "test_screens.py", "test_button_highlight.py", "test_saves.py")
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if item.path.name in _APP_TESTS:
+            item.add_marker(pytest.mark.slow)

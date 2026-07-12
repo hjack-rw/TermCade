@@ -28,6 +28,11 @@ packages = ["engine/termcade", "games/xiaolin_showdown"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# A test either exercises the rules or it drives the app. The second kind boots a real Textual
+# app per test and costs ~50x the first, so it is marked and can be left out of a working loop:
+#   pytest -m "not slow"   the rules, in about a second
+#   pytest                 everything, before you commit
+markers = ["slow: boots a real Textual app (screens, save/load, whole-game flows)"]
 
 [tool.ruff]
 line-length = 100
