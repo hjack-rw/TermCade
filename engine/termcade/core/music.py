@@ -33,16 +33,33 @@ STEPS_PER_BAR = 16  # 16th-note grid. A power of two: the downbeat never drifts.
 BARS = 8
 SAMPLE_RATE = 22050
 
-# Semitone offsets from the root. Natural minor, and chords built on it.
-SCALE = (0, 2, 3, 5, 7, 8, 10)
-PROGRESSIONS = (
-    ((0, 3, 7), (8, 12, 15), (3, 7, 10), (10, 14, 17)),  # i - VI - III - VII
-    ((0, 3, 7), (5, 8, 12), (10, 14, 17), (0, 3, 7)),    # i - iv - VII - i
-    ((0, 3, 7), (10, 14, 17), (8, 12, 15), (5, 8, 12)),  # i - VII - VI - iv
-)
-ROOTS_HZ = (196.0, 220.0, 246.9)  # G3, A3, B3 — where the whole track sits
 
-BPM_RANGE = (120, 152)
+@dataclass(frozen=True)
+class Style:
+    """The musical rules a track is composed under. The seed picks *within* a style; it can
+    never leave one. Swapping the style is how a cartridge changes what its music *is* — a
+    different scale and harmony — as opposed to a seed, which only picks a different tune
+    inside the rules it was already given.
+    """
+
+    scale: tuple[int, ...]  # semitone offsets from the root
+    progressions: tuple[tuple[tuple[int, ...], ...], ...]  # chord cycles the seed chooses between
+    roots_hz: tuple[float, ...]  # where the whole track sits
+    bpm_range: tuple[int, int]
+
+
+# The cabinet's own voice, and the fallback for a cartridge that names no style: natural minor,
+# triads, brisk. Triads are what make harmony read as major/minor, and therefore as Western.
+ARCADE = Style(
+    scale=(0, 2, 3, 5, 7, 8, 10),
+    progressions=(
+        ((0, 3, 7), (8, 12, 15), (3, 7, 10), (10, 14, 17)),  # i - VI - III - VII
+        ((0, 3, 7), (5, 8, 12), (10, 14, 17), (0, 3, 7)),    # i - iv - VII - i
+        ((0, 3, 7), (10, 14, 17), (8, 12, 15), (5, 8, 12)),  # i - VII - VI - iv
+    ),
+    roots_hz=(196.0, 220.0, 246.9),  # G3, A3, B3
+    bpm_range=(120, 152),
+)
 
 # Voice names double as waveform selectors in `_render_voice`.
 BASS = "bass"
@@ -71,6 +88,7 @@ class Track:
     root_hz: float
     progression: tuple[tuple[int, ...], ...]
     phases: tuple[int, ...]
+    style: Style = ARCADE
     notes: list[Note] = field(default_factory=list)
 
     @property
@@ -86,12 +104,12 @@ class Track:
         return self.total_steps * self.step_seconds
 
 
-def compose(seed: int | str | None = None) -> Track:
+def compose(seed: int | str | None = None, style: Style = ARCADE) -> Track:
     """Pick a key from the seed, then fill the grid by rule."""
     rng = Rng(seed)
-    bpm = rng.randint(*BPM_RANGE)
-    root_hz = rng.choice(ROOTS_HZ)
-    progression = rng.choice(PROGRESSIONS)
+    bpm = rng.randint(*style.bpm_range)
+    root_hz = rng.choice(style.roots_hz)
+    progression = rng.choice(style.progressions)
     # The rotors' starting offsets — the seed's only say over the melody itself.
     phases = tuple(rng.randint(0, p - 1) for p in ROTORS)
 
@@ -101,6 +119,7 @@ def compose(seed: int | str | None = None) -> Track:
         root_hz=root_hz,
         progression=progression,
         phases=phases,
+        style=style,
     )
     track.notes.extend(_fill(track))
     return track
@@ -135,7 +154,7 @@ def _fill(track: Track) -> list[Note]:
         # Lead — eighths. Constrain to a legal set first, then let the rotor pick from it.
         if beat % 2 == 0:
             strong = beat % 4 == 0
-            allowed = chord if strong else SCALE
+            allowed = chord if strong else track.style.scale
             pick = _rotor(track, step)
             if strong or pick % 7 != 6:  # the odd residue is a rest — it phrases the line
                 semitone = allowed[pick % len(allowed)] + 12
@@ -226,6 +245,6 @@ def wav_bytes(pcm: bytes) -> bytes:
     return buffer.getvalue()
 
 
-def theme(seed: int | str | None = None) -> bytes:
+def theme(seed: int | str | None = None, style: Style = ARCADE) -> bytes:
     """The one call a game needs: seed in, loopable WAV out."""
-    return wav_bytes(render(compose(seed)))
+    return wav_bytes(render(compose(seed, style)))

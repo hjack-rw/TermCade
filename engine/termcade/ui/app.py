@@ -142,10 +142,12 @@ class EngineApp(App[None]):
 
         Seeded by ``game_id`` so a cartridge always sounds like itself, and *not* from ``ctx.rng``:
         pulling decoration off the play stream is exactly the mistake ``Rng.spawn`` exists to
-        prevent, and a fixed string can't make it in the first place.
+        prevent, and a fixed string can't make it in the first place. The seed picks the tune; the
+        cartridge's ``music_style`` decides what kind of music it is a tune of.
         """
         seed = self.game.game_id if self.game is not None else "termcade"
-        self._theme = music.theme(seed)
+        style = self.game.music_style if self.game is not None else music.ARCADE
+        self._theme = music.theme(seed, style)
         # The render outlives a fast quit, and a player who muted while it ran wants silence, not a
         # late start — both would otherwise leave the OS looping a sound nobody asked for.
         if not self._closing and self.music_on:

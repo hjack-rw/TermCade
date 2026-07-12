@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from termcade.core.audio import AudioPlayer, make_player
+from termcade.core.music import ARCADE, Style
 from termcade.core.paths import app_dir
 from termcade.core.rng import Rng
 from termcade.core.saves import SaveBackend, SaveManager, SqliteBackend
@@ -38,6 +39,9 @@ class Game:
     min_size: tuple[int, int] | None = None
     # The grid the browser build sizes its font to fit — the layout the game wants at rest.
     fit_size: tuple[int, int] | None = None
+    # The musical rules the cartridge's theme is composed under. Default is the cabinet's own
+    # voice, so a game that says nothing still gets a soundtrack that sounds like it belongs.
+    music_style: Style = ARCADE
 
 
 class GameContext:

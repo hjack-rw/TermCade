@@ -31,7 +31,7 @@ def test_every_pitched_note_is_in_key(seed):
     pitched = {music.BASS, music.ARP, music.LEAD}
 
     for note in (n for n in track.notes if n.voice in pitched):
-        assert note.semitone % 12 in {s % 12 for s in music.SCALE}, f"{note} is out of key"
+        assert note.semitone % 12 in {s % 12 for s in track.style.scale}, f"{note} is out of key"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -55,6 +55,32 @@ def test_the_same_seed_composes_the_same_track():
 
 def test_different_seeds_compose_different_tracks():
     assert music.compose("xiaolin").notes != music.compose("wuya").notes
+
+
+PENTATONIC = music.Style(
+    scale=(0, 3, 5, 7, 10),
+    progressions=(((0, 7, 12), (3, 10, 15), (5, 12, 17), (0, 7, 12)),),
+    roots_hz=(196.0,),
+    bpm_range=(80, 100),
+)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_a_style_bounds_every_note_and_the_tempo(seed):
+    """The seed picks within a style and can never leave it — that is what makes a style the
+    cartridge's decision rather than a suggestion the RNG may overrule."""
+    track = music.compose(seed, PENTATONIC)
+    pitched = {music.BASS, music.ARP, music.LEAD}
+
+    assert 80 <= track.bpm <= 100
+    for note in (n for n in track.notes if n.voice in pitched):
+        assert note.semitone % 12 in {s % 12 for s in PENTATONIC.scale}, f"{note} left the style"
+
+
+def test_the_style_changes_the_music_the_seed_does_not_change_the_style():
+    """Same seed, two styles: a different tune. Same style, two seeds: still that style's scale."""
+    assert music.compose("xiaolin", PENTATONIC).notes != music.compose("xiaolin").notes
+    assert music.compose("wuya", PENTATONIC).style is PENTATONIC
 
 
 def test_the_same_seed_renders_the_same_bytes():

@@ -12,6 +12,7 @@ from termcade.app.game import Game
 
 from .logic.settings import default_settings
 from .logic.state import XiaolinState
+from .music import XIAOLIN
 from .screens.start import StartScreen
 
 THEME = Path(__file__).resolve().parent / "theme" / "xiaolin.tcss"
@@ -28,6 +29,7 @@ def build_game() -> Game:
         max_slots=4,
         root_screen=StartScreen,
         theme_paths=[THEME],
+        music_style=XIAOLIN,
         # No floor. Every screen scrolls once its content outgrows the window (Textual's `Screen`
         # defaults to `overflow-y: auto`), verified reachable down to 60x14 — so a "too small"
         # overlay would only ever hide a board the player can already scroll. Zooming in past the
