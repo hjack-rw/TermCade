@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from xiaolin_showdown.logic.duel import Round, Side
+from xiaolin_showdown.logic.battle import Round, Side
 from xiaolin_showdown.logic.mechanics.powers import (
     RULES,
     UNPRINTED,

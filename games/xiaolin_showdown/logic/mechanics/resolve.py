@@ -27,8 +27,8 @@ from ..models import Card, Power
 from .cards import index_of
 from .powers import Mechanic, mechanic_of
 
-if TYPE_CHECKING:  # annotation only — avoids a runtime cycle with the stage machine
-    from ..duel import Round, Side
+if TYPE_CHECKING:
+    from ..battle import Round, Side
 
 # A played card joins the queue wearing this, so `_booster_at_head` never mistakes a stand-in for a
 # live booster and no power re-triggers.
@@ -48,9 +48,12 @@ def resolve_played_power(round_: "Round", card: Card, *, is_player: bool, elemen
     booster = _booster_at_head(mine.queue)
     if booster is not None:
         _apply_booster(booster, played, theirs, cursed=cursed)
+        if cursed:
+            mine.spent.append(booster)  # its share of the curse landed opposite, like the curse itself
 
     if cursed:
         played.stats = {stat: 0 for stat in card.stats}  # spent on the opponent's side
+        mine.spent.append(played)
 
     mine.queue.append(played)
     return mechanic is Mechanic.INTANGIBLE

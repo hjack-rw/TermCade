@@ -6,7 +6,7 @@ stages 1→6 then a closing stage 0:
     1 Commitment   → draw the prize card; a tied initiative is settled by a coin toss here
     2 Setup        → the challenger names the stat (or a tournament); the other the element and wager
     3 Boost        → each duelist may lay a boost Wu ahead of the Wu they are about to field
-    4 Card         → each fields one Wu; :func:`~.mechanics.resolve.resolve_played_power` resolves it
+    4 Card         → both field one Wu, blind to each other; :mod:`.mechanics.resolve` resolves both
     5 Resolvement  → weigh the battles, decide the winner, maybe award the prize card
     0 End          → the loser's staked cards change hands; reset for the next showdown
 
@@ -37,70 +37,17 @@ from termcade.core.rng import Rng
 
 from . import bot
 from .constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
+from .battle import Duelist, Ground, Round, score_battle
 from .mechanics.cards import excluding
 from .mechanics.powers import is_boost_slot
 from .mechanics.resolve import resolve_played_power
-from .mechanics.scoring import contributing, count_end_stats, initiative
+from .mechanics.scoring import initiative
 from .models import Card, Player
 from .settings import XiaolinSettings
 from .state import XiaolinState
 
 END, COMMITMENT, SETUP, BOOST, CARD, RESOLVEMENT = range(6)
 LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD repeats per Wu wagered
-
-
-@dataclass
-class Side:
-    """One duelist's half of a round: what they put on the table, and what landed on them.
-
-    Every duelist holds one of these, and nothing here knows *which* duelist it belongs to. That is
-    the point: a rule written against a ``Side`` is written once and holds for both of them.
-    """
-
-    queue: list[Card] = field(default_factory=list)  # what scores on this side
-    suffered: list[Card] = field(default_factory=list)  # curse mirrors the opponent landed here
-    amplifiers: list[Card] = field(default_factory=list)  # which of those mirrors a booster doubled
-    result: list[int] = field(default_factory=list)  # per-stat end values
-
-    def contributors(self) -> list[Card]:
-        """The Wu *this* duelist played that still contribute — all the background rewards.
-
-        A curse mirror in the queue is the opponent's Wu. It reads the background too, but against
-        this side — see ``suffers_bonus`` in :func:`~.mechanics.scoring.count_end_stats`.
-        """
-        return contributing(excluding(self.queue, self.suffered))
-
-
-@dataclass
-class Round:
-    """One battle: both duelists field their Wu, and the ground is scored once.
-
-    A stat challenge is a single battle, fought with as many Wu as were wagered — all of them down
-    at once. A tournament is three battles of one Wu each, and ``stat`` is what changes between
-    them. Either way nobody commits more than three Wu; the choice is whether to spend them
-    together or apart.
-    """
-
-    stat: str = ""  # the stat this battle contests — the whole challenge, or one leg of a tournament
-    player: Side = field(default_factory=Side)
-    bot: Side = field(default_factory=Side)
-    fielded: int = 0  # Wu each duelist has laid down here (boosts ride along, they do not count)
-    score: int = 0  # from the player's side: +2 the contested stat, +1 each other
-    winner: bool | None = None  # True player, False bot, None a dead heat
-
-    def sides(self, is_player: bool) -> tuple[Side, Side]:
-        """``(mine, theirs)`` — the only place a duel turns "which duelist" into "which half"."""
-        return (self.player, self.bot) if is_player else (self.bot, self.player)
-
-
-@dataclass
-class Duelist:
-    """One duelist's stake in the showdown: what they brought, and what they can no longer take back."""
-
-    initiative: int = 0
-    stakes: list[Card] = field(default_factory=list)  # Wu fielded — the loser forfeits every one
-    # A boost Wu is spent once a showdown, not once a round: you choose which Wu to lift.
-    boosts_spent: list[Card] = field(default_factory=list)
 
 
 @dataclass
@@ -112,7 +59,7 @@ class DuelState:
     # The place the showdown is fought in — flavour only. Drawn from the pool of the element the
     # duelist named, off the seeded RNG, so a seed replays the same board. Never touches scoring.
     background_name: str | None = None
-    player_priority: bool | None = None  # who commits first (None = tie → coin toss)
+    player_priority: bool | None = None  # who names the challenge (None = tie → coin toss)
     player: Duelist = field(default_factory=Duelist)
     bot: Duelist = field(default_factory=Duelist)
     # How many Wu each duelist must field, all at once, in the one battle. Named by the duelist who
@@ -318,82 +265,73 @@ class Duel:
         if not self.duel.rounds or self.duel.round.fielded >= self._wu_per_battle():
             self.duel.rounds.append(Round(stat=self._stat_of(len(self.duel.rounds))))
 
+        # Gong Yi Tanpai: both duelists choose against the ground as it stands *now*, and neither
+        # sees what the other laid this stage. The opponent reads the frozen copy, so the order the
+        # code happens to run in cannot leak the player's choice into theirs.
+        blind = deepcopy(self.duel.round)
+
         player_card = await self.choices.boost(self._boost_options(self.state.player, is_player=True))
         if player_card is not None:
             self._commit_boost(player_card, is_player=True)
 
         bot_boosts = self._boost_options(self.state.bot, is_player=False)
-        if bot_boosts:  # the bot always plays a boost when it holds one
-            self._commit_boost(self.rng.choice(bot_boosts), is_player=False)
+        chosen = bot.choose_boost(
+            blind, self._ground(), bot_boosts, self._playable(self.state.bot, is_player=False)
+        )
+        if chosen is not None:
+            self._commit_boost(chosen, is_player=False)
 
     async def _card(self) -> None:
-        # A duelist with no card left (decks and hand exhausted near the end) simply plays nothing
-        # and scores on their base stats (playing nothing avoids crashing on an empty choice).
+        """Both duelists field one Wu, at the same moment and blind to each other.
+
+        Gong Yi Tanpai is a simultaneous reveal: neither duelist may answer a Wu they have seen land.
+        The code has to run in some order, so the opponent chooses against a frozen copy of the ground
+        taken before anyone committed, and both Wu are resolved afterwards. A duelist with nothing
+        left to field plays nothing and stands on their base stats.
+        """
         current = self.duel.round
-        background = self.duel.background or ""
+        blind = deepcopy(current)
+
+        player_card: Card | None = None
         player_playable = self._playable(self.state.player, is_player=True)
         if player_playable:
             player_card = await self.choices.card(player_playable)
             self.duel.player.stakes.append(player_card)
+
+        bot_card: Card | None = None
+        bot_playable = self._playable(self.state.bot, is_player=False)
+        if bot_playable:
+            bot_card = bot.choose_card(blind, self._ground(), bot_playable, self.rng)
+            self.duel.bot.stakes.append(bot_card)
+
+        if player_card is not None:
             element = await self._element_for(player_card)
             if resolve_played_power(current, player_card, is_player=True, element=element):
                 self.duel.elemental_bonus_cancelled = True
-
-        bot_playable = self._playable(self.state.bot, is_player=False)
-        if bot_playable:
-            bot_card = bot.choose_card(
-                self.state.bot.character.stats,
-                current.stat,
-                background,
-                bot_playable,
-                self.state.player.character.stats,
-                self.rng,
-            )
-            self.duel.bot.stakes.append(bot_card)
-            if resolve_played_power(current, bot_card, is_player=False, element=background):
-                self.duel.elemental_bonus_cancelled = True
+        if bot_card is not None:
+            self._resolve_bot(current, bot_card)
 
         current.fielded += 1
         # Score only once the battle is full — a wagered field is weighed as a whole, not per Wu.
         if current.fielded >= self._wu_per_battle():
             self._score_round(current)
 
-    def _score_round(self, current: Round) -> None:
-        """Weigh one battle: its contested stat counts double, the other two count once."""
-        background = self.duel.background or ""
-        stats = list(self.duel.stakes.stats.keys()) if self.duel.stakes else []
-        score = 0
-        for stat in stats:
-            elemental_bonus, point = (1, 2) if stat == current.stat else (0, 1)
-            if self.duel.elemental_bonus_cancelled:  # a Serpent's Tail is on the table
-                elemental_bonus = 0
-            player_end = self._end_stat(
-                stat, elemental_bonus, current.player, self.state.player, background
-            )
-            bot_end = self._end_stat(
-                stat, elemental_bonus, current.bot, self.state.bot, background
-            )
-            current.player.result.append(player_end)
-            current.bot.result.append(bot_end)
-            score += 0 if player_end == bot_end else point if player_end > bot_end else -point
+    def _resolve_bot(self, current: Round, card: Card) -> None:
+        if resolve_played_power(current, card, is_player=False, element=self.duel.background or ""):
+            self.duel.elemental_bonus_cancelled = True
 
-        current.score = score
-        current.winner = None if score == 0 else score > 0
-
-    @staticmethod
-    def _end_stat(
-        stat: str, elemental_bonus: int, side: Side, player: Player, background: str
-    ) -> int:
-        """One duelist's final value for one stat: their own, their Wu, and what was done to them."""
-        return count_end_stats(
-            stat,
-            elemental_bonus,
-            side.queue,
-            player.character.stats,
-            background,
-            earns_bonus=side.contributors(),
-            suffers_bonus=contributing(side.suffered),
+    def _ground(self) -> Ground:
+        """The terms this battle is fought under — what the scorer and the bot both read."""
+        return Ground(
+            stats=list(self.duel.stakes.stats.keys()) if self.duel.stakes else [],
+            background=self.duel.background or "",
+            player_stats=self.state.player.character.stats,
+            bot_stats=self.state.bot.character.stats,
+            bonus_cancelled=self.duel.elemental_bonus_cancelled,
         )
+
+    def _score_round(self, current: Round) -> None:
+        score_battle(current, self._ground())
 
     async def _element_for(self, card: Card) -> str:
         """A Morpher (play/+1) lets the player choose its element; any other card ignores it."""
@@ -423,6 +361,7 @@ class Duel:
         self.state.previous_background = [self.duel.background] if self.duel.background else []
         self.state.deposit_counter = 0
         self.state.draw_counter = 0
+        self.state.bot_turn_done = False  # a new vault turn, for both of you
         if not self.state.card_deck:
             self.state.has_ended = True
 
@@ -490,7 +429,10 @@ class Duel:
         if card.power.effect > 0:  # a positive boost can be lost, so it joins the stakes
             duelist.stakes.append(card)
         duelist.boosts_spent.append(card)  # one showdown, one use — even a dragon
-        mine.queue.append(deepcopy(card))  # a private scratch copy the resolver may amplify
+        # It keeps its unresolved "?/?/?" in the slot: what it lends is not knowable until it sees
+        # the Wu it lifts. Fielded as an ordinary Wu instead, the resolver zeroes it — and 0/0/0 is
+        # the honest reading of a Wu that was never meant to be played alone.
+        mine.queue.append(deepcopy(card))
 
     def _winner_and_loser(self) -> tuple[Player, Player]:
         if self.duel.winner:

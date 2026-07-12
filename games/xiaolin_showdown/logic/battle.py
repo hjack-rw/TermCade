@@ -25,10 +25,22 @@ class Side:
     queue: list[Card] = field(default_factory=list)  # what scores on this side
     suffered: list[Card] = field(default_factory=list)  # curse mirrors the opponent landed here
     amplifiers: list[Card] = field(default_factory=list)  # which of those mirrors a booster doubled
+    spent: list[Card] = field(default_factory=list)  # own copies emptied onto a curse, shown opposite
     result: list[int] = field(default_factory=list)  # per-stat end values
 
+    def mine(self) -> list[Card]:
+        """Every Wu *this* duelist put on the table — what the board owes them a line for.
+
+        Not the same question as what still moves a stat. A booster fielded as an ordinary Wu lends
+        nothing and a curse's caster empties their own copy onto the victim, but only the second is
+        absent from this side: its mirror is printed on the opponent's, so printing it here too would
+        count it twice. Everything else was staked, and a staked Wu the board never shows cannot be
+        told from one that was never played.
+        """
+        return excluding(self.queue, self.suffered + self.spent)
+
     def contributors(self) -> list[Card]:
-        """The Wu *this* duelist played that still contribute — all the background rewards.
+        """The Wu this duelist played that still contribute — all the background rewards.
 
         A curse mirror in the queue is the opponent's Wu. It reads the background too, but against
         this side — see ``suffers_bonus`` in :func:`~.mechanics.scoring.count_end_stats`.
@@ -66,15 +78,18 @@ class Duelist:
     boosts_spent: list[Card] = field(default_factory=list)
 
 
-def score_battle(
-    battle: Round,
-    stats: Sequence[str],
-    background: str,
-    player_stats: Mapping[str, int],
-    bot_stats: Mapping[str, int],
-    *,
-    bonus_cancelled: bool = False,
-) -> None:
+@dataclass(frozen=True)
+class Ground:
+    """The terms a battle is fought under: everything a score depends on but the Wu themselves."""
+
+    stats: Sequence[str]  # the stat columns, in the order the card prints them
+    background: str
+    player_stats: Mapping[str, int]
+    bot_stats: Mapping[str, int]
+    bonus_cancelled: bool = False  # a Serpent's Tail is on the table — nothing resonates
+
+
+def score_battle(battle: Round, ground: Ground) -> None:
     """Weigh one battle in place: its contested stat counts double, the other two count once.
 
     A positive ``score`` means the player leads. The bot plays to make it negative.
@@ -82,12 +97,14 @@ def score_battle(
     battle.player.result.clear()
     battle.bot.result.clear()
     score = 0
-    for stat in stats:
+    for stat in ground.stats:
         elemental_bonus, point = (1, 2) if stat == battle.stat else (0, 1)
-        if bonus_cancelled:  # a Serpent's Tail is on the table — nothing resonates
+        if ground.bonus_cancelled:
             elemental_bonus = 0
-        player_end = end_stat(stat, elemental_bonus, battle.player, player_stats, background)
-        bot_end = end_stat(stat, elemental_bonus, battle.bot, bot_stats, background)
+        player_end = end_stat(
+            stat, elemental_bonus, battle.player, ground.player_stats, ground.background
+        )
+        bot_end = end_stat(stat, elemental_bonus, battle.bot, ground.bot_stats, ground.background)
         battle.player.result.append(player_end)
         battle.bot.result.append(bot_end)
         score += 0 if player_end == bot_end else point if player_end > bot_end else -point

@@ -18,7 +18,7 @@ from xiaolin_showdown.screens.detail import DetailScreen
 from termcade.ui.screens.dialog import ChoiceModal
 
 from xiaolin_showdown.logic.mechanics.powers import is_gamble
-from xiaolin_showdown.screens.duel import DuelScreen, _wager_terms
+from xiaolin_showdown.screens.duel import DuelScreen
 from xiaolin_showdown.screens.format import card_label, points_label
 from xiaolin_showdown.screens.lookup import LookUpScreen
 from xiaolin_showdown.screens.outcome import OutcomeScreen
@@ -548,13 +548,13 @@ def test_the_rulebook_states_every_wager_rule():
 
     text = " ".join(rule for rules in rules_for(XiaolinSettings()).values() for rule in rules).lower()
 
-    assert "did not call it" in text  # who names the stakes
-    assert "one battle" in text and "at once" in text  # the wager widens a battle, it does not add any
+    assert "your opponent names the stakes" in text  # who prices a stat challenge
+    assert "one battle" in text and "goes down together" in text  # a wager widens a battle
     assert "tournament" in text  # the fourth challenge exists
     assert "force, then agility, then intellect" in text  # ...and the order it contests them in
-    assert "each boost wu works once" in text  # a field of three cannot be lifted by one dragon
-    assert "most battles won" in text  # how a tournament is decided
-    assert "margin" in text  # ...and how a level showdown breaks
+    assert "a boost wu works once" in text  # a field of three cannot be lifted by one dragon
+    assert "won the most battles" in text  # how a showdown is decided
+    assert "the higher total takes it" in text  # ...and how a level one breaks
     assert "best of" not in text  # a wager is not a best-of-N and must never be described as one
 
 
@@ -580,17 +580,6 @@ async def test_the_showdown_is_fought_under_the_settings_you_chose(tmp_path):
         assert app.screen._duel._wager_options() == [1]
 
 
-def test_the_stakes_spell_out_what_they_cost():
-    """The board shows a number; the announcement has to say what losing it means.
-
-    And it must not read as a best-of-N: three wagered Wu is one battle three Wu wide, not three
-    battles. Only a tournament fights more than once.
-    """
-    assert "forfeits it" in _wager_terms(1)
-    assert "all at once" in _wager_terms(3)
-    assert "best of" not in _wager_terms(3).lower()
-    assert "forfeits all 3" in _wager_terms(3)
-
 
 def test_the_gamble_wu_never_shows_a_number_anywhere(catalog):
     """The card refuses to say what it is worth, so every surface that prints points must agree.
@@ -601,3 +590,27 @@ def test_the_gamble_wu_never_shows_a_number_anywhere(catalog):
 
     assert points_label(gamble) == "?"
     assert str(gamble.points) not in card_label(gamble, f"   +{points_label(gamble)} pts").plain
+
+
+def test_no_rule_leaves_a_single_word_stranded_on_its_own_line():
+    """A lone word under a full line reads as a mistake, not as a rule.
+
+    Checked across widths, because the panel is not a fixed size and a widow only appears at some of
+    them. The rule text itself is never altered to achieve this — only where it breaks.
+    """
+    import io
+
+    from rich.console import Console
+
+    from xiaolin_showdown.logic.settings import XiaolinSettings
+    from xiaolin_showdown.screens.rules import _bullets, rules_for
+
+    for width in range(40, 90, 3):
+        for rules in rules_for(XiaolinSettings()).values():
+            console = Console(width=width, legacy_windows=False, file=io.StringIO())
+            with console.capture() as capture:
+                console.print(_bullets(rules))
+            for line in capture.get().splitlines():
+                body = line.lstrip(" •").strip()
+                if body and len(body.split()) == 1:
+                    raise AssertionError(f"width {width}: a rule ended on the lone word {body!r}")

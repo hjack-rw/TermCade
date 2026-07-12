@@ -22,7 +22,7 @@ class OutcomeScreen(EngineScreen):
     def compose(self) -> ComposeResult:
         outcome = final_score(cast(XiaolinState, self.ctx.state), self.ctx.rng)
         verdict = (
-            "A TIE — NOBODY WINS!"
+            "A TIE —  NOBODY WINS!"
             if outcome.winner is None
             else f"{outcome.winner.name.upper().replace('_', ' ')} WINS!"
         )

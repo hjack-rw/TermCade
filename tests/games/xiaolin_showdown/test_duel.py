@@ -12,7 +12,9 @@ import pytest
 from termcade.core.rng import Rng
 
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel, DuelChoices, Round
+from xiaolin_showdown.logic.battle import Round
+from xiaolin_showdown.logic.mechanics.cards import excluding
+from xiaolin_showdown.logic.duel import Duel, DuelChoices
 from xiaolin_showdown.logic.constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from xiaolin_showdown.logic.models import Card, Power
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
@@ -568,3 +570,78 @@ async def test_a_tournament_is_three_battles_contesting_each_stat_left_to_right(
     assert [battle.stat for battle in duel.duel.rounds] == list(_STATS)
     assert all(battle.fielded == 1 for battle in duel.duel.rounds), "a tournament fields one Wu a battle"
     assert len(duel.duel.player.stakes) <= TOURNAMENT_BATTLES + 1  # three Wu, plus a boost at most
+
+
+async def test_neither_duelist_can_see_the_wu_the_other_fields():
+    """Gong Yi Tanpai is a simultaneous reveal.
+
+    The code has to run in some order, so the danger is that the order leaks: whoever the machine
+    happens to ask second could answer a Wu already on the ground. Nobody may. The player is asked
+    first, so this watches the board they are shown — the opponent must never have fielded yet.
+    """
+    cat = load_catalog()
+    ahead: list[bool] = []
+
+    def _fielded(side) -> int:
+        """Wu this duelist actually put down. A fielded Wu is a neutral-power stand-in; a boost keeps
+        its real power, and a curse the *opponent* cast lands here as a stand-in that is not yours."""
+        own = excluding(side.queue, side.suffered)
+        return sum(1 for c in own if c.power.trigger == "none")
+
+    async def watch(playable):
+        battle = ref[0].duel.round
+        # `fielded` counts the exchanges already closed, so the opponent may have that many Wu down
+        # and no more. One more would be the Wu of THIS exchange — an answer to a card not yet played.
+        ahead.append(_fielded(battle.bot) > battle.fielded)
+        return playable[0]
+
+    for seed in range(1, 30):
+        rng = Rng(seed)
+        state = new_game(cat, rng, cat.character(1))
+        ref: list = []
+        duel = Duel(state, rng, DuelChoices(_first, _first, _one_wu, _no_boost, watch, _water),
+                    XiaolinSettings())
+        ref.append(duel)
+
+        ahead.clear()
+        stage, guard = -1, 0
+        while stage != 0 and guard < 40:
+            stage = await duel.advance()
+            guard += 1
+
+        assert not any(ahead), f"seed {seed}: the player was answering a Wu the opponent had just fielded"
+
+
+async def test_the_opponent_chooses_against_the_board_before_you_moved():
+    """The mirror of the above: the opponent must not read the Wu the player just committed.
+
+    It is the same leak from the other side, and the only one a test of the player's view cannot see.
+    """
+    cat = load_catalog()
+    boards: list[int] = []
+
+    import xiaolin_showdown.logic.duel as duel_module
+
+    real = duel_module.bot.choose_card
+
+    def spy(battle, ground, playable, rng, *, is_player=False):
+        boards.append(sum(1 for c in battle.player.queue if c.power.trigger == "none"))
+        return real(battle, ground, playable, rng, is_player=is_player)
+
+    duel_module.bot.choose_card = spy
+    try:
+        for seed in range(1, 20):
+            rng = Rng(seed)
+            state = new_game(cat, rng, cat.character(1))
+            duel = Duel(state, rng, _auto_choices(), XiaolinSettings())
+            stage, guard = -1, 0
+            boards.clear()
+            while stage != 0 and guard < 40:
+                stage = await duel.advance()
+                guard += 1
+            # within a battle the opponent may see Wu fielded in EARLIER exchanges of that battle,
+            # but never the one the player is committing to right now
+            assert boards == sorted(boards), f"seed {seed}: the opponent read a Wu mid-exchange"
+            assert boards[:1] in ([], [0]), f"seed {seed}: the opponent saw the opening Wu"
+    finally:
+        duel_module.bot.choose_card = real

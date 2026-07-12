@@ -12,7 +12,9 @@ game checks 8 is worse than no rulebook.
 
 from __future__ import annotations
 
+from rich.console import Console, ConsoleOptions, RenderResult
 from rich.table import Table
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.widgets import Footer, Header, Static
 
@@ -26,36 +28,35 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
     """The rulebook, with the game's own numbers in it."""
     return {
         "At the vault:": [
-            f"Depositing and Using a Power share {settings.deposit_limit} action a turn — spend it "
-            "on a power and you bank nothing.",
-            'Same "Initiative Bonuses" don\'t stack — different ones do.',
-            f"Bank {settings.point_limit} points and the run is yours.",
+            f"You get {settings.deposit_limit} action a turn: deposit a Wu for its points, or use "
+            "its power. Never both!",
+            f"You may also draw {settings.draw_limit} Wu a turn from your own Deck to shuffle Cards.",
+            "Your opponent takes the same turn you do.",
+            f"Bank {settings.point_limit} points and the run is yours!",
         ],
         "Calling a showdown:": [
-            "Two Showdowns in a row can't use the exact same Challenge and/or Background (when "
-            "possible).",
-            "The Challenge is one stat — or a Tournament, which fights all three. A Tournament can "
-            f"only be called when both sides hold {settings.max_wager} Wu.",
-            "On a stat, whoever did NOT call it names how many Wu each side fields, up to "
-            f"{settings.max_wager}. A Tournament sets its own price and asks nobody.",
-            "The contested stat counts double; the other two still count.",
+            "Matching Initiative Bonuses do not stack. Different ones do.",
+            "The higher Initiative names the Challenge. Tie, and a coin toss decides it.",
+            "The Challenge can be one stat, or a Tournament across all three.",
+            f"Name a stat and your opponent names the stakes, up to {settings.max_wager} Wu each.",
+            f"A Tournament costs {settings.max_wager} Wu, and can only be called when you both hold {settings.max_wager}.",
+            "You can never pick the same Challenge or Background two showdowns in a row.",
         ],
         "In the showdown:": [
-            f"A stat is ONE battle. Every Wu wagered goes down at once, on the same field, and they "
-            f"are all summed — {settings.max_wager} Wu is not {settings.max_wager} fights.",
-            "A Tournament is three battles of one Wu, contesting Force, then Agility, then Intellect.",
-            "Every Wu you field may carry a Boost, but each Boost Wu works once — you cannot lift a "
-            "whole field with one. Short on Wu? Your Boost gets played as a normal Wu instead.",
-            "A Wu with a negative stat curses your Opponent: it lands on their side instead.",
-            "The Background lifts a Wu of its element and drags down the one against it — and does "
-            "the reverse to a curse cast at you.",
+            "Each stat is ONE battle. Every Wu goes down together and they are summed up.",
+            "A Tournament is three battles of three different Wus: Force, then Agility, then Intellect.",
+            "Any Wu you field may carry a Boost, but a Boost Wu works once.",
+            "A Wu with a negative stat curses your opponent: it lands on their side, not yours.",
+            "The Background lifts a Wu of its element and drags down its opposite. To a curse it does the reverse.",
+            "During the evaluation: the contested stat counts x2. The other two still count so don't put it all in one place.",
         ],
         "Who takes it:": [
-            "Most battles won. Level, and the wider margin takes it. Level on that too, and it falls "
-            "to whoever called the Challenge.",
-            "The loser forfeits every Wu they staked in the Showdown.",
-            f"The prize Wu is only claimed if the winner's contested stat beats "
-            f"{settings.prize_threshold} in any battle — win small and it is lost.",
+            "The showdown goes to whoever won the most battles.",
+            "Tied on battles? Add up every stat you won across them. The higher total takes it.",
+            "Tied on that too? It goes to whoever called the Challenge.",
+            "The loser forfeits every Wu they have wagered.",
+            f"The prize Wu needs a hard blow: beat {settings.prize_threshold} on the contested stat "
+            "in any one battle. Win small and it is lost.",
         ],
     }
 
@@ -73,6 +74,44 @@ class RulesScreen(EngineScreen):
         yield Footer()
 
 
+class _Rule:
+    """One rule, wrapped so that no line of it is left holding a single word.
+
+    A greedy wrap ends a rule on whatever is left over, which is regularly one short word sitting
+    alone under a full line. It reads as a mistake. Where the line above can spare a word, one is
+    pulled down to keep it company; the text itself is never touched.
+    """
+
+    def __init__(self, rule: str) -> None:
+        self.rule = rule
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        for line in _balance(self.rule.split(), options.max_width):
+            yield Text(line)
+
+
+def _balance(words: list[str], width: int) -> list[str]:
+    """Greedy-wrap ``words`` to ``width``, then lift the last line off a lone word."""
+    lines: list[list[str]] = [[]]
+    for word in words:
+        line = lines[-1]
+        if line and sum(len(w) + 1 for w in line) - 1 + 1 + len(word) > width:
+            lines.append([word])
+        else:
+            line.append(word)
+
+    # A one-word tail is the ugly case. Borrow from the line above while it can spare a word and the
+    # tail still fits — never leave the line above worse off than the one we are fixing.
+    while len(lines) > 1 and len(lines[-1]) == 1 and len(lines[-2]) > 2:
+        borrowed = lines[-2][-1]
+        if sum(len(w) + 1 for w in lines[-1]) + len(borrowed) > width:
+            break
+        lines[-2].pop()
+        lines[-1].insert(0, borrowed)
+
+    return [" ".join(line) for line in lines if line]
+
+
 def _bullets(rules: list[str]) -> Table:
     """The rules of one section, as a hanging indent.
 
@@ -84,5 +123,5 @@ def _bullets(rules: list[str]) -> Table:
     grid.add_column(justify="left", width=1)  # the bullet
     grid.add_column(justify="left", ratio=1)  # the rule, free to wrap under itself
     for rule in rules:
-        grid.add_row("•", rule)
+        grid.add_row("•", _Rule(rule))
     return grid

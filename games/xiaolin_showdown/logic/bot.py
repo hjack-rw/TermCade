@@ -8,12 +8,14 @@ spots where they would otherwise crash a comparison.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
+from dataclasses import replace
 
 from termcade.core.rng import Rng
 
+from .battle import Ground, Round, score_battle
 from .constants import OPPOSITES, TOURNAMENT
-from .mechanics.powers import Mechanic, mechanic_of
-from .mechanics.scoring import count_end_stats
+from .mechanics.resolve import resolve_played_power
 from .models import Card
 from .turn import duel_value
 
@@ -99,35 +101,106 @@ def _counter_element(
 
 
 def choose_card(
-    bot_stats: Mapping[str, int],
-    challenge: str,
-    background: str,
-    bot_hand: Sequence[Card],
-    opponent_stats: Mapping[str, int],
+    battle: Round,
+    ground: Ground,
+    playable: Sequence[Card],
     rng: Rng,
+    *,
+    is_player: bool = False,
 ) -> Card:
-    """Play the card whose resolved value most beats the opponent on some stat; else random."""
+    """Field the Wu that leaves the battle in the best shape.
+
+    The bot plays second, so the player's Wu is already resolved onto the ground when this runs: it
+    is answering a board it can see, not guessing at one. Each candidate is played into a copy of the
+    battle and scored by the rule the duel itself uses, and the lowest score wins — a battle's score
+    is signed from the player's side, so the bot is driving it down.
+
+    Ties are broken by hitting harder, never by holding back. Only the *loser* forfeits what they
+    staked, so a Wu spent on a battle you win costs nothing — and the prize is claimed only when the
+    contested stat beats ``prize_threshold``, which a duelist who wins by the minimum never does.
+    """
+    if not playable:
+        raise ValueError("nothing to field")
+
     best: Card | None = None
-    best_value = 0
-    for card in bot_hand:
-        mechanic = mechanic_of(card.power)
-        for stat in bot_stats:
-            elemental_bonus = 1 if stat == challenge else 0
-            if mechanic is Mechanic.INTANGIBLE:
-                elemental_bonus = 0  # playing it voids the bonus it would otherwise earn
-            if mechanic is Mechanic.MORPH:
-                add = 2 if stat == challenge else 1  # "moby morpher" stand-in
-            else:
-                value = card.stats[stat]
-                add = abs(value) if value is not None and value < 0 else 0
-            score = (
-                count_end_stats(stat, elemental_bonus, [card], bot_stats, background, absolute=False)
-                - opponent_stats[stat]
-                + add
-            )
-            if score > best_value:
-                best_value, best = score, card
-    return best if best is not None else rng.choice(list(bot_hand))
+    best_key: tuple[int, int] | None = None
+    for card in playable:
+        key = _after(battle, ground, card, is_player=is_player)
+        if best_key is None or key < best_key:
+            best, best_key = card, key
+    return best if best is not None else rng.choice(list(playable))
+
+
+def choose_boost(
+    battle: Round,
+    ground: Ground,
+    options: Sequence[Card],
+    playable: Sequence[Card],
+    *,
+    is_player: bool = False,
+) -> Card | None:
+    """Lay a boost ahead of the Wu about to be fielded, or decline.
+
+    A boost is only worth playing if it improves the best Wu the bot could then field, so each option
+    is judged by what it makes reachable — and declining is judged the same way. A boost taken out of
+    hand costs the Wu it would have been, which is why it is dropped from what remains playable.
+    """
+    if not options:
+        return None
+
+    best: Card | None = None
+    best_score = _reachable(battle, ground, None, playable, is_player=is_player)
+    for boost in options:
+        score = _reachable(battle, ground, boost, playable, is_player=is_player)
+        if score < best_score:
+            best, best_score = boost, score
+    return best
+
+
+def _after(battle: Round, ground: Ground, card: Card, *, is_player: bool) -> tuple[int, int]:
+    """How the battle stands once ``card`` is fielded. Lower is better *for the duelist fielding it*.
+
+    ``(score, -blow)``: the score first, because winning the battle is what wins the showdown, and
+    the size of the blow only to separate fields that win by the same margin. A battle's score is
+    signed from the player's side, so the player maximises it and the bot minimises it.
+    """
+    trial = deepcopy(battle)
+    voided = resolve_played_power(trial, card, is_player=is_player, element=ground.background)
+    terms = replace(ground, bonus_cancelled=ground.bonus_cancelled or voided)
+    score_battle(trial, terms)
+    sign = -1 if is_player else 1
+    return sign * trial.score, -_blow(trial, terms, is_player=is_player)
+
+
+def _blow(battle: Round, ground: Ground, *, is_player: bool) -> int:
+    """A duelist's end value on the contested stat — what the prize Wu is measured against."""
+    mine, _theirs = battle.sides(is_player)
+    if battle.stat not in ground.stats or not mine.result:
+        return 0
+    return mine.result[list(ground.stats).index(battle.stat)]
+
+
+def _reachable(
+    battle: Round,
+    ground: Ground,
+    boost: Card | None,
+    playable: Sequence[Card],
+    *,
+    is_player: bool,
+) -> tuple[int, int]:
+    """The best this duelist could reach from here, having laid ``boost`` (or nothing) first."""
+    trial = deepcopy(battle)
+    mine, _theirs = trial.sides(is_player)
+    remaining = list(playable)
+    if boost is not None:
+        mine.queue.append(deepcopy(boost))  # the resolver reads a live boost off the tail
+        remaining = [card for card in remaining if card is not boost]
+
+    if not remaining:
+        score_battle(trial, ground)
+        sign = -1 if is_player else 1
+        return sign * trial.score, -_blow(trial, ground, is_player=is_player)
+    return min(_after(trial, ground, card, is_player=is_player) for card in remaining)
 
 
 def _most_common_element(hand: Sequence[Card]) -> str:
@@ -150,13 +223,14 @@ def choose_wager(options: Sequence[int], own_hand: Sequence[Card], opponent_hand
     mine = sorted((duel_value(card) for card in own_hand), reverse=True)
     theirs = sorted((duel_value(card) for card in opponent_hand), reverse=True)
 
-    best = min(options)
-    for wager in options:
-        # every rung this wager reaches: am I ahead down there?
-        edge = sum(
+    def edge(wager: int) -> int:
+        """How far ahead the summed field leaves you at this width, rung against rung."""
+        return sum(
             (mine[i] if i < len(mine) else 0) - (theirs[i] if i < len(theirs) else 0)
             for i in range(wager)
         )
-        if edge > 0:
-            best = wager  # deeper bench — the longer the match, the better it goes
-    return best
+
+    # The width where the lead is *widest*, not merely positive. Ties go to the narrower field: the
+    # same lead for fewer Wu is the same lead at a lower price, and every Wu fielded is one the loser
+    # forfeits. Taking any width that merely beats zero is what makes an opponent demand 3vs3 all day.
+    return max(options, key=lambda wager: (edge(wager), -wager))

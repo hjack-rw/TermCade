@@ -11,13 +11,16 @@ from collections.abc import Iterator
 
 import pytest
 
-from rich.console import RenderableType
+import io
+
+from rich.console import Console, RenderableType
 from rich.text import Text
 
 from xiaolin_showdown.logic.constants import TOURNAMENT
-from xiaolin_showdown.logic.duel import DuelState, Round, Side
+from xiaolin_showdown.logic.battle import Round, Side
+from xiaolin_showdown.logic.duel import DuelState
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
-from xiaolin_showdown.screens.duel import _board_text
+from xiaolin_showdown.screens.duel import _board_text, _cards_line
 from xiaolin_showdown.screens.format import COLORS
 
 SILVER_MANTA_RAY = 1  # water, boost/0 — a dragon, lends 1/1/1
@@ -200,12 +203,19 @@ def test_a_boosted_curse_lands_twice_the_harm(state, card):
     assert harm == -2  # Silk Spitter's -1, doubled by the Wushu Bracelet
 
 
-def test_a_wu_that_moves_no_stat_is_left_off_the_board(state, card):
-    """A booster that amplified nothing is noise — it has no stats and cursed no one."""
+def test_a_wu_that_moves_no_stat_still_shows_because_you_played_it(state, card):
+    """The board prints what is on the table, not what is winning.
+
+    A booster fielded as an ordinary Wu lends nothing, and 0/0/0 is exactly what a player needs to
+    see: a Wu they were forced to spend and got nothing for. Hiding it makes a staked Wu look unplayed.
+    """
     duel = DuelState(stage=6, challenge="force", background="metal", rounds=[Round(stat="force", player=Side(queue=[card(WUSHU_BRACELET)]))])
     duel.round.player.queue[0].stats = {"force": 0, "agility": 0, "intellect": 0}
 
-    assert "Wushu Bracelet" not in _line(_board_text(duel, state), "Offensive:")
+    line = _line(_board_text(duel, state), "Offensive:")
+
+    assert "Wushu Bracelet" in line
+    assert "0/0/0" in line
 
 
 def test_an_unresolved_booster_stays_on_the_board(state, card):
@@ -443,3 +453,42 @@ def test_a_tournament_shows_no_empty_brackets_before_a_battle_is_on_the_table(st
 
     assert "()" not in board
     assert "Battle 1 of 3" in board
+
+
+def _rendered(renderable, width: int) -> list[str]:
+    console = Console(width=width, legacy_windows=False, file=io.StringIO())
+    with console.capture() as capture:
+        console.print(renderable)
+    return [line.rstrip() for line in capture.get().splitlines()]
+
+
+def test_a_long_line_of_wu_breaks_between_them_never_inside_one(card):
+    """A Wu is its name and the stats it scores for. Split them and the board says nothing."""
+    cards = [card(SILVER_MANTA_RAY), card(FIST_OF_TEBIGONG), card(WUSHU_BRACELET), card(SILK_SPITTER)]
+    line = _cards_line("Offensive", cards, [], "force", "water")
+
+    rendered = _rendered(line, 58)
+
+    assert len(rendered) > 1, "the line did not wrap — widen the sample or narrow the console"
+    for text in rendered:
+        opened, closed = text.count("("), text.count(")")
+        assert opened == closed, f"a Wu was split across the break: {text!r}"
+
+
+@pytest.mark.parametrize("label", ["Offensive", "Defensive"])
+def test_a_wrapped_line_continues_under_the_first_wu_not_the_label(card, label):
+    """A continuation starts where the Wu start, whatever the label is and whatever the first Wu is.
+
+    The label is a tag, not content: a row continuing beneath it reads as a second, unlabelled row.
+    """
+    cards = [card(SILVER_MANTA_RAY), card(FIST_OF_TEBIGONG), card(WUSHU_BRACELET), card(SILK_SPITTER)]
+    line = _cards_line(label, cards, [], "force", "water")
+
+    rendered = _rendered(line, 58)
+    content_starts_at = line.label.cell_len  # the column the first Wu begins in
+
+    assert len(rendered) > 1, "the line did not wrap — nothing to check"
+    assert rendered[0].index(card(SILVER_MANTA_RAY).name) == content_starts_at
+    for text in rendered[1:]:
+        indent = len(text) - len(text.lstrip())
+        assert indent == content_starts_at, f"continued under the label, not the Wu: {text!r}"

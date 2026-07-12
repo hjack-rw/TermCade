@@ -22,7 +22,9 @@ from xiaolin_showdown.logic.actions import (
     usable_powers,
     use_power,
 )
-from xiaolin_showdown.logic.bot import choose_background, choose_card, choose_challenge
+from xiaolin_showdown.logic.battle import Ground, Round
+from xiaolin_showdown.logic.bot import choose_background, choose_boost, choose_card, choose_challenge
+from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.catalog import load_catalog
 from xiaolin_showdown.logic.mechanics.scoring import count_end_stats, initiative
 from xiaolin_showdown.logic.models import Card, Character, Player, Power
@@ -116,10 +118,44 @@ def test_bot_picks_the_challenge_where_it_is_strongest():
     assert choose_challenge(strong_force, _STATS, hand, _NO_STATS, Rng(1)) == "force"
 
 
+def _ground(stat: str = "force", background: str = "metal") -> Ground:
+    return Ground(
+        stats=list(_STATS), background=background, player_stats=_NO_STATS, bot_stats=_NO_STATS
+    )
+
+
 def test_bot_plays_the_strongest_card_for_the_challenge():
     weak, strong = _card(1, 0, 0), _card(5, 0, 0)
-    chosen = choose_card(_NO_STATS, "force", "metal", [weak, strong], _NO_STATS, Rng(1))
+    chosen = choose_card(Round(stat="force"), _ground(), [weak, strong], Rng(1))
     assert chosen is strong
+
+
+def test_bot_answers_the_wu_already_on_the_ground():
+    """The bot fields second, so the player's Wu is on the board when it chooses.
+
+    Scoring a card in isolation cannot tell a Wu that wins the battle from one that loses it: here
+    the bigger Wu on the wrong stat loses, and only reading the ground says so.
+    """
+    battle = Round(stat="force")
+    resolve_played_power(battle, _card(4, 0, 0), is_player=True, element="metal")
+
+    loses_force, wins_force = _card(0, 9, 0), _card(5, 0, 0)
+    chosen = choose_card(battle, _ground(), [loses_force, wins_force], Rng(1))
+
+    assert chosen is wins_force, "the bot took the bigger number and lost the stat that counts"
+
+
+def test_bot_declines_a_boost_that_buys_it_nothing():
+    """Boosting out of hand costs the Wu it would have been, so it must earn its place."""
+    battle = Round(stat="force")
+    dud = _card(0, 0, 0, trigger="boost", effect=1)
+    winner = _card(5, 0, 0)
+
+    # already winning on every stat: a boost cannot improve a battle that is already won
+    resolve_played_power(battle, _card(0, 0, 0), is_player=True, element="metal")
+    chosen = choose_boost(battle, _ground(), [], [winner, dud])
+
+    assert chosen is None
 
 
 def test_bot_background_favours_its_own_boosting_element():

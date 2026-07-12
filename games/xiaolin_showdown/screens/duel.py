@@ -15,7 +15,7 @@ import asyncio
 from typing import cast
 
 from rich.align import Align
-from rich.console import Group, RenderableType
+from rich.console import Console, ConsoleOptions, Group, RenderableType, RenderResult
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
@@ -27,7 +27,8 @@ from textual.widgets import Footer, Header, Static
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
-from ..logic.duel import COMMITMENT, END, SETUP, Duel, DuelChoices, DuelState, Round, Side
+from ..logic.battle import Round, Side
+from ..logic.duel import COMMITMENT, END, SETUP, Duel, DuelChoices, DuelState
 from ..logic.constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from ..logic.mechanics.cards import is_one_of
 from ..logic.models import Card, Player
@@ -109,15 +110,11 @@ class DuelScreen(EngineScreen):
         outcome = "You win priority!" if player_won else "You lose priority!"
         await self.show_message(f"The coin lands {face.upper()}.  {outcome}", title="COIN TOSS")
 
-    async def _announce_wager(self, duel: DuelState, state: XiaolinState) -> None:
-        """You called the challenge, so your opponent sets the price — and names it to your face.
-
-        Only when *they* named it: a wager you chose yourself needs no announcing.
-        """
+    def _announce_wager(self, duel: DuelState, state: XiaolinState) -> None:
+        """You called the challenge, so your opponent sets the price — and names it to your face."""
         name = display_name(state.bot.character.name)
-        await self.show_message(
-            f"{name} answers {duel.wager} v {duel.wager}.  {_wager_terms(duel.wager)}",
-            title="THE STAKES",
+        self.app.notify(
+            f"{name} requested a {duel.wager}vs{duel.wager}", title="THE STAKES"
         )
 
     @work
@@ -125,7 +122,21 @@ class DuelScreen(EngineScreen):
         state = cast(XiaolinState, self.ctx.state)
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
         rng = self.ctx.rng
-        duel = Duel(state, rng, self._choices(), settings)
+
+        # The vault turn is one turn and both duelists take it. Yours resolves first only because the
+        # game has to draw something while you decide; the opponent's is the other half of the same
+        # turn, and it is taken here, before either of you commits to a showdown. Taking it *after*
+        # would leave them a whole showdown out of step and hand you the opening duel against a hand
+        # they never got to shape.
+        if not state.bot_turn_done:
+            difficulty = self.ctx.settings.current.difficulty  # the bot's deposit skill follows it
+            self.app.notify(
+                "\n".join(bot_turn(state, settings, rng=rng, difficulty=difficulty)),
+                title="Opponent's turn",
+            )
+            state.bot_turn_done = True
+
+        duel = Duel(state, rng, self._choices(), settings)  # initiative reads the settled hands
         self._duel = duel
 
         # Initiative is already on the board: this press commits you to the priority you can see, or
@@ -145,7 +156,7 @@ class DuelScreen(EngineScreen):
             # They set the price only if you called a *stat*. A tournament prices itself — three
             # battles of one Wu — so there is nothing they named and nothing to announce.
             if stage == SETUP and duel.duel.player_priority and duel.duel.challenge != TOURNAMENT:
-                await self._announce_wager(duel.duel, state)
+                self._announce_wager(duel.duel, state)
             if stage == END:  # the end phase (the loser's stakes change hands) has run
                 break
             await self._await_continue("Continue")
@@ -168,7 +179,7 @@ class DuelScreen(EngineScreen):
             if len(state.player.whole_hand) <= max_hand_size(state.player, settings.max_hand_size):
                 return
             card = await self.choose(
-                "Too many Wu — shelve one to your deck",
+                "Too many Wu —  shelve one to your deck",
                 _card_options(state.player.hand),
                 title="DISPOSE",
             )
@@ -210,8 +221,8 @@ class DuelScreen(EngineScreen):
 
     async def _pick_challenge(self, options: list[str]) -> str:
         return await self.choose(
-            "Name the challenge — one stat, or all three.",
-            _challenge_options(options),
+            "Name the challenge —  one stat, or all three.",
+            _stat_options(options),
             title="CHALLENGE",
         )
 
@@ -240,23 +251,14 @@ class DuelScreen(EngineScreen):
         return await self.choose("Play a boost Wu?", options, title="BOOST")
 
     async def _pick_card(self, cards: list[Card]) -> Card:
+        """Field a Wu, blind. Your opponent is choosing theirs against the same board you see."""
+        if self._duel is not None:
+            self._show_board(self._duel)
         return await self.choose("Play a card", _card_options(cards), title="CARD")
 
 
 def _wager_label(wager: int) -> str:
-    """Every wagered Wu goes down together, so this is the width of one battle, not a count of them."""
-    if wager == 1:
-        return "1 Wu  —  one against one"
-    return f"{wager} Wu  —  all {wager} at once, summed"
-
-
-def _challenge_options(values: list[str]) -> list[tuple[str, str]]:
-    """The stats, and the tournament that takes all three. It is the last option because it is the
-    biggest: three Wu, spent one to a battle, instead of however many land in a single one."""
-    return [
-        ("TOURNAMENT  —  all three stats, a Wu each" if value == TOURNAMENT else value.upper(), value)
-        for value in values
-    ]
+    return f"{wager}vs{wager}"
 
 
 def _stat_options(values: list[str]) -> list[tuple[str, str]]:
@@ -368,7 +370,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         tally = [line, ""]
     elif duel.wager > 1:
         line = Text(justify="center")
-        line.append(f"{duel.wager} Wu each, fielded together", style="bold")
+        line.append(f"{duel.wager}vs{duel.wager}", style="bold")
         tally = [line, ""]
 
     parts: list[RenderableType] = [
@@ -396,12 +398,6 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         parts += ["", Text(f"{_won(duel)} WINS!", style="bold")]
     return Group(*parts)
 
-
-def _wager_terms(wager: int) -> str:
-    """What the stakes actually cost you, in words — the board only shows the number."""
-    if wager == 1:
-        return "One Wu each. The loser forfeits it."
-    return f"Field {wager} Wu each, all at once. The loser forfeits all {wager}."
 
 
 def _resonant_background(duel: DuelState) -> str | None:
@@ -442,11 +438,58 @@ def _side_line(
     # a curse cast at you. Printed here exactly as scored, so the shifts sum to the total by `base`.
     return Group(
         header,
-        _cards_line("Offensive", side.contributors(), side.amplifiers, challenge, background),
+        # The board prints every Wu played, but only the ones that still move a stat earn the
+        # background's bonus — so only those may show the shift. See `earns_bonus` in the scorer.
         _cards_line(
-            "Defensive", contributing(side.suffered), side.amplifiers, challenge, background, sign=-1
+            "Offensive", side.mine(), side.amplifiers, challenge, background,
+            earning=side.contributors(),
+        ),
+        _cards_line(
+            "Defensive", contributing(side.suffered), side.amplifiers, challenge, background,
+            earning=contributing(side.suffered), sign=-1,
         ),
     )
+
+
+class _CardsLine:
+    """A row of played Wu that breaks *between* Wu and never inside one.
+
+    A Wu is its name and the stats it scores for, and the two only mean anything together. Rich's
+    wrapper breaks on any space, so it will happily leave a name at the end of one line and its
+    stats at the start of the next, and indent the remainder under the label. This lays the row out
+    itself: each Wu is atomic, and a row that runs long continues under the *first Wu*, not the label.
+    """
+
+    def __init__(self, label: Text, entries: list[Text], joiners: list[Text]) -> None:
+        self.label = label
+        self.entries = entries
+        self.joiners = joiners  # joiners[i] goes before entries[i]; joiners[0] is never used
+
+    @property
+    def renderables(self) -> tuple[Text]:
+        """The whole row on one line, unwrapped — what a reader (or a test) means by its content."""
+        flat = self.label.copy()
+        for index, entry in enumerate(self.entries):
+            if index:
+                flat.append_text(self.joiners[index])
+            flat.append_text(entry)
+        return (flat,)
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        indent = self.label.cell_len
+        line = self.label.copy()
+        used = indent
+        for index, entry in enumerate(self.entries):
+            if index:
+                line.append_text(self.joiners[index])  # the separator stays on the line it ends
+                used += self.joiners[index].cell_len
+            if index and used + entry.cell_len > options.max_width:
+                yield line
+                line = Text(" " * indent)
+                used = indent
+            line.append_text(entry)
+            used += entry.cell_len
+        yield line
 
 
 def _cards_line(
@@ -456,20 +499,28 @@ def _cards_line(
     challenge: str | None,
     background: str | None,
     *,
+    earning: list[Card] | None = None,
     sign: int = 1,
-) -> Text:
-    line = Text()
-    line.append(f"     {label}: ", style="dim")
+) -> _CardsLine:
+    tag = Text(f"     {label}: ", style="dim")
     if not cards:
-        line.append("—")
+        return _CardsLine(tag, [Text("—")], [Text()])
+
+    entries: list[Text] = []
+    joiners: list[Text] = []
     for index, card in enumerate(cards):
-        if index:  # a booster and the Wu it lifts are one play: "Bracelet + Fist", not two entries
-            line.append(" + " if _from_the_boost_slot(cards[index - 1], amplifiers) else ", ", style="dim")
-        line.append_text(card_name_text(card))  # element-coloured, as in the hand panels
-        line.append(" (", style="dim")
-        line.append_text(_played_stats_text(card, challenge, background, sign))
-        line.append(")", style="dim")
-    return line
+        # a booster and the Wu it lifts are one play: "Bracelet + Fist", not two entries
+        joined = _from_the_boost_slot(cards[index - 1], amplifiers) if index else False
+        joiners.append(Text(" + " if joined else ", ", style="dim"))
+
+        # A Wu that no longer moves a stat earns no elemental bonus, so it must not be drawn one.
+        earns = earning is None or is_one_of(card, earning)
+        entry = card_name_text(card)  # element-coloured, as in the hand panels
+        entry.append(" (", style="dim")
+        entry.append_text(_played_stats_text(card, challenge, background if earns else None, sign))
+        entry.append(")", style="dim")
+        entries.append(entry)
+    return _CardsLine(tag, entries, joiners)
 
 
 def _played_stats_text(

@@ -32,6 +32,10 @@ class XiaolinState:
     has_ended: bool = False
     deposit_counter: int = 0  # deposits used this turn (reset by the duel end phase)
     draw_counter: int = 0  # draws used this turn (reset by the duel end phase)
+    # The opponent takes the same vault turn you do, and takes it once. Retreating from a
+    # showdown returns you to a turn you have already spent, so this keeps them from banking
+    # twice on the way back in. Reset, like the counters, by the duel end phase.
+    bot_turn_done: bool = False
 
     schema_version: int = 1
 
@@ -46,6 +50,7 @@ class XiaolinState:
             "has_ended": self.has_ended,
             "deposit_counter": self.deposit_counter,
             "draw_counter": self.draw_counter,
+            "bot_turn_done": self.bot_turn_done,
         }
 
     @classmethod
@@ -61,6 +66,7 @@ class XiaolinState:
             has_ended=data["has_ended"],
             deposit_counter=data.get("deposit_counter", 0),
             draw_counter=data.get("draw_counter", 0),
+            bot_turn_done=data.get("bot_turn_done", False),
         )
 
 

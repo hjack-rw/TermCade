@@ -141,7 +141,7 @@ class VaultScreen(EngineScreen):
 
     def action_save_game(self) -> None:
         state = cast(XiaolinState, self.ctx.state)
-        title = f"{state.player.character.name} — {state.player.points} pts"
+        title = f"{state.player.character.name} —  {state.player.points} pts"
         self.app.push_screen(SaveSlotScreen("save", title=title))
 
 
