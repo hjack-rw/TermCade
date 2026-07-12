@@ -19,6 +19,11 @@ from .mechanics.resolve import resolve_played_power
 from .models import Card
 from .turn import duel_value
 
+# How far ahead the next Wu must be before the opponent will drag it into the field. A rung won by a
+# hair is a coin flip that stakes another Wu on the result. Raise it and the opponent fights narrow;
+# drop it to zero and it demands the widest field it is entitled to, every time.
+WAGER_MARGIN = 1
+
 
 def choose_challenge(
     bot_stats: Mapping[str, int],
@@ -110,10 +115,11 @@ def choose_card(
 ) -> Card:
     """Field the Wu that leaves the battle in the best shape.
 
-    The bot plays second, so the player's Wu is already resolved onto the ground when this runs: it
-    is answering a board it can see, not guessing at one. Each candidate is played into a copy of the
-    battle and scored by the rule the duel itself uses, and the lowest score wins — a battle's score
-    is signed from the player's side, so the bot is driving it down.
+    ``battle`` is the ground as it stood before *anyone* committed this exchange — Gong Yi Tanpai is
+    a simultaneous reveal, and the duel hands over a frozen copy precisely so this cannot read the Wu
+    the other duelist is committing to. Each candidate is played into a copy of it and scored by the
+    rule the duel itself uses, and the lowest score wins: a battle's score is signed from the player's
+    side, so the player drives it up and the opponent drives it down.
 
     Ties are broken by hitting harder, never by holding back. Only the *loser* forfeits what they
     staked, so a Wu spent on a battle you win costs nothing — and the prize is claimed only when the
@@ -223,14 +229,22 @@ def choose_wager(options: Sequence[int], own_hand: Sequence[Card], opponent_hand
     mine = sorted((duel_value(card) for card in own_hand), reverse=True)
     theirs = sorted((duel_value(card) for card in opponent_hand), reverse=True)
 
-    def edge(wager: int) -> int:
-        """How far ahead the summed field leaves you at this width, rung against rung."""
-        return sum(
-            (mine[i] if i < len(mine) else 0) - (theirs[i] if i < len(theirs) else 0)
-            for i in range(wager)
+    def rung(depth: int) -> int:
+        """The Wu you would add at this depth, against the Wu they would add against it."""
+        return (mine[depth] if depth < len(mine) else 0) - (
+            theirs[depth] if depth < len(theirs) else 0
         )
 
-    # The width where the lead is *widest*, not merely positive. Ties go to the narrower field: the
-    # same lead for fewer Wu is the same lead at a lower price, and every Wu fielded is one the loser
-    # forfeits. Taking any width that merely beats zero is what makes an opponent demand 3vs3 all day.
-    return max(options, key=lambda wager: (edge(wager), -wager))
+    # Widen only while the *next* Wu clearly beats theirs. Judging the field by its total lead is
+    # what makes an opponent demand 3vs3 every game: once a duelist is ahead on every rung the total
+    # only grows with width, so the widest field always wins and the choice stops being a choice.
+    #
+    # The margin is what keeps it honest. A rung won by a hair is a coin flip that stakes another Wu
+    # on the outcome, and the loser forfeits every Wu they fielded — so the extra Wu has to earn its
+    # place, not merely avoid losing it.
+    width = min(options)
+    for wager in sorted(options)[1:]:
+        if rung(wager - 1) <= WAGER_MARGIN:
+            break
+        width = wager
+    return width

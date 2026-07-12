@@ -10,6 +10,7 @@ from termcade.ui.screens.menu import MenuItem, MenuScreen
 from ..logic.catalog import Catalog, load_catalog
 from ..logic.settings import XiaolinSettings, is_hard
 from ..logic.setup import new_game
+from ..logic.turn import bot_turn
 from .format import affiliation_icon, char_stats, display_name
 from .vault import VaultScreen
 
@@ -36,11 +37,20 @@ class CharacterSelectScreen(MenuScreen):
         character = self._catalog.character(int(item_id.removeprefix("char-")))
         current = self.ctx.settings.current
         settings = XiaolinSettings.from_settings(current)
-        self.ctx.state = new_game(
+        state = new_game(
             self._catalog,
             self.ctx.rng,
             character,
             settings=settings,
             hard_opponents=is_hard(current.difficulty),
         )
+        self.ctx.state = state
+
+        # The vault turn is one turn and both of you take it. Every later one of theirs runs as a
+        # showdown ends; the first has no showdown to end, so it runs here, before the vault opens.
+        # Without it the opponent sits out the whole opening turn and meets you with a hand they
+        # never got to shape.
+        log = bot_turn(state, settings, rng=self.ctx.rng, difficulty=current.difficulty)
+        state.bot_turn_done = True
         self.app.switch_screen(VaultScreen())
+        self.app.notify("\n".join(log), title="Opponent's turn")

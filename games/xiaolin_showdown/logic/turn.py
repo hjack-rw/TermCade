@@ -57,7 +57,7 @@ def oversee_hand_size(
     player = state.player if is_player else state.bot
     over = len(player.whole_hand) - max_hand_size(player, settings.max_hand_size)
     if over <= 0:
-        if not player.whole_hand:  # only an empty hand is refilled automatically
+        if not player.hand:  # nothing fieldable — see `Player.hand` vs `inalienable_hand`
             _emergency_fill(state, player, settings)
         return True
     if state.has_ended:
@@ -71,11 +71,19 @@ def oversee_hand_size(
 
 
 def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettings) -> None:
-    """Refill an empty hand from the main pile (up to ``empty_draw_limit``); emptying it ends the run."""
-    limit = max_hand_size(player, settings.max_hand_size)
-    for _ in range(settings.empty_draw_limit):
-        if not state.card_deck or len(player.whole_hand) >= limit:
-            break
+    """Refill a hand with nothing playable in it, from the main pile. Emptying the pile ends the run.
+
+    "Nothing playable" is not the same as "nothing at all". A dragon (``boost``/0) can only ever be
+    laid as a boost — it is never staked, lost or fielded as a Wu — so a hand holding only one has no
+    answer to a showdown and is empty for every purpose that decides a duel. An amplifier
+    (``boost``/+1) is a different matter: it sits in the hand and *can* be fielded, badly.
+
+    ``empty_draw_limit`` is the hand you are brought back up to, not a count of cards handed over.
+    A Wu that cannot be fielded still fills one of those slots, so a duelist holding one is dealt one
+    fewer: it is a mercy rule, and what is already on the shelf counts toward the mercy.
+    """
+    target = min(settings.empty_draw_limit, max_hand_size(player, settings.max_hand_size))
+    while state.card_deck and len(player.whole_hand) < target:
         _draw_from_main(state, player)
 
 

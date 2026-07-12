@@ -123,20 +123,7 @@ class DuelScreen(EngineScreen):
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
         rng = self.ctx.rng
 
-        # The vault turn is one turn and both duelists take it. Yours resolves first only because the
-        # game has to draw something while you decide; the opponent's is the other half of the same
-        # turn, and it is taken here, before either of you commits to a showdown. Taking it *after*
-        # would leave them a whole showdown out of step and hand you the opening duel against a hand
-        # they never got to shape.
-        if not state.bot_turn_done:
-            difficulty = self.ctx.settings.current.difficulty  # the bot's deposit skill follows it
-            self.app.notify(
-                "\n".join(bot_turn(state, settings, rng=rng, difficulty=difficulty)),
-                title="Opponent's turn",
-            )
-            state.bot_turn_done = True
-
-        duel = Duel(state, rng, self._choices(), settings)  # initiative reads the settled hands
+        duel = Duel(state, rng, self._choices(), settings)
         self._duel = duel
 
         # Initiative is already on the board: this press commits you to the priority you can see, or
@@ -166,10 +153,13 @@ class DuelScreen(EngineScreen):
         # hands settle (which may flag the run over on the point limit). Skip once the pile is spent.
         if not state.has_ended:
             await self._discard_surplus(state, settings)
+            # Their half of the vault turn that is about to open. The first turn of a run has no
+            # showdown in front of it, so that one is taken at character select instead.
             difficulty = self.ctx.settings.current.difficulty  # the bot's deposit skill follows it
             self.app.notify(
                 "\n".join(bot_turn(state, settings, rng=rng, difficulty=difficulty)), title="Opponent's turn"
             )
+            state.bot_turn_done = True
             refill_hands(state, settings, rng=rng)
         self._leave()
 
@@ -238,7 +228,7 @@ class DuelScreen(EngineScreen):
         if len(options) == 1:
             return options[0]  # nothing to decide: one of you can only field the one Wu
         return await self.choose(
-            "They called the Showdown. How many Wu will you field?",
+            "They called the Showdown. How many Wu will you wager?",
             [(_wager_label(n), n) for n in options],
             title="THE STAKES",
         )

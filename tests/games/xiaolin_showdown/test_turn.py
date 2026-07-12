@@ -235,3 +235,37 @@ def test_a_bad_gamble_never_takes_the_bot_below_zero():
         state.deposit_counter = 0
         bot_turn(state, _SETTINGS, rng=Rng(seed), difficulty=Difficulty.HARD)
         assert state.bot.points >= 0
+
+
+def test_a_hand_with_nothing_fieldable_is_refilled():
+    """A Wu that can only ever be a boost cannot answer a showdown, so a hand of them is empty."""
+    player = _player(0)
+    player.inalienable_hand.append(_card())  # boost-only: never fielded, staked or lost
+    state = _state(player, _player(3), main=5)
+
+    oversee_hand_size(state, is_player=True, settings=_SETTINGS, rng=Rng(1))
+
+    assert player.hand, "left holding only a Wu that cannot be fielded"
+
+
+def test_the_refill_counts_what_cannot_be_fielded_toward_the_mercy():
+    """``empty_draw_limit`` is the hand you are brought up to, not a count of cards dealt."""
+    player = _player(0)
+    player.inalienable_hand.append(_card())
+    state = _state(player, _player(3), main=9)
+
+    oversee_hand_size(state, is_player=True, settings=_SETTINGS, rng=Rng(1))
+
+    assert len(player.whole_hand) == _SETTINGS.empty_draw_limit
+    assert len(player.hand) == _SETTINGS.empty_draw_limit - 1  # the boost-only Wu filled a slot
+
+
+def test_a_wu_that_cannot_be_fielded_still_takes_a_slot_against_the_limit():
+    """The other half of the rule: it is not free, it just cannot be played."""
+    player = _player(6)  # already at the limit
+    player.inalienable_hand.append(_card())
+    state = _state(player, _player(3))
+
+    settled = oversee_hand_size(state, is_player=True, settings=_SETTINGS, rng=Rng(1))
+
+    assert not settled, "it did not count against the limit, so nothing was shed"
