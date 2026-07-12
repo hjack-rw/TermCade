@@ -15,7 +15,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header, Input, Static
 
-from termcade.core.audio import MUSIC_OPTION
+from termcade.core.audio import MUSIC_OPTION, SFX_OPTION
 from termcade.core.settings import Difficulty
 from termcade.ui.app import EngineApp
 from termcade.ui.screens.base import EngineScreen
@@ -40,6 +40,10 @@ def _music_label(on: bool) -> str:
     return f"Music:  {'ON' if on else 'OFF'}"
 
 
+def _sfx_label(on: bool) -> str:
+    return f"Sound FX:  {'ON' if on else 'OFF'}"
+
+
 class SettingsScreen(EngineScreen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
@@ -47,11 +51,13 @@ class SettingsScreen(EngineScreen):
     # Two states: never NORMAL.
     _difficulty: Difficulty = Difficulty.EASY
     _music: bool = True
+    _sfx: bool = True
 
     def compose(self) -> ComposeResult:
         current = self.ctx.settings.current
         self._difficulty = Difficulty.HARD if is_hard(current.difficulty) else Difficulty.EASY
         self._music = bool(current.options.get(MUSIC_OPTION, True))
+        self._sfx = bool(current.options.get(SFX_OPTION, True))
         rules = XiaolinSettings.from_settings(current)
         yield Header()
         with BoxedPanel(title="SETTINGS"):
@@ -64,6 +70,7 @@ class SettingsScreen(EngineScreen):
                 )
             yield Button(_difficulty_label(self._difficulty), id="difficulty")
             yield Button(_music_label(self._music), id="music")
+            yield Button(_sfx_label(self._sfx), id="sfx")
             yield Button("Save", id="save", variant="primary")
         yield Footer()
 
@@ -73,6 +80,9 @@ class SettingsScreen(EngineScreen):
             return
         if event.button.id == "music":
             self._toggle_music()
+            return
+        if event.button.id == "sfx":
+            self._toggle_sfx()
             return
         if event.button.id != "save":
             return
@@ -92,7 +102,11 @@ class SettingsScreen(EngineScreen):
         base = replace(
             self.ctx.settings.current,
             difficulty=self._difficulty,
-            options={**self.ctx.settings.current.options, MUSIC_OPTION: self._music},
+            options={
+                **self.ctx.settings.current.options,
+                MUSIC_OPTION: self._music,
+                SFX_OPTION: self._sfx,
+            },
         )
         self.ctx.settings.save(coerced.to_settings(base))
         # Silence (or the theme) has to arrive with the Save, not the next launch.
@@ -106,3 +120,7 @@ class SettingsScreen(EngineScreen):
     def _toggle_music(self) -> None:
         self._music = not self._music
         self.query_one("#music", Button).label = _music_label(self._music)
+
+    def _toggle_sfx(self) -> None:
+        self._sfx = not self._sfx
+        self.query_one("#sfx", Button).label = _sfx_label(self._sfx)

@@ -7,7 +7,10 @@ name = "termcade"
 version = "0.0.1"
 description = "Reusable Textual TUI engine for terminal games (engine = the cabinet, games = cartridges)."
 requires-python = ">=3.12"
-dependencies = ["textual>=0.80"]
+# sounddevice carries the PortAudio binary that lets the engine hold an output stream open and mix
+# its own voices — without it there is no way to sound an effect over the music, only instead of it.
+# A machine with no device still runs: make_player falls back to silence.
+dependencies = ["textual>=0.80", "sounddevice>=0.4"]
 
 [project.optional-dependencies]
 # Browser mode. Pinned: serve.py patches textual-serve's page template, so its shape must be stable.

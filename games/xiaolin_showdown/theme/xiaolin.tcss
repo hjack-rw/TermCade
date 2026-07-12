@@ -111,7 +111,8 @@ SettingsScreen Input {
    both, wide enough for the longer label — auto-sizing them would size each to its own text and
    leave two buttons of different lengths stacked on each other. */
 SettingsScreen #difficulty,
-SettingsScreen #music {
+SettingsScreen #music,
+SettingsScreen #sfx {
     width: 28;
     margin-top: 1;
 }

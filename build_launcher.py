@@ -36,5 +36,9 @@ PyInstaller.__main__.run(
         "--collect-all=aiohttp",
         "--collect-all=xiaolin_showdown",
         "--collect-all=termcade",
+        # Not just submodules: sounddevice ships the PortAudio DLL as package data, and the exe is
+        # silent without it — the import succeeds and only the device open fails, so a missed
+        # collect looks like "this machine has no sound card" rather than a build error.
+        "--collect-all=sounddevice",
     ]
 )

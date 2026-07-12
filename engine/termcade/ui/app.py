@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+from array import array
 from pathlib import Path, PurePath
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.timer import Timer
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Button, Footer, Header, Static
 
 from termcade.app.game import Game, GameContext
 from termcade.core import music
-from termcade.core.audio import MUSIC_OPTION, make_player
+from termcade.core.audio import MUSIC_OPTION, SFX_OPTION, make_player
 
 from .screens.base import EngineScreen
 from .theme import TERMCADE_THEME
@@ -109,6 +110,7 @@ class EngineApp(App[None]):
         self._player = self.ctx.audio if self.ctx is not None else make_player()
         self._closing = False
         self._theme: bytes | None = None  # rendered once, then kept — a toggle must be instant
+        self._sfx: dict[str, array] = {}  # synthesized on first press, then kept
 
     def on_mount(self) -> None:
         self.register_theme(TERMCADE_THEME)
@@ -125,6 +127,26 @@ class EngineApp(App[None]):
         if self.ctx is None:
             return True
         return bool(self.ctx.settings.current.options.get(MUSIC_OPTION, True))
+
+    @property
+    def sfx_on(self) -> bool:
+        if self.ctx is None:
+            return True
+        return bool(self.ctx.settings.current.options.get(SFX_OPTION, True))
+
+    def play_sfx(self, name: str) -> None:
+        """Sound one effect. Synthesized once and kept — a click has to answer the key that caused
+        it, and re-rendering it on every press would put that work on the UI thread."""
+        if not self.sfx_on:
+            return
+        if name not in self._sfx:
+            self._sfx[name] = music.sfx(name)
+        self._player.play_once(self._sfx[name])
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Every button in the cabinet clicks, including a game's own — the event bubbles up here
+        after the screen has handled it, so a cartridge gets this for free and cannot forget it."""
+        self.play_sfx(music.CLICK)
 
     def apply_music_setting(self) -> None:
         """Start or stop the soundtrack to match the setting. Safe to call as often as you like."""
@@ -173,9 +195,11 @@ class EngineApp(App[None]):
         if self._resize_timer is not None:
             self._resize_timer.stop()
             self._resize_timer = None
-        # The OS keeps a looping sound playing after the process lets go of the terminal.
+        # The stream outlives the terminal: an open device keeps its callback thread running and
+        # the theme audible after the app has let go of the screen. Closing is not optional.
         self._closing = True
         self._player.stop()
+        self._player.close()
 
     def _enforce_min_size(self) -> None:
         """Show the overlay while the window is below the game's minimum, hide it once it fits.

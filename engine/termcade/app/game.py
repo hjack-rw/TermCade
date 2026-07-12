@@ -68,7 +68,7 @@ class GameContext:
         # Always a real player where the platform has one. Whether it is *playing* is the music
         # setting's business, checked at the point of play — resolving it here would freeze the
         # answer at boot, and the toggle on the settings screen would do nothing until restart.
-        self.audio = player if player is not None else make_player(cache_dir=self.data_dir)
+        self.audio = player if player is not None else make_player()
 
         # SQLite is the real store; pass ``backend=`` to override (e.g. JsonFileBackend).
         if backend is None:

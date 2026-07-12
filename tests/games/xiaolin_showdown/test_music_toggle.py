@@ -7,6 +7,7 @@ that failed.
 
 from __future__ import annotations
 
+from array import array
 from dataclasses import replace
 
 import pytest
@@ -28,8 +29,14 @@ class SpyPlayer:
     def play_loop(self, wav: bytes) -> None:
         self.calls.append("play")
 
+    def play_once(self, pcm: array) -> None:
+        self.calls.append("sfx")
+
     def stop(self) -> None:
         self.calls.append("stop")
+
+    def close(self) -> None:
+        self.calls.append("close")
 
 
 async def _open_settings(tmp_path):
@@ -70,10 +77,13 @@ async def test_turning_music_off_stops_it_there_and_then(tmp_path):
 async def test_turning_music_back_on_replays_it_without_re_rendering(tmp_path):
     """The theme costs the better part of a second to synthesize; a toggle must reuse the bytes."""
     app = await _open_settings(tmp_path)
+    spy = SpyPlayer()
+    # Both before mount, on purpose. Mounting starts the render worker whenever no theme is
+    # cached, and that worker would land a second later and overwrite the stub — the reuse path
+    # this test exists to check would never be the thing that ran.
+    app._player = spy
+    app._theme = b"RIFF-already-rendered"
     async with app.run_test(size=(150, 50)) as pilot:
-        spy = SpyPlayer()
-        app._player = spy
-        app._theme = b"RIFF-already-rendered"
         current = app.ctx.settings.current
         app.ctx.settings.save(
             replace(current, options={**current.options, MUSIC_OPTION: False})
@@ -85,4 +95,8 @@ async def test_turning_music_back_on_replays_it_without_re_rendering(tmp_path):
         app.screen.query_one("#save", Button).press()
         await pilot.pause()
 
-        assert spy.calls[-1] == "play"
+        # Not `calls[-1]`: every button press now sounds a click, so the theme's "play" is no
+        # longer the last thing the player heard. What must hold is that it played at all, and
+        # that it played the bytes we already had rather than synthesizing them again.
+        assert "play" in spy.calls
+        assert app._theme == b"RIFF-already-rendered"

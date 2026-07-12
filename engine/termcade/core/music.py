@@ -183,22 +183,34 @@ def _noise(index: int) -> float:
     return ((index * 1103515245 + 12345) >> 16 & 0x7FFF) / 16383.5 - 1.0
 
 
-def _render_voice(voice: str, hz: float, samples: int, amp: float, out: array) -> None:
-    """Add one note into ``out``, in place."""
+def _render_voice(
+    voice: str, hz: float, samples: int, amp: float, out: array, *, hz_end: float | None = None
+) -> None:
+    """Add one note into ``out``, in place.
+
+    ``hz_end`` glides the pitch across the note instead of holding it. A held pitch is what a
+    *melody* wants; a falling one is what a *press* wants — the drop is the whole reason an arcade
+    blip feels like something landed rather than merely beeped. The music never passes it.
+
+    The glide is why phase is accumulated rather than computed as ``hz * i``: with a moving
+    frequency that closed form tears the waveform apart, because each sample would be placed as if
+    its own pitch had been running since the start of the note.
+    """
+    phase = 0.0
     for i in range(samples):
         decay = i / samples
+        f = hz if hz_end is None else hz + (hz_end - hz) * decay
+        phase = (phase + f / SAMPLE_RATE) % 1.0
         if voice == KICK:
             # A pitch sweep down into a thud — the whole kick drum, basically.
-            f = 110.0 * math.exp(-8.0 * decay)
-            value = math.sin(2 * math.pi * f * i / SAMPLE_RATE) * math.exp(-16.0 * decay)
+            swept = 110.0 * math.exp(-8.0 * decay)
+            value = math.sin(2 * math.pi * swept * i / SAMPLE_RATE) * math.exp(-16.0 * decay)
         elif voice in (SNARE, HAT):
             fall = 9.0 if voice == SNARE else 40.0
             value = _noise(i) * math.exp(-fall * decay)
         elif voice == BASS:
-            phase = (hz * i / SAMPLE_RATE) % 1.0
             value = (4 * abs(phase - 0.5) - 1) * math.exp(-1.4 * decay)  # triangle
         else:
-            phase = (hz * i / SAMPLE_RATE) % 1.0
             duty = 0.5 if voice == LEAD else 0.25  # two pulse widths -> two timbres
             value = (1.0 if phase < duty else -1.0) * math.exp(-4.5 * decay)  # square
         out[i] += value * amp
@@ -248,3 +260,40 @@ def wav_bytes(pcm: bytes) -> bytes:
 def theme(seed: int | str | None = None, style: Style = ARCADE) -> bytes:
     """The one call a game needs: seed in, loopable WAV out."""
     return wav_bytes(render(compose(seed, style)))
+
+
+CLICK = "click"
+CONFIRM = "confirm"
+BACK = "back"
+ERROR = "error"
+
+# Each effect is a run of notes on the music's own voices, so an effect sits in the same timbre as
+# the track it lands on — and, like the theme, ships as no file at all. Pitches are absolute Hz
+# rather than scale degrees: an effect answers a keypress, not the bar it happens to fall in, and
+# tying it to the current chord would make the same button sound different every time.
+#
+# Every one of them *moves* — that is what separates a press from a beep. A pitch falling through
+# the sound reads as something landing; a held pitch reads as a tone being sounded at you. They are
+# on ARP (a 25% pulse) rather than LEAD (a 50% square) because the thinner wave cuts through the
+# music instead of sinking into it, which is the whole job of an interface sound.
+_SFX: dict[str, tuple[tuple[str, float, float, float, float], ...]] = {
+    # voice, Hz start, Hz end, seconds, amplitude — played back to back
+    # The press: a bright blip snapping down, with a low body under it. The body is what gives it
+    # weight — without it the blip is audible but weightless, and the button feels like it beeped
+    # rather than went down.
+    CLICK: ((ARP, 900.0, 300.0, 0.035, 0.60), (BASS, 160.0, 90.0, 0.05, 0.35)),
+    CONFIRM: ((ARP, 880.0, 880.0, 0.04, 0.45), (ARP, 1320.0, 1500.0, 0.10, 0.45)),  # rising
+    BACK: ((ARP, 740.0, 370.0, 0.09, 0.40),),                                       # falling
+    ERROR: ((LEAD, 170.0, 60.0, 0.22, 0.55),),                                      # a low growl
+}
+
+
+def sfx(name: str) -> array:
+    """A short burst of PCM, synthesized on the spot. Ready to hand straight to the mixer."""
+    out = array("h")
+    for voice, hz, hz_end, seconds, amp in _SFX[name]:
+        samples = int(seconds * SAMPLE_RATE)
+        scratch = array("d", bytes(8 * samples))
+        _render_voice(voice, hz, samples, amp, scratch, hz_end=hz_end)
+        out.extend(int(max(-1.0, min(1.0, value)) * 32767) for value in scratch)
+    return out

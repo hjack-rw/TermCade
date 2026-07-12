@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from array import array
+
 import pytest
 
 from termcade.app.game import Game, GameContext
-from termcade.core.audio import MUSIC_OPTION, MUTE_ENV, NullPlayer, make_player
+from termcade.core.audio import MUSIC_OPTION, MUTE_ENV, SFX_OPTION, NullPlayer, make_player
 from termcade.core.settings import Settings
 
 
@@ -19,19 +21,27 @@ def test_mute_env_overrides_a_player_that_was_asked_for(monkeypatch):
     assert isinstance(make_player(enabled=True), NullPlayer)
 
 
-def test_a_platform_with_no_backend_falls_back_to_silence(monkeypatch):
+def test_a_machine_with_no_working_device_falls_back_to_silence(monkeypatch):
+    """A missing sound card, a missing PortAudio wheel, a device another process has taken — the
+    game must still run. Whatever the stream raises, it resolves to silence and never propagates."""
     monkeypatch.delenv(MUTE_ENV, raising=False)
-    monkeypatch.setattr("sys.platform", "linux")
+
+    def no_device():
+        raise OSError("no default output device")
+
+    monkeypatch.setattr("termcade.core.audio.StreamPlayer", no_device)
 
     assert isinstance(make_player(enabled=True), NullPlayer)
 
 
-def test_the_null_player_swallows_a_track_without_complaint():
-    """A game hands it a WAV and calls stop; neither may raise, or every headless run dies."""
+def test_the_null_player_swallows_every_sound_without_complaint():
+    """A headless run calls all four; none may raise, or every CI run dies."""
     player = NullPlayer()
 
     player.play_loop(b"RIFF....WAVE")
+    player.play_once(array("h", [0, 1, 2]))
     player.stop()
+    player.close()
 
 
 class _NoState:
@@ -63,3 +73,12 @@ def test_the_music_setting_is_readable_after_it_changes(ctx):
 
     ctx.settings.save(Settings(options={MUSIC_OPTION: True}))
     assert ctx.settings.current.options[MUSIC_OPTION] is True
+
+
+def test_music_and_effects_are_two_switches(ctx):
+    """They annoy separately — a player may want the clicks without the theme, or the reverse — so
+    one must never imply the other."""
+    ctx.settings.save(Settings(options={MUSIC_OPTION: False, SFX_OPTION: True}))
+
+    assert ctx.settings.current.options[MUSIC_OPTION] is False
+    assert ctx.settings.current.options[SFX_OPTION] is True
