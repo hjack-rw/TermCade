@@ -6,6 +6,7 @@ from copy import deepcopy
 
 from termcade.core.settings import Difficulty
 from termcade.ui.app import EngineApp
+from termcade.ui.widgets import TooltipStatic
 
 from textual.widgets import Button, Input, Static
 
@@ -275,7 +276,7 @@ async def test_start_screen_shows_the_cartridge_version(tmp_path):
     async with app.run_test(size=(150, 60)) as pilot:
         await _boot(app, pilot)
         await pilot.pause()
-        assert str(app.screen.query_one("#version", Static).render()) == "v1.1"
+        assert str(app.screen.query_one("#version", Static).render()) == "v1.2"
 
 
 async def test_settings_flags_an_out_of_range_value_instead_of_saving(tmp_path):
@@ -509,6 +510,39 @@ async def test_rules_open_from_the_vault(tmp_path):
         await pilot.pause()
 
         assert isinstance(app.screen, RulesScreen)
+
+
+async def test_rules_open_mid_showdown(tmp_path):
+    """Same key, and it keeps working after Retreat has stopped working — a showdown is exactly
+    where a player needs to look a rule up."""
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await _open_showdown(app, pilot)
+        await pilot.press("enter")  # commit — from here Escape no longer retreats
+        await pilot.pause()
+
+        await pilot.press("7")
+        await pilot.pause()
+
+        assert isinstance(app.screen, RulesScreen)
+
+
+async def test_reading_the_rules_does_not_advance_the_showdown(tmp_path):
+    """Looking something up is not a move: the duel must be exactly where it was left."""
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await _open_showdown(app, pilot)
+        duel = app.screen._duel
+        before = str(app.screen.query_one("#duel-body", TooltipStatic).render())
+
+        await pilot.press("7")
+        await pilot.pause()
+        await pilot.press("escape")  # back out of the rulebook
+        await pilot.pause()
+
+        assert isinstance(app.screen, DuelScreen)
+        assert app.screen._duel is duel  # the same showdown, not a fresh one
+        assert str(app.screen.query_one("#duel-body", TooltipStatic).render()) == before
 
 
 async def test_every_vault_action_says_what_it_does(tmp_path):

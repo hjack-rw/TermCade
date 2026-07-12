@@ -22,7 +22,7 @@ def build_game() -> Game:
     return Game(
         game_id="xiaolin_showdown",
         title="Xiaolin Showdown",
-        version="1.1",
+        version="1.2",
         state_cls=XiaolinState,
         default_settings=default_settings(),
         saves_enabled=True,

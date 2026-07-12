@@ -37,6 +37,7 @@ from ..logic.state import XiaolinState
 from ..logic.turn import bot_turn, max_hand_size, refill_hands
 from ..logic.mechanics.powers import is_boost_slot
 from ..logic.mechanics.scoring import contributing, element_score
+from .rules import RulesScreen
 from .format import (
     COLORS,
     STAT_ORDER,
@@ -55,8 +56,12 @@ class DuelScreen(EngineScreen):
     """One showdown, stepped through a phase at a time — the player presses Continue to advance,
     seeing each phase resolve, and the choice phases raise their modal inline."""
 
+    # Rules is a binding and nothing more: it never joins the prompt line, because that line is the
+    # duel's *move* list and looking something up is not a move. It costs no turn and changes no
+    # state, so it stays available for the whole showdown, long after Retreat has stopped being.
     BINDINGS = [
         ("enter,space", "continue", "Continue"),
+        ("7", "rules", "Rules"),
         ("escape", "retreat", "Retreat"),
     ]
 
@@ -79,6 +84,12 @@ class DuelScreen(EngineScreen):
 
     def action_continue(self) -> None:
         self._continue.set()
+
+    def action_rules(self) -> None:
+        """Put the rulebook on screen. The showdown underneath is mid-await on ``_continue`` and
+        simply keeps waiting — nothing is advanced, nothing is skipped, and the key is dead while a
+        choice modal is up, because a modal owns the input while it is the active screen."""
+        self.app.push_screen(RulesScreen())
 
     def action_retreat(self) -> None:
         """Back out before the showdown begins — return to the vault.
@@ -129,7 +140,7 @@ class DuelScreen(EngineScreen):
         # Initiative is already on the board: this press commits you to the priority you can see, or
         # (on a tie) draws the coin that settles it. It is the last moment you may walk away.
         self._show_board(duel)
-        await self._await_continue("Continue to begin the showdown        (Esc retreats)")
+        await self._await_continue("Continue to begin the showdown        Esc Retreat")
         if self._retreating:
             self._retreat_to_vault()
             return
