@@ -13,6 +13,7 @@ from ..logic.models import Card, Character
 from ..logic.mechanics.powers import is_gamble
 from .format import (
     char_stats,
+    effect_line,
     element_text,
     points_label,
     power_name_text,
@@ -56,6 +57,11 @@ class DetailScreen(EngineScreen):
                 yield Static(power_line, classes="power")
                 if power.description and not is_gamble(power):
                     yield Static(power.description, classes="description")
+
+            # What it does, in a line, under the flavour. A hidden power still gets one: the dragon's
+            # name stays its own business, but the rule it plays by is not a secret.
             if power.initiative_bonus:
                 yield Static(f"Initiative bonus: {power.initiative_bonus:+d}", classes="power")
+            elif effect := effect_line(power):
+                yield Static(effect, classes="power")
         yield Footer()

@@ -30,19 +30,25 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
         "At the vault:": [
             f"You get {settings.deposit_limit} action a turn: deposit a Wu for its points, or use "
             "its power. Never both!",
+            "Depositing a Wu forfeits its power. You are vaulting it, not spending it.",
             f"You may also draw {settings.draw_limit} Wu a turn from your own Deck to shuffle Cards.",
+            f"Your hand holds {settings.max_hand_size} Wu. Over that, you shelve one back to your Deck.",
+            "Left with nothing you can field? The pile deals you back in.",
             "Your opponent takes the same turn you do.",
             f"Bank {settings.point_limit} points and the run is yours!",
         ],
-        "Calling a showdown:": [
+        "Calling a Showdown:": [
             "Matching Initiative Bonuses do not stack. Different ones do.",
             "The higher Initiative names the Challenge. Tie, and a coin toss decides it.",
             "The Challenge can be one stat, or a Tournament across all three.",
             f"Name a stat and your opponent names the stakes, up to {settings.max_wager} Wu each.",
             f"A Tournament costs {settings.max_wager} Wu, and can only be called when you both hold {settings.max_wager}.",
             "You can never pick the same Challenge or Background two showdowns in a row.",
+            "You can Return before the first Continue. After it, there is no retreat.",
         ],
-        "In the showdown:": [
+        "In the Showdown:": [
+            "Gong Yi Tanpai! You and your opponent field your Wu at the same moment, neither seeing "
+            "the other's.",
             "Each stat is ONE battle. Every Wu goes down together and they are summed up.",
             "A Tournament is three battles of three different Wus: Force, then Agility, then Intellect.",
             "Any Wu you field may carry a Boost, but a Boost Wu works once.",
@@ -51,12 +57,17 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "During the evaluation: the contested stat counts x2. The other two still count so don't put it all in one place.",
         ],
         "Who takes it:": [
-            "The showdown goes to whoever won the most battles.",
+            "The Showdown goes to whoever won the most battles.",
             "Tied on battles? Add up every stat you won across them. The higher total takes it.",
             "Tied on that too? It goes to whoever called the Challenge.",
             "The loser forfeits every Wu they have wagered.",
             f"The prize Wu needs a hard blow: beat {settings.prize_threshold} on the contested stat "
             "in any one battle. Win small and it is lost.",
+        ],
+        "When the pile runs dry:": [
+            "The run ends. There is no Showdown left to call.",
+            "Whatever is still in your hand is cashed for its points, and the higher score wins.",
+            "But Wus in your Deck are wasted.",
         ],
     }
 
@@ -90,26 +101,35 @@ class _Rule:
             yield Text(line)
 
 
-def _balance(words: list[str], width: int) -> list[str]:
-    """Greedy-wrap ``words`` to ``width``, then lift the last line off a lone word."""
+def _wrap(words: list[str], width: int) -> list[list[str]]:
+    """Greedy-wrap: fill each line to ``width`` before starting the next."""
     lines: list[list[str]] = [[]]
     for word in words:
         line = lines[-1]
-        if line and sum(len(w) + 1 for w in line) - 1 + 1 + len(word) > width:
+        if line and len(" ".join(line)) + 1 + len(word) > width:
             lines.append([word])
         else:
             line.append(word)
+    return lines
 
-    # A one-word tail is the ugly case. Borrow from the line above while it can spare a word and the
-    # tail still fits — never leave the line above worse off than the one we are fixing.
-    while len(lines) > 1 and len(lines[-1]) == 1 and len(lines[-2]) > 2:
-        borrowed = lines[-2][-1]
-        if sum(len(w) + 1 for w in lines[-1]) + len(borrowed) > width:
-            break
-        lines[-2].pop()
-        lines[-1].insert(0, borrowed)
 
-    return [" ".join(line) for line in lines if line]
+def _balance(words: list[str], width: int) -> list[str]:
+    """Wrap ``words`` into even lines rather than a full one and a stub.
+
+    Greedy wrapping packs each line to the margin and leaves whatever is over on the last, which is
+    where the ragged tails come from — a rule that fills the width and then drops two words underneath
+    reads as though it broke. The line *count* is what greedy gets right, so this keeps that and then
+    wraps again at the narrowest width that still fits in it. Same number of lines, evenly filled.
+    """
+    if not words:
+        return []
+    count = len(_wrap(words, width))
+    narrowest = max(len(word) for word in words)
+    for trial in range(narrowest, width + 1):
+        lines = _wrap(words, trial)
+        if len(lines) <= count:
+            return [" ".join(line) for line in lines]
+    return [" ".join(line) for line in _wrap(words, width)]
 
 
 def _bullets(rules: list[str]) -> Table:

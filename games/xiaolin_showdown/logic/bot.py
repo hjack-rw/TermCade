@@ -1,8 +1,14 @@
-"""The opponent's duel decisions — pure, RNG-injected.
+"""The opponent's decisions — pure, RNG-injected.
 
-Each function scores the options by ``own stat + card contribution − opponent stat`` and picks
-the best, falling back to a random legal choice. ``None`` card stats count as 0, guarding the two
-spots where they would otherwise crash a comparison.
+Two kinds, and they are not equally good. What to *field* is searched: every candidate Wu is played
+into a copy of the real battle and weighed by :func:`~.battle.score_battle`, the same scorer the duel
+itself uses, so the opponent and the referee can never disagree about what a card is worth. What to
+*call* — the challenge, the background, the wager — is still heuristic, judged on hand strength
+rather than played out.
+
+Every one of them is blind to what the other duelist is committing to this exchange. The duel hands
+over a frozen copy of the ground for exactly that reason: Gong Yi Tanpai is a simultaneous reveal,
+and the order this code happens to run in must never leak.
 """
 
 from __future__ import annotations

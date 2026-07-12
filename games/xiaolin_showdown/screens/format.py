@@ -159,6 +159,24 @@ def bonus_tooltip(bonuses: Sequence[int]) -> str:
     return f"({', '.join(f'{bonus:+d}' for bonus in bonuses)})"
 
 
+# What a Wu does, in one line, under its flavour. The trigger is already printed beside the power's
+# name, so it is not repeated here. Not every mechanic gets one: a plain Wu's stats are the whole of
+# it, and the joke Wu tells you nothing on purpose.
+EFFECTS = {
+    Mechanic.HAND_SIZE: "Hand limit: +1",
+    Mechanic.CHRONOKINESIS: "Draw a Wu from the incoming Wu pile.",
+    Mechanic.DRAGON: "Boosts only. Can't be staked, lost or banked.",
+    Mechanic.BOOST: "Enhances the played Wu by 1 per stat it holds.",
+    Mechanic.MORPH: "You choose its Element.",
+    Mechanic.INTANGIBLE: "No Elemental bonus for either duelist all Showdown.",
+}
+
+
+def effect_line(power: Power) -> str | None:
+    """The one-liner under a Wu's flavour, or ``None`` for the Wu that do not earn one."""
+    return EFFECTS.get(mechanic_of(power))
+
+
 _TRIGGERS = {
     "use": "On Use",
     "hand": "While Held",

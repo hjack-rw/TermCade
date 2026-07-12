@@ -163,3 +163,37 @@ def test_a_hand_trigger_says_it_is_passive(catalog):
     from xiaolin_showdown.screens.format import trigger_label
 
     assert {trigger_label(p) for p in catalog.powers if p.trigger == "hand"} == {"While Held"}
+
+
+# --- what a Wu tells you it does ---------------------------------------------------
+
+
+SILENT = {Mechanic.FILLER, Mechanic.PRINTED_STATS, Mechanic.INITIATIVE, Mechanic.GAMBLE}
+
+
+def test_every_mechanic_either_explains_itself_or_is_deliberately_silent(catalog):
+    """A Wu whose rule appears nowhere can only be learned by losing a run to it.
+
+    Four say nothing on purpose: deck filler has no power, a plain Wu's stats are the whole of it,
+    an initiative Wu already prints its bonus, and the joke Wu tells you nothing by design.
+    """
+    from xiaolin_showdown.screens.format import effect_line
+
+    for power in catalog.powers:
+        mechanic = mechanic_of(power)
+        if mechanic in SILENT:
+            assert effect_line(power) is None, f"{mechanic} should say nothing"
+        else:
+            assert effect_line(power), f"{mechanic} does what, exactly? Nothing says."
+
+
+def test_a_hidden_power_still_states_its_rule(catalog):
+    """A dragon keeps its *name* to itself. The rule it plays by is not a secret."""
+    from xiaolin_showdown.screens.format import effect_line
+
+    dragons = [c for c in catalog.cards if mechanic_of(c.power) is Mechanic.DRAGON]
+
+    assert dragons
+    for card in dragons:
+        assert -5 < card.power.id < 0, "no longer hidden — this test is guarding nothing"
+        assert effect_line(card.power)

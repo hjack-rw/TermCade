@@ -1,9 +1,10 @@
-"""The vault turn — what happens on each return to the vault, between showdowns.
+"""The vault turn — what both duelists do between showdowns.
 
-Keeps a hand from exceeding its size limit (surplus goes to the personal deck) and flags the run
-finished when a point limit is reached or the draw pile runs dry. A short hand is *not* topped up
-automatically — the player refills it themselves with Draw; only a fully empty hand is emergency-
-drawn from the main pile, so the duel loop can still terminate rather than strand on an empty hand.
+Keeps a hand within its size limit (the surplus goes to the personal deck) and flags the run finished
+when a point limit is reached or the draw pile runs dry. A short hand is *not* topped up: the player
+refills it themselves with Draw. Only a hand with **nothing that can be fielded** is drawn for
+automatically — a Wu that can only ever be laid as a boost is no answer to a showdown, so a hand of
+those is empty for every purpose that decides a duel, and the loop would otherwise strand on it.
 """
 
 from __future__ import annotations
@@ -51,8 +52,8 @@ def oversee_hand_size(
     """Nudge one duelist's hand toward its size limit by one pass; return whether it is settled.
 
     Over the limit → shed the surplus at random to the personal deck. Under → leave it (the player
-    tops up manually with Draw), unless the hand is *empty*, which is emergency-drawn from the main
-    pile. Returns ``False`` after shedding (the caller re-checks), ``True`` otherwise.
+    tops up manually with Draw), unless there is nothing in it that can be *fielded*, which is drawn
+    for from the main pile. Returns ``False`` after shedding (the caller re-checks), ``True`` else.
     """
     player = state.player if is_player else state.bot
     over = len(player.whole_hand) - max_hand_size(player, settings.max_hand_size)
@@ -102,10 +103,15 @@ def duel_value(card: Card) -> int:
 def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
     """Which Wu the bot banks this turn — its deposit skill, dialled by difficulty.
 
-    Both bots always race for points (a bot that hoards can never reach ``point_limit``); they
-    differ in *what* they give up. An easy bot chases the biggest number and cheerfully cashes the
-    Wu it needed, which is what makes it lean so hard on whatever it keeps. The hard bot sheds its
-    least useful Wu instead — the gag card, deck filler, a 1-point trinket — and holds its weapons.
+    **The hard bot takes the points, and it is right to.** A run is won by banking to
+    ``point_limit``, so the strong line is to cash the biggest number in hand and fight on with what
+    is left. Protecting good Wu is the clever-sounding play and it loses: over 250 runs, weighting
+    the choice by ``duel_value`` costs the bot ground at every weight tried, and refusing to bank a
+    booster costs it five points of win rate. Points are not merely the currency — they are the win
+    condition, and a duelist who hoards its weapons never reaches it.
+
+    The easy bot does the reverse: it sheds its least useful Wu and holds its weapons. It duels
+    exactly as well as the hard bot — it simply never banks enough to close a run out.
 
     Returns ``None`` when nothing in hand is worth points.
     """
