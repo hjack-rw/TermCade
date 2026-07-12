@@ -139,7 +139,7 @@ def test_a_bot_passes_when_nothing_in_hand_is_worth_points():
 
 def test_bot_turn_swaps_a_deposit_power_wu_for_a_fresh_draw():
     bot = _player(2)
-    power_wu = _card(trigger="deposit", effect=1, points=9)
+    power_wu = _card(trigger="use", effect=1, points=9)
     bot.hand.append(power_wu)
     state = _state(_player(3), bot, main=5)
 
@@ -213,7 +213,7 @@ def test_a_bot_banks_whatever_sits_above_the_floor():
 
 def test_a_gamble_wu_pays_its_roll_not_its_printed_points():
     """Its printed 1 is a polite fiction. What it pays is drawn, and can beat every Wu in the deck."""
-    rolls = {bank_value(_card(trigger="deposit", effect=0, points=1), Rng(seed)) for seed in range(60)}
+    rolls = {bank_value(_card(trigger="use", effect=0, points=1), Rng(seed)) for seed in range(60)}
 
     assert rolls - {1}, "every roll came back as the printed points — it is not being rolled at all"
     assert min(rolls) < 0, "it can never cost you anything, so keeping it is not a gamble"
@@ -227,7 +227,7 @@ def test_an_ordinary_wu_is_never_rolled():
 
 def test_a_bad_gamble_never_takes_the_bot_below_zero():
     bot = _player(3)
-    bot.hand.append(_card(trigger="deposit", effect=0, points=1))
+    bot.hand.append(_card(trigger="use", effect=0, points=1))
     state = _state(_player(3), bot, main=5)
 
     for seed in range(40):  # some of these roll negative

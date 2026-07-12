@@ -44,7 +44,7 @@ class DepositScreen(EngineScreen):
 
     @work
     async def _choose(self, card: Card) -> None:
-        if card.power.trigger == "deposit":  # banking it forfeits its power — confirm first
+        if card.power.trigger == "use":  # banking it forfeits its power — confirm first
             # Name the power the Wu actually has. The joke Wu's is "? ? ?" in the card DB, and that
             # is the right thing to print: you are being asked to give up something unnamed.
             forfeit = await self.confirm(

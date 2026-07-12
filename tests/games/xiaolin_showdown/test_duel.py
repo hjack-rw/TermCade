@@ -492,10 +492,10 @@ async def test_a_spare_wu_makes_the_booster_affordable_again():
 
 
 def test_a_second_boost_in_a_battle_lifts_the_second_wu_not_the_first():
-    """The bug this rebuild would have shipped: a battle can field three Wu, each with its own boost.
+    """A battle can field three Wu, each with its own boost.
 
-    Boosts and Wu go down as pairs, so the live boost is the TAIL of the queue. Reading the head
-    instead would fire the first boost of the battle again and again and leave every later one inert.
+    Boosts and Wu go down as pairs, so the live boost is the tail of the queue: everything before it
+    is a spent stand-in. Each boost lifts the Wu laid down after it, and only that one.
     """
     duel = Round(stat="force")
     first_boost = _card(0, 0, 0, element="water", trigger="boost", effect=1)

@@ -140,3 +140,26 @@ def test_a_hand_or_play_wu_is_never_offered_the_boost_slot(catalog):
     assert Mechanic.DRAGON not in rejected
     assert Mechanic.BOOST not in rejected
     assert Mechanic.PRINTED_STATS in rejected
+
+
+# --- the player's word for a trigger, not the DB's ---------------------------------
+
+
+def test_a_deposit_trigger_never_says_deposit(catalog):
+    """To deposit a Wu is to bank it for points, which forfeits the power.
+
+    So "On Deposit" names the one action that guarantees the power never fires. It fires on Use.
+    """
+    from xiaolin_showdown.screens.format import trigger_label
+
+    labels = {trigger_label(p) for p in catalog.powers if p.trigger == "use"}
+
+    assert "On Deposit" not in labels
+    assert labels <= {"On Use", "? ? ?"}
+
+
+def test_a_hand_trigger_says_it_is_passive(catalog):
+    """`hand` powers do not fire on anything — they apply for as long as the Wu is held."""
+    from xiaolin_showdown.screens.format import trigger_label
+
+    assert {trigger_label(p) for p in catalog.powers if p.trigger == "hand"} == {"While Held"}

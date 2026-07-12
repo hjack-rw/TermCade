@@ -86,13 +86,13 @@ RULES: dict[tuple[str, int], Rule] = {
         Timing.AT_VAULT,
         "Can be spent from the vault, but its power fizzles — it is discarded for no points.",
     ),
-    ("deposit", 0): Rule(
+    ("use", 0): Rule(
         Mechanic.GAMBLE,
         Timing.AT_VAULT,
         f"Nobody knows what it is worth. Deposit it and find out: anywhere from "
         f"{GAMBLE_SPREAD[0]:+d} to {GAMBLE_SPREAD[1]:+d} points.",
     ),
-    ("deposit", 1): Rule(
+    ("use", 1): Rule(
         Mechanic.CHRONOKINESIS,
         Timing.AT_VAULT,
         "Spend it to draw a Wu from the pile. Depositing it forfeits that.",

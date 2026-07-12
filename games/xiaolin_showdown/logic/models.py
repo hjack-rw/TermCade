@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 class Power:
     id: int
     name: str
-    trigger: str  # "hand" | "deposit" | "boost" | "play"
+    trigger: str  # "hand" | "use" | "boost" | "play"
     effect: int  # -1 | 0 | 1 | ...
     description: str
     initiative_bonus: int = 0

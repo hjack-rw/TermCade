@@ -555,7 +555,7 @@ def test_the_rulebook_states_every_wager_rule():
     assert "each boost wu works once" in text  # a field of three cannot be lifted by one dragon
     assert "most battles won" in text  # how a tournament is decided
     assert "margin" in text  # ...and how a level showdown breaks
-    assert "best of" not in text  # the rule this rebuild existed to kill
+    assert "best of" not in text  # a wager is not a best-of-N and must never be described as one
 
 
 async def test_the_showdown_is_fought_under_the_settings_you_chose(tmp_path):
@@ -593,10 +593,9 @@ def test_the_stakes_spell_out_what_they_cost():
 
 
 def test_the_gamble_wu_never_shows_a_number_anywhere(catalog):
-    """The card refuses to say what it is worth. Every surface that prints points must agree.
+    """The card refuses to say what it is worth, so every surface that prints points must agree.
 
-    The Deposit button is the one that got this wrong: it read `card.points` directly and cheerfully
-    offered "+1 pts" for a Wu whose whole point is that nobody knows.
+    Any surface reading `card.points` directly would offer a number for a Wu that has none.
     """
     gamble = next(c for c in catalog.cards if is_gamble(c.power))
 

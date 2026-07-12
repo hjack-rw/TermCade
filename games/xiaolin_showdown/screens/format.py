@@ -159,11 +159,19 @@ def bonus_tooltip(bonuses: Sequence[int]) -> str:
     return f"({', '.join(f'{bonus:+d}' for bonus in bonuses)})"
 
 
+_TRIGGERS = {
+    "use": "On Use",
+    "hand": "While Held",
+    "play": "On Play",
+    "boost": "On Boost",
+}
+
+
 def trigger_label(power: Power) -> str:
     """When a power fires, e.g. ``On Play`` — or ``? ? ?`` for the gamble Wu, which says nothing."""
     if is_gamble(power):
         return "? ? ?"
-    return f"On {power.trigger.capitalize()}"
+    return _TRIGGERS.get(power.trigger, f"On {power.trigger.capitalize()}")
 
 
 def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list[Text]:

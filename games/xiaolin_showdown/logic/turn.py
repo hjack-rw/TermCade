@@ -139,11 +139,11 @@ def bot_turn(
 def _bot_deposits(
     state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty
 ) -> list[str]:
-    """Up to ``deposit_limit`` deposits: swap each ``deposit``/+1 Wu for a fresh draw, then bank the
+    """Up to ``deposit_limit`` deposits: swap each ``use``/+1 Wu for a fresh draw, then bank the
     card :func:`pick_deposit` chooses.
 
     Banks *any* card, matching the rule the player's Deposit screen offers (:func:`~.actions.deposit`).
-    Restricting the bot to ``deposit``-trigger Wu left it with exactly one bankable card in the whole
+    Restricting the bot to ``use``-trigger Wu left it with exactly one bankable card in the whole
     pile, so it could never race the player to ``point_limit``.
     """
     name = state.bot.character.name.split("_")[0]
@@ -153,7 +153,7 @@ def _bot_deposits(
     for card in list(state.bot.whole_hand):  # snapshot: the hand mutates as cards leave
         if deposits >= settings.deposit_limit:
             break
-        if card.power.trigger == "deposit" and card.power.effect == 1 and state.card_deck:
+        if card.power.trigger == "use" and card.power.effect == 1 and state.card_deck:
             _draw_from_main(state, state.bot)  # trade the power card for a fresh one
             state.bot.remove_card(card)
             deposits += 1

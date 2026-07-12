@@ -13,7 +13,7 @@ from .settings import XiaolinSettings
 from .state import XiaolinState
 from .turn import bank_value, max_hand_size
 
-# The gag Wu Ohwah Tegu Saim (deposit/0) has a "? ? ?" power that does nothing when used.
+# The gag Wu Ohwah Tegu Saim (use/0) has a "? ? ?" power that does nothing when used.
 FIZZLE_MESSAGE = "You feel like something should have happened..."
 DRAW_MESSAGE = "Chronokinesis warps time — you draw a Wu!"
 
@@ -79,13 +79,13 @@ def draw(state: XiaolinState) -> Card:
 
 def usable_powers(state: XiaolinState, deposit_limit: int) -> list[Card]:
     """Wu whose power the player can actively use now: a hand power-up (``hand``/+1), or a
-    ``deposit``-trigger Wu while a deposit is still allowed this turn."""
+    ``use``-trigger Wu while a deposit is still allowed this turn."""
     can_dep = can_deposit(state, deposit_limit)
     return [
         card
         for card in state.player.whole_hand
         if (card.power.trigger == "hand" and card.power.effect > 0)
-        or (card.power.trigger == "deposit" and can_dep)
+        or (card.power.trigger == "use" and can_dep)
     ]
 
 
@@ -93,10 +93,10 @@ def use_power_blocked(state: XiaolinState, deposit_limit: int) -> str | None:
     """Why no power can be used right now, or ``None`` when one can."""
     if usable_powers(state, deposit_limit):
         return None
-    # A `deposit`-trigger Wu only counts while a deposit is still allowed, so a spent deposit is the
+    # A `use`-trigger Wu only counts while a deposit is still allowed, so a spent deposit is the
     # more useful thing to say than "no Wu with a power".
     if state.deposit_counter >= deposit_limit and any(
-        card.power.trigger == "deposit" for card in state.player.whole_hand
+        card.power.trigger == "use" for card in state.player.whole_hand
     ):
         return "Already deposited this turn."
     return "No Wu with a usable power."
@@ -107,9 +107,9 @@ def use_power(state: XiaolinState, card: Card) -> str:
     happened.
 
     Distinct from :func:`deposit`, which banks the Wu for its points. Only Chronokinesis
-    (``deposit``/+1) does something — it draws a Wu; every other power just fizzles.
+    (``use``/+1) does something — it draws a Wu; every other power just fizzles.
     """
-    if card.power.trigger != "deposit":  # a hand power-up is passive — nothing to trigger, kept
+    if card.power.trigger != "use":  # a hand power-up is passive — nothing to trigger, kept
         return FIZZLE_MESSAGE
 
     drew = card.power.effect == 1 and bool(state.card_deck)
