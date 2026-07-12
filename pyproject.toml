@@ -13,8 +13,9 @@ dependencies = ["textual>=0.80"]
 # Browser mode. Pinned: serve.py patches textual-serve's page template, so its shape must be stable.
 serve = ["textual-serve==1.1.3"]
 dev = ["pytest", "pytest-asyncio", "textual-dev", "ruff", "mypy", "textual-serve==1.1.3"]
-# Build the standalone double-click executable (see build_launcher.py).
-build = ["pyinstaller>=6.0", "textual-serve==1.1.3"]
+# Build the standalone double-click executable (see build_launcher.py). Pillow is here rather than
+# in the runtime deps because only `make_icon.py` needs it — the game never imports it.
+build = ["pyinstaller>=6.0", "textual-serve==1.1.3", "pillow"]
 
 [project.scripts]
 termcade = "termcade.__main__:main"

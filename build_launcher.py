@@ -17,7 +17,11 @@ Notes
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import PyInstaller.__main__
+
+ICON = Path(__file__).parent / "engine" / "termcade" / "assets" / "termcade.ico"
 
 PyInstaller.__main__.run(
     [
@@ -26,6 +30,7 @@ PyInstaller.__main__.run(
         "--onefile",
         "--noconfirm",
         "--console",  # prints the URL; closing it stops the server
+        f"--icon={ICON}",  # the cabinet; regenerate it with `python make_icon.py`
         "--collect-all=textual",
         "--collect-all=textual_serve",
         "--collect-all=aiohttp",
