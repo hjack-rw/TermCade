@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "termcade"
-version = "0.0.1"
+version = "0.1.0"
 description = "Reusable Textual TUI engine for terminal games (engine = the cabinet, games = cartridges)."
 requires-python = ">=3.12"
 # sounddevice carries the PortAudio binary that lets the engine hold an output stream open and mix
