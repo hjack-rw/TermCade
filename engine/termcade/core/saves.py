@@ -307,6 +307,22 @@ class SaveManager:
         state = state_cls.restore(envelope["state"], ctx)
         return state, rng, meta, settings
 
+    def settings_of(self, slot: int) -> Settings | None:
+        """The rules a saved run was dealt under — read without restoring the run itself.
+
+        A save freezes its settings on purpose: that run *is* that game, and loading it must not
+        retro-fit rules it was never played by. But then nothing tells a player their old save is a
+        different game from the one a new run would deal — the pile was smaller, the target was lower,
+        and the run will feel wrong for a reason they cannot see. This is what lets the slot say so.
+        """
+        if not self._enabled or not self._backend.exists(slot):
+            return None
+        envelope = self._backend.read(slot)
+        frozen = envelope.get("settings")
+        if not frozen:
+            return None
+        return Settings.from_dict(frozen, Settings())
+
     def list(self) -> list[SaveMeta | None]:
         """One entry per slot; ``None`` for an empty slot. Length == ``max_slots``."""
         slots: list[SaveMeta | None] = [None] * self._max_slots

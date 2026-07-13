@@ -42,6 +42,10 @@ class MenuItem:
     classes: str = ""
     action_id: str | None = None
     action_label: str = ""
+    # Hover text for the row. A label has to stay short enough to read at a glance, so anything a
+    # player would want *explained* rather than announced belongs here — a mark on a save that says
+    # its rules are not the default ones, say, which is meaningless until you hover it.
+    tooltip: str | None = None
 
 
 class MenuScreen(EngineScreen):
@@ -78,6 +82,8 @@ class MenuScreen(EngineScreen):
                     variant=item.variant,
                     classes=item.classes or None,
                 )
+                if item.tooltip:
+                    button.tooltip = item.tooltip
                 if not rows:
                     yield button
                 elif item.action_id is not None:

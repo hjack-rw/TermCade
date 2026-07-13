@@ -14,7 +14,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Literal
 
-from textual import work
+from termcade.app.game import SaveNote
+from termcade.ui.work import work
 from textual.screen import Screen
 
 from termcade.core.saves import SaveError
@@ -44,14 +45,30 @@ class SaveSlotScreen(MenuScreen):
         self._next_screen = next_screen
         self.menu_title = "SAVE" if mode == "save" else "LOAD"
 
+    def _note_for(self, slot: int) -> SaveNote | None:
+        """What the cartridge wants said about this save, if anything."""
+        note = self.game.save_note
+        if note is None:
+            return None
+        frozen = self.ctx.saves.settings_of(slot)
+        return note(frozen) if frozen is not None else None
+
     def menu_items(self) -> list[MenuItem]:
         items = []
         for slot, meta in enumerate(self.ctx.saves.list()):
+            tooltip: str | None = None
             # `list()` hides an unreadable save as a hole, so ask the store whether the slot is
             # really free — otherwise a corrupt save could never be seen, let alone deleted.
             occupied = meta is not None or self.ctx.saves.exists(slot)
             if meta is not None:
                 label = f"{slot + 1}.  {meta.title}"
+                note = self._note_for(slot)
+                if note:
+                    # A save keeps the rules it was frozen with, and nothing else on this screen would
+                    # tell a player those are not the rules a new run gets. The mark is small enough to
+                    # ignore and the tooltip says what it means — the cartridge writes both.
+                    label = f"{label}  {note.mark}"
+                    tooltip = note.explanation
             elif occupied:
                 label = f"{slot + 1}.  — unreadable save —"
             else:
@@ -66,6 +83,7 @@ class SaveSlotScreen(MenuScreen):
                     # is reached mid-game, where a stray click shouldn't destroy a run.
                     action_id=f"del-{slot}" if occupied and self._mode == "load" else None,
                     action_label=DELETE_GLYPH,
+                    tooltip=tooltip,
                 )
             )
         return items

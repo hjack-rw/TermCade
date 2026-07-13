@@ -21,6 +21,19 @@ from termcade.core.settings import Settings, SettingsStore
 from termcade.core.state import GameState
 
 
+@dataclass(frozen=True)
+class SaveNote:
+    """A mark against a save, and what it means when you hover it.
+
+    Two fields and not one, because they answer different questions. The **mark** sits in the slot's
+    label, where there is room for a character and no more — so it must be small enough to ignore. The
+    **explanation** is what it is *for*, and it can afford a sentence.
+    """
+
+    mark: str
+    explanation: str
+
+
 @dataclass
 class Game:
     game_id: str
@@ -42,6 +55,24 @@ class Game:
     # The musical rules the cartridge's theme is composed under. Default is the cabinet's own
     # voice, so a game that says nothing still gets a soundtrack that sounds like it belongs.
     music_style: Style = ARCADE
+    # A last word over the settings once they are loaded, for a game whose defaults are DERIVED from
+    # its own data rather than chosen by a player.
+    #
+    # `SettingsStore` merges a saved file *over* the defaults — which is right for a preference and
+    # wrong for a derived value: the file keeps whatever it was written with, forever. Xiaolin's deck
+    # size and win target are read off the card pool, and a `settings.json` written when the pool held
+    # ~20 Wu went on dealing 20 of 40 cards and ending at a target meant for a game half the size,
+    # months after the pool grew. Every Wu printed since that file was written could simply never
+    # appear. This is where a cartridge gets to notice that and put it right.
+    refresh_settings: Callable[[Settings], Settings] | None = None
+    # Option keys the game writes for its own bookkeeping rather than for a player. They survive the
+    # settings prune (which drops anything nobody declares) but are not preferences — see
+    # `SettingsStore._pruned`.
+    private_options: frozenset[str] = frozenset()
+    # What to say about a saved run whose rules differ from the ones a NEW run would be dealt. Given
+    # the save's frozen settings, a cartridge returns a `SaveNote` — or None when there is nothing to
+    # tell. A save keeps its own rules (that run is that game), and this is how a player finds out.
+    save_note: Callable[[Settings], "SaveNote | None"] | None = None
 
 
 class GameContext:
@@ -62,8 +93,16 @@ class GameContext:
         self.game = game
         self.data_dir = data_dir or app_dir(game.game_id)
 
-        self.settings = SettingsStore(self.data_dir / "settings.json", game.default_settings)
-        self.settings.load()
+        self.settings = SettingsStore(
+            self.data_dir / "settings.json",
+            game.default_settings,
+            private_options=game.private_options,
+        )
+        loaded = self.settings.load()
+        if game.refresh_settings is not None:
+            refreshed = game.refresh_settings(loaded)
+            if refreshed != loaded:
+                self.settings.save(refreshed)  # heal the file, so it is right for the next launch too
 
         # Always a real player where the platform has one. Whether it is *playing* is the music
         # setting's business, checked at the point of play — resolving it here would freeze the

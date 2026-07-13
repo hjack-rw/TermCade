@@ -10,7 +10,7 @@ from pathlib import Path
 
 from termcade.app.game import Game
 
-from .logic.settings import default_settings
+from .logic.settings import default_settings, refreshed_for_pool, save_note
 from .logic.state import XiaolinState
 from .music import XIAOLIN
 from .screens.start import StartScreen
@@ -25,6 +25,18 @@ def build_game() -> Game:
         version="1.2",
         state_cls=XiaolinState,
         default_settings=default_settings(),
+        # The deck size and the win target are read off the CARD POOL, not chosen by a player, so a
+        # settings file written for a smaller pool must not go on dealing a smaller game. A save
+        # keeps its own frozen settings — that run is that game — but the defaults a NEW run is
+        # dealt with follow the pool.
+        refresh_settings=refreshed_for_pool,
+        # The pool fingerprint is bookkeeping, not a preference: it records which card pool this
+        # settings file was written for. It must survive the prune and must NOT be shipped in the
+        # defaults, or a stale file inherits it and reads as current.
+        private_options=frozenset({"pool"}),
+        # A run saved under a smaller pool still plays by its own rules. The slot says so, rather
+        # than leaving the player to wonder why the game feels different.
+        save_note=save_note,
         saves_enabled=True,
         max_slots=4,
         root_screen=StartScreen,
