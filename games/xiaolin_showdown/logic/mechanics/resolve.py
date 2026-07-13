@@ -5,7 +5,10 @@ neutral power, so nothing downstream can mistake it for a live power or fire it 
 applies is looked up once, by :func:`~.powers.mechanic_of`:
 
 - :attr:`~.powers.Mechanic.BOOST` — lends no stats; amplifies the card played after it.
-- :attr:`~.powers.Mechanic.MORPH` — every stat becomes 1; the caster picks its element.
+- :attr:`~.powers.Mechanic.MORPH` — takes a fixed shape, low on the contested stat; the caster picks
+  its element.
+- :attr:`~.powers.Mechanic.HYDROKINESIS` / :attr:`~.powers.Mechanic.MISFORTUNE` — prints no stats; the caster
+  names one, and it takes the whole value, for them or against their opponent.
 - :attr:`~.powers.Mechanic.INTANGIBLE` — voids the elemental bonus for both duelists. A condition of
   the *showdown*, not of one round, so this reports it and the stage machine holds the flag.
 - anything else — the printed stats.
@@ -23,27 +26,35 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from ..models import Card, Power
+from ..models import Card, Mechanic, Power
 from .cards import index_of
-from .powers import Mechanic, mechanic_of
+from .powers import MORPH_ASIDE, MORPH_CONTESTED, NAMED_STAT_VALUE, mechanic_of
 
 if TYPE_CHECKING:
     from ..battle import Round, Side
 
 # A played card joins the queue wearing this, so `_booster_at_head` never mistakes a stand-in for a
 # live booster and no power re-triggers.
-_NEUTRAL_POWER = Power(id=0, name="", trigger="none", effect=0, description="")
+_NEUTRAL_POWER = Power(id=0, name="", mechanic=Mechanic.FILLER, description="")
 
-def resolve_played_power(round_: "Round", card: Card, *, is_player: bool, element: str) -> bool:
+def resolve_played_power(
+    round_: "Round", card: Card, *, is_player: bool, element: str, stat: str | None = None
+) -> bool:
     """Resolve ``card`` into this round's scoring queues; return whether it voided the elemental bonus.
 
     The bonus is a condition of the whole *showdown*, not of one round, so the caller owns that flag
     — a Serpent's Tail played in round one leaves the ground intangible for the rest of the match.
+
+    ``element`` and ``stat`` are the two things a Wu can ask of whoever plays it: the Morpher's
+    element, and the stat the Orb or the Curse pours itself into. Both are resolved by the caller —
+    a human at a modal, or the bot — because this module is pure and cannot ask anyone anything.
     """
     mine, theirs = round_.sides(is_player)
     mechanic = mechanic_of(card.power)
     played = _stand_in(card)
-    cursed = _apply_mechanic(mechanic, card, played, theirs, element)
+    cursed = _apply_mechanic(
+        mechanic, card, played, mine, theirs, element, stat, contested=round_.stat
+    )
 
     booster = _booster_at_head(mine.queue)
     if booster is not None:
@@ -90,20 +101,82 @@ def _inert(mirror: Card) -> Card:
 
 
 def _apply_mechanic(
-    mechanic: Mechanic, card: Card, played: Card, opponent: "Side", element: str
+    mechanic: Mechanic,
+    card: Card,
+    played: Card,
+    caster: "Side",
+    opponent: "Side",
+    element: str,
+    stat: str | None,
+    contested: str | None = None,
 ) -> bool:
     """Set the stand-in's stats for the card's own rule; return whether it cursed the opponent."""
+    if mechanic in _NEGATIONS:
+        _negate(mechanic, caster, opponent)
+        return False
     if mechanic is Mechanic.BOOST:
-        played.stats = {stat: 0 for stat in card.stats}
+        played.stats = {name: 0 for name in card.stats}
         return False
     if mechanic is Mechanic.MORPH:
-        played.stats = {stat: 1 for stat in card.stats}
+        played.stats = _morphed(card, contested)
         played.element = element
+        return False
+    if mechanic in (Mechanic.HYDROKINESIS, Mechanic.MISFORTUNE):
+        played.stats = _poured(card, mechanic, _named(card, stat))
+        # A Misfortune Wu prints no stats, so `_is_negative` cannot see what it is: the wound only
+        # exists once its caster has named a stat. It curses from here instead.
+        if mechanic is Mechanic.MISFORTUNE:
+            _curse(opponent, deepcopy(played))
+            return True
         return False
     if _is_negative(card):
         _curse(opponent, deepcopy(played))
         return True
     return False
+
+
+# The three Wu that take a line off the board for one battle. Each names the side it lands on and
+# the flag it raises there — the scorer reads the flags, so a Wu played after the negator is negated
+# with the rest. The negators print 0/0/0: the rule is the whole of what they are.
+_NEGATIONS: dict[Mechanic, tuple[bool, str]] = {
+    # mechanic: (does it land on the opponent?, which line it takes)
+    Mechanic.CONTAINMENT: (True, "base_negated"),  # Sphere of Jianyu — the duelist themselves
+    Mechanic.SUBJUGATION: (True, "offence_negated"),  # Emperor Scorpion — every Wu they played
+    Mechanic.REVERSAL: (False, "defence_negated"),  # Reversing Mirror — every curse laid on you
+}
+
+
+def _negate(mechanic: Mechanic, caster: "Side", opponent: "Side") -> None:
+    """Take a line off the board for the rest of this battle."""
+    lands_opposite, line = _NEGATIONS[mechanic]
+    setattr(opponent if lands_opposite else caster, line, True)
+
+
+def _named(card: Card, stat: str | None) -> str:
+    """The stat its caster named. Such a Wu, never asked, would pour into nothing."""
+    if stat is None:
+        raise ValueError(f"{card.name!r} was played without naming a stat — it would do nothing")
+    return stat
+
+
+def _poured(card: Card, mechanic: Mechanic, stat: str) -> dict[str, int | None]:
+    """Everything into the one named stat, nothing anywhere else."""
+    value = NAMED_STAT_VALUE if mechanic is Mechanic.HYDROKINESIS else -NAMED_STAT_VALUE
+    return {name: (value if name == stat else 0) for name in card.stats}
+
+
+def _morphed(card: Card, contested: str | None) -> dict[str, int | None]:
+    """What the Morpher becomes: ``MORPH_ASIDE`` everywhere, but only ``MORPH_CONTESTED`` on the
+    stat the battle is fought over.
+
+    The dip is not a penalty — it is where the Morpher's *own* power pays it back. It is the one Wu
+    that chooses the element it counts as, so it can always match the arena, and the elemental bonus
+    lands on the contested stat alone. Played into a coloured arena it stands the low stat back up.
+    Scoring weighs the contested stat double, so the shape matters more than the sum.
+    """
+    return {
+        name: (MORPH_CONTESTED if name == contested else MORPH_ASIDE) for name in card.stats
+    }
 
 
 def _booster_at_head(own_queue: list[Card]) -> Card | None:

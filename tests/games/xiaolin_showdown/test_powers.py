@@ -9,7 +9,10 @@ from __future__ import annotations
 import pytest
 
 from xiaolin_showdown.logic.battle import Round, Side
+from xiaolin_showdown.logic.constants import FIRST_DECK_CARD
 from xiaolin_showdown.logic.mechanics.powers import (
+    MORPH_ASIDE,
+    MORPH_CONTESTED,
     RULES,
     UNPRINTED,
     Mechanic,
@@ -17,6 +20,7 @@ from xiaolin_showdown.logic.mechanics.powers import (
     is_boost_slot,
     mechanic_of,
     rule_of,
+    trigger_of,
 )
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.models import Power
@@ -39,10 +43,28 @@ def test_an_unprinted_mechanic_really_has_no_card(catalog):
     assert used.isdisjoint(UNPRINTED)
 
 
-def test_an_unknown_pair_raises_rather_than_doing_nothing():
-    invented = Power(99, "Unknown", "play", 7, "")
-    with pytest.raises(KeyError, match="no mechanic"):
-        rule_of(invented)
+def test_a_mechanic_nobody_implemented_raises_rather_than_doing_nothing(monkeypatch):
+    """A named mechanic with no rule behind it is a Wu that quietly does nothing. It must shout.
+
+    A *bad name* can no longer reach this: `Mechanic(row)` rejects it when the DB is loaded. What is
+    left is a mechanic somebody added to the enum and never wrote a rule for — so that is what this
+    simulates, by taking one out of the table.
+    """
+    orphan = Power(99, "Unwritten", Mechanic.SUBJUGATION, "")
+    monkeypatch.delitem(RULES, Mechanic.SUBJUGATION)
+
+    with pytest.raises(KeyError, match="nobody implemented it"):
+        rule_of(orphan)
+
+
+def test_the_db_refuses_a_mechanic_nobody_named():
+    """The failure the whole encoding exists for: a typo is a DB that will not open.
+
+    Under the old `(trigger, effect)` pair a wrong integer was a Wu that silently did nothing for a
+    whole run. A wrong *name* cannot survive being read.
+    """
+    with pytest.raises(ValueError):
+        Mechanic("subjuggation")  # a typo, and it never becomes a card
 
 
 @pytest.mark.parametrize("rule", RULES.values(), ids=lambda rule: rule.mechanic.value)
@@ -55,34 +77,52 @@ def test_each_mechanic_states_its_rule(rule):
 
 SILVER_MANTA_RAY = 1  # boost/0, dragon element
 MOBY_MORPHER = 5  # play/+1
-FIST_OF_TEBIGONG = 6  # play/0, 4/0/0 metal
+FIST_OF_TEBIGONG = 6  # a plain Wu — its stats ARE its power
 WUSHU_BRACELET = 14  # boost/+1
-TWO_TON_TUNIC = 17  # play/0 with -4 force: a negative Wu
+TWO_TON_TUNIC = 17  # a plain Wu with negative force: a curse
 SERPENTS_TAIL = 24  # play/-1, Intangibility
 
 
 def test_a_plain_wu_contributes_its_printed_stats(card):
+    """Whatever it prints — the rule is *printed*, so the card is asked, never assumed."""
     duel = Round()
-    resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
-    assert duel.player.queue[0].stats["force"] == 4
+    fist = card(FIST_OF_TEBIGONG)
+
+    resolve_played_power(duel, fist, is_player=True, element="metal")
+
+    assert duel.player.queue[0].stats["force"] == fist.stats["force"]
 
 
-def test_a_morpher_turns_every_stat_to_one(card):
-    duel = Round()
+def test_a_morpher_is_worth_less_on_the_stat_the_battle_contests(card):
+    duel = Round(stat="agility")
     resolve_played_power(duel, card(MOBY_MORPHER), is_player=True, element="fire")
-    assert list(duel.player.queue[0].stats.values()) == [1, 1, 1]
+
+    stats = duel.player.queue[0].stats
+    assert stats["agility"] == MORPH_CONTESTED
+    assert stats["force"] == stats["intellect"] == MORPH_ASIDE
+
+
+def test_the_morphers_dip_follows_whichever_stat_is_contested(card):
+    """The shape is not printed on the card — it is cut to the battle it is played into."""
+    duel = Round(stat="intellect")
+    resolve_played_power(duel, card(MOBY_MORPHER), is_player=True, element="fire")
+
+    assert duel.player.queue[0].stats["intellect"] == MORPH_CONTESTED
 
 
 def test_a_morpher_takes_the_element_its_caster_chose(card):
-    duel = Round()
+    duel = Round(stat="force")
     resolve_played_power(duel, card(MOBY_MORPHER), is_player=True, element="fire")
     assert duel.player.queue[0].element == "fire"
 
 
 def test_a_negative_wu_mirrors_onto_the_opponent(card):
     duel = Round()
-    resolve_played_power(duel, card(TWO_TON_TUNIC), is_player=True, element="metal")
-    assert duel.bot.queue[0].stats["force"] == -4
+    tunic = card(TWO_TON_TUNIC)
+
+    resolve_played_power(duel, tunic, is_player=True, element="metal")
+
+    assert duel.bot.queue[0].stats["force"] == tunic.stats["force"]  # the wound, entire
 
 
 def test_a_negative_wu_is_spent_on_the_casters_side(card):
@@ -152,7 +192,7 @@ def test_a_deposit_trigger_never_says_deposit(catalog):
     """
     from xiaolin_showdown.screens.format import trigger_label
 
-    labels = {trigger_label(p) for p in catalog.powers if p.trigger == "use"}
+    labels = {trigger_label(p) for p in catalog.powers if trigger_of(p) == "use"}
 
     assert "On Deposit" not in labels
     assert labels <= {"On Use", "? ? ?"}
@@ -162,7 +202,7 @@ def test_a_hand_trigger_says_it_is_passive(catalog):
     """`hand` powers do not fire on anything — they apply for as long as the Wu is held."""
     from xiaolin_showdown.screens.format import trigger_label
 
-    assert {trigger_label(p) for p in catalog.powers if p.trigger == "hand"} == {"While Held"}
+    assert {trigger_label(p) for p in catalog.powers if trigger_of(p) == "hand"} == {"While Held"}
 
 
 # --- what a Wu tells you it does ---------------------------------------------------
@@ -188,12 +228,36 @@ def test_every_mechanic_either_explains_itself_or_is_deliberately_silent(catalog
 
 
 def test_a_hidden_power_still_states_its_rule(catalog):
-    """A dragon keeps its *name* to itself. The rule it plays by is not a secret."""
+    """A character's dragon keeps its *name* to itself. The rule it plays by is not a secret."""
     from xiaolin_showdown.screens.format import effect_line
 
-    dragons = [c for c in catalog.cards if mechanic_of(c.power) is Mechanic.DRAGON]
+    born_holding = [
+        c
+        for c in catalog.cards
+        if mechanic_of(c.power) is Mechanic.DRAGON and c.power.id < 0
+    ]
 
-    assert dragons
-    for card in dragons:
+    assert born_holding
+    for card in born_holding:
         assert -5 < card.power.id < 0, "no longer hidden — this test is guarding nothing"
+        assert effect_line(card.power)
+
+
+def test_a_wudai_weapon_can_be_found_rather_than_inherited(catalog):
+    """Not every dragon is born in a hand. One waits in the pile to be won.
+
+    The negative power id marks the Wu a character was born holding; a wudai weapon printed into the
+    draw pile is the same mechanic with none of the birthright — it can be staked, won and lost.
+    """
+    from xiaolin_showdown.screens.format import effect_line
+
+    found = [
+        c
+        for c in catalog.cards
+        if mechanic_of(c.power) is Mechanic.DRAGON and c.id >= FIRST_DECK_CARD
+    ]
+
+    assert found, "the pile holds no wudai weapon"
+    for card in found:
+        assert card.power.id > 0, "a found dragon is not a birthright"
         assert effect_line(card.power)

@@ -10,7 +10,14 @@ from collections.abc import Mapping, Sequence
 
 from rich.text import Text
 
-from ..logic.mechanics.powers import Mechanic, is_gamble, mechanic_of
+from ..logic.mechanics.powers import (
+    NAMED_STAT_VALUE,
+    SCOPE_DEPTH,
+    Mechanic,
+    is_gamble,
+    mechanic_of,
+    trigger_of,
+)
 from ..logic.models import Card, Character, Power
 
 # element -> colour, as explicit hex so the theme's ANSI palette can't remap it (the OG mapping:
@@ -70,6 +77,16 @@ def stats_text(values: Sequence[str], challenge: str | None = None) -> Text:
 
 def card_stats_text(stats: Mapping[str, int | None], challenge: str | None = None) -> Text:
     return stats_text([stat_str(stats[key]) for key in STAT_ORDER], challenge)
+
+
+# A negated line — a Sphere, a Scorpion, a Mirror. Not zero: *absent*. `?` is a stat not yet
+# resolved and `0` is a stat that resolved to nothing, and this is neither.
+ABSENT = "-"
+
+
+def absent_stats_text(challenge: str | None = None) -> Text:
+    """A line that has been negated for this battle: no stats, and no element to resonate with."""
+    return stats_text([ABSENT] * len(STAT_ORDER), challenge)
 
 
 def char_stats(character: Character) -> str:
@@ -169,6 +186,17 @@ EFFECTS = {
     Mechanic.BOOST: "Enhances the played Wu by 1 per stat it holds.",
     Mechanic.MORPH: "You choose its Element.",
     Mechanic.INTANGIBLE: "No Elemental bonus for either duelist all Showdown.",
+    Mechanic.DIASKOPIA: "Read your opponent's personal Deck.",
+    Mechanic.TELESKOPIA: f"Look at the next {SCOPE_DEPTH} Wu in the incoming Wu pile.",
+    Mechanic.TELEPATHEIA: "Take or refuse the next Showdown's Initiative.",
+    Mechanic.HYDROKINESIS: f"You name one stat. It takes +{NAMED_STAT_VALUE} in the battle.",
+    Mechanic.MISFORTUNE: f"You name one stat. Your opponent takes −{NAMED_STAT_VALUE} in the battle.",
+    Mechanic.ATTRACTION: "Pull any one Wu from your own Deck into your hand.",
+    Mechanic.REPULSION: "Shove a Wu out of their hand. They bank it, and keep the points.",
+    Mechanic.ANABIOSIS: "Bring the oldest lost Wu back — into your hand.",
+    Mechanic.CONTAINMENT: "In battle: their own stats count nothing.",
+    Mechanic.REVERSAL: "In battle: the curses laid on you count nothing.",
+    Mechanic.SUBJUGATION: "In battle: every Wu they played counts nothing.",
 }
 
 
@@ -189,7 +217,8 @@ def trigger_label(power: Power) -> str:
     """When a power fires, e.g. ``On Play`` — or ``? ? ?`` for the gamble Wu, which says nothing."""
     if is_gamble(power):
         return "? ? ?"
-    return _TRIGGERS.get(power.trigger, f"On {power.trigger.capitalize()}")
+    trigger = trigger_of(power)
+    return _TRIGGERS.get(trigger, f"On {trigger.capitalize()}")
 
 
 def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list[Text]:

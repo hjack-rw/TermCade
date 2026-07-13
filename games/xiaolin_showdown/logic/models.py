@@ -7,14 +7,60 @@ Plain data only. Display formatting belongs to screens; decoding a DB row belong
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
+
+
+class Mechanic(StrEnum):
+    """The rule a Wu's power buys — the whole vocabulary of what a power can *be*.
+
+    The card DB names one of these and nothing else. What each one does, when it fires, and what it
+    says to a player all live in :mod:`.mechanics.powers`; this is only the list of the words.
+
+    It lives here, with the nouns, because :class:`Power` *is* one — and because a mechanic no card
+    can name is a rule nobody can reach. The names are the powers' printed names (``CHRONOKINESIS``,
+    ``INTANGIBLE``, ...), so a reader can grep one straight back to the card that carries it.
+    """
+
+    FILLER = "filler"
+    INITIATIVE = "initiative"
+    HAND_SIZE = "hand_size"
+    HAND_FIZZLE = "hand_fizzle"
+    GAMBLE = "gamble"
+    CHRONOKINESIS = "chronokinesis"
+    ANABIOSIS = "anabiosis"
+    DRAGON = "dragon"
+    BOOST = "boost"
+    PRINTED_STATS = "printed_stats"
+    MORPH = "morph"
+    INTANGIBLE = "intangible"
+    DIASKOPIA = "diaskopia"
+    TELESKOPIA = "teleskopia"
+    TELEPATHEIA = "telepatheia"
+    HYDROKINESIS = "hydrokinesis"
+    MISFORTUNE = "misfortune"
+    ATTRACTION = "attraction"
+    REPULSION = "repulsion"
+    CONTAINMENT = "containment"
+    REVERSAL = "reversal"
+    SUBJUGATION = "subjugation"
 
 
 @dataclass
 class Power:
+    """What a Wu does, named — never encoded.
+
+    The DB stores the *mechanic*, so a row says ``subjugation`` and means it. It used to store a
+    ``(trigger, effect)`` pair of integers: nothing but a lookup table said what ``use``/+5 meant, two
+    cards could silently claim the same pair, and a typo became a Wu that quietly did nothing rather
+    than a load that failed. Now an unknown name cannot survive :func:`~.catalog.load_catalog`.
+
+    ``trigger`` is not stored either — *when* a power fires follows from *what it is*, and
+    :data:`~.mechanics.powers.RULES` is the one place that says so.
+    """
+
     id: int
     name: str
-    trigger: str  # "hand" | "use" | "boost" | "play"
-    effect: int  # -1 | 0 | 1 | ...
+    mechanic: Mechanic
     description: str
     initiative_bonus: int = 0
 

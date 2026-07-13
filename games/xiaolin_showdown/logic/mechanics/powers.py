@@ -18,23 +18,7 @@ from enum import StrEnum
 
 from termcade.core.rng import Rng
 
-from ..models import Power
-
-
-class Mechanic(StrEnum):
-    """The rule a ``(trigger, effect)`` pair buys."""
-
-    FILLER = "filler"
-    INITIATIVE = "initiative"
-    HAND_SIZE = "hand_size"
-    HAND_FIZZLE = "hand_fizzle"
-    GAMBLE = "gamble"
-    CHRONOKINESIS = "chronokinesis"
-    DRAGON = "dragon"
-    BOOST = "boost"
-    PRINTED_STATS = "printed_stats"
-    MORPH = "morph"
-    INTANGIBLE = "intangible"
+from ..models import Mechanic, Power
 
 
 class Timing(StrEnum):
@@ -48,7 +32,15 @@ class Timing(StrEnum):
 
 @dataclass(frozen=True)
 class Rule:
+    """What a mechanic is: when it fires, when it *acts*, and what it says to a player.
+
+    ``trigger`` is the slot the duel machinery reads — a Wu is offered at the vault (``use``), sits
+    in the hand (``hand``), goes down in the boost slot (``boost``) or is fielded (``play``). It used
+    to be a DB column; it is a property of the mechanic, and this is the one place that says so.
+    """
+
     mechanic: Mechanic
+    trigger: str  # "none" | "hand" | "use" | "boost" | "play"
     timing: Timing
     text: str
 
@@ -68,52 +60,163 @@ class Rule:
 # the promise false. If you are about to give another Wu a random anything: don't.
 GAMBLE_SPREAD = (-2, 5)
 
+# What the Orb and the Curse pour into the one stat their caster names. Both print `? ? ?` — the mark
+# of a Wu whose stats are resolved when it is played — so the magnitude lives here, not in the row.
+#
+# Worth 3 because a battle scores every stat, not just the contested one: the contested stat is
+# worth 2 points and the other two 1 each (`battle.score_battle`). So pouring it into the challenge
+# is the obvious line, and pouring it into the two side stats to steal 1+1 instead is the one that
+# has to be *chosen*. Move this number and that choice moves with it.
+NAMED_STAT_VALUE = 3
 
-# Keyed by (trigger, effect) — the order the DB and `Power` use, so a reader never has to flip it.
-RULES: dict[tuple[str, int], Rule] = {
-    ("none", 0): Rule(Mechanic.FILLER, Timing.NEVER, "Deck filler. Does nothing."),
-    ("hand", 0): Rule(
+# How deep into the draw pile Teleskopia sees. Three, not one: a single card tells you what you are
+# about to draw, three lets you plan a turn around it — which is the whole reason to spend a Wu on
+# looking instead of banking it.
+SCOPE_DEPTH = 3
+
+# What the Morpher becomes when it is played. It prints `? ? ?` and takes these instead: the full
+# value on the two stats the battle is *not* fought over, and less on the one it is.
+#
+# The dip is the price of the rest of the card, and the Morpher is the one Wu that can pay it: it
+# chooses the element it counts as, so it always matches the arena, and the elemental bonus lands on
+# the contested stat *alone* — which stands the low stat straight back up. The cost is real anyway,
+# because the contested stat scores double (`battle.score_battle`) and metal arenas grant nothing.
+MORPH_ASIDE = 2
+MORPH_CONTESTED = 1
+
+
+# Keyed by the mechanic itself — which is what the card DB stores. Nothing here is an integer, so
+# nothing here can be a Wu that quietly does nothing because somebody picked a number twice.
+RULES: dict[Mechanic, Rule] = {
+    Mechanic.FILLER: Rule(Mechanic.FILLER, "none", Timing.NEVER, "Deck filler. Does nothing."),
+    Mechanic.INITIATIVE: Rule(
         Mechanic.INITIATIVE,
+        "hand",
         Timing.IN_HAND,
         "Adds its initiative bonus while held. Equal bonuses don't stack; different ones do, "
         "and your opponent's negatives land on you.",
     ),
-    ("hand", -1): Rule(
-        Mechanic.HAND_SIZE, Timing.IN_HAND, "Raises your hand limit by one while held."
+    Mechanic.HAND_SIZE: Rule(
+        Mechanic.HAND_SIZE, "hand", Timing.IN_HAND, "Raises your hand limit by one while held."
     ),
-    ("hand", 1): Rule(
+    Mechanic.HAND_FIZZLE: Rule(
         Mechanic.HAND_FIZZLE,
+        "hand",
         Timing.AT_VAULT,
         "Can be spent from the vault, but its power fizzles — it is discarded for no points.",
     ),
-    ("use", 0): Rule(
+    Mechanic.GAMBLE: Rule(
         Mechanic.GAMBLE,
+        "use",
         Timing.AT_VAULT,
         f"Nobody knows what it is worth. Deposit it and find out: anywhere from "
         f"{GAMBLE_SPREAD[0]:+d} to {GAMBLE_SPREAD[1]:+d} points.",
     ),
-    ("use", 1): Rule(
+    Mechanic.CHRONOKINESIS: Rule(
         Mechanic.CHRONOKINESIS,
+        "use",
         Timing.AT_VAULT,
         "Spend it to draw a Wu from the pile. Depositing it forfeits that.",
     ),
-    ("boost", 0): Rule(
-        Mechanic.DRAGON,
-        Timing.IN_DUEL,
-        "Your dragon's element. Lends its stats every showdown and can never be staked or lost.",
+    Mechanic.DIASKOPIA: Rule(
+        Mechanic.DIASKOPIA,
+        "use",
+        Timing.AT_VAULT,
+        "Spend it to read your opponent's personal deck. Only offered while they hold one.",
     ),
-    ("boost", 1): Rule(
+    Mechanic.TELESKOPIA: Rule(
+        Mechanic.TELESKOPIA,
+        "use",
+        Timing.AT_VAULT,
+        f"Spend it to look at the next {SCOPE_DEPTH} Wu in the draw pile, in the order they will "
+        f"come.",
+    ),
+    Mechanic.TELEPATHEIA: Rule(
+        Mechanic.TELEPATHEIA,
+        "use",
+        Timing.AT_VAULT,
+        "Spend it to see the next Wu in the pile, then take or refuse initiative in the next "
+        "showdown — whatever the two hands add up to.",
+    ),
+    Mechanic.ATTRACTION: Rule(
+        Mechanic.ATTRACTION,
+        "use",
+        Timing.AT_VAULT,
+        "Spend it to pull any one Wu out of your own deck and into your hand.",
+    ),
+    Mechanic.REPULSION: Rule(
+        Mechanic.REPULSION,
+        "use",
+        Timing.AT_VAULT,
+        "Spend it to shove one Wu out of your opponent's hand. They bank it, and keep the points.",
+    ),
+    Mechanic.ANABIOSIS: Rule(
+        Mechanic.ANABIOSIS,
+        "use",
+        Timing.AT_VAULT,
+        "Spend it at the vault to bring the oldest lost Wu back — into your hand, not the pile.",
+    ),
+    Mechanic.DRAGON: Rule(
+        Mechanic.DRAGON,
+        "boost",
+        Timing.IN_DUEL,
+        "A wudai weapon: it lends its stats every showdown from the boost slot, and is never "
+        "fielded as a Wu. The one your character was born holding can never be staked or lost — "
+        "one found in the pile can be both.",
+    ),
+    Mechanic.BOOST: Rule(
         Mechanic.BOOST,
+        "boost",
         Timing.IN_DUEL,
         "Lends no stats of its own; amplifies the card you play after it by 1 per stat that card "
         "contributes.",
     ),
-    ("play", 0): Rule(Mechanic.PRINTED_STATS, Timing.IN_DUEL, "Contributes its printed stats."),
-    ("play", 1): Rule(
-        Mechanic.MORPH, Timing.IN_DUEL, "Every stat becomes 1, and you choose the element it counts as."
+    Mechanic.PRINTED_STATS: Rule(Mechanic.PRINTED_STATS, "play", Timing.IN_DUEL, "Contributes its printed stats."),
+    Mechanic.MORPH: Rule(
+        Mechanic.MORPH,
+        "play",
+        Timing.IN_DUEL,
+        f"Becomes {MORPH_ASIDE} in the two stats the battle is not fought over and "
+        f"{MORPH_CONTESTED} in the one it is — and you choose the element it counts as.",
     ),
-    ("play", -1): Rule(
+    Mechanic.HYDROKINESIS: Rule(
+        Mechanic.HYDROKINESIS,
+        "play",
+        Timing.IN_DUEL,
+        f"Prints no stats. Name one when you play it, and it pours +{NAMED_STAT_VALUE} into that stat "
+        f"alone.",
+    ),
+    Mechanic.MISFORTUNE: Rule(
+        Mechanic.MISFORTUNE,
+        "play",
+        Timing.IN_DUEL,
+        f"Prints no stats. Name one when you play it, and your opponent suffers −{NAMED_STAT_VALUE} in "
+        f"that stat.",
+    ),
+    Mechanic.CONTAINMENT: Rule(
+        Mechanic.CONTAINMENT,
+        "play",
+        Timing.IN_DUEL,
+        "Traps your opponent for this battle: their own stats count for nothing, and only the Wu "
+        "they played answer for them.",
+    ),
+    Mechanic.REVERSAL: Rule(
+        Mechanic.REVERSAL,
+        "play",
+        Timing.IN_DUEL,
+        "Turns every curse laid on you aside for this battle. Your Defensive line counts for "
+        "nothing.",
+    ),
+    Mechanic.SUBJUGATION: Rule(
+        Mechanic.SUBJUGATION,
+        "play",
+        Timing.IN_DUEL,
+        "Disarms your opponent for this battle: every Wu they played counts for nothing, and only "
+        "they themselves answer for it.",
+    ),
+    Mechanic.INTANGIBLE: Rule(
         Mechanic.INTANGIBLE,
+        "play",
         Timing.IN_DUEL,
         "Voids the elemental bonus for the rest of the showdown — for both duelists, whoever "
         "played it.",
@@ -121,25 +224,34 @@ RULES: dict[tuple[str, int], Rule] = {
 }
 
 
-# Mechanics no printed card triggers. `actions.usable_powers` has a branch waiting for HAND_FIZZLE
-# (`hand`/+1), and nothing in the card DB satisfies it — the branch is unreachable today. Listed here
+# Mechanics no printed card names. `actions.usable_powers` has a branch waiting for HAND_FIZZLE,
+# and nothing in the card DB satisfies it — the branch is unreachable today. Listed here
 # so the "every mechanic is reachable" test stays a guard rather than a permanent failure.
 UNPRINTED: frozenset[Mechanic] = frozenset({Mechanic.HAND_FIZZLE})
 
 
 def rule_of(power: Power) -> Rule:
-    """The rule a power buys. Raises on a pair nobody implemented, rather than doing nothing."""
+    """The rule a power buys. Raises on a mechanic nobody implemented, rather than doing nothing.
+
+    A card's mechanic is validated when the DB is *loaded* (``Mechanic(row)`` rejects an unknown
+    name), so reaching this is not a bad card — it is a mechanic somebody named and never wrote.
+    """
     try:
-        return RULES[power.trigger, power.effect]
+        return RULES[power.mechanic]
     except KeyError:
         raise KeyError(
-            f"power {power.name!r} has no mechanic for (trigger={power.trigger!r}, "
-            f"effect={power.effect}) — it would silently do nothing"
+            f"power {power.name!r} names the mechanic {power.mechanic!r}, and nobody implemented it "
+            f"— it would silently do nothing"
         ) from None
 
 
 def mechanic_of(power: Power) -> Mechanic:
-    return rule_of(power).mechanic
+    return power.mechanic
+
+
+def trigger_of(power: Power) -> str:
+    """When a power fires — a property of *what it is*, no longer a column in the DB."""
+    return rule_of(power).trigger
 
 
 def is_gamble(power: Power) -> bool:
@@ -153,10 +265,19 @@ def roll_gamble(rng: Rng) -> int:
     return rng.randint(low, high)
 
 
+def names_a_stat(power: Power) -> bool:
+    """Does this Wu ask its caster which stat to pour itself into?
+
+    Both do — the Orb pours a gain, the Curse pours a wound. What they aim at is the same question,
+    asked of whoever plays them, so the duel asks it in one place.
+    """
+    return mechanic_of(power) in (Mechanic.HYDROKINESIS, Mechanic.MISFORTUNE)
+
+
 def is_boost_slot(power: Power) -> bool:
     """Can this Wu be played *in addition* to the card, at the power stage?
 
-    Both boost Wu can: the dragon (``boost``/0) lends a flat 1/1/1, the amplifier (``boost``/+1)
-    lends 1 per stat the card moves. What they lend differs; the slot they occupy does not.
+    Both boost Wu can: the dragon lends a flat 1/1/1, the amplifier lends 1 per stat the card moves.
+    What they lend differs; the slot they occupy does not.
     """
-    return power.trigger == "boost"
+    return trigger_of(power) == "boost"
