@@ -5,6 +5,9 @@ file; the engine never sees it. ``sqlite3`` is stdlib, so the logic layer stays 
 
 Everything that knows what a row looks like lives here: column order, the ``power_id`` indirection,
 and the ``~`` suffix that encodes an initiative bonus. :mod:`models` stays plain data.
+
+The DB is a build artifact. ``xs_game.sql`` is the source a card is written into, and
+:func:`build_db` turns it into the file the game reads — see ``build_cards.py``.
 """
 
 from __future__ import annotations
@@ -15,10 +18,12 @@ from functools import cached_property
 from pathlib import Path
 from typing import Callable
 
-from .models import Background, Card, Character, Power
+from .models import Background, Card, Character, Mechanic, Power
 
-# Bundled alongside the package: games/xiaolin_showdown/data/xs_game.db
-DEFAULT_DB = Path(__file__).resolve().parents[1] / "data" / "xs_game.db"
+# Bundled alongside the package: games/xiaolin_showdown/data/
+DATA = Path(__file__).resolve().parents[1] / "data"
+DEFAULT_DB = DATA / "xs_game.db"
+DEFAULT_SQL = DATA / "xs_game.sql"
 
 # A card/character row's 6th column is a *power id*; resolution is a lookup.
 ResolvePower = Callable[[int], Power]
@@ -79,16 +84,39 @@ def load_catalog(db_path: Path | str = DEFAULT_DB) -> Catalog:
     return Catalog(powers=powers, cards=cards, characters=characters, backgrounds=backgrounds)
 
 
+def build_db(sql_path: Path | str = DEFAULT_SQL, db_path: Path | str = DEFAULT_DB) -> Path:
+    """Rebuild the card DB from the seed. The seed is written by hand; this file never is.
+
+    Built from empty rather than migrated: the catalog is reference data with no history to keep,
+    so the seed is the whole truth and a rebuild can't inherit a row somebody edited in the blob.
+    """
+    db_path = Path(db_path)
+    db_path.unlink(missing_ok=True)
+    con = sqlite3.connect(str(db_path))
+    try:
+        con.executescript(Path(sql_path).read_text(encoding="utf-8"))
+        con.commit()
+    finally:
+        con.close()
+    return db_path
+
+
 def _background(row: tuple) -> Background:
     bg_id, name, element, sec_element = row
     return Background(bg_id, name, element, sec_element or None)
 
 
 def _power(row: tuple) -> Power:
-    pid, name, trigger, effect, description = row
-    # an initiative bonus is encoded after a "~", and only on passive hand powers
-    bonus = int(description.split("~")[1]) if (trigger == "hand" and effect == 0) else 0
-    return Power(pid, name, trigger, effect, description.split("~")[0], bonus)
+    """A power row, decoded. The mechanic is validated *here*, at load.
+
+    ``Mechanic(name)`` raises on a name nobody implemented, so a typo in the seed is a DB that
+    refuses to open rather than a Wu that quietly does nothing for a whole run. That failure mode is
+    the entire reason the DB names its mechanic instead of encoding it as a pair of integers.
+
+    ``initiative_bonus`` is a column now — it used to be smuggled into the description after a ``~``.
+    """
+    pid, name, mechanic, description, initiative_bonus = row
+    return Power(pid, name, Mechanic(mechanic), description, initiative_bonus or 0)
 
 
 def _card(row: tuple, resolve_power: ResolvePower) -> Card:
