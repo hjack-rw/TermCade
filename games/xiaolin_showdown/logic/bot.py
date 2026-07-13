@@ -21,14 +21,10 @@ from termcade.core.rng import Rng
 
 from .battle import Ground, Round, score_battle
 from .constants import OPPOSITES, TOURNAMENT
+from .mechanics.powers import names_a_stat
 from .mechanics.resolve import resolve_played_power
 from .models import Card
 from .turn import duel_value
-
-# How far ahead the next Wu must be before the opponent will drag it into the field. A rung won by a
-# hair is a coin flip that stakes another Wu on the result. Raise it and the opponent fights narrow;
-# drop it to zero and it demands the widest field it is entitled to, every time.
-WAGER_MARGIN = 1
 
 
 def choose_challenge(
@@ -169,15 +165,46 @@ def choose_boost(
     return best
 
 
-def _after(battle: Round, ground: Ground, card: Card, *, is_player: bool) -> tuple[int, int]:
+def choose_stat(battle: Round, ground: Ground, card: Card, *, is_player: bool = False) -> str:
+    """Which stat the Orb or the Curse pours itself into.
+
+    Played out rather than guessed at: every stat is fielded in a trial battle and the one that
+    leaves the board best is taken. Usually that is the contested stat — it scores double — but not
+    always, and the bot finds the exception for the same reason a player would.
+    """
+    return min(
+        _stat_options(ground, card),
+        key=lambda stat: _after(battle, ground, card, is_player=is_player, stat=stat),
+    )
+
+
+def _stat_options(ground: Ground, card: Card) -> list[str]:
+    """The stats a Wu may be poured into — the ground's, or the card's own before one is set."""
+    return list(ground.stats) or list(card.stats)
+
+
+def _after(
+    battle: Round, ground: Ground, card: Card, *, is_player: bool, stat: str | None = None
+) -> tuple[int, int]:
     """How the battle stands once ``card`` is fielded. Lower is better *for the duelist fielding it*.
 
     ``(score, -blow)``: the score first, because winning the battle is what wins the showdown, and
     the size of the blow only to separate fields that win by the same margin. A battle's score is
     signed from the player's side, so the player maximises it and the bot minimises it.
+
+    A Wu that names a stat is worth what its *best* stat is worth — so weighing whether to play it at
+    all (``choose_card``) asks this without a stat, and gets the best line it could take.
     """
+    if stat is None and names_a_stat(card.power):
+        return min(
+            _after(battle, ground, card, is_player=is_player, stat=option)
+            for option in _stat_options(ground, card)
+        )
+
     trial = deepcopy(battle)
-    voided = resolve_played_power(trial, card, is_player=is_player, element=ground.background)
+    voided = resolve_played_power(
+        trial, card, is_player=is_player, element=ground.background, stat=stat
+    )
     terms = replace(ground, bonus_cancelled=ground.bonus_cancelled or voided)
     score_battle(trial, terms)
     sign = -1 if is_player else 1
@@ -225,32 +252,42 @@ def _most_common_element(hand: Sequence[Card]) -> str:
 def choose_wager(options: Sequence[int], own_hand: Sequence[Card], opponent_hand: Sequence[Card]) -> int:
     """How wide to make the battle — the answer to a stat challenge you did not call.
 
-    Both hands are face up, so this is a read, not a gamble. Every wagered Wu lands at once and they
-    are all summed, so widening the field drags in a duelist's *second* and *third* best Wu. A hand
-    that is one monster and two trinkets wants the narrowest battle it can get; a deep bench wants
-    the widest. Compared rung by rung, best against best, since every rung ends up on the table.
+    **The width is the size of the bet.** Every wagered Wu lands at once and they are summed, and the
+    loser forfeits every Wu they fielded *to the winner* (`duel._award`). So a field of three is not a
+    bigger version of a field of one: it is the same bet at triple stakes. Win it and you take three of
+    their Wu; lose it and they take three of yours.
+
+    That is what the old rule missed. It widened only while the *next* Wu beat theirs rung by rung —
+    which asks "am I ahead?" and never "is the extra Wu worth staking?". Both hands are drawn from the
+    same pool, so beating them on a given rung is a coin flip that a tie breaks, and the field could
+    only ever widen as a *reward for already leading*. A wide field was never a decision.
+
+    Priced properly it is one. For each width, read the margin the whole field would carry, turn it into
+    a rough chance of winning, and take the width whose **expected swing in Wu** is best:
+
+        swing(w) = w x (2 x P(win at w) - 1)
+
+    A deep bench widens, because its second and third Wu carry their weight. One monster and two
+    trinkets narrows, because the trinkets drag the average down and stake two more Wu on a worse fight.
+    And a duelist who is simply behind on the field takes the *narrowest* bet it can, which is exactly
+    what a person does when they are losing.
     """
     if not options:
         return 1
     mine = sorted((duel_value(card) for card in own_hand), reverse=True)
     theirs = sorted((duel_value(card) for card in opponent_hand), reverse=True)
 
-    def rung(depth: int) -> int:
-        """The Wu you would add at this depth, against the Wu they would add against it."""
-        return (mine[depth] if depth < len(mine) else 0) - (
-            theirs[depth] if depth < len(theirs) else 0
-        )
+    def margin(width: int) -> int:
+        """What the whole field would carry at this width, theirs subtracted from mine."""
+        return sum(mine[:width]) - sum(theirs[:width])
 
-    # Widen only while the *next* Wu clearly beats theirs. Judging the field by its total lead is
-    # what makes an opponent demand 3vs3 every game: once a duelist is ahead on every rung the total
-    # only grows with width, so the widest field always wins and the choice stops being a choice.
+    # Take the WIDEST field you are still ahead in; if you are behind in all of them, take the
+    # narrowest bet on offer.
     #
-    # The margin is what keeps it honest. A rung won by a hair is a coin flip that stakes another Wu
-    # on the outcome, and the loser forfeits every Wu they fielded — so the extra Wu has to earn its
-    # place, not merely avoid losing it.
-    width = min(options)
-    for wager in sorted(options)[1:]:
-        if rung(wager - 1) <= WAGER_MARGIN:
-            break
-        width = wager
-    return width
+    # That is the expected-swing rule written out. The swing is `w x (2P - 1)`, and any sane reading of
+    # a margin into a chance is monotone — so the best width turns on the *sign* of the margin, never on
+    # the scale you map it through. (This was written with a `WAGER_SPREAD` constant first. Swept from 2
+    # to 40 it changed not one decision in a full run, because it could not: it divided every width by
+    # the same number. A knob that cannot move anything is worse than no knob, so it is gone.)
+    ahead = [width for width in options if margin(width) > 0]
+    return max(ahead) if ahead else min(options)
