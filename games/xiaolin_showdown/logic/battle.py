@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
-from .mechanics.cards import excluding
+from .mechanics.cards import excluding, is_one_of
 from .mechanics.scoring import contributing, count_end_stats
 from .models import Card
 
@@ -28,6 +28,18 @@ class Side:
     spent: list[Card] = field(default_factory=list)  # own copies emptied onto a curse, shown opposite
     result: list[int] = field(default_factory=list)  # per-stat end values
 
+    # What has been negated on this side, for this battle only. A negated line is *absent*, not
+    # zeroed: its cards lend no stats and read no element, so they earn no background bonus either.
+    #   base     — a Sphere of Jianyu: this duelist's character counts for nothing
+    #   offence  — an Emperor Scorpion: every Wu this duelist played counts for nothing
+    #   defence  — a Reversing Mirror: every curse landed here counts for nothing
+    # They are read at scoring time rather than applied when played, so a Wu fielded *after* the
+    # negator is negated too — a three-Wu wager is laid down one at a time, and the order a duelist
+    # happened to choose must not decide what survives.
+    base_negated: bool = False
+    offence_negated: bool = False
+    defence_negated: bool = False
+
     def mine(self) -> list[Card]:
         """Every Wu *this* duelist put on the table — what the board owes them a line for.
 
@@ -45,7 +57,28 @@ class Side:
         A curse mirror in the queue is the opponent's Wu. It reads the background too, but against
         this side — see ``suffers_bonus`` in :func:`~.mechanics.scoring.count_end_stats`.
         """
+        if self.offence_negated:
+            return []
         return contributing(excluding(self.queue, self.suffered))
+
+    def curses(self) -> list[Card]:
+        """The curses still biting this duelist — none, once a Reversing Mirror has turned them."""
+        if self.defence_negated:
+            return []
+        return contributing(self.suffered)
+
+    def counted(self) -> list[Card]:
+        """Every card whose stats still reach the score, after whatever was negated here.
+
+        The queue holds both lines at once: the Wu this duelist played, and the mirrors landed on
+        them. A negation removes one of the two, so what is left is what scores.
+        """
+        cards = self.queue
+        if self.offence_negated:
+            cards = [card for card in cards if is_one_of(card, self.suffered)]
+        if self.defence_negated:
+            cards = excluding(cards, self.suffered)
+        return cards
 
 
 @dataclass
@@ -120,13 +153,18 @@ def end_stat(
     character: Mapping[str, int],
     background: str,
 ) -> int:
-    """One duelist's final value for one stat: their own, their Wu, and what was done to them."""
+    """One duelist's final value for one stat: their own, their Wu, and what was done to them.
+
+    Each of those three can be negated out from under them for the battle — see ``Side``. A trapped
+    duelist brings no character; a disarmed one brings no Wu; a warded one carries no curse.
+    """
+    base = {name: 0 for name in character} if side.base_negated else character
     return count_end_stats(
         stat,
         elemental_bonus,
-        side.queue,
-        character,
+        side.counted(),
+        base,
         background,
         earns_bonus=side.contributors(),
-        suffers_bonus=contributing(side.suffered),
+        suffers_bonus=side.curses(),
     )

@@ -29,7 +29,10 @@ def _choices() -> DuelChoices:
     async def element(background):
         return background
 
-    return DuelChoices(first, first, wager, no_boost, first, element)
+    async def stat(options):
+        return options[0]
+
+    return DuelChoices(first, first, wager, no_boost, first, element, stat)
 
 
 async def _setup(catalog, seed: int) -> DuelState:

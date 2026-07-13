@@ -28,7 +28,7 @@ LONGI_SASH = 3  # fire
 FIST_OF_TEBIGONG = 6  # metal, play/0 — 4/0/0
 WUSHU_BRACELET = 14  # boost/+1 — the booster
 JU_JU_FLYTRAP = 22  # a negative Wu: 0/0/-2
-SILK_SPITTER = 23  # a negative Wu: 0/-1/-1, water
+SILK_SPITTER = 23  # a negative Wu — a curse, and water
 TWO_TON_TUNIC = 17  # a negative Wu: -4/0/0, metal
 
 
@@ -236,19 +236,32 @@ def test_a_resonant_wu_shows_the_value_the_background_lifts_it_to(state, card):
 
 
 def test_an_opposed_wu_shows_the_value_the_background_drags_it_to(state, card):
-    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(stat="force", player=Side(queue=[card(FIST_OF_TEBIGONG)]))])
+    """Metal on water is opposed: it scores one less than it prints, and the board says so.
 
-    assert "Fist of Tebigong (4⌞₃/0/0)" in _line(_board_text(duel, state), "Offensive:")
+    The numbers are read off the card, not restated — this test is about the *rendering* of a shift,
+    and it must keep holding when the Fist is rebalanced.
+    """
+    fist = card(FIST_OF_TEBIGONG)
+    printed = fist.stats["force"]
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(stat="force", player=Side(queue=[fist]))])
+
+    shown = f"Fist of Tebigong ({printed}⌞{_subscript(printed - 1)}/0/0)"
+    assert shown in _line(_board_text(duel, state), "Offensive:")
 
 
 def test_the_struck_value_is_the_printed_one(state, card):
     """Guards the two above: strike what the card prints, subscript what it is worth."""
-    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(stat="force", player=Side(queue=[card(FIST_OF_TEBIGONG)]))])
+    fist = card(FIST_OF_TEBIGONG)
+    printed = fist.stats["force"]
+    effective = _subscript(printed - 1)  # metal, dragged down by a water arena
+    duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(stat="force", player=Side(queue=[fist]))])
     board = _board_text(duel, state)
 
-    assert "4⌞₃" in _line(board, "Offensive:")  # printed 4 struck, effective 3 beneath it
-    assert any("strike" in style for style in _styles_over(board, "4"))
-    assert not any("strike" in style for style in _styles_over(board, "⌞₃"))
+    assert f"{printed}⌞{effective}" in _line(board, "Offensive:")
+    # Anchored to the shift itself. A bare "5" matches the first 5 anywhere on the board — a base
+    # stat, a point total — and the styles come back from whatever that was.
+    assert any("strike" in style for style in _styles_over(board, f"{printed}⌞"))
+    assert not any("strike" in style for style in _styles_over(board, f"⌞{effective}"))
 
 
 def test_the_shift_lands_on_whichever_stat_is_contested(state, card):
@@ -336,6 +349,12 @@ def _effective_values(text: Text) -> str:
 
 
 _FROM_SUBSCRIPT = str.maketrans("₀₁₂₃₄₅₆₇₈₉₋", "0123456789-")
+_TO_SUBSCRIPT = str.maketrans("0123456789-", "₀₁₂₃₄₅₆₇₈₉₋")
+
+
+def _subscript(value: int) -> str:
+    """The value that *counts*, as the board draws it — beneath the struck printed one."""
+    return str(value).translate(_TO_SUBSCRIPT)
 
 
 def _contested_column(line: str) -> list[str]:
@@ -348,7 +367,10 @@ def test_a_curse_resonating_with_the_background_bites_deeper(state, card):
     duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(stat="force")])
     resolve_played_power(duel.round, card(SILK_SPITTER), is_player=False, element="water")
 
-    assert "Silk Spitter (0⌞₋₁/-1/-1)" in _line(_board_text(duel, state), "Defensive:", side="P1")
+    spitter = card(SILK_SPITTER)
+    force, agility, intellect = spitter.stats.values()
+    shown = f"Silk Spitter ({force}⌞{_subscript(force - 1)}/{agility}/{intellect})"
+    assert shown in _line(_board_text(duel, state), "Defensive:", side="P1")
 
 
 def test_a_curse_the_background_turns_against_lands_softer(state, card):
@@ -356,14 +378,20 @@ def test_a_curse_the_background_turns_against_lands_softer(state, card):
     duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(stat="force")])
     resolve_played_power(duel.round, card(TWO_TON_TUNIC), is_player=False, element="water")
 
-    assert "Two-Ton Tunic (-4⌞₋₃/0/0)" in _line(_board_text(duel, state), "Defensive:", side="P1")
+    tunic_force = card(TWO_TON_TUNIC).stats["force"]  # negative: it is a wound
+    softened = _subscript(tunic_force + 1)  # the arena turns against it, so it bites one less deep
+    shown = f"Two-Ton Tunic ({tunic_force}⌞{softened}/0/0)"
+    assert shown in _line(_board_text(duel, state), "Defensive:", side="P1")
 
 
 def test_the_same_wu_shifts_the_other_way_when_you_play_it(state, card):
     """Guards the sign: what lifts a Wu you played must drag down the same Wu cast at you."""
     duel = DuelState(stage=6, challenge="force", background="water", rounds=[Round(stat="force", player=Side(queue=[card(SILK_SPITTER)]))])
 
-    assert "Silk Spitter (0⌞₁/-1/-1)" in _line(_board_text(duel, state), "Offensive:")
+    spitter = card(SILK_SPITTER)
+    force, agility, intellect = spitter.stats.values()
+    shown = f"Silk Spitter ({force}⌞{_subscript(force + 1)}/{agility}/{intellect})"
+    assert shown in _line(_board_text(duel, state), "Offensive:")
 
 
 def test_the_printed_shifts_sum_to_the_total_beside_base(state, card):

@@ -44,10 +44,14 @@ def _strategy(name: str, duel_ref: list) -> DuelChoices:
     async def element(background):
         return background
 
+    async def stat(options):
+        # the contrary player pours into a side stat; everyone else into the obvious one
+        return options[-1] if name == "contrary" else options[0]
+
     wager = biggest_wager if name in ("reckless", "greedy") else smallest_wager
     boost = never_boost if name == "cautious" else always_boost
     card = last if name == "contrary" else first
-    return DuelChoices(first, first, wager, boost, card, element)
+    return DuelChoices(first, first, wager, boost, card, element, stat)
 
 
 STRATEGIES = ("greedy", "contrary", "reckless", "cautious")

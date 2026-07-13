@@ -38,8 +38,9 @@ from termcade.core.rng import Rng
 from . import bot
 from .constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from .battle import Duelist, Ground, Round, score_battle
-from .mechanics.cards import excluding
-from .mechanics.powers import is_boost_slot
+from .mechanics.cards import excluding, is_one_of
+from .mechanics.powers import Mechanic, is_boost_slot, mechanic_of, names_a_stat
+from .mechanics.prize import PrizeRoute, claim_route
 from .mechanics.resolve import resolve_played_power
 from .mechanics.scoring import initiative
 from .models import Card, Player
@@ -70,6 +71,9 @@ class DuelState:
     winner: bool | None = None  # True = player won, False = bot won
     winner_character: str | None = None
     card_won: bool = False
+    # Which of the four routes claimed it (`mechanics.prize`), or None when nobody did and the Wu was
+    # lost. Kept so the board can say *how* it was won: a card that simply appears teaches nothing.
+    prize_route: PrizeRoute | None = None
     # A "Serpent's Tail" (play/−1) played by *either* duelist voids the elemental bonus for the whole
     # showdown — a condition of the duel, not of the queue it was played into. It carries across
     # every round: the ground stays intangible once someone makes it so.
@@ -109,6 +113,7 @@ class DuelChoices:
     boost: Callable[[list[Card]], Awaitable[Card | None]]  # play a boost Wu, or decline
     card: Callable[[list[Card]], Awaitable[Card]]  # play a card from hand
     element: Callable[[str], Awaitable[str]]  # a Morpher's element (given the background)
+    stat: Callable[[list[str]], Awaitable[str]]  # an Orb/Curse Wu's stat (given the three)
 
 
 class Duel:
@@ -131,11 +136,16 @@ class Duel:
     def _new_round(self) -> DuelState:
         """A fresh showdown with initiative already read off the two hands.
 
-        Priority is ``None`` only on a tie, which :meth:`_commitment` settles with a coin.
+        Priority is ``None`` only on a tie, which :meth:`_commitment` settles with a coin — unless a
+        Mind Reader Conch was spent, in which case the player already answered and neither the sums
+        nor the coin get a say. The answer is spent by :meth:`_end`, not here: a showdown opened and
+        retreated from has not delivered it yet.
         """
         duel = DuelState()
         duel.player.initiative, duel.bot.initiative = initiative(self.state.player, self.state.bot)
-        if duel.player.initiative != duel.bot.initiative:
+        if self.state.forced_priority is not None:
+            duel.player_priority = self.state.forced_priority
+        elif duel.player.initiative != duel.bot.initiative:
             duel.player_priority = duel.player.initiative > duel.bot.initiative
         return duel
 
@@ -306,7 +316,10 @@ class Duel:
 
         if player_card is not None:
             element = await self._element_for(player_card)
-            if resolve_played_power(current, player_card, is_player=True, element=element):
+            stat = await self._stat_for(player_card)
+            if resolve_played_power(
+                current, player_card, is_player=True, element=element, stat=stat
+            ):
                 self.duel.elemental_bonus_cancelled = True
         if bot_card is not None:
             self._resolve_bot(current, bot_card)
@@ -317,7 +330,10 @@ class Duel:
             self._score_round(current)
 
     def _resolve_bot(self, current: Round, card: Card) -> None:
-        if resolve_played_power(current, card, is_player=False, element=self.duel.background or ""):
+        stat = bot.choose_stat(current, self._ground(), card) if names_a_stat(card.power) else None
+        if resolve_played_power(
+            current, card, is_player=False, element=self.duel.background or "", stat=stat
+        ):
             self.duel.elemental_bonus_cancelled = True
 
     def _ground(self) -> Ground:
@@ -335,9 +351,19 @@ class Duel:
 
     async def _element_for(self, card: Card) -> str:
         """A Morpher (play/+1) lets the player choose its element; any other card ignores it."""
-        if card.power.trigger == "play" and card.power.effect == 1:
+        if mechanic_of(card.power) is Mechanic.MORPH:
             return await self.choices.element(self.duel.background or "")
         return self.duel.background or ""
+
+    async def _stat_for(self, card: Card) -> str | None:
+        """The Orb and the Curse are told which stat to pour into; every other Wu already knows."""
+        if names_a_stat(card.power):
+            return await self.choices.stat(self._stat_names())
+        return None
+
+    def _stat_names(self) -> list[str]:
+        """The three stats, in the order a card prints them."""
+        return list(self.state.player.character.stats)
 
     async def _resolvement(self) -> None:
         """Weigh the match. A Wu must belong to someone, so this always names a winner.
@@ -359,9 +385,11 @@ class Duel:
     async def _end(self) -> None:
         self.state.previous_challenge = [self.duel.challenge] if self.duel.challenge else []
         self.state.previous_background = [self.duel.background] if self.duel.background else []
-        self.state.deposit_counter = 0
-        self.state.draw_counter = 0
+        # The action counters are NOT reset here. A turn turns over in `turn.refill_hands`, which runs
+        # after the opponent has taken theirs — and which may spend the coming turn's action for you,
+        # by dealing you back in. Reset here and that charge would be wiped before it ever bit.
         self.state.bot_turn_done = False  # a new vault turn, for both of you
+        self.state.forced_priority = None  # the Conch's answer was for this showdown, and is spent
         if not self.state.card_deck:
             self.state.has_ended = True
 
@@ -426,7 +454,11 @@ class Duel:
     def _commit_boost(self, card: Card, *, is_player: bool) -> None:
         duelist = self.duel.duelist(is_player)
         mine, _theirs = self.duel.round.sides(is_player)
-        if card.power.effect > 0:  # a positive boost can be lost, so it joins the stakes
+        player = self.state.player if is_player else self.state.bot
+        # What cannot be lost is what sits in the inalienable slot — *not* every Wu that boosts. A
+        # wudai weapon found in the pile boosts exactly like the one a character was born holding,
+        # and is staked like anything else you carry: win it, lose it, bank it.
+        if not is_one_of(card, player.inalienable_hand):
             duelist.stakes.append(card)
         duelist.boosts_spent.append(card)  # one showdown, one use — even a dragon
         # It keeps its unresolved "?/?/?" in the slot: what it lends is not knowable until it sees
@@ -440,23 +472,28 @@ class Duel:
         return self.state.bot, self.state.player
 
     def _award_prize(self) -> None:
-        """The prize is claimed on the winner's BEST battle — one decisive blow is enough.
+        """Winning settles who keeps their own Wu. Taking the revealed one has to be *earned*.
 
-        Measured on each battle's *own* contested stat, so a tournament is judged the same way: win
-        any one of its three legs hard enough and the Wu is yours. Win them all narrowly and it is not.
+        Four routes, in :mod:`.mechanics.prize` — a decisive blow, a broad win, total command, or
+        having fought in tune with the arena. Fail all four and the Wu is **lost**, not destroyed.
         """
         winner, _loser = self._winner_and_loser()
         self.duel.winner_character = winner.character.name
-        stats = list(self.duel.stakes.stats.keys()) if self.duel.stakes else []
         if not self.duel.stakes:
             self.duel.card_won = False
             return
 
-        blows = [
-            battle.sides(bool(self.duel.winner))[0].result[stats.index(battle.stat)]
-            for battle in self.duel.rounds
-            if battle.player.result and battle.bot.result and battle.stat in stats
-        ]
-        self.duel.card_won = bool(blows) and max(blows) > self.settings.prize_threshold
+        self.duel.prize_route = claim_route(
+            self.duel.rounds,
+            winner_is_player=bool(self.duel.winner),
+            background=self.duel.background or "",
+            threshold=self.settings.prize_threshold,
+            bonus_cancelled=self.duel.elemental_bonus_cancelled,
+        )
+        self.duel.card_won = self.duel.prize_route is not None
         if self.duel.card_won:
             winner.hand.append(self.duel.stakes)
+        else:
+            # Lost, not destroyed. It leaves play, and one day it can surface again — which is what
+            # the Rooster Booster reaches for. Until that card exists, nothing reads this pile.
+            self.state.lost.append(self.duel.stakes)

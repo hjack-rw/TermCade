@@ -7,6 +7,8 @@ the negative-card curse.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 import pytest
 
 from termcade.core.rng import Rng
@@ -14,9 +16,10 @@ from termcade.core.rng import Rng
 from xiaolin_showdown.logic.catalog import load_catalog
 from xiaolin_showdown.logic.battle import Round
 from xiaolin_showdown.logic.mechanics.cards import excluding
+from xiaolin_showdown.logic.mechanics.powers import MORPH_ASIDE, MORPH_CONTESTED
 from xiaolin_showdown.logic.duel import Duel, DuelChoices
 from xiaolin_showdown.logic.constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
-from xiaolin_showdown.logic.models import Card, Power
+from xiaolin_showdown.logic.models import Card, Mechanic, Power
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
@@ -25,9 +28,9 @@ from xiaolin_showdown.logic.turn import refill_hands
 _STATS = ("force", "agility", "intellect")
 
 
-def _card(force, agility, intellect, *, element="water", trigger="hand", effect=0) -> Card:
+def _card(force, agility, intellect, *, element="water", mechanic=Mechanic.INITIATIVE) -> Card:
     stats = {"force": force, "agility": agility, "intellect": intellect}
-    return Card(1, "Wu", stats, Power(0, "", trigger, effect, ""), element, "item", 0)
+    return Card(1, "Wu", stats, Power(0, "", mechanic, ""), element, "item", 0)
 
 
 def test_a_plain_card_enters_the_caster_queue_as_an_inert_stand_in():
@@ -41,23 +44,28 @@ def test_a_plain_card_enters_the_caster_queue_as_an_inert_stand_in():
     stand_in = duel.player.queue[0]
     assert stand_in.stats == {"force": 3, "agility": 1, "intellect": 0}
     assert stand_in.stats is not card.stats  # a private copy, safe to mutate in the duel
-    assert stand_in.power.effect == 0  # neutral power — never re-triggers, never seen as a booster
+    assert stand_in.power.mechanic is Mechanic.FILLER  # neutral — never re-triggers, never a booster
 
 
-def test_a_morpher_sets_every_stat_to_one_and_takes_the_chosen_element():
-    duel = Round()
-    morpher = _card(None, None, None, element="metal", trigger="play", effect=1)
+def test_a_morpher_dips_on_the_contested_stat_and_takes_the_chosen_element():
+    """It gives ground where the battle is actually fought — and buys the element that lifts it."""
+    duel = Round(stat="force")
+    morpher = _card(None, None, None, element="metal", mechanic=Mechanic.MORPH)
 
     resolve_played_power(duel, morpher, is_player=True, element="earth")
 
     stand_in = duel.player.queue[0]
-    assert stand_in.stats == {"force": 1, "agility": 1, "intellect": 1}
+    assert stand_in.stats == {
+        "force": MORPH_CONTESTED,  # the stat this battle contests
+        "agility": MORPH_ASIDE,
+        "intellect": MORPH_ASIDE,
+    }
     assert stand_in.element == "earth"
 
 
 def test_a_bot_morpher_falls_back_to_the_background_element():
-    duel = Round()
-    morpher = _card(None, None, None, element="metal", trigger="play", effect=1)
+    duel = Round(stat="force")
+    morpher = _card(None, None, None, element="metal", mechanic=Mechanic.MORPH)
 
     resolve_played_power(duel, morpher, is_player=False, element="fire")
 
@@ -81,7 +89,7 @@ def test_a_negative_card_curses_the_opponent_and_is_spent_on_your_side():
 
 def test_a_boost_lends_no_stats_of_its_own():
     duel = Round()
-    boost = _card(9, 9, 9, element="water", trigger="boost", effect=1)
+    boost = _card(9, 9, 9, element="water", mechanic=Mechanic.BOOST)
 
     resolve_played_power(duel, boost, is_player=True, element="water")
 
@@ -90,7 +98,7 @@ def test_a_boost_lends_no_stats_of_its_own():
 
 def test_a_queued_booster_amplifies_the_next_positive_card():
     duel = Round()
-    booster = _card(0, 0, 0, element="water", trigger="boost", effect=1)
+    booster = _card(0, 0, 0, element="water", mechanic=Mechanic.BOOST)
     duel.player.queue.append(booster)  # played in stage 4, keeps its real power at the head
 
     resolve_played_power(duel, _card(4, 0, 2, element="water"), is_player=True, element="water")
@@ -101,7 +109,7 @@ def test_a_queued_booster_amplifies_the_next_positive_card():
 
 def test_a_queued_booster_flips_to_the_opponent_on_a_negative_card():
     duel = Round()
-    booster = _card(0, 0, 0, element="water", trigger="boost", effect=1)
+    booster = _card(0, 0, 0, element="water", mechanic=Mechanic.BOOST)
     duel.player.queue.append(booster)
 
     resolve_played_power(duel, _card(-3, -1, 0, element="water"), is_player=True, element="water")
@@ -117,11 +125,11 @@ def test_a_mirrored_booster_cannot_boost_the_duelist_it_lands_on():
     """It keeps the booster's *name*, never its power — else the victim's next card is amplified
     by their attacker's Wu, because it sits at the head of their queue."""
     duel = Round()
-    duel.player.queue.append(_card(0, 0, 0, element="water", trigger="boost", effect=1))
+    duel.player.queue.append(_card(0, 0, 0, element="water", mechanic=Mechanic.BOOST))
 
     resolve_played_power(duel, _card(-3, -1, 0, element="water"), is_player=True, element="water")
 
-    assert all(card.power.trigger == "none" for card in duel.bot.queue)
+    assert all(card.power.mechanic is Mechanic.FILLER for card in duel.bot.queue)
 
 
 # --- the stage machine (scripted, headless) ----------------------------------------------
@@ -147,10 +155,15 @@ async def _water(_background: str) -> str:
     return "water"
 
 
+async def _first_stat(options: list[str]) -> str:
+    """Where an Orb of Tornami or a Kaijin's Curse pours itself, when nobody is choosing on purpose."""
+    return options[0]
+
+
 def _auto_choices() -> DuelChoices:
     return DuelChoices(
         challenge=_first, background=_first, wager=_one_wu,
-        boost=_no_boost, card=_first_card, element=_water,
+        boost=_no_boost, card=_first_card, element=_water, stat=_first_stat,
     )
 
 
@@ -205,7 +218,7 @@ async def test_a_showdown_opens_with_initiative_already_resolved():
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
     _flatten_initiative(state)
-    state.player.hand[0].power = Power(9, "Buff", "hand", 0, "", 2)
+    state.player.hand[0].power = Power(9, "Buff", Mechanic.INITIATIVE, "", 2)
 
     duel = _duel_over(state)
 
@@ -218,7 +231,7 @@ def _flatten_initiative(state) -> None:
     """Strip every initiative bonus from both hands, so the two sides tie at 0."""
     for duelist in (state.player, state.bot):
         for card in duelist.hand:
-            card.power = Power(0, "", "none", 0, "")
+            card.power = Power(0, "", Mechanic.FILLER, "")
 
 
 async def test_a_tied_initiative_leaves_priority_to_the_coin():
@@ -248,7 +261,7 @@ async def test_a_clear_initiative_is_never_re_rolled_by_the_coin():
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
     _flatten_initiative(state)
-    state.player.hand[0].power = Power(9, "Buff", "hand", 0, "", 1)
+    state.player.hand[0].power = Power(9, "Buff", Mechanic.INITIATIVE, "", 1)
     duel = _duel_over(state)
     assert duel.duel.player_priority is True
 
@@ -279,7 +292,7 @@ async def test_a_new_showdown_re_reads_initiative_from_the_hands():
     assert duel.duel.stage == 0
 
     _flatten_initiative(state)
-    state.player.hand[0].power = Power(9, "Buff", "hand", 0, "", 3)
+    state.player.hand[0].power = Power(9, "Buff", Mechanic.INITIATIVE, "", 3)
     await duel.advance()  # resets the round, re-reading the hands
 
     assert duel.duel.player.initiative == 3
@@ -338,12 +351,15 @@ async def test_resolvement_negates_the_bonus_a_curse_would_have_earned_its_caste
     duel.duel.challenge, duel.duel.background = "force", "water"
     base = state.player.character.stats["force"]
 
-    # a water curse landed on the player: its resonance must count against them
+    # a water curse landed on the player: its resonance must count against them, and its own force
+    # wound with it. Both read off the card — this test is about the *bonus*, not the card's balance.
+    spitter = cat.card(23)  # Silk Spitter, water
     duel.duel.rounds.append(Round(stat="force"))  # the battle contests force
-    resolve_played_power(duel.duel.round, cat.card(23), is_player=False, element="water")  # Silk Spitter
+    resolve_played_power(duel.duel.round, spitter, is_player=False, element="water")
     duel._score_round(duel.duel.round)
 
-    assert duel.duel.round.player.result[0] == base - 1
+    wound = spitter.stats["force"]  # negative
+    assert duel.duel.round.player.result[0] == base + wound - 1  # -1: it resonates, so it bites deeper
 
 
 # --- a boost is spent once a showdown, not once a round ------------------------------
@@ -351,7 +367,7 @@ async def test_resolvement_negates_the_bonus_a_curse_would_have_earned_its_caste
 
 def _boost_card(name: str) -> Card:
     return Card(9, name, {"force": None, "agility": None, "intellect": None},
-                Power(0, "", "boost", 1, ""), "water", "item", 0)
+                Power(0, "", Mechanic.BOOST, ""), "water", "item", 0)
 
 
 async def test_a_boost_wu_cannot_be_played_twice_in_one_showdown():
@@ -375,13 +391,44 @@ async def test_a_dragon_is_spent_once_too():
     """It is inalienable and never leaves the hand, so nothing else would stop it being replayed."""
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
-    dragon = next(c for c in state.player.inalienable_hand if c.power.trigger == "boost")
+    dragon = next(c for c in state.player.inalienable_hand if c.power.mechanic is Mechanic.DRAGON)
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.rounds.append(Round())
 
     duel._commit_boost(dragon, is_player=True)
 
     assert not any(c is dragon for c in duel._boost_options(state.player, is_player=True))
+
+
+async def test_the_dragon_you_were_born_holding_is_never_at_stake():
+    """The birthright cannot be lost — boosting with it stakes nothing."""
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    dragon = next(c for c in state.player.inalienable_hand if c.power.mechanic is Mechanic.DRAGON)
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.rounds.append(Round())
+
+    duel._commit_boost(dragon, is_player=True)
+
+    assert not duel.duel.player.stakes
+
+
+async def test_a_wudai_weapon_you_found_is_at_stake_like_anything_else():
+    """The Shimo Staff boosts exactly as a dragon does — and is lost exactly as a Wu does.
+
+    The rule is *where the Wu sits*, not what its power is: only the inalienable slot is safe. A
+    dragon pulled out of the draw pile was never anybody's birthright, so laying it down risks it.
+    """
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    staff = deepcopy(cat.card(44))  # Shimo Staff — a dragon nobody was born holding
+    state.player.hand.append(staff)
+    duel = Duel(state, Rng(1), _auto_choices())
+    duel.duel.rounds.append(Round())
+
+    duel._commit_boost(staff, is_player=True)
+
+    assert any(c is staff for c in duel.duel.player.stakes)
 
 
 async def test_holding_two_boosts_lets_you_amplify_two_rounds():
@@ -469,7 +516,7 @@ async def test_the_inalienable_dragon_is_always_affordable():
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
     state.player.hand = state.player.hand[:3]
-    dragon = next(c for c in state.player.inalienable_hand if c.power.trigger == "boost")
+    dragon = next(c for c in state.player.inalienable_hand if c.power.mechanic is Mechanic.DRAGON)
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.wager = 3
     duel.duel.rounds.append(Round())
@@ -500,12 +547,12 @@ def test_a_second_boost_in_a_battle_lifts_the_second_wu_not_the_first():
     is a spent stand-in. Each boost lifts the Wu laid down after it, and only that one.
     """
     duel = Round(stat="force")
-    first_boost = _card(0, 0, 0, element="water", trigger="boost", effect=1)
+    first_boost = _card(0, 0, 0, element="water", mechanic=Mechanic.BOOST)
     duel.player.queue.append(first_boost)
     resolve_played_power(duel, _card(4, 0, 0, element="water"), is_player=True, element="water")
     assert first_boost.stats == {"force": 1, "agility": 0, "intellect": 0}  # lifted Wu one
 
-    second_boost = _card(0, 0, 0, element="water", trigger="boost", effect=1)
+    second_boost = _card(0, 0, 0, element="water", mechanic=Mechanic.BOOST)
     duel.player.queue.append(second_boost)
     resolve_played_power(duel, _card(0, 0, 3, element="water"), is_player=True, element="water")
 
@@ -529,7 +576,9 @@ def _forced(challenge: str, wager: int) -> DuelChoices:
     async def pick_wager(options):
         return wager if wager in options else options[-1]
 
-    return DuelChoices(pick_challenge, _first, pick_wager, _no_boost, _first_card, _water)
+    return DuelChoices(
+        pick_challenge, _first, pick_wager, _no_boost, _first_card, _water, _first_stat
+    )
 
 
 async def _leading_player(cat, challenge: str, wager: int):
@@ -586,7 +635,7 @@ async def test_neither_duelist_can_see_the_wu_the_other_fields():
         """Wu this duelist actually put down. A fielded Wu is a neutral-power stand-in; a boost keeps
         its real power, and a curse the *opponent* cast lands here as a stand-in that is not yours."""
         own = excluding(side.queue, side.suffered)
-        return sum(1 for c in own if c.power.trigger == "none")
+        return sum(1 for c in own if c.power.mechanic is Mechanic.FILLER)
 
     async def watch(playable):
         battle = ref[0].duel.round
@@ -599,8 +648,12 @@ async def test_neither_duelist_can_see_the_wu_the_other_fields():
         rng = Rng(seed)
         state = new_game(cat, rng, cat.character(1))
         ref: list = []
-        duel = Duel(state, rng, DuelChoices(_first, _first, _one_wu, _no_boost, watch, _water),
-                    XiaolinSettings())
+        duel = Duel(
+            state,
+            rng,
+            DuelChoices(_first, _first, _one_wu, _no_boost, watch, _water, _first_stat),
+            XiaolinSettings(),
+        )
         ref.append(duel)
 
         ahead.clear()
@@ -625,7 +678,7 @@ async def test_the_opponent_chooses_against_the_board_before_you_moved():
     real = duel_module.bot.choose_card
 
     def spy(battle, ground, playable, rng, *, is_player=False):
-        boards.append(sum(1 for c in battle.player.queue if c.power.trigger == "none"))
+        boards.append(sum(1 for c in battle.player.queue if c.power.mechanic is Mechanic.FILLER))
         return real(battle, ground, playable, rng, is_player=is_player)
 
     duel_module.bot.choose_card = spy

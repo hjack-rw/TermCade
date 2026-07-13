@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from xiaolin_showdown.logic.mechanics.scoring import initiative, initiative_sources
-from xiaolin_showdown.logic.models import Card, Character, Player, Power
+from xiaolin_showdown.logic.models import Card, Character, Mechanic, Player, Power
 from xiaolin_showdown.screens.format import bonus_tooltip
 
 JETBOOTSU = 10  # +1, the player's own buff
@@ -19,7 +19,7 @@ TANGLE_WEB_COMB = 21  # -1, a debuff that lands on the *opponent*
 
 def _wu(bonus: int) -> Card:
     # An initiative bonus rides on a passive `hand`/0 power (see catalog._power).
-    power = Power(1, "buff", "hand", 0, "", initiative_bonus=bonus)
+    power = Power(1, "buff", Mechanic.INITIATIVE, "", initiative_bonus=bonus)
     return Card(0, "Wu", {"force": 0, "agility": 0, "intellect": 0}, power, "metal", "item", 0)
 
 
