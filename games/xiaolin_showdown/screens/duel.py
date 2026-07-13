@@ -19,7 +19,7 @@ from rich.console import Console, ConsoleOptions, Group, RenderableType, RenderR
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
-from textual import work
+from termcade.ui.work import work
 from textual.app import ComposeResult
 from textual.content import ContentText
 from textual.widgets import Footer, Header, Static
@@ -41,6 +41,7 @@ from .rules import RulesScreen
 from .format import (
     COLORS,
     STAT_ORDER,
+    absent_stats_text,
     stat_str,
     card_label,
     card_name_text,
@@ -218,6 +219,7 @@ class DuelScreen(EngineScreen):
             boost=self._pick_boost,
             card=self._pick_card,
             element=self._pick_element,
+            stat=self._pick_stat,
         )
 
     async def _pick_challenge(self, options: list[str]) -> str:
@@ -246,6 +248,14 @@ class DuelScreen(EngineScreen):
 
     async def _pick_element(self, _background: str) -> str:
         return await self.choose("Choose an element", _element_options(list(ELEMENTS)), title="ELEMENT")
+
+    async def _pick_stat(self, options: list[str]) -> str:
+        """Where the Orb's flood, or the Curse's misfortune, lands.
+
+        The contested stat is worth double, so it is the obvious answer — but the other two are worth
+        a point each, and taking both of them wins the battle just the same. That is the whole card.
+        """
+        return await self.choose("Name the stat it pours into", _stat_options(options), title="POUR")
 
     async def _pick_boost(self, cards: list[Card]) -> Card | None:
         options: list[tuple[ContentText, Card | None]] = [*_card_options(cards), ("Don't play", None)]
@@ -327,13 +337,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
     # board a pure function of the state rather than a special case at every line.
     live = duel.rounds[-1] if duel.rounds else Round()
 
-    prize_line = Text(justify="center")  # the prize sits on its own centred line
-    prize_line.append("Prize: ", style="dim")
-    if duel.stakes is None:
-        prize_line.append("? ? ?", style="dim")  # not drawn yet — spaced, as the hidden power reads
-    else:
-        prize_line.append_text(card_name_text(duel.stakes, bold=True))
-        prize_line.append(f" ({stats_line(duel.stakes.stats)})")
+    prize_line = _prize_line(duel)
 
     # The prize is not in play. A short drawn rule sets it apart from the cards that are — an
     # underline would only span the glyphs, and collapses to nothing when the prize is a dash.
@@ -424,7 +428,12 @@ def _side_line(
         header.append("✫ ", style=Style(bold=True, meta={"tooltip": "Challenger"}))
     header.append(name, style="bold")
     header.append(" (base ", style="dim")
-    header.append_text(card_stats_text(player.character.stats, challenge))
+    # A Sphere of Jianyu has them: the duelist themselves count for nothing this battle, and only
+    # the Wu they played answer for them.
+    if side.base_negated:
+        header.append_text(absent_stats_text(challenge))
+    else:
+        header.append_text(card_stats_text(player.character.stats, challenge))
     header.append(")", style="dim")
     if side.result:  # score appears once scoring has run; joined to its arrow so they wrap as one unit
         header.append("   ")
@@ -443,11 +452,11 @@ def _side_line(
         # background's bonus — so only those may show the shift. See `earns_bonus` in the scorer.
         _cards_line(
             "Offensive", side.mine(), side.amplifiers, challenge, background,
-            earning=side.contributors(),
+            earning=side.contributors(), negated=side.offence_negated,
         ),
         _cards_line(
             "Defensive", contributing(side.suffered), side.amplifiers, challenge, background,
-            earning=contributing(side.suffered), sign=-1,
+            earning=contributing(side.suffered), sign=-1, negated=side.defence_negated,
         ),
     )
 
@@ -493,6 +502,32 @@ class _CardsLine:
         yield line
 
 
+def _prize_line(duel: DuelState) -> Text:
+    """The Wu both duelists are racing for, and — once it is settled — how it was taken.
+
+    A Wu that simply appears in a hand teaches a player nothing about the four ways to earn one, and
+    *lost* is the outcome they will meet most often. So the board says which it was.
+    """
+    line = Text(justify="center")
+    line.append("Prize: ", style="dim")
+    if duel.stakes is None:
+        line.append("? ? ?", style="dim")  # not drawn yet — spaced, as the hidden power reads
+        return line
+
+    line.append_text(card_name_text(duel.stakes, bold=True))
+    line.append(f" ({stats_line(duel.stakes.stats)})")
+    if duel.winner is None:  # still being fought over
+        return line
+    # The reason is set apart on purpose. Run it straight on from the Wu's name and a reader joins the
+    # two — "Serpent's Tail ... in tune with the arena" reads as a claim ABOUT the Tail, which is the
+    # one Wu that could never make it. The prize is what was *won*; the route is how the winner won it.
+    if duel.prize_route is None:
+        line.append("   [Wu lost, but it may surface again...]", style="dim italic")
+    else:
+        line.append(f"   [Claimed: {duel.prize_route.value}]", style="dim italic")
+    return line
+
+
 def _cards_line(
     label: str,
     cards: list[Card],
@@ -502,7 +537,11 @@ def _cards_line(
     *,
     earning: list[Card] | None = None,
     sign: int = 1,
+    negated: bool = False,
 ) -> _CardsLine:
+    """One line of the board. ``negated`` means a Sphere, Scorpion or Mirror has taken it for this
+    battle: the Wu are still named — you must see what was turned off — but they read ``-/-/-`` and
+    take no elemental colour, because they are not there to resonate with anything."""
     tag = Text(f"     {label}: ", style="dim")
     if not cards:
         return _CardsLine(tag, [Text("—")], [Text()])
@@ -515,10 +554,15 @@ def _cards_line(
         joiners.append(Text(" + " if joined else ", ", style="dim"))
 
         # A Wu that no longer moves a stat earns no elemental bonus, so it must not be drawn one.
-        earns = earning is None or is_one_of(card, earning)
+        earns = not negated and (earning is None or is_one_of(card, earning))
         entry = card_name_text(card)  # element-coloured, as in the hand panels
         entry.append(" (", style="dim")
-        entry.append_text(_played_stats_text(card, challenge, background if earns else None, sign))
+        if negated:
+            entry.append_text(absent_stats_text(challenge))
+        else:
+            entry.append_text(
+                _played_stats_text(card, challenge, background if earns else None, sign)
+            )
         entry.append(")", style="dim")
         entries.append(entry)
     return _CardsLine(tag, entries, joiners)

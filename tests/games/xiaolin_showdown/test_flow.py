@@ -18,7 +18,8 @@ from xiaolin_showdown.screens.character_select import CharacterSelectScreen
 from xiaolin_showdown.screens.detail import DetailScreen
 from termcade.ui.screens.dialog import ChoiceModal
 
-from xiaolin_showdown.logic.mechanics.powers import is_gamble
+from xiaolin_showdown.logic.mechanics.powers import is_gamble, trigger_of
+from xiaolin_showdown.logic.mechanics.scoring import initiative
 from xiaolin_showdown.screens.duel import DuelScreen
 from xiaolin_showdown.screens.format import card_label, points_label
 from xiaolin_showdown.screens.lookup import LookUpScreen
@@ -133,11 +134,18 @@ async def test_deposit_banks_a_card_for_points(tmp_path):
         await _new_game_at_vault(app, pilot)
         hand_before = len(app.ctx.state.player.hand)
         points_before = app.ctx.state.player.points
-        gained = app.ctx.state.player.hand[0].points
+
+        # A plain Wu, chosen rather than assumed: banking a `use` Wu forfeits its power, and the
+        # Deposit screen stops to ask first. That confirm is its own test — this one is about the
+        # banking, and which Wu the seed happens to deal first must not decide what it exercises.
+        index = next(
+            i for i, wu in enumerate(app.ctx.state.player.hand) if trigger_of(wu.power) != "use"
+        )
+        gained = app.ctx.state.player.hand[index].points
 
         await pilot.press("3")  # Deposit
         await pilot.pause()
-        await pilot.click("#dep-0")  # cash the first card, back to the vault
+        await pilot.click(f"#dep-{index}")  # cash it, back to the vault
         await pilot.pause()
 
         assert isinstance(app.screen, VaultScreen)
@@ -186,8 +194,13 @@ async def test_use_a_power_opens_the_picker_and_returns_to_the_vault(tmp_path):
         await pilot.pause()
         assert isinstance(app.screen, UsePowerScreen)
 
-        await pilot.click("#pow-0")  # spend the first usable Wu, back to the vault
+        # Spend the first usable Wu. Some powers ask a question before they fire (the Conch wants an
+        # answer, the Glove and the Ruby want a target) — which Wu the seed deals first must not decide
+        # whether this test passes, so whatever it asks, answer it.
+        await pilot.click("#pow-0")
         await pilot.pause()
+        await _answer_any_modal(app, pilot)
+
         assert isinstance(app.screen, VaultScreen)
 
 
@@ -453,15 +466,44 @@ async def _open_showdown(app, pilot):
     return app.screen
 
 
+async def _answer_any_modal(app, pilot) -> None:
+    """Take the first option of whatever the showdown stops to ask, until it stops asking.
+
+    Which questions a duelist is asked depends on who holds initiative — the leader names the
+    challenge, the other prices the wager — and that turns on the hands the seed dealt. A test about
+    what a *Continue* does must not also be a bet on which of the two the seed made you.
+    """
+    while isinstance(app.screen, ChoiceModal):
+        await pilot.click("#opt-0")
+        await pilot.pause()
+
+
 async def test_a_showdown_opens_showing_initiative_before_anything_is_pressed(tmp_path):
-    """Initiative is a property of the hands, not a phase to click through."""
+    """Initiative is a property of the hands, not a phase to click through.
+
+    Read off the dealt hands rather than pinned to a number: the seed decides which Wu are dealt, so
+    a hardcoded initiative pins the *card pool* — and every new Wu printed would break this test
+    while the behaviour it guards stayed correct.
+    """
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:
         screen = await _open_showdown(app, pilot)
+        state = app.ctx.state
+        player_bonus, bot_bonus = initiative(state.player, state.bot)
+        duel = screen._duel.duel
 
-        assert screen._duel.duel.stage == 0  # nothing has advanced
-        assert screen._duel.duel.bot.initiative == 1
-        assert screen._duel.duel.player_priority is False  # already known, no coin needed
+        assert duel.stage == 0  # nothing has advanced
+        assert (duel.player.initiative, duel.bot.initiative) == (player_bonus, bot_bonus)
+
+        # Already settled before a key is pressed — from the hands, unless somebody spent a Mind
+        # Reader Conch, which overrules the sums outright (and the coin a tie would otherwise need).
+        if state.forced_priority is not None:
+            expected = state.forced_priority
+        elif player_bonus == bot_bonus:
+            expected = None  # a tie, and the coin is not tossed until the showdown commits
+        else:
+            expected = player_bonus > bot_bonus
+        assert duel.player_priority is expected
 
 
 async def test_the_opening_board_stakes_nothing_so_you_may_retreat(tmp_path):
@@ -483,6 +525,7 @@ async def test_the_first_continue_draws_the_prize_and_locks_you_in(tmp_path):
 
         await pilot.press("enter")
         await pilot.pause()
+        await _answer_any_modal(app, pilot)
 
         assert app.screen._duel.duel.stakes is not None
 
@@ -493,6 +536,7 @@ async def test_there_is_no_retreat_once_the_showdown_has_begun(tmp_path):
         await _open_showdown(app, pilot)
         await pilot.press("enter")
         await pilot.pause()
+        await _answer_any_modal(app, pilot)
 
         await pilot.press("escape")
         await pilot.pause()
@@ -506,7 +550,7 @@ async def test_rules_open_from_the_vault(tmp_path):
     async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)
 
-        await pilot.press("7")
+        await pilot.press("7")  # Rules
         await pilot.pause()
 
         assert isinstance(app.screen, RulesScreen)
@@ -520,8 +564,9 @@ async def test_rules_open_mid_showdown(tmp_path):
         await _open_showdown(app, pilot)
         await pilot.press("enter")  # commit — from here Escape no longer retreats
         await pilot.pause()
+        await _answer_any_modal(app, pilot)
 
-        await pilot.press("7")
+        await pilot.press("7")  # Rules
         await pilot.pause()
 
         assert isinstance(app.screen, RulesScreen)
@@ -535,7 +580,7 @@ async def test_reading_the_rules_does_not_advance_the_showdown(tmp_path):
         duel = app.screen._duel
         before = str(app.screen.query_one("#duel-body", TooltipStatic).render())
 
-        await pilot.press("7")
+        await pilot.press("7")  # Rules
         await pilot.pause()
         await pilot.press("escape")  # back out of the rulebook
         await pilot.pause()
@@ -546,7 +591,9 @@ async def test_reading_the_rules_does_not_advance_the_showdown(tmp_path):
 
 
 async def test_every_vault_action_says_what_it_does(tmp_path):
-    """A greyed action shows why; an available one shows what it is for. Neither can be silent."""
+    """A greyed action shows why; an available one shows what it is for. Neither can be silent.
+
+    """
     from xiaolin_showdown.screens.vault import _ACTION_HELP, _ACTIONS
 
     keys = [action.split(".")[0] for action in _ACTIONS]
@@ -586,7 +633,8 @@ def test_the_rulebook_states_every_wager_rule():
     assert "one battle" in text and "goes down together" in text  # a wager widens a battle
     assert "tournament" in text  # the fourth challenge exists
     assert "force, then agility, then intellect" in text  # ...and the order it contests them in
-    assert "a boost wu works once" in text  # a field of three cannot be lifted by one dragon
+    assert "spent once a showdown" in text  # a boost is per showdown, not per battle
+    assert "three different boosts" in text  # ...so one dragon cannot lift a field of three
     assert "won the most battles" in text  # how a showdown is decided
     assert "the higher total takes it" in text  # ...and how a level one breaks
     assert "best of" not in text  # a wager is not a best-of-N and must never be described as one

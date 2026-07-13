@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from textual import work
+from termcade.ui.work import work
 from textual.app import ComposeResult
 from textual.widgets import Footer, Header, Static
 
@@ -16,7 +16,7 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.actions import deposit
-from ..logic.mechanics.powers import is_gamble
+from ..logic.mechanics.powers import is_gamble, trigger_of
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
@@ -44,7 +44,7 @@ class DepositScreen(EngineScreen):
 
     @work
     async def _choose(self, card: Card) -> None:
-        if card.power.trigger == "use":  # banking it forfeits its power — confirm first
+        if trigger_of(card.power) == "use":  # banking it forfeits its power — confirm first
             # Name the power the Wu actually has. The joke Wu's is "? ? ?" in the card DB, and that
             # is the right thing to print: you are being asked to give up something unnamed.
             forfeit = await self.confirm(

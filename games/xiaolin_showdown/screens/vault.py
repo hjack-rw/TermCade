@@ -23,6 +23,7 @@ from termcade.ui.widgets import BoxedPanel, TooltipStatic
 from ..logic.actions import (
     can_deposit,
     can_draw,
+    can_early_bird,
     deposit_blocked,
     draw,
     draw_blocked,
@@ -34,7 +35,13 @@ from ..logic.models import Player
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
 from .deposit import DepositScreen
-from .format import affiliation_icon, bonus_tooltip, char_stats, display_name, hands_lines
+from .format import (
+    affiliation_icon,
+    bonus_tooltip,
+    char_stats,
+    display_name,
+    hands_lines,
+)
 from .lookup import LookUpScreen
 from .rules import RulesScreen
 from .use_power import UsePowerScreen
@@ -78,8 +85,14 @@ class VaultScreen(EngineScreen):
         blocked: dict[str, str | None] = {
             "1": "The run is over." if state.has_ended else None,
             "2": draw_blocked(state, settings),
-            "3": deposit_blocked(state, settings.deposit_limit),
-            "4": use_power_blocked(state, settings.deposit_limit),
+            "3": deposit_blocked(state, settings.actions_per_turn),
+            # The Early Bird is a power like any other, so it opens this screen on its own — a
+            # duelist fast enough to fly it has something to spend, even holding no Wu that acts.
+            "4": (
+                None
+                if can_early_bird(state, settings)
+                else use_power_blocked(state, settings.actions_per_turn)
+            ),
         }
         with BoxedPanel(title="ACTIONS"):
             yield TooltipStatic(_actions_grid(blocked), id="actions")
@@ -121,13 +134,13 @@ class VaultScreen(EngineScreen):
     def action_use_power(self) -> None:
         state = cast(XiaolinState, self.ctx.state)
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        if usable_powers(state, settings.deposit_limit):
+        if usable_powers(state, settings.actions_per_turn) or can_early_bird(state, settings):
             self.app.push_screen(UsePowerScreen())
 
     def action_deposit(self) -> None:
         state = cast(XiaolinState, self.ctx.state)
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        if can_deposit(state, settings.deposit_limit):
+        if can_deposit(state, settings.actions_per_turn):
             self.app.push_screen(DepositScreen())
 
     def action_lookup_cards(self) -> None:
