@@ -12,6 +12,7 @@ from textual.timer import Timer
 from textual.widgets import Button, Footer, Header, Static
 
 from termcade.app.game import Game, GameContext
+from termcade.ui.screens.dialog import ChoiceModal
 from termcade.core import music
 from termcade.core.audio import MUSIC_OPTION, SFX_OPTION, make_player
 
@@ -82,10 +83,31 @@ class EngineApp(App[None]):
     # focus-next) app-wide, modals included. Arrows are app-level, so they yield to a widget that uses
     # the key itself (an Input keeps its own cursor). All hidden from the footer to keep it uncluttered.
     BINDINGS = [
-        Binding("tab", "toggle_focus", "Focus", show=False, priority=True),
+        # Shown in the footer, and live only where focus has somewhere to go (see `check_action`). Tab
+        # moves focus in every Textual app and says so in none of them, and `EngineScreen.AUTO_FOCUS = ""`
+        # makes that worse here: nothing starts focused, so nothing hints that focus is a thing at all.
+        # A key a player cannot discover is a key they do not have.
+        #
+        # `priority=True` is why this must be fixed HERE and could not be fixed on the screen: an
+        # app-level priority binding beats a screen's, so a `Binding("tab", ...)` added to EngineScreen
+        # is dead the moment it is written.
+        Binding("tab", "toggle_focus", "Focus", show=True, priority=True),
         Binding("up", "focus_previous", "Previous", show=False),
         Binding("down", "focus_next", "Next", show=False),
     ]
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """Grey the focus key out on a screen with nothing to focus.
+
+        ``None`` marks the binding *disabled*, and Textual's ``Footer`` renders a disabled key dimmed
+        rather than dropping it (`Footer.compose` filters on ``binding.show``, not on ``enabled``). So
+        the key is always listed and is only *live* where focus has somewhere to go — which is the
+        honest compromise: a player learns the key exists, and the screen tells them when it does
+        nothing here.
+        """
+        if action == "toggle_focus":
+            return True if self.screen.focus_chain else None
+        return True
 
     def __init__(
         self,
@@ -174,6 +196,27 @@ class EngineApp(App[None]):
         # late start — both would otherwise leave the OS looping a sound nobody asked for.
         if not self._closing and self.music_on:
             self._player.play_loop(self._theme)
+
+    def report_crash(self, error: BaseException, *, where: str) -> None:
+        """Put a crashed worker's exception in front of the player, and hand them back their game.
+
+        Textual's own `@work` defaults to `exit_on_error=True`, so an exception inside any of the
+        dialogs a screen raises — the deposit confirm, the Morpher's element, the Early Bird's price —
+        **takes the whole game down**: a traceback where the board was, and the run with it. For a game
+        that is the wrong trade. A bug in one dialog should cost you that dialog, not your afternoon.
+
+        `termcade.ui.work` turns that default off; `EngineScreen` catches the dead worker and calls
+        this. The exception is named, so it can be reported, and the dialog is dismissible, so the
+        player is put back where they were.
+        """
+        self.log.error(f"worker {where!r} crashed", error)
+        self.push_screen(
+            ChoiceModal(
+                f"{type(error).__name__}: {error}",
+                [("Continue", None)],
+                title="SOMETHING BROKE",
+            )
+        )
 
     def action_toggle_focus(self) -> None:
         """Tab toggles keyboard-nav mode: focus the first option if nothing is focused, or clear focus

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, TypeVar, cast
 
 from textual.content import ContentText
 from textual.screen import Screen
+from textual.worker import Worker, WorkerState
 
 from termcade.app.game import Game, GameContext
 
@@ -32,6 +33,24 @@ class EngineScreen(Screen[None]):
     # must be "" (not None): Textual reads AUTO_FOCUS=None as "inherit the app default", which is "*"
     # (focus the first focusable); only the empty string truly disables auto-focus.
     AUTO_FOCUS = ""
+
+    # The focus key (Tab) is advertised by `EngineApp`, not here: the app binds it with `priority=True`,
+    # which beats any screen binding, so a copy on this class would be dead code pretending to work.
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        """A worker that died takes its error to the player, not to the void.
+
+        This lives on the *screen* and not on the app because `Worker.StateChanged` **does not bubble**
+        — it is delivered only to the node that started the worker. An app-level handler looks right,
+        compiles, and never fires; that is exactly the trap this base class exists to close, since every
+        screen in the engine and in every cartridge inherits it.
+        """
+        if event.state is not WorkerState.ERROR:
+            return
+        error = event.worker.error
+        if error is None:  # cancelled, not crashed
+            return
+        cast("EngineApp", self.app).report_crash(error, where=event.worker.name)
 
     @property
     def ctx(self) -> GameContext:
