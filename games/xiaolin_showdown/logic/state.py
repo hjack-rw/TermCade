@@ -30,12 +30,30 @@ class XiaolinState:
     previous_challenge: list[str] = field(default_factory=list)
     previous_background: list[str] = field(default_factory=list)
     has_ended: bool = False
-    deposit_counter: int = 0  # deposits used this turn (reset by the duel end phase)
-    draw_counter: int = 0  # draws used this turn (reset by the duel end phase)
+    # Actions spent this turn, one counter each (both reset by the duel end phase). A vault turn buys
+    # one action — bank a Wu, spend a Wu's power, or draw one off your shelf — so the hand is a
+    # resource and a Wu spent is a Wu not replaced.
+    #
+    # The bot has its own because it is held to the same count, and because the mercy rule can spend
+    # it: a duelist dealt back in from the pile (`turn._emergency_fill`) has had their turn's action
+    # spent for them. The cards are the action, not a gift on top of it.
+    actions_taken: int = 0
+    bot_actions_taken: int = 0
     # The opponent takes the same vault turn you do, and takes it once. Retreating from a
     # showdown returns you to a turn you have already spent, so this keeps them from banking
     # twice on the way back in. Reset, like the counters, by the duel end phase.
     bot_turn_done: bool = False
+    # What the Mind Reader Conch was promised: who holds priority in the next showdown, whatever
+    # the initiative sums say. ``None`` is the ordinary game, where the hands decide.
+    #
+    # Spent by the duel *end* phase, not by the showdown that reads it — a player who opens a
+    # showdown and retreats has not had their answer yet, and the Conch is already gone from their
+    # hand. Burning it there would sell them a Wu for nothing.
+    forced_priority: bool | None = None
+    # Wu that surfaced, were fought over, and that nobody won hard enough to keep. They are **lost**,
+    # not destroyed: out of play, and one day recoverable (the Rooster Booster reaches for the oldest).
+    # Shared — a Wu dies to a showdown, not to a duelist.
+    lost: list[Card] = field(default_factory=list)
 
     schema_version: int = 1
 
@@ -48,9 +66,11 @@ class XiaolinState:
             "previous_challenge": list(self.previous_challenge),
             "previous_background": list(self.previous_background),
             "has_ended": self.has_ended,
-            "deposit_counter": self.deposit_counter,
-            "draw_counter": self.draw_counter,
+            "actions_taken": self.actions_taken,
+            "bot_actions_taken": self.bot_actions_taken,
             "bot_turn_done": self.bot_turn_done,
+            "forced_priority": self.forced_priority,
+            "lost": [card.id for card in self.lost],
         }
 
     @classmethod
@@ -64,9 +84,15 @@ class XiaolinState:
             previous_challenge=list(data["previous_challenge"]),
             previous_background=list(data["previous_background"]),
             has_ended=data["has_ended"],
-            deposit_counter=data.get("deposit_counter", 0),
-            draw_counter=data.get("draw_counter", 0),
+            # A save from before the one-action turn counted a deposit and a draw separately. Both
+            # were spends of the turn, so the sum is what the turn had already cost.
+            actions_taken=data.get(
+                "actions_taken", data.get("deposit_counter", 0) + data.get("draw_counter", 0)
+            ),
+            bot_actions_taken=data.get("bot_actions_taken", 0),
             bot_turn_done=data.get("bot_turn_done", False),
+            forced_priority=data.get("forced_priority"),  # absent in a save from before the Conch
+            lost=[_fresh_card(catalog, cid) for cid in data.get("lost", [])],
         )
 
 

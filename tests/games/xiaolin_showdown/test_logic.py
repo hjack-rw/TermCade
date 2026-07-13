@@ -27,9 +27,9 @@ from xiaolin_showdown.logic.bot import choose_background, choose_boost, choose_c
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.catalog import load_catalog
 from xiaolin_showdown.logic.mechanics.scoring import count_end_stats, initiative
-from xiaolin_showdown.logic.models import Card, Character, Player, Power
+from xiaolin_showdown.logic.models import Card, Character, Mechanic, Player, Power
 from xiaolin_showdown.logic.outcome import final_score
-from xiaolin_showdown.logic.settings import XiaolinSettings
+from xiaolin_showdown.logic.settings import XiaolinSettings, deck_size_for, point_limit_for
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.state import XiaolinState
 
@@ -41,9 +41,9 @@ def _omi(catalog):
 def _player_with_initiative(*bonuses: int) -> Player:
     """A Player whose hand contributes the given initiative bonuses (nothing else matters)."""
     stats = {"force": 0, "agility": 0, "intellect": 0}
-    character = Character(0, "", dict(stats), Power(0, "", "hand", 0, ""), "xiaolin", True)
+    character = Character(0, "", dict(stats), Power(0, "", Mechanic.FILLER, ""), "xiaolin", True)
     hand = [
-        Card(0, "", dict(stats), Power(0, "", "hand", 0, "", bonus), "metal", "item", 0)
+        Card(0, "", dict(stats), Power(0, "", Mechanic.INITIATIVE, "", bonus), "metal", "item", 0)
         for bonus in bonuses
     ]
     return Player(character=character, hand=hand)
@@ -51,11 +51,33 @@ def _player_with_initiative(*bonuses: int) -> Player:
 
 def test_catalog_loads_all_tables():
     cat = load_catalog()
-    assert len(cat.powers) == 25
-    assert len(cat.cards) == 25
+    assert cat.powers and cat.cards
     assert len(cat.characters) == 10  # 4 playable + two opponent rosters of 3
     assert cat.character(1).name == "Omi"
     assert cat.opponent_characters  # the bot must have someone to be
+
+
+def test_settings_defaults_match_the_card_pool():
+    """A bare ``XiaolinSettings()`` deals a real game, so its literals must say what the pool says.
+
+    Left stale, ``max_deck_size`` shuffles the pool and truncates it — the newest Wu sit out of the
+    run at random, while ``point_limit`` still counts the points they took with them. Print a Wu,
+    and this is the test that tells you the two numbers moved.
+    """
+    cards = load_catalog().cards
+    shipped = XiaolinSettings()
+
+    assert shipped.max_deck_size == deck_size_for(cards)
+    assert shipped.point_limit == point_limit_for(cards)
+
+
+def test_card_ids_are_contiguous_from_zero():
+    """``new_game`` deals the pile by indexing the card list with an id. A gap deals the wrong Wu,
+    and a beginning Wu is found by ``id == abs(power_id)`` — so a hole is silent corruption, not a
+    missing card. Guards the seed, where a new Wu is written by hand."""
+    cat = load_catalog()
+
+    assert [card.id for card in cat.cards] == list(range(len(cat.cards)))
 
 
 def test_new_game_is_deterministic_for_a_seed():
@@ -76,7 +98,7 @@ def test_new_game_hand_sizes():
     assert len(state.player.hand) == 4  # 5 minus the inalienable card
     assert len(state.player.inalienable_hand) == 1
     assert len(state.bot.hand) == 5
-    assert len(state.card_deck) == 20 - (4 + 5)
+    assert len(state.card_deck) == XiaolinSettings().max_deck_size - (4 + 5)
 
 
 def test_snapshot_round_trips_through_savemanager(tmp_path):
@@ -101,15 +123,15 @@ def test_snapshot_round_trips_through_savemanager(tmp_path):
     assert meta.schema_version == state.schema_version
 
 
-def _card(force, agility, intellect, element="metal", *, trigger="hand", effect=0):
+def _card(force, agility, intellect, element="metal", *, mechanic=Mechanic.PRINTED_STATS):
     stats = {"force": force, "agility": agility, "intellect": intellect}
-    return Card(0, "", stats, Power(0, "", trigger, effect, ""), element, "wudai", 0)
+    return Card(0, "", stats, Power(0, "", mechanic, ""), element, "wudai", 0)
 
 
 _NO_STATS = {"force": 0, "agility": 0, "intellect": 0}
 _STATS = ["force", "agility", "intellect"]
 _ELEMENTS = ["water", "fire", "wind", "earth", "metal"]
-_NO_POWER = Power(0, "", "none", 0, "")
+_NO_POWER = Power(0, "", Mechanic.FILLER, "")
 
 
 def test_bot_picks_the_challenge_where_it_is_strongest():
@@ -148,7 +170,7 @@ def test_bot_answers_the_wu_already_on_the_ground():
 def test_bot_declines_a_boost_that_buys_it_nothing():
     """Boosting out of hand costs the Wu it would have been, so it must earn its place."""
     battle = Round(stat="force")
-    dud = _card(0, 0, 0, trigger="boost", effect=1)
+    dud = _card(0, 0, 0, mechanic=Mechanic.BOOST)
     winner = _card(5, 0, 0)
 
     # already winning on every stat: a boost cannot improve a battle that is already won
@@ -198,7 +220,7 @@ def test_count_end_stats_does_not_inspect_powers():
     played card enters as a stand-in wearing a neutral power. The scan was dead, and the test that
     covered it built a queue by hand.
     """
-    tail = _card(0, 0, 0, "water", trigger="play", effect=-1)
+    tail = _card(0, 0, 0, "water", mechanic=Mechanic.INTANGIBLE)
     assert count_end_stats("force", 2, [tail], _NO_STATS, "water") == 2
 
 
@@ -212,14 +234,14 @@ def test_deposit_cashes_a_card_for_its_points():
 
     assert state.player.points == points_before + card.points
     assert card not in state.player.hand
-    assert state.deposit_counter == 1
+    assert state.actions_taken == 1
 
 
 def test_can_deposit_respects_the_turn_limit():
     cat = load_catalog()
     state = new_game(cat, Rng(1), _omi(cat))
     assert can_deposit(state, 1) is True
-    state.deposit_counter = 1
+    state.actions_taken = 1
     assert can_deposit(state, 1) is False
 
 
@@ -266,13 +288,13 @@ def test_settings_clamp_impossible_values_to_a_playable_range():
         max_deck_size=1,
         point_limit=0,
         starting_points_player=99,
-        draw_limit=0,
+        actions_per_turn=0,
     )
     assert s.max_hand_size == 1
     assert s.starting_hand_player == 1 and s.starting_hand_bot == 1
     assert s.point_limit == 2
     assert s.starting_points_player == s.point_limit - 1  # capped below the point limit
-    assert s.draw_limit == 1
+    assert s.actions_per_turn == 1
     assert s.max_deck_size >= s.starting_hand_player + s.starting_hand_bot + 1  # deck fits both hands
 
 
@@ -357,29 +379,29 @@ def test_draw_pulls_a_wu_from_the_personal_deck_into_the_hand():
     assert any(card is shelved for card in state.player.hand)
     assert len(state.player.hand) == hand_before + 1
     assert not state.player.deck
-    assert state.draw_counter == 1
+    assert state.actions_taken == 1
 
 
-def test_can_draw_respects_the_turn_draw_limit():
+def test_can_draw_respects_the_turns_one_action():
     cat = load_catalog()
     state = new_game(cat, Rng(1), _omi(cat))
     settings = XiaolinSettings()
     state.player.deck.append(deepcopy(cat.card(6)))  # a Wu waiting to be drawn, hand has room
 
     assert can_draw(state, settings) is True
-    state.draw_counter = settings.draw_limit  # this turn's draw is spent
+    state.actions_taken = settings.actions_per_turn  # this turn's draw is spent
     assert can_draw(state, settings) is False
 
 
-def test_usable_powers_respects_the_deposit_limit():
+def test_usable_powers_respect_the_turns_one_action():
     cat = load_catalog()
     state = new_game(cat, Rng(1), _omi(cat))
     bras = _named(cat, "Bras Finger")
     state.player.hand.append(bras)
 
-    assert any(card is bras for card in usable_powers(state, deposit_limit=1))
-    state.deposit_counter = 1  # the turn's deposit is spent → the deposit Wu is no longer usable
-    assert all(card is not bras for card in usable_powers(state, deposit_limit=1))
+    assert any(card is bras for card in usable_powers(state, actions_per_turn=1))
+    state.actions_taken = 1  # the turn's deposit is spent → the deposit Wu is no longer usable
+    assert all(card is not bras for card in usable_powers(state, actions_per_turn=1))
 
 
 def test_the_two_opponent_rosters_are_disjoint():
