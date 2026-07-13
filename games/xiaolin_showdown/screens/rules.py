@@ -1,13 +1,21 @@
-"""Rules screen — static info explaining how the game plays.
+"""Rules screen — a book with a contents list, not a scroll.
 
-Distinct from the Settings screen: this only informs, it changes nothing.
+**The sections are the navigation.** A rulebook read top to bottom is a rulebook nobody reads: a player
+arrives with a question ("what does initiative *do*?") and wants the two paragraphs that answer it, not
+a wall to scan. So the left rail lists the sections and the right pane shows the one you picked. How to
+Play sits at the top of that rail, because it is where a player who has *no* question yet should land.
 
-Grouped by *when* a rule applies, in the order a player meets them: what you do at the vault, what
-decides a showdown, and what it costs you. Every rule the game enforces belongs here — one the code
-obeys and this screen never states can only be learned by losing a run to it.
+**The search is hidden until it is wanted, and `R` is what wants it.** A search box sitting open on a
+book you have not read yet is clutter, and a rulebook is read far more often than it is searched. `R`
+summons it and puts the cursor in it; `Tab` stays what it is everywhere else in the engine — the focus
+key — and moves between the rail and the box once the box exists.
 
-The numbers are read from the live settings, never typed twice. A rulebook that says 7 while the
-game checks 8 is worse than no rulebook.
+Searching **cuts across every section**: it is the answer to "a rule just bit me and I do not know
+where it lives". The rail steps aside while results are up, because a result already says which section
+it came from, and Escape puts the book back the way it was.
+
+The numbers are read from the live settings, never typed twice. A rulebook that says 7 while the game
+checks 8 is worse than no rulebook, and `test_rules_screen.py` fails the moment the two part.
 """
 
 from __future__ import annotations
@@ -16,29 +24,60 @@ from rich.console import Console, ConsoleOptions, RenderResult
 from rich.table import Table
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.widgets import Footer, Header, Static
+from textual.binding import Binding
+from textual.containers import Horizontal, VerticalScroll
+from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 
 from termcade.ui.screens.base import EngineScreen
-from termcade.ui.widgets import BoxedPanel
-
 from ..logic.settings import XiaolinSettings
+
+PRIMER = "How to Play"  # the first entry in the rail, and where a player with no question yet lands
+
+# The loop, and nothing else. A player who reads only this can sit down and play a whole run: what a
+# turn buys, what a showdown costs, how a Wu changes hands, how the run ends. Every rule in the
+# reference below is an answer to a question this raises — and none of them has to be read first.
+HOW_TO_PLAY: list[str] = [
+    "Collect Shen Gong Wu, bank them for points, and reach the target before your opponent does.",
+    "A turn at the vault allows for ONE action: bank a Wu for its points, spend a Wu for its power, or "
+    "draw one into your hand. Banking a Wu forfeits its power; keeping the power forfeits the points. ",
+    "Then call `Gong Yi Tanpai!` — a Showdown for the next Wu on the pile.",
+    "Whoever is faster (Initiative) says what is contested.",
+    "You both field your Wu at the same moment, neither seeing the other's. "
+    "Your character, the Wu you played and the arena you stand in are all added up.",
+    "The loser forfeits every Wu they wagered. The winner takes the prize Wu — but only by winning "
+    "decisively. Win small and nobody takes it: it will be temporarily lost.",
+    "When the pile runs dry the run ends. Whatever is still in your hand is cashed for points. "
+    "Whatever you shelved in your Deck is wasted.",
+]
 
 
 def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
     """The rulebook, with the game's own numbers in it."""
     return {
-        "At the vault:": [
-            f"You get {settings.deposit_limit} action a turn: deposit a Wu for its points, or use "
-            "its power. Never both!",
+        "At the Vault": [
+            f"A turn buys you {settings.actions_per_turn} action: deposit a Wu for its "
+            "points, use its power, or draw one from your Deck.",
             "Depositing a Wu forfeits its power. You are vaulting it, not spending it.",
-            f"You may also draw {settings.draw_limit} Wu a turn from your own Deck to shuffle Cards.",
+            "Your hand never refills itself. Drawing it back up costs you the turn's action too.",
             f"Your hand holds {settings.max_hand_size} Wu. Over that, you shelve one back to your Deck.",
-            "Left with nothing you can field? The pile deals you back in.",
-            "Your opponent takes the same turn you do.",
+            f"Left with nothing you can field, you are dealt back in — up to {settings.empty_draw_limit} "
+            "Wu, from your own Deck first and the pile only after it. It costs you the turn's action, "
+            "and it never hands you more than you could have staked. "
+            "You are being put back in the fight, not paid for having lost it.",
+            "Your opponent takes the same turn when you do.",
             f"Bank {settings.point_limit} points and the run is yours!",
         ],
-        "Calling a Showdown:": [
-            "Matching Initiative Bonuses do not stack. Different ones do.",
+        "Initiative": [
+            "Initiative is how fast you are, and the faster duelist names the Challenge.",
+            "Matching Initiative bonuses do NOT stack. Different ones do — a +1 beside a +2 is +3.",
+            "A Wu with a NEGATIVE bonus slows your opponent, not you. "
+            "Holding one makes you the faster of the two, exactly as a positive one does.",
+            f"Lead them by {settings.early_bird_gap} and the Early Bird advantage is yours: "
+            "take the next Wu straight off the pile, with no Showdown at all. "
+            "It is treated as a power, and it costs the turn's action like any other.",
+            "The Early Bird's price is one of your FASTEST Wu, and it is discarded for no points.",
+        ],
+        "Calling a Showdown": [
             "The higher Initiative names the Challenge. Tie, and a coin toss decides it.",
             "The Challenge can be one stat, or a Tournament across all three.",
             f"Name a stat and your opponent names the stakes, up to {settings.max_wager} Wu each.",
@@ -46,43 +85,202 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "You can never pick the same Challenge or Background two showdowns in a row.",
             "You can Return before the first Continue. After it, there is no retreat.",
         ],
-        "In the Showdown:": [
-            "Gong Yi Tanpai! You and your opponent field your Wu at the same moment, neither seeing "
-            "the other's.",
+        "In the Showdown": [
+            "`Gong Yi Tanpai!` you and your opponent play your Wu at the same moment, neither seeing the other's.",
             "Each stat is ONE battle. Every Wu goes down together and they are summed up.",
             "A Tournament is three battles of three different Wus: Force, then Agility, then Intellect.",
-            "Any Wu you field may carry a Boost, but a Boost Wu works once.",
+            "Any Wu you field may carry a Boost, but each Boost Wu is spent once a Showdown. A field "
+            "of three needs three different Boosts — one dragon cannot lift them all.",
             "A Wu with a negative stat curses your opponent: it lands on their side, not yours.",
-            "The Background lifts a Wu of its element and drags down its opposite. To a curse it does the reverse.",
-            "During the evaluation: the contested stat counts x2. The other two still count so don't put it all in one place.",
+            "The Background lifts a Wu of its element and drags down its opposite."
+            "To a curse it does the reverse.",
+            "Metal is nobody's friend: it is dragged down on every coloured arena, and every coloured "
+            "Wu is dragged down on metal.",
+            "During the evaluation: the contested stat counts x2. The other two still count, so don't "
+            "put it all in one place.",
         ],
-        "Who takes it:": [
+        "Who Takes It": [
             "The Showdown goes to whoever won the most battles.",
             "Tied on battles? Add up every stat you won across them. The higher total takes it.",
             "Tied on that too? It goes to whoever called the Challenge.",
             "The loser forfeits every Wu they have wagered.",
-            f"The prize Wu needs a hard blow: beat {settings.prize_threshold} on the contested stat "
-            "in any one battle. Win small and it is lost.",
         ],
-        "When the pile runs dry:": [
+        "Claiming the Prize": [
+            "Winning the Showdown is not enough. The prize Wu answers only to a decisive victory, and "
+            "there are four ways to take it, evaluated in that order:",
+            f"A decisive blow — beat {settings.prize_threshold} on the contested stat in any one battle.",
+            f"A win on two fronts — beat {settings.prize_threshold - 1} on any two stats.",
+            f"Total command — beat {settings.prize_threshold - 2} on all three.",
+            "In tune with the arena — end the Showdown with more of the arena's element on your side "
+            "than against it. Nullifying the elemental bonus voids this way to win it.",
+            "Meet none of them and the Wu is LOST: nobody takes it. It is not destroyed, though — "
+            "a way exists that calls the oldest lost Wu back into your hand.",
+        ],
+        "When the Pile Runs Dry": [
             "The run ends. There is no Showdown left to call.",
-            "Whatever is still in your hand is cashed for its points, and the higher score wins.",
-            "But Wus in your Deck are wasted.",
+            "Whatever is still in your hand is cashed for points, and the higher score wins.",
+            "But Wus in your Deck are missed points.",
         ],
     }
 
 
+def matching(rules: dict[str, list[str]], query: str) -> dict[str, list[str]]:
+    """The rules holding ``query``, section by section. An empty query is the whole book.
+
+    A section whose rules all fall away goes with them — a heading over nothing reads as a bug. But a
+    section *heading* that matches keeps its whole section: someone searching "showdown" wants the
+    showdown rules, not only the ones that happen to repeat the word.
+    """
+    wanted = query.strip().lower()
+    if not wanted:
+        return rules
+
+    found: dict[str, list[str]] = {}
+    for heading, section in rules.items():
+        if wanted in heading.lower():
+            found[heading] = section
+            continue
+        hits = [rule for rule in section if wanted in rule.lower()]
+        if hits:
+            found[heading] = hits
+    return found
+
+
 class RulesScreen(EngineScreen):
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    """The book: a rail of sections on the left, the one you picked on the right."""
+
+    # `Tab` is the engine's focus key everywhere and stays that way here — it moves between the rail
+    # and the search box once the box exists. `R` is what *summons* the box: a search field sitting open
+    # on a book you have not read yet is clutter, and a rulebook is read far more often than searched.
+    BINDINGS = [
+        Binding("r", "search", "Search", show=True),
+        Binding("escape", "back", "Back", show=True),
+    ]
 
     def compose(self) -> ComposeResult:
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
+        self._rules = rules_for(settings)
+        self._searching = False
+        self._visible: dict[str, list[str]] = {PRIMER: HOW_TO_PLAY}
+        self._by_slug = {_slug(name): name for name in self._entries()}
+
         yield Header()
-        with BoxedPanel(title="RULES"):
-            for heading, rules in rules_for(settings).items():
-                yield Static(heading, classes="rule-heading")
-                yield Static(_bullets(rules), classes="rules")
+        yield Input(placeholder="Search every section...", id="rule-search")
+        with Horizontal(id="rule-book"):
+            yield ListView(
+                *(ListItem(Static(name), id=_slug(name)) for name in self._entries()),
+                id="rule-nav",
+            )
+            with VerticalScroll(id="rule-body"):
+                yield Static(_page(PRIMER, HOW_TO_PLAY), id="rule-page", classes="rules")
         yield Footer()
+
+    def on_mount(self) -> None:
+        """The book opens out of focus mode, like every other screen in the engine.
+
+        It used to open with the rail focused, on the argument that the rail *is* this screen. That was
+        wrong, and it broke the one thing the focus key is for: `Tab` is offered in the footer as the way
+        **into** keyboard mode, and on a screen that starts in it, pressing the advertised key throws you
+        out of a mode you never asked to enter. One screen behaving backwards is worse than the second of
+        friction it saves.
+
+        The rail keeps its highlight regardless — the highlight says which section is on the page, and
+        that is true whether or not the rail holds the keyboard.
+        """
+        self.query_one("#rule-search", Input).display = False  # hidden until `R` asks for it
+        self.query_one("#rule-nav", ListView).index = 0
+
+    def _entries(self) -> list[str]:
+        return [PRIMER, *self._rules]
+
+    # --- the rail ---------------------------------------------------------------------------
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        """Pick a section and it is *shown* — no click, no Enter. Moving the cursor is the choice.
+
+        Keyed by the item's id rather than the label rendered inside it: reading a widget's text back
+        out to decide what it meant is a round trip through the display, and the display is the last
+        place a decision should live.
+        """
+        if self._searching or event.item is None or event.item.id is None:
+            return
+        self._show(self._by_slug[event.item.id])
+
+    @property
+    def showing(self) -> dict[str, list[str]]:
+        """The rules on the page right now, under the headings they came from.
+
+        The page itself is a Rich table, and reading text back out of a rendered widget is a round trip
+        through the display — brittle, and it tests the renderer rather than the book. This is what the
+        screen *decided to show*, one step before Rich draws it, and it is what the tests ask about.
+        """
+        return self._visible
+
+    def _show(self, entry: str) -> None:
+        rules = HOW_TO_PLAY if entry == PRIMER else self._rules[entry]
+        self._visible = {entry: rules}
+        self.query_one("#rule-page", Static).update(_page(entry, rules))
+
+    # --- the search -------------------------------------------------------------------------
+    def action_search(self) -> None:
+        """`R` reveals the box and puts the cursor in it; `Tab` can then move focus back to the rail."""
+        box = self.query_one("#rule-search", Input)
+        box.display = True
+        self._searching = True
+        self.query_one("#rule-nav", ListView).display = False  # a result says which section it is from
+        box.focus()
+
+    def action_back(self) -> None:
+        """Escape closes the search first, and only leaves the screen once there is none to close."""
+        if not self._searching:
+            self.app.pop_screen()
+            return
+        box = self.query_one("#rule-search", Input)
+        box.value = ""
+        box.display = False
+        self._searching = False
+        nav = self.query_one("#rule-nav", ListView)
+        nav.display = True
+        nav.focus()
+        self._show(self._entries()[nav.index or 0])
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Every section at once — the point of searching is not knowing where the rule lives."""
+        page = self.query_one("#rule-page", Static)
+        found = matching(self._rules, event.value)
+        self._visible = found
+        page.update(
+            _all_of_it(found)
+            if found
+            else Text(f"No rule mentions '{event.value.strip()}'.", style="dim")
+        )
+
+
+def _slug(name: str) -> str:
+    return "nav-" + "".join(ch if ch.isalnum() else "-" for ch in name.lower()).strip("-")
+
+
+def _page(heading: str, rules: list[str]) -> Table:
+    """One section: its name, then its rules."""
+    grid = Table.grid(padding=(0, 0))
+    grid.add_column(justify="left", ratio=1)
+    grid.add_row(Text(heading.upper(), style="bold"))
+    grid.add_row("")
+    grid.add_row(_bullets(rules))
+    return grid
+
+
+def _all_of_it(rules: dict[str, list[str]]) -> Table:
+    """Search results: every section that still has something in it, its heading kept.
+
+    The heading is what makes a hit useful — "you found this under *Initiative*" is half the answer.
+    """
+    grid = Table.grid(padding=(0, 0))
+    grid.add_column(justify="left", ratio=1)
+    for heading, section in rules.items():
+        grid.add_row(Text(heading.upper(), style="bold"))
+        grid.add_row(_bullets(section))
+        grid.add_row("")
+    return grid
 
 
 class _Rule:
@@ -139,7 +337,9 @@ def _bullets(rules: list[str]) -> Table:
     under its own text, not under the bullet. Padding on a ``Static`` indents the whole block and
     cannot do that.
     """
-    grid = Table.grid(padding=(0, 1))
+    # A blank line between rules. They are paragraphs, not a list of nouns — run together they read as
+    # a wall, and the rail freed the width to afford the air.
+    grid = Table.grid(padding=(1, 1))
     grid.add_column(justify="left", width=1)  # the bullet
     grid.add_column(justify="left", ratio=1)  # the rule, free to wrap under itself
     for rule in rules:
