@@ -32,15 +32,16 @@ from ..logic.mechanics.powers import Mechanic, mechanic_of
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
-from .format import card_label, trigger_label
+from rich.text import Text
+
+from .format import card_headline, card_label
 
 NOTHING_COMING = "The pile is empty — nothing is coming."
 
 # The Early Bird is not a Wu, but it is a power: it costs the turn's action, it spends a Wu, and it is
 # offered only while it can actually be used. So it belongs on this screen, listed under the Wu whose
 # powers can be spent — not as a menu action of its own.
-EARLY_BIRD_LABEL = "The Early Bird"
-EARLY_BIRD_HINT = "   (outrun them to the next Wu)"
+EARLY_BIRD_LABEL = "Early Bird"
 
 
 class UsePowerScreen(EngineScreen):
@@ -56,9 +57,9 @@ class UsePowerScreen(EngineScreen):
         with BoxedPanel(title="USE A POWER"):
             yield Static("Choose a Wu", classes="panel-desc")
             for index, card in enumerate(self._usable):
-                yield Button(card_label(card, f"   ({trigger_label(card.power)})"), id=f"pow-{index}")
+                yield Button(card_label(card), id=f"pow-{index}")
             if self._early_bird:
-                yield Button(f"{EARLY_BIRD_LABEL}{EARLY_BIRD_HINT}", id="early-bird")
+                yield Button(EARLY_BIRD_LABEL, id="early-bird")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -73,8 +74,14 @@ class UsePowerScreen(EngineScreen):
         """The Early Bird: take the next Wu with no duel, and give up one of your fastest for it."""
         state = cast(XiaolinState, self.ctx.state)
 
+        # Statement, blank line, question — the shape every dialog in the game uses. Run together they
+        # cram, and a reader has to find the question inside a paragraph.
+        asked = Text("Take the next Wu with no duel.")
+        asked.append("\n\n")
+        asked.append("Which Initiative Wu do you give up?")
+
         surrendered = await self.choose(
-            "Take the next Wu with no duel. Which initiative Wu do you give up?",
+            asked,
             [(card_label(card), card) for card in early_bird_options(state)],
             title="THE EARLY BIRD",
         )
@@ -123,9 +130,20 @@ class UsePowerScreen(EngineScreen):
         want initiative — or to hand it over — so being told it *after* choosing would be no help.
         """
         coming = coming_wu(state)
-        heard = f"{coming[0].name} comes next." if coming else NOTHING_COMING
+        # The Wu on its own line and the question under it: the card is what the answer turns on, and a
+        # name buried mid-sentence is a name a player skims. Rendered by `card_headline`, so a Wu read
+        # here looks exactly like the same Wu sitting in a hand.
+        heard = Text()
+        if coming:
+            heard.append_text(card_headline(coming[0]))
+            heard.append(" comes next.")
+        else:
+            heard.append(NOTHING_COMING)
+        heard.append("\n\n")
+        heard.append("Take Initiative in the next showdown?")
+
         return await self.confirm(
-            f"{heard} Take initiative in the next showdown?",
+            heard,
             title="MIND READER CONCH",
             yes="Take it",
             no="Refuse it",

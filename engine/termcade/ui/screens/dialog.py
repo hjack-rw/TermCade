@@ -12,6 +12,7 @@ from collections.abc import Sequence
 
 from typing import TypeVar
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.content import ContentText
 from textual.screen import ModalScreen
@@ -32,7 +33,11 @@ class ChoiceModal(ModalScreen[T]):
     AUTO_FOCUS = ""
 
     def __init__(
-        self, prompt: str, options: Sequence[tuple[ContentText, T]], *, title: str | None = None
+        self,
+        prompt: "ContentText | Text",
+        options: Sequence[tuple[ContentText, T]],
+        *,
+        title: str | None = None,
     ) -> None:
         super().__init__()
         self._prompt = prompt
@@ -40,7 +45,11 @@ class ChoiceModal(ModalScreen[T]):
         self._title = title
 
     def compose(self) -> ComposeResult:
-        with BoxedPanel(title=self._title or self._prompt):
+        # A border label is a plain string by nature — it cannot carry style. So a *rich* prompt (a card
+        # in its element's colour, say) always goes inside the panel, and only a bare string is allowed
+        # to become the border itself.
+        border = self._title if self._title is not None else str(self._prompt)
+        with BoxedPanel(title=border):
             if self._title is not None:
                 yield Static(self._prompt, classes="modal-prompt")
             for index, (label, _value) in enumerate(self._options):

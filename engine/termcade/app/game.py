@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any, Callable
 
 from termcade.core.audio import AudioPlayer, make_player
@@ -73,6 +74,12 @@ class Game:
     # the save's frozen settings, a cartridge returns a `SaveNote` — or None when there is nothing to
     # tell. A save keeps its own rules (that run is that game), and this is how a player finds out.
     save_note: Callable[[Settings], "SaveNote | None"] | None = None
+    # The dev console's commands, by name (see `termcade.ui.screens.console`). The engine owns the
+    # console — `~` opens it, it survives a command that raises, it prints what it is told — and the
+    # GAME owns what a command can do, because only the game knows what a card is.
+    #
+    # Empty by default: a cartridge that supplies none simply has a console with nothing in it.
+    console_commands: "Mapping[str, Any]" = field(default_factory=dict)
 
 
 class GameContext:

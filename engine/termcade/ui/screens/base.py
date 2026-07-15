@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 from typing import TYPE_CHECKING, TypeVar, cast
 
+from rich.text import Text
 from textual.content import ContentText
 from textual.screen import Screen
 from textual.worker import Worker, WorkerState
@@ -65,19 +66,34 @@ class EngineScreen(Screen[None]):
         return game
 
     async def choose(
-        self, prompt: str, options: Sequence[tuple[ContentText, _T]], *, title: str | None = None
+        self,
+        prompt: "ContentText | Text",
+        options: Sequence[tuple[ContentText, _T]],
+        *,
+        title: str | None = None,
     ) -> _T:
         """Ask the player to pick one option; resolves with the value behind their choice."""
         return await self.app.push_screen_wait(ChoiceModal(prompt, options, title=title))
 
     async def confirm(
-        self, prompt: str, *, title: str | None = None, yes: str = "Yes", no: str = "No"
+        self,
+        prompt: "ContentText | Text",
+        *,
+        title: str | None = None,
+        yes: str = "Yes",
+        no: str = "No",
     ) -> bool:
-        """A yes/no dialog; resolves ``True`` if the player takes the ``yes`` option."""
+        """A yes/no dialog; resolves ``True`` if the player takes the ``yes`` option.
+
+        A **rich** prompt, not only a string: a game asking about a *card* has to be able to show it —
+        coloured by its element and carrying its stats — rather than flattening it into a sentence.
+        """
         return await self.app.push_screen_wait(
             ChoiceModal(prompt, [(yes, True), (no, False)], title=title)
         )
 
-    async def show_message(self, message: str, *, title: str | None = None, ok: str = "Continue") -> None:
+    async def show_message(
+        self, message: "ContentText | Text", *, title: str | None = None, ok: str = "Continue"
+    ) -> None:
         """A single-button acknowledgement; resolves once the player dismisses it."""
         await self.app.push_screen_wait(ChoiceModal(message, [(ok, None)], title=title))

@@ -113,6 +113,12 @@ def _open_when_ready(url: str, port: int) -> None:
 
 
 def main() -> None:
+    # `--debug` turns the dev console on for this launch. It has to be a *flag* and not just an
+    # environment variable, because the way this game is actually played is by double-clicking an exe —
+    # and a double-click has no shell to export anything from.
+    if "--debug" in sys.argv:
+        os.environ["TERMCADE_DEBUG"] = "1"
+
     if "--run-game" in sys.argv:  # a per-session child spawned by textual-serve
         _run_game()
         return
@@ -129,7 +135,14 @@ def main() -> None:
         _log(f"port={port} frozen={getattr(sys, 'frozen', False)}")
         # Frozen exe: textual-serve re-invokes this same exe (via the shell) to run each session's
         # game. From source: the installed ``xiaolin`` console script.
-        game = f'"{sys.executable}" --run-game' if getattr(sys, "frozen", False) else "xiaolin"
+        # The child inherits this process's environment, so TERMCADE_DEBUG reaches it — but the flag
+        # is passed on too, so a child launched any other way still knows what kind of run this is.
+        debug = " --debug" if os.environ.get("TERMCADE_DEBUG") else ""
+        game = (
+            f'"{sys.executable}" --run-game{debug}'
+            if getattr(sys, "frozen", False)
+            else f"xiaolin{debug}"
+        )
 
         if not os.environ.get("TERMCADE_NO_BROWSER"):  # the flag lets tests serve headlessly
             threading.Thread(target=_open_when_ready, args=(url, port), daemon=True).start()

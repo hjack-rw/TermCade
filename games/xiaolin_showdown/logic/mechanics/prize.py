@@ -6,7 +6,7 @@ racing for. That has to be *earned*, and there are four ways to earn it, tried i
 1. **a decisive blow** — one stat at or above ``N``
 2. **a broad win** — two stats at ``N-1``
 3. **total command** — all three at ``N-2``
-4. **in tune with the arena** — your Wu belonged where the fight happened
+4. **being in tune with the arena** — your Wu belonged where the fight happened
 
 The first three are read off a *single battle*'s three end values, so a tournament (three battles)
 gets three bites at them and a stat challenge one. That is not an accident: a tournament commits
@@ -40,7 +40,7 @@ class PrizeRoute(StrEnum):
     DECISIVE_BLOW = "a decisive blow"
     BROAD_WIN = "a win on two fronts"
     TOTAL_COMMAND = "total command"
-    IN_TUNE = "in tune with the arena"
+    IN_TUNE = "being in tune with the arena"
 
 
 def claim_route(

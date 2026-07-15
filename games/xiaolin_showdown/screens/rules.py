@@ -29,6 +29,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 
 from termcade.ui.screens.base import EngineScreen
+from ..logic.mechanics.prize import PrizeRoute
 from ..logic.settings import XiaolinSettings
 
 PRIMER = "How to Play"  # the first entry in the rail, and where a player with no question yet lands
@@ -49,6 +50,11 @@ HOW_TO_PLAY: list[str] = [
     "When the pile runs dry the run ends. Whatever is still in your hand is cashed for points. "
     "Whatever you shelved in your Deck is wasted.",
 ]
+
+
+def _route(route: PrizeRoute) -> str:
+    """A prize route as the rulebook prints it: the game's own words, capitalised to open a line."""
+    return route.value[0].upper() + route.value[1:]
 
 
 def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
@@ -108,11 +114,16 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
         "Claiming the Prize": [
             "Winning the Showdown is not enough. The prize Wu answers only to a decisive victory, and "
             "there are four ways to take it, evaluated in that order:",
-            f"A decisive blow — beat {settings.prize_threshold} on the contested stat in any one battle.",
-            f"A win on two fronts — beat {settings.prize_threshold - 1} on any two stats.",
-            f"Total command — beat {settings.prize_threshold - 2} on all three.",
-            "In tune with the arena — end the Showdown with more of the arena's element on your side "
-            "than against it. Nullifying the elemental bonus voids this way to win it.",
+            # The route NAMES are quoted from `PrizeRoute` itself, never retyped. The board announces
+            # the winning route in the enum's own words — "[Claimed: a decisive blow]" — so a book that
+            # called it something else would teach a player a name the game never says. Renaming a route
+            # in the code used to leave the book quietly lying; now it cannot.
+            f"{_route(PrizeRoute.DECISIVE_BLOW)} — beat {settings.prize_threshold} on the contested "
+            "stat in any one battle.",
+            f"{_route(PrizeRoute.BROAD_WIN)} — beat {settings.prize_threshold - 1} on any two stats.",
+            f"{_route(PrizeRoute.TOTAL_COMMAND)} — beat {settings.prize_threshold - 2} on all three.",
+            f"{_route(PrizeRoute.IN_TUNE)} — end the Showdown with more of the arena's element on your "
+            "side than against it. Nullifying the elemental bonus voids this way to win it.",
             "Meet none of them and the Wu is LOST: nobody takes it. It is not destroyed, though — "
             "a way exists that calls the oldest lost Wu back into your hand.",
         ],

@@ -61,6 +61,11 @@ def stats_line(stats: Mapping[str, int | None]) -> str:
     return "/".join(stat_str(stats[key]) for key in STAT_ORDER)
 
 
+# The stat a battle is decided on, wherever it is drawn: bright white and bold, against the dim of the
+# two that only count single. Bold on its own is advisory — a terminal may render it as nothing.
+CONTESTED_STYLE = "bold bright_white"
+
+
 def stats_text(values: Sequence[str], challenge: str | None = None) -> Text:
     """A stat triple with every stat but the contested one dimmed, so the eye finds what decides.
 
@@ -71,7 +76,10 @@ def stats_text(values: Sequence[str], challenge: str | None = None) -> Text:
     for index, (stat, value) in enumerate(zip(STAT_ORDER, values)):
         if index:
             text.append("/", style="dim")
-        text.append(value, style="dim" if challenge and stat != challenge else "")
+        # Bright on the contested stat, dim on the rest. One rule, everywhere a stat is printed — the
+        # end totals AND the Wu on the table — so the eye learns a single thing to look for. An explicit
+        # colour, because bold alone is a hint a terminal may ignore and is invisible on a dim ground.
+        text.append(value, style="dim" if challenge and stat != challenge else CONTESTED_STYLE)
     return text
 
 
@@ -219,6 +227,23 @@ def trigger_label(power: Power) -> str:
         return "? ? ?"
     trigger = trigger_of(power)
     return _TRIGGERS.get(trigger, f"On {trigger.capitalize()}")
+
+
+def card_headline(card: Card) -> Text:
+    """One Wu, named: its name in its element's colour, then its stats in brackets. Nothing else.
+
+    **The established shape for a card anywhere it is named** — a button, a dialog, a reveal. The type
+    glyph is deliberately absent: it belongs to the vault's hand panels, where it says what can build
+    Mala Mala Jong and gives the eye something to sort by. On a button it is decoration, and decoration
+    on a button is noise.
+
+    Built on a FRESH Text: `card_name_text` carries the element colour as its base style, so appending
+    to it directly tints the stats too (see `card_label`, which learned this the same way).
+    """
+    line = Text()
+    line.append_text(card_name_text(card, bold=True))
+    line.append(f" ({stats_line(card.stats)})")
+    return line
 
 
 def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list[Text]:

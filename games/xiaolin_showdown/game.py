@@ -10,6 +10,7 @@ from pathlib import Path
 
 from termcade.app.game import Game
 
+from .console import COMMANDS
 from .logic.settings import default_settings, refreshed_for_pool, save_note
 from .logic.state import XiaolinState
 from .music import XIAOLIN
@@ -37,6 +38,10 @@ def build_game() -> Game:
         # A run saved under a smaller pool still plays by its own rules. The slot says so, rather
         # than leaving the player to wonder why the game feels different.
         save_note=save_note,
+        # `~` opens the console; these are what it can do. It exists to make a NEW Wu testable:
+        # deal it into a hand, stack the pile with it, and play the thing you are judging by the
+        # same rules a dealt Wu would be played by.
+        console_commands=COMMANDS,
         saves_enabled=True,
         max_slots=4,
         root_screen=StartScreen,

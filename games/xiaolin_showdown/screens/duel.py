@@ -40,6 +40,7 @@ from ..logic.mechanics.scoring import contributing, element_score
 from .rules import RulesScreen
 from .format import (
     COLORS,
+    CONTESTED_STYLE,
     STAT_ORDER,
     absent_stats_text,
     stat_str,
@@ -255,7 +256,9 @@ class DuelScreen(EngineScreen):
         The contested stat is worth double, so it is the obvious answer — but the other two are worth
         a point each, and taking both of them wins the battle just the same. That is the whole card.
         """
-        return await self.choose("Name the stat it pours into", _stat_options(options), title="POUR")
+        return await self.choose(
+            "Which stat does it pour into?", _stat_options(options), title="POUR"
+        )
 
     async def _pick_boost(self, cards: list[Card]) -> Card | None:
         options: list[tuple[ContentText, Card | None]] = [*_card_options(cards), ("Don't play", None)]
@@ -329,7 +332,7 @@ def _labelled(label: str, value: str, *, strong: bool = False, style: str = "") 
     return text
 
 
-_DIVIDER_WIDTH = 36  # a rule under the prize; deliberately short of the board's width
+_DIVIDER_MIN = 36  # the rule under the prize never shrinks below this, however short the line is
 
 
 def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
@@ -339,9 +342,15 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
 
     prize_line = _prize_line(duel)
 
-    # The prize is not in play. A short drawn rule sets it apart from the cards that are — an
-    # underline would only span the glyphs, and collapses to nothing when the prize is a dash.
-    divider = Text("─" * _DIVIDER_WIDTH, style="dim", justify="center")
+    # The prize is not in play. A drawn rule sets it apart from the cards that are — an underline would
+    # only span the glyphs and collapse to nothing when the prize is a dash.
+    #
+    # It is drawn to the LINE it sits under, not to a fixed width: the moment a claim was appended
+    # ("[Claimed: by being in tune with the arena]") the line outgrew a 36-column rule and the rule read as
+    # broken. A rule that does not reach the end of what it underlines is worse than none.
+    divider = Text(
+        "─" * max(_DIVIDER_MIN, prize_line.cell_len), style="dim", justify="center"
+    )
 
     meta = Table.grid(padding=(0, 8))  # initiative / challenge / background, grouped, not spread
     meta.add_column(justify="left")
@@ -524,7 +533,7 @@ def _prize_line(duel: DuelState) -> Text:
     if duel.prize_route is None:
         line.append("   [Wu lost, but it may surface again...]", style="dim italic")
     else:
-        line.append(f"   [Claimed: {duel.prize_route.value}]", style="dim italic")
+        line.append(f"   [Claimed: by {duel.prize_route.value}]", style="dim italic")
     return line
 
 
@@ -555,7 +564,12 @@ def _cards_line(
 
         # A Wu that no longer moves a stat earns no elemental bonus, so it must not be drawn one.
         earns = not negated and (earning is None or is_one_of(card, earning))
-        entry = card_name_text(card)  # element-coloured, as in the hand panels
+        # A FRESH Text, and the name appended into it — `card_name_text` carries the element colour as
+        # its *base* style, so building on it directly tints everything that follows. That is why the
+        # stats were coming out blue on a water Wu, and why bold on top of a colour never read as
+        # "brighter". `card_label` documents the same trap.
+        entry = Text()
+        entry.append_text(card_name_text(card))
         entry.append(" (", style="dim")
         if negated:
             entry.append_text(absent_stats_text(challenge))
@@ -586,7 +600,10 @@ def _played_stats_text(
         if index:
             text.append("/", style="dim")
         value = card.stats[stat]
-        style = "dim" if challenge and stat != challenge else ""
+        # The contested stat is drawn BRIGHT — an explicit colour, not just bold. Bold alone is what a
+        # terminal is free to ignore, and on a dim or element-coloured ground it reads as nothing at
+        # all; the whole point is that the number deciding the battle should be the one you see first.
+        style = "dim" if challenge and stat != challenge else CONTESTED_STYLE
         if stat != challenge or not shift or value is None:
             text.append(stat_str(value), style=style)
             continue

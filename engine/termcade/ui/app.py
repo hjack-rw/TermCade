@@ -12,6 +12,7 @@ from textual.timer import Timer
 from textual.widgets import Button, Footer, Header, Static
 
 from termcade.app.game import Game, GameContext
+from termcade.ui.screens.console import ConsoleScreen, debug_enabled
 from termcade.ui.screens.dialog import ChoiceModal
 from termcade.core import music
 from termcade.core.audio import MUSIC_OPTION, SFX_OPTION, make_player
@@ -92,6 +93,20 @@ class EngineApp(App[None]):
         # app-level priority binding beats a screen's, so a `Binding("tab", ...)` added to EngineScreen
         # is dead the moment it is written.
         Binding("tab", "toggle_focus", "Focus", show=True, priority=True),
+        # The dev console. `show=False` and no menu entry anywhere: a player who has not been told is
+        # never going to find it, and that is the whole of the access control. `priority=True` so it
+        # opens from a screen that has bound the key to something of its own.
+        # The dev console, on FOUR names, and every one of them earns its place.
+        #
+        # `~` needs Shift, and the packaged game runs in a browser (textual-serve over xterm.js) where a
+        # shifted key may never arrive as the key Textual is watching for. The backtick below it needs no
+        # modifier at all, which is why it is the one that actually works; `f12` is there for a keyboard
+        # layout where the backtick is somewhere else entirely.
+        #
+        # Bound as `~` alone this passed every test and did nothing in the real game: `Pilot.press("~")`
+        # maps the character for you, so the test was flattering the binding rather than checking it. A
+        # key binding is not tested until a *terminal* has sent it.
+        Binding("grave_accent,~,tilde,f12", "console", "Console", show=False, priority=True),
         Binding("up", "focus_previous", "Previous", show=False),
         Binding("down", "focus_next", "Next", show=False),
     ]
@@ -217,6 +232,28 @@ class EngineApp(App[None]):
                 title="SOMETHING BROKE",
             )
         )
+
+    def action_console(self) -> None:
+        """Toggle the dev console over whatever is on screen — the key that opens it shuts it.
+
+        A *toggle*, and it has to live here rather than on the console: this is an app-level priority
+        binding, so it fires before any binding the console itself declares. A "close" binding on the
+        console screen looked right and never ran.
+        """
+        if isinstance(self.screen, ConsoleScreen):
+            self.pop_screen()
+            return
+        # Locked behind TERMCADE_DEBUG. A console that can deal a player any Wu in the game does not
+        # belong in a shipped build behind nothing but an undocumented key — hidden is not the same as
+        # absent, and this is absent.
+        if not debug_enabled():
+            return
+        # And only over a RUNNING game: every command acts on a run — deal a Wu into a hand, stack a
+        # pile, set the score — so a console on the start menu is a box whose every answer is "there is
+        # no game".
+        if self.ctx is None or self.ctx.state is None:
+            return
+        self.push_screen(ConsoleScreen())
 
     def action_toggle_focus(self) -> None:
         """Tab toggles keyboard-nav mode: focus the first option if nothing is focused, or clear focus

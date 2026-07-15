@@ -157,3 +157,53 @@ ToastRack {
     dock: top;
     align: right top;
 }
+
+/* --- Dev console (backtick) ----------------------------------------------- */
+/* It FLOATS over the game: the board stays visible under a dimmed veil, so a Wu conjured into a hand
+   can be watched landing in it. A full screen would hide the very thing you are changing. */
+/* Semi-transparent, deliberately: the board is *readable* through the console. You conjure a Wu and
+   watch the hand it lands in without closing anything. Opaque, the console would hide the very thing
+   it exists to change. 30% veil over the game, 80% panel over that — enough contrast to read the text
+   against, not enough to blindfold the board. */
+ConsoleScreen {
+    align: center middle;
+    background: $background 30%;
+}
+ConsoleScreen BoxedPanel {
+    width: 80%;
+    height: 70%;
+    background: $surface 80%;
+}
+ConsoleScreen #console-prompt {
+    background: $panel 90%;
+}
+ConsoleScreen #console-log {
+    height: 1fr;
+    padding: 0 1;
+}
+ConsoleScreen #console-output {
+    width: 100%;
+    height: auto;
+}
+/* The prompt line: a caret, then the field. Docked as a ROW so a long transcript never pushes it off
+   the bottom, and given a real background — a bare Input on a dark panel is invisible: its border sits
+   a shade off the panel and an empty field has nothing in it to see. */
+ConsoleScreen #console-prompt {
+    dock: bottom;
+    height: 3;
+    background: $panel;
+    border: tall $accent;
+}
+ConsoleScreen #console-caret {
+    width: 3;
+    height: 1;
+    content-align: center middle;
+    color: $accent-lighten-2;
+    text-style: bold;
+}
+ConsoleScreen #console-input {
+    width: 1fr;
+    height: 1;
+    border: none;
+    background: $panel;
+}
