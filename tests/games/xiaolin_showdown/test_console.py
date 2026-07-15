@@ -162,6 +162,14 @@ async def test_pile_stacks_the_next_showdown(console, state):
     assert state.card_deck[0].id == SHIMO_STAFF
 
 
+async def test_deck_shelves_onto_the_opponents_personal_deck(console, state):
+    """What the deck powers read and pull from — testable at last without waiting for a hand to overflow."""
+    async with console() as (app, run):
+        await run(f"deck them {SHIMO_STAFF}")
+
+    assert SHIMO_STAFF in _ids(state.bot.deck)
+
+
 async def test_lose_feeds_the_lost_pile(console, state):
     """The Rooster Booster's whole reason to exist, and otherwise a wait for a showdown to end badly."""
     async with console() as (app, run):

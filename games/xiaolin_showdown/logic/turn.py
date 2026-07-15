@@ -156,7 +156,7 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         Mechanic.TELEPATHEIA,  # likewise
         Mechanic.ATTRACTION,  # likewise
         Mechanic.REPULSION,  # likewise
-        Mechanic.ANABIOSIS,  # likewise — it acts on the lost pile, never in a battle
+        Mechanic.EUTHYMIA,  # likewise — it acts on the lost pile, never in a battle
         # The dragon and the booster carry no stats but decide duels — they are priced by
         # BOOSTER_PREMIUM in `duel_value` rather than here, which is the older seam.
         Mechanic.DRAGON,

@@ -150,8 +150,8 @@ RULES: dict[Mechanic, Rule] = {
         Timing.AT_VAULT,
         "Spend it to shove one Wu out of your opponent's hand. They bank it, and keep the points.",
     ),
-    Mechanic.ANABIOSIS: Rule(
-        Mechanic.ANABIOSIS,
+    Mechanic.EUTHYMIA: Rule(
+        Mechanic.EUTHYMIA,
         "use",
         Timing.AT_VAULT,
         "Spend it at the vault to bring the oldest lost Wu back — into your hand, not the pile.",

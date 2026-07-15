@@ -69,7 +69,7 @@ def choose_vault_power(
         if mechanic is Mechanic.CHRONOKINESIS and _worth_drawing(state, settings, is_player):
             return VaultPlay(card)
 
-        if mechanic is Mechanic.ANABIOSIS and _worth_reviving(state):
+        if mechanic is Mechanic.EUTHYMIA and _worth_reviving(state):
             return VaultPlay(card)
 
     return None
@@ -202,7 +202,7 @@ def choose_early_bird(
 EARLY_BIRD_CEILING = 5
 
 
-# --- Anabiosis: the oldest Wu nobody won, back off the lost pile -------------------
+# --- Euthymia: the oldest Wu nobody won, back off the lost pile -------------------
 
 
 def _worth_reviving(state: XiaolinState) -> bool:

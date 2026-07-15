@@ -27,7 +27,7 @@ class Mechanic(StrEnum):
     HAND_FIZZLE = "hand_fizzle"
     GAMBLE = "gamble"
     CHRONOKINESIS = "chronokinesis"
-    ANABIOSIS = "anabiosis"
+    EUTHYMIA = "euthymia"
     DRAGON = "dragon"
     BOOST = "boost"
     PRINTED_STATS = "printed_stats"

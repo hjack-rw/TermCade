@@ -19,23 +19,75 @@ from .settings import XiaolinSettings
 from .state import XiaolinState
 from .turn import bank_value, max_hand_size
 
-# Every one of these is a REPORT: it is raised after the thing has happened, and it is read again in
-# the Game Log a turn later. So they are all past tense — a toast that says "you draw a Wu" describes
-# a future the game has already spent, and reads as an instruction rather than an account.
+# A fired power says its piece TWICE. The toast names the power and sets the scene; the log line drops
+# the name and states only the outcome, because the Game Log entry above it already read "You played
+# Chronokinesis from the...". See docs/design/VOICE.md.
 #
-# The gag Wu Ohwah Tegu Saim (use/0) has a "? ? ?" power that does nothing when used.
-FIZZLE_MESSAGE = "Something should have happened..."
-DRAW_MESSAGE = "Chronokinesis warped time — you drew a Wu!"
-DECK_MESSAGE = "Diaskopia saw through the vault — their deck holds: {cards}"
-PILE_MESSAGE = "Teleskopia reached down the pile — next come: {cards}"
-CONCH_MESSAGE = "Telepatheia listened — you {answer} Initiative in the next Showdown."
-TAKEN, REFUSED = "took", "refused"
-GLOVE_MESSAGE = "Attraction pulled {name} out of your deck and into your hand."
-RUBY_MESSAGE = "Repulsion shoved {name} out of their hand — they deposited it for {paid} points."
-ROOSTER_MESSAGE = "Anabiosis called {name} back from the lost — it is yours."
+# All past tense: a report is raised AFTER the thing happened and re-read a turn later, so "you draw a
+# Wu" would read as an instruction for a move the game already spent.
+
+
+@dataclass(frozen=True)
+class PowerReport:
+    """What a fired power says — twice. `toast` names the power and sets the scene; `log` states only
+    the outcome, because the Game Log entry above it already read "You played <power> from the <Wu>".
+    A template (with `{...}` fields) fills both forms at once through `_report`."""
+
+    toast: str
+    log: str
+
+
+# Every acting power's two lines, keyed by mechanic — the same shape as `RULES` and `_FIRE`, so a power
+# is defined once, in one place. To tweak a power's wording, edit its row here and nothing else. The
+# `{...}` fields are filled with what the handler returns (see `_fire` / `_report`).
+REPORTS: dict[Mechanic, PowerReport] = {
+    Mechanic.CHRONOKINESIS: PowerReport(
+        "Chronokinesis stopped time — you drew a Wu!",
+        "You drew a Wu!",
+    ),
+    Mechanic.DIASKOPIA: PowerReport(
+        "Diaskopia saw through the wall — their Deck holds: {cards}",
+        "Their Deck holds: {cards}",
+    ),
+    Mechanic.TELESKOPIA: PowerReport(
+        "Teleskopia saw down the line — next will come: {cards}",
+        "Next will come: {cards}",
+    ),
+    Mechanic.TELEPATHEIA: PowerReport(
+        "Telepatheia listened in — you {answer} Initiative in the next Showdown.",
+        "You {answer} Initiative in the next Showdown.",
+    ),
+    Mechanic.ATTRACTION: PowerReport(
+        "Attraction pulled {name} out of your Deck and into your Hand.",
+        "{name} came out of your Deck and into your Hand.",
+    ),
+    Mechanic.REPULSION: PowerReport(
+        "Repulsion shoved {name} out of their Hand — they deposited it for {paid} points.",
+        "{name} was forced deposited by them for {paid} points.",
+    ),
+    Mechanic.EUTHYMIA: PowerReport(
+        "Euthymia called {name} back from the lost — it is yours.",
+        "{name} came back from the lost into your possession.",
+    ),
+}
+
+# The fizzle is not keyed to an acting power: the gag Wu (use/0) hits it, so does any power with
+# nothing to act on. No outcome to keep — the non-event IS the joke, so both lines are the same.
+FIZZLE_MESSAGE = PowerReport(
+    "Something should have happened...",
+    "Something should have happened...",
+)
+
+
+def _report(template: PowerReport, **kw: object) -> PowerReport:
+    """Fill both lines of a template from the same values."""
+    return PowerReport(template.toast.format(**kw), template.log.format(**kw))
+
+
+# Not a power: the Early Bird logs its own line, so it stays a plain one-form message.
 EARLY_BIRD_MESSAGE = "You outran your opponent to the next Wu: {taken} is yours. You gave up your {given} for it."
 
-
+TAKEN, REFUSED = "took", "refused"
 SPENT_MESSAGE = "You have already acted this turn."
 
 
@@ -139,7 +191,7 @@ def _has_target(state: XiaolinState, card: Card, is_player: bool = True) -> bool
     if mechanic is Mechanic.REPULSION:
         # The opponent is held to the rule that binds you: a deposit may never empty a hand.
         return len(them.hand) > 1
-    if mechanic is Mechanic.ANABIOSIS:
+    if mechanic is Mechanic.EUTHYMIA:
         return bool(state.lost)  # nothing has been lost yet — there is nobody to call back
     return True
 
@@ -246,14 +298,14 @@ def use_power(
     priority: bool | None = None,
     target: Card | None = None,
     rng: Rng | None = None,
-) -> str:
-    """Fire ``card``'s power, then discard it for **no points**; return a line describing what
-    happened.
+) -> PowerReport:
+    """Fire ``card``'s power, then discard it for **no points**; return its :class:`PowerReport`
+    (a toast line and a shorter log line).
 
     Distinct from :func:`deposit`, which banks the Wu for its points. Seven powers do something —
     Chronokinesis draws, Diaskopia and Teleskopia reveal, Telepatheia buys the next showdown's
     initiative, Attraction pulls a Wu to you, Repulsion shoves one out of your opponent's hand, and
-    Anabiosis calls one back from the lost; the gag Wu fizzles.
+    Euthymia calls one back from the lost; the gag Wu fizzles.
 
     ``is_player`` is which duelist fired it — the bot spends a Wu by exactly these rules. The rest
     are the answers a power needs and the logic layer cannot ask for: ``priority`` is Telepatheia's
@@ -301,7 +353,12 @@ class _Spend:
         return self.target
 
 
-def _draw(spend: _Spend) -> str | None:
+# A handler does the game work and returns the values that fill its `REPORTS` row — or ``None`` when it
+# found nothing to act on, which fizzles. It carries no text: the wording all lives in `REPORTS`.
+_Fill = dict[str, object]
+
+
+def _draw(spend: _Spend) -> _Fill | None:
     """Chronokinesis: the top of the pile, into your hand. An empty pile ends the run."""
     state = spend.state
     if not state.card_deck:
@@ -309,22 +366,22 @@ def _draw(spend: _Spend) -> str | None:
     spend.me.hand.append(state.card_deck.pop(0))
     if not state.card_deck:
         state.has_ended = True
-    return DRAW_MESSAGE
+    return {}
 
 
-def _read_deck(spend: _Spend) -> str | None:
+def _read_deck(spend: _Spend) -> _Fill | None:
     """Diaskopia: everything the opponent has shelved."""
     deck = spend.them.deck
-    return DECK_MESSAGE.format(cards=_names(deck)) if deck else None
+    return {"cards": _names(deck)} if deck else None
 
 
-def _scan_pile(spend: _Spend) -> str | None:
+def _scan_pile(spend: _Spend) -> _Fill | None:
     """Teleskopia: as far down the pile as the Wu can see."""
     coming = coming_wu(spend.state, SCOPE_DEPTH)
-    return PILE_MESSAGE.format(cards=_names(coming)) if coming else None
+    return {"cards": _names(coming)} if coming else None
 
 
-def _listen(spend: _Spend) -> str | None:
+def _listen(spend: _Spend) -> _Fill | None:
     """Telepatheia: the next showdown's initiative, bought with an answer.
 
     ``priority`` is the *caster's* answer — do I want it? ``forced_priority`` is the duel's, and the
@@ -333,10 +390,10 @@ def _listen(spend: _Spend) -> str | None:
     if spend.priority is None:
         raise ValueError("Telepatheia was spent without an answer — ask before you fire it")
     spend.state.forced_priority = spend.priority if spend.is_player else not spend.priority
-    return CONCH_MESSAGE.format(answer=TAKEN if spend.priority else REFUSED)
+    return {"answer": TAKEN if spend.priority else REFUSED}
 
 
-def _pull(spend: _Spend) -> str | None:
+def _pull(spend: _Spend) -> _Fill | None:
     """Attraction: a Wu of your choosing, out of your own deck.
 
     The hand does not grow: the Glove leaves it as the Wu it drew arrives.
@@ -347,11 +404,11 @@ def _pull(spend: _Spend) -> str | None:
     pulled = spend.wu()
     deck.pop(index_of(deck, pulled))
     spend.me.hand.append(pulled)
-    return GLOVE_MESSAGE.format(name=pulled.name)
+    return {"name": pulled.name}
 
 
-def _recover(spend: _Spend) -> str | None:
-    """Anabiosis: the oldest Wu in the lost pile, back into the hand of whoever spent the Rooster.
+def _recover(spend: _Spend) -> _Fill | None:
+    """Euthymia: the oldest Wu in the lost pile, back into the hand of whoever spent the Rooster.
 
     The **oldest**, and that is the whole of the rule. Letting its caster read the pile and pick would
     make it a tutor for the best Wu anyone ever failed to win; letting it roll would make it the second
@@ -362,10 +419,10 @@ def _recover(spend: _Spend) -> str | None:
         return None
     revived = lost.pop(0)
     spend.me.hand.append(revived)
-    return ROOSTER_MESSAGE.format(name=revived.name)
+    return {"name": revived.name}
 
 
-def _shove(spend: _Spend) -> str | None:
+def _shove(spend: _Spend) -> _Fill | None:
     """Repulsion: a Wu out of the opponent's hand, into the opponent's vault.
 
     Their points, not yours — the Wu is *pushed away*, not taken. The clamp is the one every deposit
@@ -380,32 +437,34 @@ def _shove(spend: _Spend) -> str | None:
     them.hand.pop(index_of(them.hand, shoved))
     paid = bank_value(shoved, spend.rng)
     them.points = max(0, them.points + paid)
-    return RUBY_MESSAGE.format(name=shoved.name, paid=paid)
+    return {"name": shoved.name, "paid": paid}
 
 
 # What each `use` power does. A mechanic that is absent, or whose handler finds nothing to act on,
 # fizzles — the gag Wu by design, and the rest when the pile or a hand has run dry.
-_FIRE: dict[Mechanic, Callable[[_Spend], str | None]] = {
+_FIRE: dict[Mechanic, Callable[[_Spend], _Fill | None]] = {
     Mechanic.CHRONOKINESIS: _draw,
     Mechanic.DIASKOPIA: _read_deck,
     Mechanic.TELESKOPIA: _scan_pile,
     Mechanic.TELEPATHEIA: _listen,
     Mechanic.ATTRACTION: _pull,
     Mechanic.REPULSION: _shove,
-    Mechanic.ANABIOSIS: _recover,
+    Mechanic.EUTHYMIA: _recover,
 }
 
 
-def _fire(spend: _Spend) -> str:
+def _fire(spend: _Spend) -> PowerReport:
     """What a ``use`` power does, before the Wu is spent on it.
 
     Every handler checks what it acts on, rather than trusting :func:`usable_powers` to have gated
     it: a power that reveals an empty pile would read as a bug rather than as the fizzle it is.
     """
-    handler = _FIRE.get(mechanic_of(spend.card.power))
+    mechanic = mechanic_of(spend.card.power)
+    handler = _FIRE.get(mechanic)
     if handler is None:
         return FIZZLE_MESSAGE
-    return handler(spend) or FIZZLE_MESSAGE
+    fills = handler(spend)
+    return _report(REPORTS[mechanic], **fills) if fills is not None else FIZZLE_MESSAGE
 
 
 def _names(cards: list[Card]) -> str:

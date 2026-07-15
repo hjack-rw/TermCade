@@ -37,7 +37,14 @@ class UsePowerScreen(XiaolinMenu):
     menu_description = "Choose a power"
 
     def menu_items(self) -> list[MenuItem]:
-        self._usable: list[Card] = usable_powers(self.state, self.rules.actions_per_turn)
+        # One button per distinct power. Two identical Wu (two Eagle Scopes) spend the same and read
+        # the same, so a second row is only noise — collapse by name, and `_spend` fires one copy.
+        seen: set[str] = set()
+        self._usable: list[Card] = [
+            card
+            for card in usable_powers(self.state, self.rules.actions_per_turn)
+            if not (card.name in seen or seen.add(card.name))
+        ]
         items = [
             MenuItem(id=f"pow-{index}", label=power_headline(card))
             for index, card in enumerate(self._usable)
@@ -80,11 +87,12 @@ class UsePowerScreen(XiaolinMenu):
         priority = await self._ask_priority() if mechanic is Mechanic.TELEPATHEIA else None
         target = await self._ask_target(mechanic)
 
-        message = use_power(self.state, card, priority=priority, target=target, rng=self.ctx.rng)
+        report = use_power(self.state, card, priority=priority, target=target, rng=self.ctx.rng)
         self.app.pop_screen()
-        self.app.notify(message, log=False)
+        self.app.notify(report.toast, log=False)  # the toast names the power and sets the scene
         self.ctx.journal.add(
-            f"You played {card.power.name} from the {card.name}.\n{message}",
+            # the log drops the power name — the line here already gives it — and keeps only the outcome
+            f"You played {card.power.name} from the {card.name}.\n{report.log}",
             title=your_move(POWER),
         )
 

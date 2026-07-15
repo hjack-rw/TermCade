@@ -13,8 +13,8 @@ from termcade.core.rng import Rng
 from termcade.core.saves import SaveManager, SqliteBackend
 
 from xiaolin_showdown.logic.actions import (
-    DRAW_MESSAGE,
     FIZZLE_MESSAGE,
+    REPORTS,
     can_deposit,
     can_draw,
     deposit,
@@ -339,7 +339,7 @@ def test_use_power_draws_a_wu_and_banks_no_points():
 
     message = use_power(state, bras)
 
-    assert message == DRAW_MESSAGE
+    assert message == REPORTS[Mechanic.CHRONOKINESIS]
     assert all(card is not bras for card in state.player.hand)  # spent, not banked
     assert len(state.player.hand) == hand_size  # a drawn Wu replaced it
     assert len(state.card_deck) == deck_before - 1

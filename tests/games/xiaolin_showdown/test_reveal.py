@@ -45,7 +45,7 @@ def test_the_scope_names_the_next_wu_in_the_pile(state, held):
     message = use_power(state, scope)
 
     for wu in coming:
-        assert wu.name in message
+        assert wu.name in message.toast
 
 
 def test_the_scope_sees_exactly_three_deep(state, held):
@@ -54,7 +54,7 @@ def test_the_scope_sees_exactly_three_deep(state, held):
 
     message = use_power(state, scope)
 
-    assert fourth.name not in message, "the scope showed a Wu it should not reach"
+    assert fourth.name not in message.toast, "the scope showed a Wu it should not reach"
 
 
 def test_the_scope_does_not_draw_the_wu_it_shows(state, held):
@@ -73,8 +73,8 @@ def test_the_eye_reads_the_whole_opponent_deck(state, held, card):
 
     message = use_power(state, eye)
 
-    assert "Fist of Tebigong" in message
-    assert "Helmet of Jong" in message
+    assert "Fist of Tebigong" in message.toast
+    assert "Helmet of Jong" in message.toast
 
 
 def test_the_eye_is_not_offered_against_an_empty_deck(state, held):

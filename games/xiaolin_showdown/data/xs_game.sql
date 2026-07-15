@@ -76,7 +76,7 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (35, 'Mnenokinesis', 'initiative', 'Erases memory for a short while', -2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (36, 'Stupefaction', 'initiative', 'Releases a purple gas that leaves its victims confused and foolish, or drops them into a deep sleep outright', -2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (37, 'Efiáltiskinesis', 'initiative', 'Walks into a sleeping mind and gives its worst fear a body. It has no hold on anyone awake', -2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (38, 'Anabiosis', 'anabiosis', 'Calls a Wu back from the lost and gifts it to its user', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (38, 'Euthymia', 'euthymia', 'Your good spirits turn fortune your way and a lost Wu finds its way back to you', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (39, 'Polymorphia', 'dragon', 'Transforms into any weapon the user requires', 0);
 
 -- ----------------------------------------------------------------------------

@@ -86,6 +86,24 @@ def pile(ctx: GameContext, args: Sequence[str]) -> str:
     return f"{_named(cards)} on top of the pile"
 
 
+_ME = ("me", "player", "mine")
+_THEM = ("them", "bot", "theirs")
+
+
+def deck(ctx: GameContext, args: Sequence[str]) -> str:
+    """Shelve Wu onto a personal deck — what the deck powers read and pull from (Diaskopia, the Glove).
+
+    ``deck them <id>...`` fills the opponent's shelf; a leading ``me``/``them`` picks whose, and with
+    none it is yours. FIFO, so the first shelved is the first drawn — the order you list them in.
+    """
+    state = _state(ctx)
+    who, rest = (args[0], args[1:]) if args and args[0] in (*_ME, *_THEM) else ("me", args)
+    player = state.bot if who in _THEM else state.player
+    cards = _cards(rest)
+    player.deck.extend(cards)
+    return f"shelved onto {'their' if who in _THEM else 'your'} deck: {_named(cards)}"
+
+
 def lose(ctx: GameContext, args: Sequence[str]) -> str:
     """Put a Wu on the lost pile, where nobody won it — the Rooster Booster's whole reason to exist."""
     state = _state(ctx)
@@ -151,6 +169,7 @@ COMMANDS: dict[str, Command] = {
     "give": Command(give, "give <id>... — deal a Wu straight into your hand"),
     "givebot": Command(givebot, "givebot <id>... — deal one to the opponent"),
     "pile": Command(pile, "pile <id>... — stack the top of the draw pile"),
+    "deck": Command(deck, "deck [me|them] <id>... — shelve Wu onto a personal deck"),
     "lose": Command(lose, "lose <id>... — put a Wu on the lost pile"),
     "points": Command(points, "points <yours> [theirs] — set the banked score"),
     "clear": Command(clear, "clear me | clear them — empty a hand"),
