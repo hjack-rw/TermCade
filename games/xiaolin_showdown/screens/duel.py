@@ -18,6 +18,7 @@ from rich.console import Console, ConsoleOptions, Group, RenderableType, RenderR
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
+from termcade.ui.typography import spaced_dashes
 from termcade.ui.work import work
 from textual.app import ComposeResult
 from textual.content import ContentText
@@ -608,11 +609,13 @@ def _showdown_result(duel: DuelState) -> tuple[Text, ...]:
     """
     assert duel.stakes is not None
     prize = card_name_text(duel.stakes)
+    # `spaced_dashes` on the lead, since the em dash abuts a coloured Wu name: it is drawn a full cell
+    # wide and eats the space after it, so the log would read "the Wu —Lasso" without this.
     if duel.winner_character is None:
-        return (Text("A dead heat — "), prize, Text(" was lost!"))
+        return (Text(spaced_dashes("A dead heat — ")), prize, Text(" was lost!"))
     who = display_name(duel.winner_character)
     if duel.prize_route is None:
-        return (Text(f"{who} won the showdown, but not the Wu — "), prize, Text(" was lost!"))
+        return (Text(spaced_dashes(f"{who} won the showdown, but not the Wu — ")), prize, Text(" was lost!"))
     return (Text(f"{who} won and claimed "), prize, Text(f" by {duel.prize_route.value}!"))
 
 
