@@ -336,10 +336,11 @@ def test_use_power_draws_a_wu_and_banks_no_points():
     bras = _named(cat, "Bras Finger")  # deposit/+1 — Chronokinesis draws a card
     state.player.hand.append(bras)
     hand_size, deck_before = len(state.player.hand), len(state.card_deck)
+    drawn = state.card_deck[0]  # Chronokinesis takes the top of the pile — read its name off the card
 
     message = use_power(state, bras)
 
-    assert message.log == "You drew a Wu."  # cast by the player, so the log reads "You"
+    assert message.log == f"You drew {drawn.name}."  # cast by the player, so the log reads "You"
     assert all(card is not bras for card in state.player.hand)  # spent, not banked
     assert len(state.player.hand) == hand_size  # a drawn Wu replaced it
     assert len(state.card_deck) == deck_before - 1

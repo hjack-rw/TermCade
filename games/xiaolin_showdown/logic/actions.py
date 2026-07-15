@@ -46,8 +46,8 @@ class PowerReport:
 # the other duelist. The rest (`{name}`, `{cards}`, `{answer}`, `{paid}`) come from the handler.
 REPORTS: dict[Mechanic, PowerReport] = {
     Mechanic.CHRONOKINESIS: PowerReport(
-        "Chronokinesis stopped time — you drew a Wu!",
-        "{caster} drew a Wu.",
+        "Chronokinesis stopped time — you drew {name}!",
+        "{caster} drew {name}.",
     ),
     # Diaskopia and Teleskopia reveal to the CASTER, and the opponent never spends them (they are always
     # banked — see temple_ai), so their log only ever reads player-cast. Left first-person.
@@ -414,10 +414,11 @@ def _draw(spend: _Spend) -> _Fill | None:
     state = spend.state
     if not state.card_deck:
         return None
-    spend.me.hand.append(state.card_deck.pop(0))
+    drawn = state.card_deck.pop(0)
+    spend.me.hand.append(drawn)
     if not state.card_deck:
         state.has_ended = True
-    return {}
+    return {"name": drawn.name}
 
 
 def _read_deck(spend: _Spend) -> _Fill | None:

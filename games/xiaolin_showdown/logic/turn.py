@@ -307,18 +307,19 @@ def _bot_acts(
     # it is the only action here that takes from the *shared* pile rather than the bot's own shelf.
     bird = choose_early_bird(state, settings)
     if bird is not None:
+        taken = state.card_deck[0]  # the Wu the bird snatches, off the top of the pile
         early_bird(state, bird, is_player=False)
         return BotMove(
             EARLY_BIRD,
-            f"{name} used Early Bird and sacrificed {bird.name} — the next Wu was taken from "
-            "under your nose.",
+            f"{name} used Early Bird to take {taken.name} from under your nose, "
+            f"giving up {bird.name}.",
         )
 
     if len(state.bot.hand) < settings.max_wager and state.bot.deck:
         drawn = state.bot.deck.pop(0)
         state.bot.hand.append(drawn)
         state.bot_actions_taken += 1
-        return BotMove(DRAW, f"{name} drew a Wu from their deck.")
+        return BotMove(DRAW, f"{name} drew {drawn.name} from their deck.")
 
     # Mirrors `can_deposit`: never cash the last card out of the hand.
     if len(state.bot.hand) > DUEL_FLOOR:

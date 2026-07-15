@@ -73,11 +73,12 @@ class UsePowerScreen(XiaolinMenu):
         )
         if surrendered is None:
             return
+        taken = self.state.card_deck[0]  # the Wu the Early Bird takes, off the top of the pile
         message = early_bird(self.state, surrendered)
         self.app.pop_screen()
         self.engine_app.notify(message, log=False)  # the log gets the move's own shape, below
         self.ctx.journal.add(
-            f"You used Early Bird and sacrificed {surrendered.name}.",
+            f"You used Early Bird to take {taken.name}, giving up {surrendered.name}.",
             title=your_move(EARLY_BIRD),
         )
 
