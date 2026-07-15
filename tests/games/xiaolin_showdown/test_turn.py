@@ -14,7 +14,7 @@ from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.state import XiaolinState
 from xiaolin_showdown.logic.mechanics.powers import GAMBLE_SPREAD
 from xiaolin_showdown.logic.turn import (
-    DEPOSIT,
+    VAULT,
     DUEL_FLOOR,
     PASSED,
     bank_value,
@@ -251,7 +251,7 @@ def test_bot_turn_reports_what_it_did():
     banker.hand.append(_card(mechanic=Mechanic.FILLER, points=3))
     log = bot_turn(_state(_player(3), banker, main=5), _SETTINGS, rng=Rng(1), difficulty=Difficulty.EASY)
     assert any("deposited" in move.line for move in log)
-    assert DEPOSIT in [move.action for move in log]
+    assert VAULT in [move.action for move in log]
 
 
 def test_a_bot_never_banks_its_hand_below_the_duel_floor():

@@ -134,7 +134,7 @@ class DuelScreen(EngineScreen):
         self.app.notify(
             # Not logged: the showdown's own story tells who staked what, in the order it happened.
             # Logging it here as well would say the same thing twice, once out of order.
-            f"{name} requested a {duel.wager}vs{duel.wager}",
+            f"{name} requested a {_wager_label(duel.wager)}",
             title="The stakes",
             log=False,
         )
@@ -294,7 +294,13 @@ class DuelScreen(EngineScreen):
 
 
 def _wager_label(wager: int) -> str:
-    return f"{wager}vs{wager}"
+    """``2 vs 2`` — the width of the field, wherever it is printed.
+
+    Spaced: ``2vs2`` runs the three glyphs into one word and reads as a token, not as two sides facing
+    each other. One helper, because the board, the toast and the log all print it and three of them
+    used to build it themselves.
+    """
+    return f"{wager} vs {wager}"
 
 
 def _stat_options(values: list[str]) -> list[tuple[str, str]]:
@@ -406,7 +412,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         tally = [line, ""]
     elif duel.wager > 1:
         line = Text(justify="center")
-        line.append(f"{duel.wager}vs{duel.wager}", style="bold")
+        line.append(_wager_label(duel.wager), style="bold")
         tally = [line, ""]
 
     parts: list[RenderableType] = [
@@ -574,7 +580,7 @@ def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
         # nothing left for the answerer to name. On a stat challenge they name the width of the field,
         # in the same words the toast used when they named it to your face.
         if duel.challenge != TOURNAMENT and duel.wager:
-            answer.append(Text(f", and {answerer} requested a {duel.wager}v{duel.wager}"))
+            answer.append(Text(f", and {answerer} requested a {_wager_label(duel.wager)}"))
         answer.append(Text("!"))
         _line(story, *answer)
 
@@ -634,11 +640,11 @@ def _showdown_result(duel: DuelState) -> tuple[Text, ...]:
     assert duel.stakes is not None
     prize = card_name_text(duel.stakes)
     if duel.winner_character is None:
-        return (Text("A dead heat — "), prize, Text(" is lost!"))
+        return (Text("A dead heat — "), prize, Text(" was lost!"))
     who = display_name(duel.winner_character)
     if duel.prize_route is None:
-        return (Text(f"{who} wins the showdown, but not the Wu — "), prize, Text(" is lost!"))
-    return (Text(f"{who} wins and claims "), prize, Text(f" by {duel.prize_route.value}!"))
+        return (Text(f"{who} won the showdown, but not the Wu — "), prize, Text(" was lost!"))
+    return (Text(f"{who} won and claimed "), prize, Text(f" by {duel.prize_route.value}!"))
 
 
 def _prize_line(duel: DuelState) -> Text:

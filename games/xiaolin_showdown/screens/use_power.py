@@ -32,7 +32,7 @@ from ..logic.mechanics.powers import Mechanic, mechanic_of
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
-from ..logic.turn import EARLY_BIRD, POWERUP
+from ..logic.turn import EARLY_BIRD, POWER
 from rich.text import Text
 
 from .format import card_headline, card_label, power_headline, your_move
@@ -58,7 +58,7 @@ class UsePowerScreen(EngineScreen):
         self._early_bird = can_early_bird(state, settings)
 
         yield Header()
-        with BoxedPanel(title="POWERUPS"):
+        with BoxedPanel(title="POWERS"):
             yield Static("Choose a power", classes="panel-desc")
             for index, card in enumerate(self._usable):
                 # Named by the POWER, not the Wu: what is being chosen here is an effect, and the Wu
@@ -100,7 +100,7 @@ class UsePowerScreen(EngineScreen):
         # written in — the action, then the Wu it cost.
         self.app.notify(message, log=False)
         self.ctx.journal.add(
-            f"You used Early Bird and sacrificed {surrendered.name}",
+            f"You used Early Bird and sacrificed {surrendered.name}.",
             title=your_move(EARLY_BIRD_LABEL),
         )
 
@@ -114,13 +114,13 @@ class UsePowerScreen(EngineScreen):
 
         message = use_power(state, card, priority=priority, target=target, rng=self.ctx.rng)
         self.app.pop_screen()
-        # Filed under "Powerup" — the action — with the power NAMED in the line beneath it, the way
+        # Filed under "Power" — the action — with the power NAMED in the line beneath it, the way
         # the opponent's powers are written. What it then did follows on its own line: the Conch's
         # answer, the Glove's pull, the gag Wu's fizzle.
         self.app.notify(message, log=False)
         self.ctx.journal.add(
-            f"You played {card.power.name} from the {card.name}\n{message}",
-            title=your_move(POWERUP),
+            f"You played {card.power.name} from the {card.name}.\n{message}",
+            title=your_move(POWER),
         )
 
     async def _ask_target(self, state: XiaolinState, mechanic: Mechanic) -> Card | None:

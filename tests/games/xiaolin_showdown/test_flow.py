@@ -220,7 +220,8 @@ async def test_a_power_is_offered_by_its_own_name_with_the_wu_that_pays_for_it(t
 
         label = app.screen.query_one("#pow-0", Button).label.plain
         # Read off the card, never restated: a rename or a re-stat must not need this test edited.
-        assert label == f"{bras.power.name} ({bras.name} {stats_line(bras.stats)})"
+        # The power, then the Wu it costs. No stats: they decide nothing about which power to spend.
+        assert label == f"{bras.power.name} ({bras.name})"
 
 
 async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):

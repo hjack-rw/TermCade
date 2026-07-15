@@ -16,7 +16,7 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.actions import deposit
-from ..logic.turn import DEPOSIT
+from ..logic.turn import VAULT
 from ..logic.mechanics.powers import is_gamble, trigger_of
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
@@ -30,7 +30,7 @@ class DepositScreen(EngineScreen):
     def compose(self) -> ComposeResult:
         state = cast(XiaolinState, self.ctx.state)
         yield Header()
-        with BoxedPanel(title="DEPOSIT"):
+        with BoxedPanel(title="VAULT"):
             yield Static("Choose a card", classes="panel-desc")
             for index, card in enumerate(state.player.hand):
                 # `points_label`, not `card.points`: the gamble Wu is worth `?` and must read as one
@@ -69,7 +69,7 @@ class DepositScreen(EngineScreen):
             # A deposit raises no toast — you watch the points move — so the log would lose the most
             # common action in the game.
             self.ctx.journal.add(
-                f"You banked {card.name} for {paid} pts.", title=your_move(DEPOSIT)
+                f"You deposited {card.name} for {paid} pts.", title=your_move(VAULT)
             )
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
         if state.player.points >= settings.point_limit:  # crossing the line ends the game at once

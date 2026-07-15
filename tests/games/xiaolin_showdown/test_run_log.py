@@ -14,8 +14,8 @@ from xiaolin_showdown.logic.constants import TOURNAMENT
 from xiaolin_showdown.logic.duel import DuelState
 from xiaolin_showdown.logic.mechanics.powers import is_gamble, trigger_of
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute
-from xiaolin_showdown.logic.turn import DEPOSIT
-from xiaolin_showdown.screens.duel import DuelScreen, _showdown_story
+from xiaolin_showdown.logic.turn import VAULT
+from xiaolin_showdown.screens.duel import DuelScreen, _showdown_story, _wager_label
 from xiaolin_showdown.screens.format import (
     OPPONENT_LOG,
     SHOWDOWN_LOG,
@@ -79,7 +79,7 @@ async def test_a_banked_wu_reaches_the_log(open_vault, state, catalog, card):
 
 
 async def test_your_move_is_filed_as_yours(open_vault, state, catalog, card):
-    """Whose move it was is the first thing the log has to say — "Deposit" alone leaves it to be
+    """Whose move it was is the first thing the log has to say — "Vault" alone leaves it to be
     worked out from the sentence underneath."""
     state.player.hand = [card(_plain(catalog).id), card(_plain(catalog).id)]
 
@@ -90,7 +90,7 @@ async def test_your_move_is_filed_as_yours(open_vault, state, catalog, card):
         await pilot.pause()
 
         titles = [entry.title for entry in app.ctx.journal.entries]
-        assert your_move(DEPOSIT) in titles
+        assert your_move(VAULT) in titles
 
 
 async def test_the_showdown_closes_the_turn_it_was_fought_in(open_vault, state):
@@ -137,7 +137,9 @@ def test_a_stat_challenge_names_the_price_and_who_named_it(state, catalog):
     story = _showdown_story(duel, state).plain
 
     opponent = display_name(state.bot.character.name)
-    assert f"{opponent} requested a {duel.wager}v{duel.wager}!" in story
+    # Read the wager's shape off the helper that prints it, never restated — one place decides whether
+    # it is "2 vs 2" or "2v2", and this test must not be a second opinion.
+    assert f"{opponent} requested a {_wager_label(duel.wager)}!" in story
     assert "Snowy Slope" in story  # the place, not the element it was summoned under
 
 
@@ -156,9 +158,12 @@ def test_a_tournament_asks_nobody_for_a_price(state, catalog):
 
 def test_both_sides_file_the_same_action_under_the_same_word():
     """One shape, two sides. A move of theirs titled differently from the same move of yours makes a
-    reader compare shapes instead of sides."""
-    assert your_move(DEPOSIT) == "Your move: Deposit"
-    assert opponent_move([DEPOSIT]) == "Opponent's move: Deposit"
+    reader compare shapes instead of sides.
+
+    The title is the PLACE — you went to the Vault. What you did there is the line underneath it.
+    """
+    assert your_move(VAULT) == "Your move: Vault"
+    assert opponent_move([VAULT]) == "Opponent's move: Vault"
 
 
 def test_a_wu_named_in_prose_is_drawn_as_a_wu(catalog):

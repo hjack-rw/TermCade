@@ -92,6 +92,24 @@ def test_a_wu_that_belonged_on_the_ground_claims_it_after_a_scrappy_win():
     assert _claim([battle], background="water") is PrizeRoute.IN_TUNE
 
 
+def test_a_wu_that_moves_no_stat_is_still_standing_on_the_ground():
+    """Resonance asks what you BROUGHT, not what it did once it got there.
+
+    Straight off a real board: a water dragon and two metal Wu on a water canal — one of the metal Wu
+    a negation, which prints 0/0/0 and moves nothing. The sum is +1 −1 −1 = −1, and the duelist is not
+    in tune with anything. It used to read only the Wu whose stats still moved, so the silent metal was
+    dropped, the sum came to +1, and a player who fielded two lumps of metal in a canal was told they
+    had won the Wu by being in tune with the water.
+    """
+    silent_metal = _wu("metal")
+    silent_metal.stats = {"force": 0, "agility": 0, "intellect": 0}  # a negation Wu: 0/0/0 printed
+
+    battle = _battle(1, 1, 1)  # nowhere near any stat bar — only resonance could claim this
+    battle.player.queue = [_wu("water"), _wu("metal"), silent_metal]
+
+    assert _claim([battle], background="water") is None
+
+
 def test_a_wu_at_odds_with_the_ground_claims_nothing():
     battle = _battle(1, 1, 1)
     battle.player.queue = [_wu("fire")]  # fire on water: opposed

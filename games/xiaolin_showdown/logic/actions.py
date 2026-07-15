@@ -19,17 +19,21 @@ from .settings import XiaolinSettings
 from .state import XiaolinState
 from .turn import bank_value, max_hand_size
 
+# Every one of these is a REPORT: it is raised after the thing has happened, and it is read again in
+# the Game Log a turn later. So they are all past tense — a toast that says "you draw a Wu" describes
+# a future the game has already spent, and reads as an instruction rather than an account.
+#
 # The gag Wu Ohwah Tegu Saim (use/0) has a "? ? ?" power that does nothing when used.
-FIZZLE_MESSAGE = "You feel like something should have happened..."
-DRAW_MESSAGE = "Chronokinesis warps time — you draw a Wu!"
-DECK_MESSAGE = "Diaskopia sees through the vault — their deck holds: {cards}"
-PILE_MESSAGE = "Teleskopia reaches down the pile — next come: {cards}"
-CONCH_MESSAGE = "Telepatheia listens — you {answer} Initiative in the next Showdown."
-TAKEN, REFUSED = "take", "refuse"
-GLOVE_MESSAGE = "Attraction pulls {name} out of your deck and into your hand."
-RUBY_MESSAGE = "Repulsion shoves {name} out of their hand — they bank it for {paid} points."
-ROOSTER_MESSAGE = "Anabiosis calls {name} back from the lost — it is yours."
-EARLY_BIRD_MESSAGE = "You outrun your opponent to the next Wu: {taken} is yours. You gave up your {given} for it."
+FIZZLE_MESSAGE = "Something should have happened..."
+DRAW_MESSAGE = "Chronokinesis warped time — you drew a Wu!"
+DECK_MESSAGE = "Diaskopia saw through the vault — their deck holds: {cards}"
+PILE_MESSAGE = "Teleskopia reached down the pile — next come: {cards}"
+CONCH_MESSAGE = "Telepatheia listened — you {answer} Initiative in the next Showdown."
+TAKEN, REFUSED = "took", "refused"
+GLOVE_MESSAGE = "Attraction pulled {name} out of your deck and into your hand."
+RUBY_MESSAGE = "Repulsion shoved {name} out of their hand — they deposited it for {paid} points."
+ROOSTER_MESSAGE = "Anabiosis called {name} back from the lost — it is yours."
+EARLY_BIRD_MESSAGE = "You outran your opponent to the next Wu: {taken} is yours. You gave up your {given} for it."
 
 
 SPENT_MESSAGE = "You have already acted this turn."

@@ -310,11 +310,12 @@ def _wu_names() -> tuple[re.Pattern[str], dict[str, Card]]:
 
 
 def power_headline(card: Card) -> Text:
-    """A Wu named by its *power*: ``Teleskopia (Eagle Scope 1/2/3)``.
+    """A Wu named by its *power*: ``Teleskopia (Eagle Scope)``.
 
-    The shape for a screen that asks which power to spend, where the power is the thing being chosen
-    and the Wu is which one it costs. `card_headline` is the other way round, and belongs everywhere a
-    *card* is the choice.
+    The shape for a screen that asks which power to spend: the power is the thing being chosen, and
+    the Wu is only which card it costs you. No stats — a power does not care what the card fights for,
+    and printing them here asks a reader to weigh numbers that have nothing to do with the choice.
+    `card_headline` is the other way round, and belongs everywhere a *card* is what is being picked.
 
     Fresh ``Text``, as always: both name helpers carry a colour as their base style.
     """
@@ -322,7 +323,7 @@ def power_headline(card: Card) -> Text:
     line.append_text(power_name_text(card.power))
     line.append(" (")
     line.append_text(card_name_text(card))
-    line.append(f" {stats_line(card.stats)})")
+    line.append(")")
     return line
 
 

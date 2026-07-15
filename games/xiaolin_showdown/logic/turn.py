@@ -244,14 +244,20 @@ def bank_value(card: Card, rng: Rng) -> int:
 # theirs and the same move of yours are filed under the same word in the Game Log — "Deposit" is
 # "Deposit" whichever side of the table it happened on. (A power is filed under its own name, and the
 # Early Bird under this one, because the Bird is a power that belongs to no Wu.)
-DEPOSIT = "Deposit"
+# The PLACE, not the verb. You go to the Vault; what you do there is bank a Wu, and the line under
+# the title says so ("You deposited Golden Tiger Claws for 2 pts"). A title names where a move was made;
+# the prose names what it was.
+VAULT = "Vault"
 DRAW = "Draw"
 EARLY_BIRD = "Early Bird"
 PASSED = "Pass"
-# Every Wu power is one action — "Powerup", the same word the screen that spends them is called. The
-# *power* is named in the line, not in the title: a title is a label, and a label that changes with
-# every card cannot be scanned for.
-POWERUP = "Powerup"
+# Every Wu power is one action, and the game already has a word for it: the vault offers "Use a Power",
+# the rulebook says power, the code says `use_power`. A second word for the same thing is the thing
+# that reads wrong, whichever word it is.
+#
+# The *power's own name* goes in the line, not in the title: a title is a label, and a label that
+# changes with every card cannot be scanned for.
+POWER = "Power"
 
 
 @dataclass(frozen=True)
@@ -291,7 +297,7 @@ def bot_turn(
         if acted is None:
             break
         log.append(acted)
-    return log or [BotMove(PASSED, f"{name} does nothing this turn")]
+    return log or [BotMove(PASSED, f"{name} did nothing this turn.")]
 
 
 def _bot_acts(
@@ -321,7 +327,7 @@ def _bot_acts(
             rng=rng,
         )
         return BotMove(
-            POWERUP, f"{name} played {play.card.power.name} from the {play.card.name}"
+            POWER, f"{name} played {play.card.power.name} from the {play.card.name}."
         )
 
     # The Early Bird, before drawing or banking: a Wu off the pile with no showdown beats either, and
@@ -332,14 +338,14 @@ def _bot_acts(
         return BotMove(
             EARLY_BIRD,
             f"{name} used Early Bird and sacrificed {bird.name} — the next Wu was taken from "
-            "under your nose",
+            "under your nose.",
         )
 
     if len(state.bot.hand) < settings.max_wager and state.bot.deck:
         drawn = state.bot.deck.pop(0)
         state.bot.hand.append(drawn)
         state.bot_actions_taken += 1
-        return BotMove(DRAW, f"{name} drew a Wu from their deck")
+        return BotMove(DRAW, f"{name} drew a Wu from their deck.")
 
     # Mirrors `can_deposit`: never cash the last card out of the hand.
     if len(state.bot.hand) > DUEL_FLOOR:
@@ -350,8 +356,8 @@ def _bot_acts(
             state.bot.remove_card(banked)
             state.bot_actions_taken += 1
             return BotMove(
-                DEPOSIT,
-                f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}",
+                VAULT,
+                f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}.",
             )
     return None
 

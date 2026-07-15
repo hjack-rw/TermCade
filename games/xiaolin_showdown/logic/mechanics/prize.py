@@ -80,11 +80,17 @@ def _elemental_surplus(rounds: list[Round], winner_is_player: bool, background: 
 
     +1 for a Wu of the ground's element, −1 for its opposite — and −1 for metal on any coloured
     ground, which is the price metal pays for being at home everywhere and favoured almost nowhere.
-    Only the Wu still pulling their weight count; a spent curse or a booster that lifted nothing was
-    never really on the table.
+
+    **Every Wu the duelist FIELDED counts** — the whole Offensive line, exactly as the board prints
+    it. Being in tune asks what you *brought* to the ground, not what it did once it got there: a
+    negation Wu prints 0/0/0 and moves no stat, and it is still a lump of metal standing in a water
+    canal. This used to read `contributors()`, which drops any Wu whose stats move nothing — so two
+    metal Wu could be fielded on a water ground, one of them a negation, and only the *other* one was
+    counted against you. A player who fielded metal, metal and one water dragon was told they were in
+    tune with the water.
     """
     return sum(
         element_score(card.element, background)
         for battle in rounds
-        for card in battle.sides(winner_is_player)[0].contributors()
+        for card in battle.sides(winner_is_player)[0].mine()
     )
