@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from array import array
 from pathlib import Path, PurePath
+from typing import Any
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -211,6 +212,18 @@ class EngineApp(App[None]):
         # late start — both would otherwise leave the OS looping a sound nobody asked for.
         if not self._closing and self.music_on:
             self._player.play_loop(self._theme)
+
+    def notify(self, message: str, *, title: str = "", **kwargs: Any) -> None:
+        """Raise a toast — and write it down, because a toast is a thing a player can miss.
+
+        Every notification the game raises passes through here, so this is the one place that can
+        record them all: the opponent's whole turn, the price they named, what a power did. They show
+        for a few seconds and vanish, and the game does not pause while they do. The journal is what
+        the Game Log reads back.
+        """
+        if self.ctx is not None:
+            self.ctx.journal.add(message, title=title)
+        super().notify(message, title=title, **kwargs)
 
     def report_crash(self, error: BaseException, *, where: str) -> None:
         """Put a crashed worker's exception in front of the player, and hand them back their game.

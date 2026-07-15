@@ -38,6 +38,24 @@ class EngineScreen(Screen[None]):
     # The focus key (Tab) is advertised by `EngineApp`, not here: the app binds it with `priority=True`,
     # which beats any screen binding, so a copy on this class would be dead code pretending to work.
 
+    def rebuild(self) -> None:
+        """Recompose the screen — and put its footer back.
+
+        **Never call `refresh(recompose=True)` directly on a screen with a `Footer`.** Recomposing
+        tears the Footer down and builds a new one, and the new one comes up *empty*: it fills itself
+        from the screen's bindings when it mounts, and at that moment there are none to read. Every key
+        the screen offers silently vanishes from the bottom of the terminal — the screen still works,
+        it just stops telling anyone how.
+
+        That bit the vault, which recomposes on every return from a sub-screen and after every draw, so
+        looking one card up cost you the whole hint line for the rest of the run.
+
+        `refresh_bindings` after the recompose is what refills it. Deferred, because the new Footer does
+        not exist yet at the moment we ask.
+        """
+        self.refresh(recompose=True)
+        self.call_after_refresh(self.refresh_bindings)
+
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
         """A worker that died takes its error to the player, not to the void.
 

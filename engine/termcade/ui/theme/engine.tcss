@@ -207,3 +207,19 @@ ConsoleScreen #console-input {
     border: none;
     background: $panel;
 }
+
+/* --- Game Log -------------------------------------------------------------- */
+/* A full-height page: the log is read by scrolling, and a panel sized to its content would grow from
+   a two-line box into a full one as the run went on — the same screen, never twice the same shape. */
+GameLogScreen BoxedPanel {
+    width: 1fr;
+    height: 1fr;
+}
+GameLogScreen #log-body {
+    height: 1fr;
+    padding: 0 2;
+}
+GameLogScreen #log-entries {
+    width: 100%;
+    height: auto;
+}

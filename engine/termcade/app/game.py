@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from typing import Any, Callable
 
 from termcade.core.audio import AudioPlayer, make_player
+from termcade.core.journal import Journal
 from termcade.core.music import ARCADE, Style
 from termcade.core.paths import app_dir
 from termcade.core.rng import Rng
@@ -80,6 +81,15 @@ class Game:
     #
     # Empty by default: a cartridge that supplies none simply has a console with nothing in it.
     console_commands: "Mapping[str, Any]" = field(default_factory=dict)
+    # How a line of the journal is DRAWN in the Game Log (see `termcade.ui.screens.log`). Given the
+    # message, a cartridge returns Rich text.
+    #
+    # The engine cannot do this itself: the log's lines are prose the game wrote ("Katnappé played Bras
+    # Finger"), and only the game knows that "Bras Finger" is a Wu — which element colours it, what its
+    # stats are, that a card is written `Name (1/2/3)` everywhere else it appears. Without this the log
+    # is the one screen in the game where a card is plain grey words, and it reads as a different game.
+    # None = draw the message as it was written.
+    log_line: Callable[[str], Any] | None = None
 
 
 class GameContext:
@@ -128,5 +138,24 @@ class GameContext:
 
         self.rng = Rng(seed)
 
+        # Everything the run has said, in order — every notification, plus whatever the game writes
+        # down itself. Built BEFORE `state`, because assigning a state empties it.
+        self.journal = Journal()
+
         # The game's current live state (opaque GameState); set by the game on new-game/load.
-        self.state: GameState | None = None
+        self._state: GameState | None = None
+
+    @property
+    def state(self) -> GameState | None:
+        return self._state
+
+    @state.setter
+    def state(self, state: GameState | None) -> None:
+        """Set the live state — and empty the journal, because a new state is a new run.
+
+        A property and not a plain attribute for exactly this: the log is emptied in *one* place. A
+        new game and a loaded save both land here, and neither should open showing the tail of the
+        game before it — a record of a run must be a record of *that* run.
+        """
+        self._state = state
+        self.journal.clear()

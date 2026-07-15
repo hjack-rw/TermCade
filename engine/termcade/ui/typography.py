@@ -23,4 +23,8 @@ def spaced_dashes(text: str) -> str:
     spaces into a sentence to work around a font.
     """
     parts = [part.strip() for part in text.split(EM_DASH)]
-    return f" {EM_DASH}{DASH_GAP}".join(parts)
+    spaced = f" {EM_DASH}{DASH_GAP}".join(parts)
+    # A line that BEGINS with a dash gets no space in front of it — there is nothing to separate it
+    # from, and the stray column would indent that line alone. (A wrapped paragraph can break exactly
+    # there, so this is not a hypothetical.)
+    return spaced if text[:1].isspace() else spaced.lstrip(" ")

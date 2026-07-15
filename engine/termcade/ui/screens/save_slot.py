@@ -109,7 +109,7 @@ class SaveSlotScreen(MenuScreen):
             return
         self.ctx.saves.delete(slot)
         self.app.notify(f"Slot {slot + 1} deleted.")
-        self.refresh(recompose=True)  # the freed slot shows as empty at once
+        self.rebuild()  # the freed slot shows as empty at once (and the footer survives it)
 
     def _save(self, slot: int) -> None:
         state = self.ctx.state

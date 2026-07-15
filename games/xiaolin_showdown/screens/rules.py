@@ -29,6 +29,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 
 from termcade.ui.screens.base import EngineScreen
+from termcade.ui.typography import spaced_dashes
 from ..logic.mechanics.prize import PrizeRoute
 from ..logic.settings import XiaolinSettings
 
@@ -41,7 +42,7 @@ HOW_TO_PLAY: list[str] = [
     "Collect Shen Gong Wu, bank them for points, and reach the target before your opponent does.",
     "A turn at the vault allows for ONE action: bank a Wu for its points, spend a Wu for its power, or "
     "draw one into your hand. Banking a Wu forfeits its power; keeping the power forfeits the points. ",
-    "Then call `Gong Yi Tanpai!` — a Showdown for the next Wu on the pile.",
+    "Then call `Gong Yi Tanpai!` —  a Showdown for the next Wu on the pile.",
     "Whoever is faster (Initiative) says what is contested.",
     "You both field your Wu at the same moment, neither seeing the other's. "
     "Your character, the Wu you played and the arena you stand in are all added up.",
@@ -306,8 +307,21 @@ class _Rule:
         self.rule = rule
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        # The lines come back already spaced (see `_line`): the wrap both measures and emits the printed
+        # text, because the em dash needs a column the joined text does not have.
         for line in _balance(self.rule.split(), options.max_width):
             yield Text(line)
+
+
+def _line(words: list[str]) -> str:
+    """The line as it will be PRINTED — em dashes already given their gap.
+
+    Wrapping has to measure the printed line, not the joined one: `spaced_dashes` puts a column back
+    after every dash, and a wrap that measured the text before that ran hands Rich a line one column
+    too long. Rich then breaks it again, on its own terms, and the whole balancing act below is undone
+    by a word dropped onto a line of its own.
+    """
+    return spaced_dashes(" ".join(words))
 
 
 def _wrap(words: list[str], width: int) -> list[list[str]]:
@@ -315,7 +329,7 @@ def _wrap(words: list[str], width: int) -> list[list[str]]:
     lines: list[list[str]] = [[]]
     for word in words:
         line = lines[-1]
-        if line and len(" ".join(line)) + 1 + len(word) > width:
+        if line and len(_line([*line, word])) > width:
             lines.append([word])
         else:
             line.append(word)
@@ -337,8 +351,8 @@ def _balance(words: list[str], width: int) -> list[str]:
     for trial in range(narrowest, width + 1):
         lines = _wrap(words, trial)
         if len(lines) <= count:
-            return [" ".join(line) for line in lines]
-    return [" ".join(line) for line in _wrap(words, width)]
+            return [_line(line) for line in lines]
+    return [_line(line) for line in _wrap(words, width)]
 
 
 def _bullets(rules: list[str]) -> Table:
