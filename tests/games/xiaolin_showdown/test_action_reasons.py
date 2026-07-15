@@ -15,6 +15,7 @@ from xiaolin_showdown.logic.actions import (
     can_draw,
     deposit_blocked,
     draw_blocked,
+    draw_swaps,
     usable_powers,
     use_power_blocked,
 )
@@ -68,10 +69,13 @@ def test_an_empty_personal_deck_says_so(state, settings):
     assert draw_blocked(state, settings) == "Your personal deck is empty."
 
 
-def test_a_full_hand_says_so(state, settings, card):
+def test_a_full_hand_does_not_block_a_draw_it_swaps(state, settings, card):
+    """A full hand used to block Draw. Now it SWAPS — shelve one, draw one — so a stuck hand can cycle."""
     state.player.deck = [card(PLAIN_WU)]
     state.player.hand = [card(PLAIN_WU) for _ in range(settings.max_hand_size)]
-    assert draw_blocked(state, settings) == "Your hand is full."
+
+    assert draw_blocked(state, settings) is None  # allowed
+    assert draw_swaps(state, settings) is True  # ...and it is a swap, not a growth
 
 
 def test_a_spent_action_blocks_a_deposit(state, settings):

@@ -18,6 +18,7 @@ from xiaolin_showdown.logic.actions import (
     can_draw,
     deposit,
     draw,
+    swap_from_hand,
     usable_powers,
     use_power,
 )
@@ -385,6 +386,21 @@ def test_can_draw_respects_the_turns_one_action():
     assert can_draw(state, settings) is True
     state.actions_taken = settings.actions_per_turn  # this turn's draw is spent
     assert can_draw(state, settings) is False
+
+
+def test_swapping_from_a_full_hand_keeps_it_the_same_size_and_costs_the_action():
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), _omi(cat))
+    shelved = state.player.hand[0]
+    state.player.deck.append(deepcopy(cat.card(6)))  # something to draw back
+    hand_before = len(state.player.hand)
+
+    drawn = swap_from_hand(state, shelved, rng=Rng(1))
+
+    assert len(state.player.hand) == hand_before  # net size unchanged
+    assert all(card is not shelved for card in state.player.hand)  # the chosen Wu left the hand
+    assert any(card is drawn for card in state.player.hand)  # a Wu came back
+    assert state.actions_taken == 1  # for the one action
 
 
 def test_usable_powers_respect_the_turns_one_action():

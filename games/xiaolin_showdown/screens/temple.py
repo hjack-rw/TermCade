@@ -10,6 +10,7 @@ from __future__ import annotations
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
+from termcade.ui.work import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header, Static
@@ -25,6 +26,8 @@ from ..logic.actions import (
     deposit_blocked,
     draw,
     draw_blocked,
+    draw_swaps,
+    swap_from_hand,
     usable_powers,
     use_power_blocked,
 )
@@ -37,6 +40,7 @@ from .deposit import DepositScreen
 from .format import (
     affiliation_icon,
     bonus_tooltip,
+    card_label,
     char_stats,
     display_name,
     hands_lines,
@@ -120,10 +124,32 @@ class TempleScreen(XiaolinScreen):
         self.app.switch_screen(DuelScreen())
 
     def action_draw(self) -> None:
-        if can_draw(self.state, self.rules):
-            card = draw(self.state)
-            self.app.notify(f"Drew {card.name}.", title=your_move(DRAW))
-            self.rebuild()  # show the drawn Wu without leaving the temple
+        if not can_draw(self.state, self.rules):
+            return
+        if draw_swaps(self.state, self.rules):
+            self._swap_draw()  # a full hand cycles: pick one to shelve, take one back
+            return
+        card = draw(self.state)
+        self.app.notify(f"Drew {card.name}.", title=your_move(DRAW))
+        self.rebuild()  # show the drawn Wu without leaving the temple
+
+    @work
+    async def _swap_draw(self) -> None:
+        """Full hand: choose a Wu to shelve, then draw one back — one action, hand size unchanged."""
+        asked = Text("Your hand is full.")
+        asked.append("\n\n")
+        asked.append("Shelve which Wu to your Deck, and draw another?")
+        shelved = await self.choose(
+            asked,
+            [(card_label(card), card) for card in self.state.player.hand],
+            title="SWAP",
+        )
+        if shelved is None:
+            return
+        drawn = swap_from_hand(self.state, shelved, rng=self.ctx.rng)
+        self.app.notify(f"Shelved {shelved.name}, drew {drawn.name}.", title=your_move(DRAW))
+        # No rebuild here: the picker suspended this screen, so `on_screen_resume` rebuilds on the way
+        # back. A second recompose races the Header's title-setter.
 
     def action_use_power(self) -> None:
         state, rules = self.state, self.rules

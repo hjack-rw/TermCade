@@ -161,20 +161,27 @@ def deposit(state: XiaolinState, card: Card, *, rng: Rng) -> int:
 
 
 def draw_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | None:
-    """Why a draw is disallowed right now, or ``None`` when it is allowed."""
+    """Why a draw is disallowed right now, or ``None`` when it is allowed.
+
+    A full hand no longer blocks it: instead of growing the hand, Draw *swaps* — you shelve a Wu and
+    take one back (see :func:`swap_from_hand`), so a stuck hand can still cycle.
+    """
     if has_acted(state, settings.actions_per_turn):
         return SPENT_MESSAGE
     if not state.player.deck:
         return "Your personal deck is empty."
-    if len(state.player.whole_hand) >= max_hand_size(state.player, settings.max_hand_size):
-        return "Your hand is full."
     return None
 
 
 def can_draw(state: XiaolinState, settings: XiaolinSettings) -> bool:
-    """The player may pull one Wu from their personal deck — if the deck holds one, this turn's
-    action is unspent, and the hand has room under the size limit."""
+    """The player may draw — the deck holds a Wu and this turn's action is unspent. A full hand swaps
+    rather than grows."""
     return draw_blocked(state, settings) is None
+
+
+def draw_swaps(state: XiaolinState, settings: XiaolinSettings) -> bool:
+    """Whether a Draw would SWAP (hand already full) rather than simply add a Wu."""
+    return len(state.player.whole_hand) >= max_hand_size(state.player, settings.max_hand_size)
 
 
 def draw(state: XiaolinState) -> Card:
@@ -183,6 +190,21 @@ def draw(state: XiaolinState) -> Card:
     state.player.hand.append(card)
     state.actions_taken += 1
     return card
+
+
+def swap_from_hand(state: XiaolinState, shelved: Card, *, rng: Rng) -> Card:
+    """A full hand's Draw: shelve ``shelved`` and take one back, for the turn's one action.
+
+    Draw FIRST, then shelve — so the Wu you take is whatever the deck already held, never the one you
+    are putting down. The shelved Wu is then shuffled into the deck for later. The hand ends the same
+    size, and the swap is never a wasted action that hands you back your own card.
+    """
+    drawn = state.player.deck.pop(0)
+    state.player.hand.append(drawn)
+    state.player.remove_card(shelved)
+    shelve(state.player, shelved, rng=rng)
+    state.actions_taken += 1
+    return drawn
 
 
 def usable_powers(state: XiaolinState, actions_per_turn: int, *, is_player: bool = True) -> list[Card]:

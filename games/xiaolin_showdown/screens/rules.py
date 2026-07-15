@@ -66,6 +66,8 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "points, use its power, or draw one from your Deck.",
             "Depositing a Wu forfeits its power. You are vaulting it, not spending it.",
             "Your hand never refills itself. Drawing it back up costs you the turn's action too.",
+            "Drawing with a full hand SWAPS: shelve one Wu to your Deck and take another. "
+            "Your Deck is shuffled, so a shelved Wu comes back in its own time.",
             f"Your hand holds {settings.max_hand_size} Wu. Over that, you shelve one back to your Deck.",
             f"Left with nothing you can field, you are dealt back in — up to {settings.empty_draw_limit} "
             "Wu, from your own Deck first and the pile only after it. It costs you the turn's action, "

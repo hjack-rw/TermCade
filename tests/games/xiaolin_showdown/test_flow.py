@@ -236,9 +236,43 @@ async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):
         await pilot.press("2")  # Draw a card
         await pilot.pause()
 
-        assert isinstance(app.screen, TempleScreen)  # a fresh vault reflecting the draw
+        assert isinstance(app.screen, TempleScreen)  # a fresh temple reflecting the draw
         assert len(app.ctx.state.player.hand) == hand_before + 1
         assert not app.ctx.state.player.deck
+
+
+async def test_drawing_with_a_full_hand_swaps_a_wu_through_a_picker(tmp_path):
+    """A full hand does not block Draw — it opens a picker to shelve one, then takes another back."""
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await _boot(app, pilot)
+        await _new_game_at_vault(app, pilot)
+        from xiaolin_showdown.logic.settings import XiaolinSettings
+
+        state = app.ctx.state
+        cat = state.catalog
+        # Fill the hand to the limit and stock the deck with a Wu to draw back.
+        limit = XiaolinSettings.from_settings(app.ctx.settings.current).max_hand_size
+        state.player.hand = [deepcopy(cat.card(6)) for _ in range(limit - len(state.player.inalienable_hand))]
+        state.player.deck.append(deepcopy(cat.card(7)))
+        full = len(state.player.whole_hand)
+
+        await pilot.press("2")  # Draw — a full hand, so a SWAP picker opens
+        for _ in range(10):  # the picker is raised from a worker; wait for it
+            await pilot.pause()
+            if isinstance(app.screen, ChoiceModal):
+                break
+        assert isinstance(app.screen, ChoiceModal)
+
+        await pilot.click("#opt-0")  # shelve the first Wu
+        for _ in range(10):
+            await pilot.pause()
+            if isinstance(app.screen, TempleScreen):
+                break
+
+        assert isinstance(app.screen, TempleScreen)
+        assert len(state.player.whole_hand) == full  # a swap: net size unchanged
+        assert any(card.id == 7 for card in state.player.hand)  # the deck's Wu came in
 
 
 async def test_reaching_the_point_limit_ends_the_game_instead_of_dueling(tmp_path):

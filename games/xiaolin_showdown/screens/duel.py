@@ -271,9 +271,7 @@ class DuelScreen(XiaolinScreen):
         The contested stat is worth double, so it is the obvious answer — but the other two are worth
         a point each, and taking both of them wins the battle just the same. That is the whole card.
         """
-        return await self.choose(
-            "Which stat does it pour into?", _stat_options(options), title="POUR"
-        )
+        return await self.choose("Which stat do you name?", _stat_options(options), title="NAME A STAT")
 
     async def _pick_boost(self, cards: list[Card]) -> Card | None:
         options: list[tuple[ContentText, Card | None]] = [*_card_options(cards), ("Don't play", None)]
@@ -637,7 +635,7 @@ def _prize_line(duel: DuelState) -> Text:
     # two — "Serpent's Tail ... in tune with the arena" reads as a claim ABOUT the Tail, which is the
     # one Wu that could never make it. The prize is what was *won*; the route is how the winner won it.
     if duel.prize_route is None:
-        line.append("   [Wu lost, but it may surface again...]", style="dim italic")
+        line.append("   [Wu was lost, but it may surface again...]", style="dim italic")
     else:
         line.append(f"   [Claimed: by {duel.prize_route.value}]", style="dim italic")
     return line
