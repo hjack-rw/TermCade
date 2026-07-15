@@ -235,4 +235,19 @@ def test_the_ruby_hands_you_nothing_but_the_shove(state, held, card):
     use_power(state, ruby, target=victim, rng=Rng(1))
 
     assert state.player.points == mine
+
+
+def test_shoving_a_wu_to_their_deck_pays_them_nothing(state, held, card):
+    """The caster's other option: no points to them, but the Wu is shuffled into their deck to be
+    drawn back — a delay, not the deposit's permanent removal."""
+    ruby = held(RUBY_OF_RAMSES)
+    victim = card(6)  # Fist of Tebigong, worth points
+    state.bot.hand = [victim, card(7)]
+    before = state.bot.points
+
+    use_power(state, ruby, target=victim, to_deck=True, rng=Rng(1))
+
+    assert not is_one_of(victim, state.bot.hand)  # gone from their hand
+    assert is_one_of(victim, state.bot.deck)  # onto their shelf, not banked
+    assert state.bot.points == before  # and they were paid nothing for it
     assert not is_one_of(victim, state.player.whole_hand)

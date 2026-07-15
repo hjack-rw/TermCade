@@ -39,6 +39,7 @@ class VaultPlay:
     card: Card
     priority: bool | None = None
     target: Card | None = None
+    to_deck: bool = False  # Repulsion: shove into their deck (no points) rather than their vault
 
 
 def choose_vault_power(
@@ -57,8 +58,12 @@ def choose_vault_power(
     for card in state.duelist(is_player).whole_hand:
         mechanic = mechanic_of(card.power)
 
-        if mechanic is Mechanic.REPULSION and _worth_shoving(state, settings, is_player):
-            return VaultPlay(card, target=_their_best(state, is_player))
+        if mechanic is Mechanic.REPULSION and _worth_shoving(state, is_player):
+            return VaultPlay(
+                card,
+                target=_their_best(state, is_player),
+                to_deck=_shove_to_deck(state, settings, is_player),
+            )
 
         if mechanic is Mechanic.TELEPATHEIA and _initiative_is_wrong(state, is_player):
             return VaultPlay(card, priority=_wants_initiative(state, is_player))
@@ -90,19 +95,27 @@ def _their_best(state: XiaolinState, is_player: bool = False) -> Card:
     return max(state.opponent(is_player).hand, key=duel_value)
 
 
-def _worth_shoving(state: XiaolinState, settings: XiaolinSettings, is_player: bool = False) -> bool:
-    """Shove their best Wu into their vault — unless the points would hand them the run.
+def _worth_shoving(state: XiaolinState, is_player: bool = False) -> bool:
+    """Shove their best Wu — if it is a real weapon and their hand can spare one.
 
-    That is the trap the card carries: it is a denial that *pays the duelist you are denying*. Fire
-    it while they are near the target and you lose the game with your own Wu.
+    Whether the *points* are safe is no longer part of this: with the deck as a destination, a shove
+    that would bank them into the win is simply routed there instead (see `_shove_to_deck`).
     """
     them = state.opponent(is_player)
     if len(them.hand) <= 1:  # a deposit may never empty a hand — theirs no more than yours
         return False
-    best = _their_best(state, is_player)
-    if them.points + expected_points(best) >= settings.point_limit:
-        return False  # it would bank them into the win
-    return duel_value(best) >= REPULSION_THRESHOLD
+    return duel_value(_their_best(state, is_player)) >= REPULSION_THRESHOLD
+
+
+def _shove_to_deck(state: XiaolinState, settings: XiaolinSettings, is_player: bool = False) -> bool:
+    """Deck it, not deposit it, when the points would carry them toward the win.
+
+    Deposit is the aggressive line — the weapon is gone for good — and worth the points it pays for a
+    real threat. But the card's trap is that those points are *theirs*: near the limit, banking their
+    own Wu could hand them the run. There, the deck denies the weapon for a while and pays them nothing.
+    """
+    them = state.opponent(is_player)
+    return them.points + expected_points(_their_best(state, is_player)) >= settings.point_limit
 
 
 # --- the Mind Reader Conch: buy the initiative, when it is pointing the wrong way ---

@@ -21,6 +21,7 @@ from termcade.app.game import GameContext
 from termcade.ui.screens.console import Command
 
 from .logic.catalog import load_catalog
+from .logic.turn import shelve
 from .logic.models import Card
 from .logic.state import XiaolinState
 
@@ -94,13 +95,14 @@ def deck(ctx: GameContext, args: Sequence[str]) -> str:
     """Shelve Wu onto a personal deck — what the deck powers read and pull from (Diaskopia, the Glove).
 
     ``deck them <id>...`` fills the opponent's shelf; a leading ``me``/``them`` picks whose, and with
-    none it is yours. FIFO, so the first shelved is the first drawn — the order you list them in.
+    none it is yours. Shuffled in, exactly as the game shelves — the deck is an obstacle, not an order.
     """
     state = _state(ctx)
     who, rest = (args[0], args[1:]) if args and args[0] in (*_ME, *_THEM) else ("me", args)
     player = state.bot if who in _THEM else state.player
     cards = _cards(rest)
-    player.deck.extend(cards)
+    for card in cards:
+        shelve(player, card, rng=ctx.rng)
     return f"shelved onto {'their' if who in _THEM else 'your'} deck: {_named(cards)}"
 
 

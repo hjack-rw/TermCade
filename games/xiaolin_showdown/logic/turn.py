@@ -84,8 +84,16 @@ def oversee_hand_size(
     for _ in range(over):
         card = rng.choice(player.hand)
         player.remove_card(card)
-        player.deck.append(card)
+        shelve(player, card, rng=rng)
     return False
+
+
+def shelve(player: Player, card: Card, *, rng: Rng) -> None:
+    """Put a Wu on a personal deck — and shuffle it in. The deck is an OBSTACLE, not an ordered stack:
+    a shelved Wu must not come back in a known order or on a countable turn, or it could be memorised
+    and played around. Load-bearing randomness (it decides a draw), so it draws the main stream."""
+    player.deck.append(card)
+    rng.shuffle(player.deck)
 
 
 def _charge_the_turn(state: XiaolinState, settings: XiaolinSettings, *, is_player: bool) -> None:
@@ -281,16 +289,18 @@ def _bot_acts(
 
     play = choose_vault_power(state, settings)
     if play is not None:
-        use_power(
+        report = use_power(
             state,
             play.card,
             is_player=False,
             priority=play.priority,
             target=play.target,
+            to_deck=play.to_deck,
             rng=rng,
         )
         return BotMove(
-            POWER, f"{name} played {play.card.power.name} from the {play.card.name}."
+            POWER,
+            f"{name} played {play.card.power.name} from the {play.card.name}.\n{report.log}",
         )
 
     # The Early Bird, before drawing or banking: a Wu off the pile with no showdown beats either, and

@@ -86,8 +86,11 @@ class UsePowerScreen(XiaolinMenu):
         mechanic = mechanic_of(card.power)
         priority = await self._ask_priority() if mechanic is Mechanic.TELEPATHEIA else None
         target = await self._ask_target(mechanic)
+        to_deck = await self._ask_destination(target) if mechanic is Mechanic.REPULSION else False
 
-        report = use_power(self.state, card, priority=priority, target=target, rng=self.ctx.rng)
+        report = use_power(
+            self.state, card, priority=priority, target=target, to_deck=to_deck, rng=self.ctx.rng
+        )
         self.app.pop_screen()
         self.app.notify(report.toast, log=False)  # the toast names the power and sets the scene
         self.ctx.journal.add(
@@ -107,11 +110,30 @@ class UsePowerScreen(XiaolinMenu):
             )
         if mechanic is Mechanic.REPULSION:
             return await self.choose(
-                "Shove which Wu out of their hand? They will deposit it.",
+                "Shove which Wu out of their hand?",
                 [(card_label(wu), wu) for wu in self.state.bot.hand],
                 title="RUBY OF RAMSES",
             )
         return None
+
+    async def _ask_destination(self, target: Card | None) -> bool:
+        """Where the shoved Wu lands — the two costs of Repulsion. Deposit pays them points but is
+        forever; the deck gives no points but they draw it back. Returns True for the deck."""
+        asked = Text()
+        if target is not None:
+            asked.append_text(card_headline(target))
+            asked.append(" — where does it go?")
+        else:
+            asked.append("Where does the shoved Wu go?")
+        asked.append("\n\n")
+        asked.append("Their vault pays them points but is final; their deck pays nothing but returns.")
+
+        return await self.confirm(
+            asked,
+            title="RUBY OF RAMSES",
+            yes="Into their deck",
+            no="Deposit for points",
+        )
 
     async def _ask_priority(self) -> bool:
         """Reveal and question on one screen: the next Wu is the whole reason to want initiative, so

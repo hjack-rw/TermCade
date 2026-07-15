@@ -32,7 +32,7 @@ from ..logic.mechanics.cards import is_one_of
 from ..logic.models import Card, Player
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
-from ..logic.turn import bot_turn, max_hand_size, refill_hands
+from ..logic.turn import bot_turn, max_hand_size, refill_hands, shelve
 from ..logic.mechanics.powers import is_boost_slot
 from ..logic.mechanics.scoring import contributing, element_score
 from .base import XiaolinScreen
@@ -207,7 +207,7 @@ class DuelScreen(XiaolinScreen):
                 title="DISPOSE",
             )
             state.player.remove_card(card)
-            state.player.deck.append(card)
+            shelve(state.player, card, rng=self.ctx.rng)
 
     def _leave(self) -> None:
         if self.state.has_ended:

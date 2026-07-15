@@ -22,6 +22,7 @@ from xiaolin_showdown.logic.turn import (
     max_hand_size,
     oversee_hand_size,
     refill_hands,
+    shelve,
 )
 
 from factories import duelist, wu
@@ -62,6 +63,19 @@ def test_an_over_limit_hand_sheds_the_surplus_to_the_personal_deck():
     assert settled is False  # it shed cards — the vault loop will re-check
     assert len(player.hand) == 6
     assert len(player.deck) == 2  # the two surplus Wu went to the personal deck
+
+
+def test_shelving_shuffles_the_deck_so_it_cannot_be_memorised():
+    """The personal deck is an OBSTACLE: a shelved Wu must not come back in the order it went in, or a
+    player could count turns and play around it (the whole point of Repulsion-to-deck)."""
+    order = [wu(force=n, name=f"Wu{n}") for n in range(12)]
+    player = _player(0)
+
+    for card in order:
+        shelve(player, card, rng=Rng(1))
+
+    assert {c.name for c in player.deck} == {c.name for c in order}  # every card is still there
+    assert [c.name for c in player.deck] != [c.name for c in order]  # but not in the order shelved
 
 
 def test_a_short_hand_is_left_for_the_player_to_draw():

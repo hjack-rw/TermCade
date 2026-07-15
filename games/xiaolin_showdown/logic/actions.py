@@ -17,7 +17,7 @@ from .mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of, trigger_of
 from .models import Card, Player
 from .settings import XiaolinSettings
 from .state import XiaolinState
-from .turn import bank_value, max_hand_size
+from .turn import bank_value, max_hand_size, shelve
 
 # A fired power says its piece TWICE. The toast names the power and sets the scene; the log line drops
 # the name and states only the outcome, because the Game Log entry above it already read "You played
@@ -38,13 +38,19 @@ class PowerReport:
 
 
 # Every acting power's two lines, keyed by mechanic — the same shape as `RULES` and `_FIRE`, so a power
-# is defined once, in one place. To tweak a power's wording, edit its row here and nothing else. The
-# `{...}` fields are filled with what the handler returns (see `_fire` / `_report`).
+# is defined once, in one place. To tweak a power's wording, edit its row here and nothing else.
+#
+# The TOAST is player-only (only you see a toast for your own action), so it is written first-person.
+# The LOG is read by BOTH sides — your own move, and the opponent's — so it takes pronoun inserts that
+# flip by who cast it (see `_voice`): {caster} You/They, {caster_poss} your/their, {victim}/{victim_poss}
+# the other duelist. The rest (`{name}`, `{cards}`, `{answer}`, `{paid}`) come from the handler.
 REPORTS: dict[Mechanic, PowerReport] = {
     Mechanic.CHRONOKINESIS: PowerReport(
         "Chronokinesis stopped time — you drew a Wu!",
-        "You drew a Wu!",
+        "{caster} drew a Wu.",
     ),
+    # Diaskopia and Teleskopia reveal to the CASTER, and the opponent never spends them (they are always
+    # banked — see vault_ai), so their log only ever reads player-cast. Left first-person.
     Mechanic.DIASKOPIA: PowerReport(
         "Diaskopia saw through the wall — their Deck holds: {cards}",
         "Their Deck holds: {cards}",
@@ -55,21 +61,28 @@ REPORTS: dict[Mechanic, PowerReport] = {
     ),
     Mechanic.TELEPATHEIA: PowerReport(
         "Telepatheia listened in — you {answer} Initiative in the next Showdown.",
-        "You {answer} Initiative in the next Showdown.",
+        "{caster} {answer} Initiative in the next Showdown.",
     ),
     Mechanic.ATTRACTION: PowerReport(
         "Attraction pulled {name} out of your Deck and into your Hand.",
-        "{name} came out of your Deck and into your Hand.",
+        "{name} came out of {caster_poss} Deck and into {caster_poss} Hand.",
     ),
     Mechanic.REPULSION: PowerReport(
         "Repulsion shoved {name} out of their Hand — they deposited it for {paid} points.",
-        "{name} was forced deposited by them for {paid} points.",
+        "{name} was deposited out of {victim_poss} Hand for {paid} points.",
     ),
     Mechanic.EUTHYMIA: PowerReport(
         "Euthymia called {name} back from the lost — it is yours.",
-        "{name} came back from the lost into your possession.",
+        "{name} came back from the lost into {caster_poss} possession.",
     ),
 }
+
+# Repulsion's OTHER destination: shoved into their deck (no points), not banked. Picked by `_fire` when
+# the caster chose the deck — it sits by the vault version above, so both wordings tweak together.
+REPULSION_TO_DECK = PowerReport(
+    "Repulsion shoved {name} out of their Hand — it is lost in their Deck.",
+    "{name} was shoved out of {victim_poss} Hand into {victim_poss} Deck.",
+)
 
 # The fizzle is not keyed to an acting power: the gag Wu (use/0) hits it, so does any power with
 # nothing to act on. No outcome to keep — the non-event IS the joke, so both lines are the same.
@@ -79,9 +92,22 @@ FIZZLE_MESSAGE = PowerReport(
 )
 
 
-def _report(template: PowerReport, **kw: object) -> PowerReport:
-    """Fill both lines of a template from the same values."""
-    return PowerReport(template.toast.format(**kw), template.log.format(**kw))
+def _voice(is_player: bool) -> dict[str, str]:
+    """The pronoun inserts for a log line, flipped by who cast the power — so one line reads right from
+    either seat. The toast has no such inserts (it is first-person, and player-only)."""
+    return {
+        "caster": "You" if is_player else "They",
+        "caster_poss": "your" if is_player else "their",
+        "victim": "they" if is_player else "you",
+        "victim_poss": "their" if is_player else "your",
+    }
+
+
+def _report(template: PowerReport, *, is_player: bool = True, **kw: object) -> PowerReport:
+    """Fill both lines of a template. The log takes pronoun inserts (`_voice`); the toast ignores the
+    ones it does not use, so the same call fills both."""
+    fills = {**_voice(is_player), **kw}
+    return PowerReport(template.toast.format(**fills), template.log.format(**fills))
 
 
 # Not a power: the Early Bird logs its own line, so it stays a plain one-form message.
@@ -297,6 +323,7 @@ def use_power(
     is_player: bool = True,
     priority: bool | None = None,
     target: Card | None = None,
+    to_deck: bool = False,
     rng: Rng | None = None,
 ) -> PowerReport:
     """Fire ``card``'s power, then discard it for **no points**; return its :class:`PowerReport`
@@ -310,13 +337,14 @@ def use_power(
     ``is_player`` is which duelist fired it — the bot spends a Wu by exactly these rules. The rest
     are the answers a power needs and the logic layer cannot ask for: ``priority`` is Telepatheia's
     (take the next showdown's initiative, or refuse it), ``target`` is the Wu Attraction pulls or the
-    one Repulsion shoves, and ``rng`` is Repulsion's, because a Wu shoved into the vault might be the
-    one whose worth is rolled.
+    one Repulsion shoves, ``to_deck`` is Repulsion's destination (shelve it into their deck for no
+    points, instead of banking it for points), and ``rng`` is Repulsion's, because a Wu shoved into the
+    vault might be the one whose worth is rolled — and a Wu shoved into a deck is shuffled in.
     """
     if trigger_of(card.power) != "use":  # a hand power-up is passive — nothing to trigger, kept
         return FIZZLE_MESSAGE
 
-    spend = _Spend(state, card, is_player, priority, target, rng)
+    spend = _Spend(state, card, is_player, priority, target, to_deck, rng)
     message = _fire(spend)
     state.spend_action(is_player)
     spend.me.remove_card(card)  # discarded, no points
@@ -336,6 +364,7 @@ class _Spend:
     is_player: bool = True
     priority: bool | None = None
     target: Card | None = None
+    to_deck: bool = False  # Repulsion: shove into their deck (no points), not into their vault
     rng: Rng | None = None
 
     @property
@@ -423,18 +452,23 @@ def _recover(spend: _Spend) -> _Fill | None:
 
 
 def _shove(spend: _Spend) -> _Fill | None:
-    """Repulsion: a Wu out of the opponent's hand, into the opponent's vault.
+    """Repulsion: a Wu out of the opponent's hand — the caster picks where it lands.
 
-    Their points, not yours — the Wu is *pushed away*, not taken. The clamp is the one every deposit
-    lives under: a bad roll costs banked points, never the run.
+    Two destinations, each with a cost. **Vault** (``to_deck=False``): they *bank the points*, the Wu
+    is gone for good — you pay them to remove it. **Deck** (``to_deck=True``): no points to them, but
+    it is shuffled into their deck and they will draw it back — a delay, not a removal. The clamp on the
+    deposit is the one every deposit lives under: a bad roll costs banked points, never the run.
     """
     them = spend.them
     if not them.hand:
         return None
     if spend.rng is None:
-        raise ValueError("Repulsion banks a Wu, and a banked Wu may need a roll — pass the rng")
+        raise ValueError("Repulsion moves a Wu that may need a roll or a shuffle — pass the rng")
     shoved = spend.wu()
     them.hand.pop(index_of(them.hand, shoved))
+    if spend.to_deck:
+        shelve(them, shoved, rng=spend.rng)
+        return {"name": shoved.name}
     paid = bank_value(shoved, spend.rng)
     them.points = max(0, them.points + paid)
     return {"name": shoved.name, "paid": paid}
@@ -464,7 +498,11 @@ def _fire(spend: _Spend) -> PowerReport:
     if handler is None:
         return FIZZLE_MESSAGE
     fills = handler(spend)
-    return _report(REPORTS[mechanic], **fills) if fills is not None else FIZZLE_MESSAGE
+    if fills is None:
+        return FIZZLE_MESSAGE
+    # Repulsion is the one power with two outcomes — the deck version has its own wording.
+    template = REPULSION_TO_DECK if mechanic is Mechanic.REPULSION and spend.to_deck else REPORTS[mechanic]
+    return _report(template, is_player=spend.is_player, **fills)
 
 
 def _names(cards: list[Card]) -> str:
