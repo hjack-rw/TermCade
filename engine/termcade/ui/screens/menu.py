@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header, Static
@@ -36,7 +37,9 @@ class MenuItem:
     """
 
     id: str
-    label: str
+    # Rich ``Text`` as well as plain: a game names its own nouns in its own colours, and a menu of
+    # cards is still a menu. ``Button`` renders either.
+    label: str | Text
     disabled: bool = False
     variant: ButtonVariant = "default"
     classes: str = ""

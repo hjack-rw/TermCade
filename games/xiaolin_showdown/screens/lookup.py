@@ -4,51 +4,53 @@ from __future__ import annotations
 
 from typing import Literal
 
-from textual.app import ComposeResult
-from textual.widgets import Footer, Header, Static
-
-from termcade.ui.widgets import BoxedPanel, Button
+from termcade.ui.screens.menu import MenuItem
 
 from ..logic.models import Card
-from .base import XiaolinScreen
+from .base import XiaolinMenu
 from .detail import DetailScreen
 from .format import card_label, char_stats, display_name, stats_line
 
 Kind = Literal["cards", "characters"]
 
 
-class LookUpScreen(XiaolinScreen):
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+class LookUpScreen(XiaolinMenu):
+    menu_title = "LOOK UP"
 
     def __init__(self, kind: Kind) -> None:
         super().__init__()
         self._kind = kind
         self._cards: list[Card] = []
+        self.menu_description = "Choose a card" if kind == "cards" else "Choose a character"
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        if self._kind == "cards":
-            self._cards = self.state.player.whole_hand + self.state.bot.whole_hand
-            mine = len(self.state.player.whole_hand)  # first this many are the player's
-            with BoxedPanel(title="LOOK UP"):
-                yield Static("Choose a card", classes="panel-desc")
-                for index, card in enumerate(self._cards):
-                    who = "You" if index < mine else "Opp"
-                    label = card_label(card, f"  ({stats_line(card.stats)})", prefix=f"{who}: ")
-                    yield Button(label, id=f"look-{index}")
-        else:
-            with BoxedPanel(title="LOOK UP"):
-                yield Static("Choose a character", classes="panel-desc")
-                you, opp = self.state.player.character, self.state.bot.character
-                yield Button(f"You: {display_name(you.name)}  ({char_stats(you)})", id="look-player")
-                yield Button(f"Opp: {display_name(opp.name)}  ({char_stats(opp)})", id="look-bot")
-        yield Footer()
+    def menu_items(self) -> list[MenuItem]:
+        if self._kind == "characters":
+            you, opp = self.state.player.character, self.state.bot.character
+            return [
+                MenuItem(id="look-player", label=f"You: {display_name(you.name)}  ({char_stats(you)})"),
+                MenuItem(id="look-bot", label=f"Opp: {display_name(opp.name)}  ({char_stats(opp)})"),
+            ]
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        assert event.button.id is not None
+        self._cards = self.state.player.whole_hand + self.state.bot.whole_hand
+        mine = len(self.state.player.whole_hand)  # the first this many are yours
+        return [
+            MenuItem(
+                id=f"look-{index}",
+                label=card_label(
+                    card,
+                    f"  ({stats_line(card.stats)})",
+                    prefix=f"{'You' if index < mine else 'Opp'}: ",
+                ),
+            )
+            for index, card in enumerate(self._cards)
+        ]
+
+    def on_select(self, item_id: str) -> None:
         if self._kind == "cards":
-            card = self._cards[int(event.button.id.removeprefix("look-"))]
-            self.app.push_screen(DetailScreen(card, is_card=True))
-        else:
-            character = self.state.player.character if event.button.id == "look-player" else self.state.bot.character
-            self.app.push_screen(DetailScreen(character, is_card=False))
+            self.app.push_screen(
+                DetailScreen(self._cards[int(item_id.removeprefix("look-"))], is_card=True)
+            )
+            return
+        player = item_id == "look-player"
+        character = self.state.player.character if player else self.state.bot.character
+        self.app.push_screen(DetailScreen(character, is_card=False))

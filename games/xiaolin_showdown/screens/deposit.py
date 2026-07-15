@@ -3,35 +3,32 @@ power). Crossing the point limit ends the run at once."""
 
 from __future__ import annotations
 
+from termcade.ui.screens.menu import MenuItem
 from termcade.ui.work import work
-from textual.app import ComposeResult
-from textual.widgets import Footer, Header, Static
-
-from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.actions import deposit
 from ..logic.mechanics.powers import is_gamble, trigger_of
 from ..logic.models import Card
 from ..logic.turn import VAULT
-from .base import XiaolinScreen
+from .base import XiaolinMenu
 from .format import card_label, points_label, your_move
 
 
-class DepositScreen(XiaolinScreen):
+class DepositScreen(XiaolinMenu):
     BINDINGS = [("escape", "app.pop_screen", "Cancel")]
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with BoxedPanel(title="VAULT"):
-            yield Static("Choose a card", classes="panel-desc")
-            for index, card in enumerate(self.state.player.hand):
-                # `points_label`, never `card.points`: the gamble Wu is worth `?` and reads as one.
-                yield Button(card_label(card, f"   +{points_label(card)} pts"), id=f"dep-{index}")
-        yield Footer()
+    menu_title = "VAULT"
+    menu_description = "Choose a card"
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        assert event.button.id is not None
-        self._choose(self.state.player.hand[int(event.button.id.removeprefix("dep-"))])
+    def menu_items(self) -> list[MenuItem]:
+        # `points_label`, never `card.points`: the gamble Wu is worth `?` and must read as one here.
+        return [
+            MenuItem(id=f"dep-{index}", label=card_label(card, f"   +{points_label(card)} pts"))
+            for index, card in enumerate(self.state.player.hand)
+        ]
+
+    def on_select(self, item_id: str) -> None:
+        self._choose(self.state.player.hand[int(item_id.removeprefix("dep-"))])
 
     @work
     async def _choose(self, card: Card) -> None:

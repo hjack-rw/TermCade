@@ -7,11 +7,8 @@ layer cannot ask, it takes the answer as an argument.
 from __future__ import annotations
 
 from rich.text import Text
+from termcade.ui.screens.menu import MenuItem
 from termcade.ui.work import work
-from textual.app import ComposeResult
-from textual.widgets import Footer, Header, Static
-
-from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.actions import (
     can_early_bird,
@@ -24,37 +21,36 @@ from ..logic.actions import (
 from ..logic.mechanics.powers import Mechanic, mechanic_of
 from ..logic.models import Card
 from ..logic.turn import EARLY_BIRD, POWER
-from .base import XiaolinScreen
+from .base import XiaolinMenu
 from .format import card_headline, card_label, power_headline, your_move
 
 NOTHING_COMING = "The pile is empty — nothing is coming."
 
 
-class UsePowerScreen(XiaolinScreen):
+class UsePowerScreen(XiaolinMenu):
     """The Early Bird is listed among the Wu powers: it costs the same action and spends a Wu, so it
     is a power like any other — it just belongs to no card."""
 
     BINDINGS = [("escape", "app.pop_screen", "Cancel")]
 
-    def compose(self) -> ComposeResult:
+    menu_title = "POWERS"
+    menu_description = "Choose a power"
+
+    def menu_items(self) -> list[MenuItem]:
         self._usable: list[Card] = usable_powers(self.state, self.rules.actions_per_turn)
-        self._early_bird = can_early_bird(self.state, self.rules)
+        items = [
+            MenuItem(id=f"pow-{index}", label=power_headline(card))
+            for index, card in enumerate(self._usable)
+        ]
+        if can_early_bird(self.state, self.rules):
+            items.append(MenuItem(id="early-bird", label=EARLY_BIRD))
+        return items
 
-        yield Header()
-        with BoxedPanel(title="POWERS"):
-            yield Static("Choose a power", classes="panel-desc")
-            for index, card in enumerate(self._usable):
-                yield Button(power_headline(card), id=f"pow-{index}")
-            if self._early_bird:
-                yield Button(EARLY_BIRD, id="early-bird")
-        yield Footer()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        assert event.button.id is not None
-        if event.button.id == "early-bird":
+    def on_select(self, item_id: str) -> None:
+        if item_id == "early-bird":
             self._fly()
             return
-        self._spend(self._usable[int(event.button.id.removeprefix("pow-"))])
+        self._spend(self._usable[int(item_id.removeprefix("pow-"))])
 
     @work
     async def _fly(self) -> None:
