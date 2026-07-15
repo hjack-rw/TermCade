@@ -93,8 +93,18 @@ def _assert_invariants(duel, state, before_hand: list) -> None:
     assert d.winner is not None
     assert d.winner_character
 
-    # the tally agrees with the rounds
+    # EVERY BATTLE has a winner — none of them can come out drawn. A battle whose points land level
+    # (+2 on the contested stat, -1 and -1 on the others) used to be filed as a draw, and a tournament
+    # could end 0:0 with the Wu handed over on aggregate margin.
+    assert all(battle.winner is not None for battle in d.rounds), "a battle came out drawn"
+
+    # so a tournament is decided 2:1 or 3:0 — three battles, three results, no other shape
     player_rounds, bot_rounds = d.rounds_won
+    if tournament:
+        assert player_rounds + bot_rounds == TOURNAMENT_BATTLES
+        assert player_rounds != bot_rounds
+
+    # the tally agrees with the rounds
     assert player_rounds == sum(1 for r in d.rounds if r.winner is True)
     assert bot_rounds == sum(1 for r in d.rounds if r.winner is False)
 

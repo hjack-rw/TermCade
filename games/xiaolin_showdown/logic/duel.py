@@ -344,6 +344,9 @@ class Duel:
             player_stats=self.state.player.character.stats,
             bot_stats=self.state.bot.character.stats,
             bonus_cancelled=self.duel.elemental_bonus_cancelled,
+            # Priority is the last word on a battle nothing else can separate — and priority is held by
+            # whoever called the challenge, settled by initiative (or by the coin, on a tie).
+            challenger_is_player=bool(self.duel.player_priority),
         )
 
     def _score_round(self, current: Round) -> None:

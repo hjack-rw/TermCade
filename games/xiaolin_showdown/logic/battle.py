@@ -120,12 +120,21 @@ class Ground:
     player_stats: Mapping[str, int]
     bot_stats: Mapping[str, int]
     bonus_cancelled: bool = False  # a Serpent's Tail is on the table — nothing resonates
+    # Who holds priority. The last word on a battle nothing else can separate — the same rule the
+    # showdown itself ends on, so a duelist who sets the terms holds the ground at every level.
+    challenger_is_player: bool = True
 
 
 def score_battle(battle: Round, ground: Ground) -> None:
-    """Weigh one battle in place: its contested stat counts double, the other two count once.
+    """Weigh one battle in place. **Points, then initiative.**
 
-    A positive ``score`` means the player leads. The bot plays to make it negative.
+    The points: the contested stat counts ×2, the other two count ×1 each. A positive ``score`` means
+    the player leads, and the bot plays to make it negative.
+
+    **Level goes to initiative, and so every battle has a winner.** Level is not a corner case — take
+    the contested stat, lose the other two, and it is exactly level: +2 −1 −1 = 0. That used to be
+    recorded as a draw, which is how a tournament could end 0:0 with three battles fought and the Wu
+    handed over on aggregate margin. Three battles, three winners: a tournament ends 2:1 or 3:0.
     """
     battle.player.result.clear()
     battle.bot.result.clear()
@@ -143,7 +152,7 @@ def score_battle(battle: Round, ground: Ground) -> None:
         score += 0 if player_end == bot_end else point if player_end > bot_end else -point
 
     battle.score = score
-    battle.winner = None if score == 0 else score > 0
+    battle.winner = score > 0 if score else ground.challenger_is_player
 
 
 def end_stat(

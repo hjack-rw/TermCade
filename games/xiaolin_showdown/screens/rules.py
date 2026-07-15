@@ -107,7 +107,9 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "put it all in one place.",
         ],
         "Who Takes It": [
-            "The Showdown goes to whoever won the most battles.",
+            "A battle goes to whoever scored higher. Level? Initiative takes it. Every battle has a "
+            "winner.",
+            "The Showdown goes to whoever won the most battles. A Tournament therefore ends 2:1 or 3:0.",
             "Tied on battles? Add up every stat you won across them. The higher total takes it.",
             "Tied on that too? It goes to whoever called the Challenge.",
             "The loser forfeits every Wu they have wagered.",
