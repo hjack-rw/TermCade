@@ -207,7 +207,7 @@ EFFECTS = {
     Mechanic.HYDROKINESIS: f"You name one stat. It takes +{NAMED_STAT_VALUE} in the battle.",
     Mechanic.MISFORTUNE: f"You name one stat. Your opponent takes −{NAMED_STAT_VALUE} in the battle.",
     Mechanic.ATTRACTION: "Pull any one Wu from your own Deck into your hand.",
-    Mechanic.REPULSION: "Shove a Wu out of their hand. They bank it, and keep the points.",
+    Mechanic.REPULSION: "Shove a Wu from their hand — deposit it (they keep the points) or bury it in their Deck (no points).",
     Mechanic.EUTHYMIA: "Bring the oldest lost Wu back — into your hand.",
     Mechanic.CONTAINMENT: "In battle: their own stats count nothing.",
     Mechanic.REVERSAL: "In battle: the curses laid on you count nothing.",

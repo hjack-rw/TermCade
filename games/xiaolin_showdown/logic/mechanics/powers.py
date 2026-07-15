@@ -148,7 +148,8 @@ RULES: dict[Mechanic, Rule] = {
         Mechanic.REPULSION,
         "use",
         Timing.AT_TEMPLE,
-        "Spend it to shove one Wu out of your opponent's hand. They bank it, and keep the points.",
+        "Spend it to shove one Wu out of your opponent's hand — deposit it (they keep the points) or "
+        "bury it in their Deck (no points, but they draw it back).",
     ),
     Mechanic.EUTHYMIA: Rule(
         Mechanic.EUTHYMIA,
