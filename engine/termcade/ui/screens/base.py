@@ -72,6 +72,12 @@ class EngineScreen(Screen[None]):
         cast("EngineApp", self.app).report_crash(error, where=event.worker.name)
 
     @property
+    def engine_app(self) -> "EngineApp":
+        """`self.app` narrowed to the engine's App, for its extras — the journalling
+        ``notify(log=...)``, ``report_crash``. Textual types `app` as the base `App`."""
+        return cast("EngineApp", self.app)
+
+    @property
     def ctx(self) -> GameContext:
         ctx = cast("EngineApp", self.app).ctx
         assert ctx is not None, "screen has no GameContext (running without a Game)"

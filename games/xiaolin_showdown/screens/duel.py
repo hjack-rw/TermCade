@@ -106,7 +106,7 @@ class DuelScreen(XiaolinScreen):
         if self._committed:
             # Not logged: this is a *refusal*, an answer to a key, not something that happened in the
             # run. A log full of the game saying no is a log nobody reads.
-            self.app.notify("Gong Yi Tanpai! There is no retreat from a showdown.", log=False)
+            self.engine_app.notify("Gong Yi Tanpai! There is no retreat from a showdown.", log=False)
             return
         self._retreating = True
         self._continue.set()
@@ -132,7 +132,7 @@ class DuelScreen(XiaolinScreen):
     def _announce_wager(self, duel: DuelState, state: XiaolinState) -> None:
         """You called the challenge, so your opponent sets the price — and names it to your face."""
         name = display_name(state.bot.character.name)
-        self.app.notify(
+        self.engine_app.notify(
             # Not logged: the showdown's own story tells who staked what, in the order it happened.
             # Logging it here as well would say the same thing twice, once out of order.
             f"{name} requested a {_wager_label(duel.wager)}",

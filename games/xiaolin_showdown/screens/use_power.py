@@ -40,11 +40,11 @@ class UsePowerScreen(XiaolinMenu):
         # One button per distinct power. Two identical Wu (two Eagle Scopes) spend the same and read
         # the same, so a second row is only noise — collapse by name, and `_spend` fires one copy.
         seen: set[str] = set()
-        self._usable: list[Card] = [
-            card
-            for card in usable_powers(self.state, self.rules.actions_per_turn)
-            if not (card.name in seen or seen.add(card.name))
-        ]
+        self._usable: list[Card] = []
+        for card in usable_powers(self.state, self.rules.actions_per_turn):
+            if card.name not in seen:
+                seen.add(card.name)
+                self._usable.append(card)
         items = [
             MenuItem(id=f"pow-{index}", label=power_headline(card))
             for index, card in enumerate(self._usable)
@@ -75,7 +75,7 @@ class UsePowerScreen(XiaolinMenu):
             return
         message = early_bird(self.state, surrendered)
         self.app.pop_screen()
-        self.app.notify(message, log=False)  # the log gets the move's own shape, below
+        self.engine_app.notify(message, log=False)  # the log gets the move's own shape, below
         self.ctx.journal.add(
             f"You used Early Bird and sacrificed {surrendered.name}.",
             title=your_move(EARLY_BIRD),
@@ -92,7 +92,7 @@ class UsePowerScreen(XiaolinMenu):
             self.state, card, priority=priority, target=target, to_deck=to_deck, rng=self.ctx.rng
         )
         self.app.pop_screen()
-        self.app.notify(report.toast, log=False)  # the toast names the power and sets the scene
+        self.engine_app.notify(report.toast, log=False)  # the toast names the power and sets the scene
         self.ctx.journal.add(
             # the log drops the power name — the line here already gives it — and keeps only the outcome
             f"You played {card.power.name} from the {card.name}.\n{report.log}",
