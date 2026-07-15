@@ -17,6 +17,7 @@ from textual.containers import Horizontal
 from textual.widgets import Footer, Header, Static
 
 from termcade.ui.screens.base import EngineScreen
+from termcade.ui.screens.log import GameLogScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
@@ -32,6 +33,7 @@ from ..logic.actions import (
 )
 from ..logic.mechanics.scoring import initiative, initiative_sources
 from ..logic.models import Player
+from ..logic.turn import DRAW
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
 from .deposit import DepositScreen
@@ -41,6 +43,7 @@ from .format import (
     char_stats,
     display_name,
     hands_lines,
+    your_move,
 )
 from .lookup import LookUpScreen
 from .rules import RulesScreen
@@ -55,8 +58,9 @@ class VaultScreen(EngineScreen):
         ("4", "use_power", "Power"),
         ("5", "lookup_cards", "Cards"),
         ("6", "lookup_characters", "Characters"),
-        ("7", "rules", "Rules"),
-        ("0", "save_game", "Save"),
+        ("7", "game_log", "Log"),
+        ("8", "rules", "Rules"),
+        ("9", "save_game", "Save"),
         ("escape", "app.pop_screen", "Menu"),
     ]
 
@@ -107,7 +111,7 @@ class VaultScreen(EngineScreen):
     def on_screen_resume(self) -> None:
         if self._suspended:
             self._suspended = False
-            self.refresh(recompose=True)
+            self.rebuild()
 
     def action_gong_yi_tanpai(self) -> None:
         state = cast(XiaolinState, self.ctx.state)
@@ -128,8 +132,8 @@ class VaultScreen(EngineScreen):
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
         if can_draw(state, settings):
             card = draw(state)
-            self.app.notify(f"Drew {card.name}.")
-            self.refresh(recompose=True)  # show the drawn Wu without leaving the vault
+            self.app.notify(f"Drew {card.name}.", title=your_move(DRAW))
+            self.rebuild()  # show the drawn Wu without leaving the vault
 
     def action_use_power(self) -> None:
         state = cast(XiaolinState, self.ctx.state)
@@ -149,6 +153,9 @@ class VaultScreen(EngineScreen):
     def action_lookup_characters(self) -> None:
         self.app.push_screen(LookUpScreen("characters"))
 
+    def action_game_log(self) -> None:
+        self.app.push_screen(GameLogScreen())
+
     def action_rules(self) -> None:
         self.app.push_screen(RulesScreen())
 
@@ -166,9 +173,12 @@ _ACTIONS = [
     "4. Use a Power",
     "5. Look up Cards",
     "6. Look up Characters",
-    "7. Rules",
-    "0. Save game",
-    "Esc. Return to menu",
+    "7. Game Log",
+    "8. Rules",
+    "9. Save game",
+    # Escape is NOT listed. It is on the footer, where every screen's escape is, and a panel of things
+    # to *do* in the vault is not where "leave the vault" belongs. Nine actions fill the three columns
+    # exactly; a tenth entry left one hanging alone on a fourth row.
 ]
 
 # Hover text for an action that *is* available; a blocked one shows why instead (see _action_cell).
@@ -179,9 +189,9 @@ _ACTION_HELP = {
     "4": "Spend a Wu for its power.",
     "5": "Inspect any Wu in either hand.",
     "6": "Inspect either duelist.",
-    "7": "Rulebook for the game.",
-    "0": "Save this run to a slot.",
-    "Esc": "Back to the main menu.",
+    "7": "Everything that has happened so far.",
+    "8": "Rulebook for the game.",
+    "9": "Save this run to a slot.",
 }
 
 

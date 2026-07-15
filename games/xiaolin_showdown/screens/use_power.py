@@ -32,16 +32,20 @@ from ..logic.mechanics.powers import Mechanic, mechanic_of
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
+from ..logic.turn import EARLY_BIRD, POWERUP
 from rich.text import Text
 
-from .format import card_headline, card_label
+from .format import card_headline, card_label, power_headline, your_move
 
 NOTHING_COMING = "The pile is empty — nothing is coming."
 
 # The Early Bird is not a Wu, but it is a power: it costs the turn's action, it spends a Wu, and it is
 # offered only while it can actually be used. So it belongs on this screen, listed under the Wu whose
 # powers can be spent — not as a menu action of its own.
-EARLY_BIRD_LABEL = "Early Bird"
+#
+# The name comes from the logic layer, where the bot's own Early Bird is filed under it. One word for
+# one action, whichever side of the table takes it — the Game Log puts the two side by side.
+EARLY_BIRD_LABEL = EARLY_BIRD
 
 
 class UsePowerScreen(EngineScreen):
@@ -54,10 +58,13 @@ class UsePowerScreen(EngineScreen):
         self._early_bird = can_early_bird(state, settings)
 
         yield Header()
-        with BoxedPanel(title="USE A POWER"):
-            yield Static("Choose a Wu", classes="panel-desc")
+        with BoxedPanel(title="POWERUPS"):
+            yield Static("Choose a power", classes="panel-desc")
             for index, card in enumerate(self._usable):
-                yield Button(card_label(card), id=f"pow-{index}")
+                # Named by the POWER, not the Wu: what is being chosen here is an effect, and the Wu
+                # is which card it costs you. The Early Bird sits among them and is no Wu at all —
+                # which is only coherent if the list reads as powers.
+                yield Button(power_headline(card), id=f"pow-{index}")
             if self._early_bird:
                 yield Button(EARLY_BIRD_LABEL, id="early-bird")
         yield Footer()
@@ -89,7 +96,13 @@ class UsePowerScreen(EngineScreen):
             return
         message = early_bird(state, surrendered)
         self.app.pop_screen()
-        self.app.notify(message)
+        # The toast says what happened; the log says what you DID, in the shape every other move is
+        # written in — the action, then the Wu it cost.
+        self.app.notify(message, log=False)
+        self.ctx.journal.add(
+            f"You used Early Bird and sacrificed {surrendered.name}",
+            title=your_move(EARLY_BIRD_LABEL),
+        )
 
     @work
     async def _spend(self, card: Card) -> None:
@@ -101,7 +114,14 @@ class UsePowerScreen(EngineScreen):
 
         message = use_power(state, card, priority=priority, target=target, rng=self.ctx.rng)
         self.app.pop_screen()
-        self.app.notify(message)
+        # Filed under "Powerup" — the action — with the power NAMED in the line beneath it, the way
+        # the opponent's powers are written. What it then did follows on its own line: the Conch's
+        # answer, the Glove's pull, the gag Wu's fizzle.
+        self.app.notify(message, log=False)
+        self.ctx.journal.add(
+            f"You played {card.power.name} from the {card.name}\n{message}",
+            title=your_move(POWERUP),
+        )
 
     async def _ask_target(self, state: XiaolinState, mechanic: Mechanic) -> Card | None:
         """The Wu a power is aimed at — your own deck to pull from, or their hand to shove.
@@ -140,7 +160,7 @@ class UsePowerScreen(EngineScreen):
         else:
             heard.append(NOTHING_COMING)
         heard.append("\n\n")
-        heard.append("Take Initiative in the next showdown?")
+        heard.append("Take Initiative in the next Showdown?")
 
         return await self.confirm(
             heard,

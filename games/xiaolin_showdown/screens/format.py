@@ -6,10 +6,13 @@ cards.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
+from functools import cache
 
 from rich.text import Text
 
+from ..logic.catalog import load_catalog
 from ..logic.mechanics.powers import (
     NAMED_STAT_VALUE,
     SCOPE_DEPTH,
@@ -243,6 +246,83 @@ def card_headline(card: Card) -> Text:
     line = Text()
     line.append_text(card_name_text(card, bold=True))
     line.append(f" ({stats_line(card.stats)})")
+    return line
+
+
+# What a Game Log entry is filed under. Three kinds, and the difference is WHOSE it is: a move of
+# yours, a move of theirs, and the showdown — which is neither. A showdown is not somebody's move; it
+# is what the two moves were leading to, so it is titled flat and owns no side.
+YOUR_LOG = "Your move"
+OPPONENT_LOG = "Opponent's move"
+SHOWDOWN_LOG = "Showdown"
+
+
+def your_move(action: str) -> str:
+    """``Your move: Deposit`` — a line of the log that is yours, and says which action it was."""
+    return f"{YOUR_LOG}: {action}"
+
+
+def opponent_move(actions: Sequence[str]) -> str:
+    """``Opponent's move: Deposit`` — the same shape, the other side of the table.
+
+    One rule for both duelists: whose move, then which action. A move of theirs titled differently
+    from the same move of yours makes a reader compare two shapes instead of two sides.
+
+    A turn buys one action, so there is normally one to name. Where a rule hands out more (the console
+    can), the actions are not listed — a title is a label, and a label that grows is a sentence.
+    """
+    return f"{OPPONENT_LOG}: {actions[0]}" if len(actions) == 1 else OPPONENT_LOG
+
+
+def wu_in_prose(prose: str) -> Text:
+    """The game's own prose, with every Wu it names drawn as a Wu.
+
+    The Game Log's lines are sentences the game wrote — "Katnappé played Bras Finger", "Drew Eagle
+    Scope" — and a card written in plain grey words is a card in the one place the game does not look
+    like itself. Every other screen prints a Wu as an element-coloured name and its stats; so does this.
+
+    **A Wu is introduced once.** The first time it is named it comes with its stats, because that is
+    the moment a reader needs them; every mention after that is the name alone. Repeating the triple
+    turns a sentence into a datasheet, and the second copy tells nobody anything new.
+
+    Longest name first, or a Wu whose name contains another's gets cut in half by it.
+    """
+    names, cards = _wu_names()
+    text = Text()
+    introduced: set[str] = set()
+    at = 0
+    for match in names.finditer(prose):
+        name = match.group()
+        text.append(prose[at : match.start()])
+        card = cards[name]
+        text.append_text(card_name_text(card) if name in introduced else card_headline(card))
+        introduced.add(name)
+        at = match.end()
+    text.append(prose[at:])
+    return text
+
+
+@cache
+def _wu_names() -> tuple[re.Pattern[str], dict[str, Card]]:
+    cards = {card.name: card for card in load_catalog().cards if card.name}
+    pattern = re.compile("|".join(re.escape(name) for name in sorted(cards, key=len, reverse=True)))
+    return pattern, cards
+
+
+def power_headline(card: Card) -> Text:
+    """A Wu named by its *power*: ``Teleskopia (Eagle Scope 1/2/3)``.
+
+    The shape for a screen that asks which power to spend, where the power is the thing being chosen
+    and the Wu is which one it costs. `card_headline` is the other way round, and belongs everywhere a
+    *card* is the choice.
+
+    Fresh ``Text``, as always: both name helpers carry a colour as their base style.
+    """
+    line = Text()
+    line.append_text(power_name_text(card.power))
+    line.append(" (")
+    line.append_text(card_name_text(card))
+    line.append(f" {stats_line(card.stats)})")
     return line
 
 

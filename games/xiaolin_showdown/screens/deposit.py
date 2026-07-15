@@ -16,11 +16,12 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.actions import deposit
+from ..logic.turn import DEPOSIT
 from ..logic.mechanics.powers import is_gamble, trigger_of
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
-from .format import card_label, points_label
+from .format import card_label, points_label, your_move
 
 
 class DepositScreen(EngineScreen):
@@ -61,7 +62,15 @@ class DepositScreen(EngineScreen):
         state = cast(XiaolinState, self.ctx.state)
         paid = deposit(state, card, rng=self.ctx.rng)
         if is_gamble(card.power):  # you banked a "? ? ?" — this is the moment you learn what it was
+            # Its own toast is the record: it says what the Wu turned out to be worth, which is more
+            # than a generic "banked" line, and two entries for one deposit would just be noise.
             self.app.notify(_gamble_result(card, paid), title="? ? ?")
+        else:
+            # A deposit raises no toast — you watch the points move — so the log would lose the most
+            # common action in the game.
+            self.ctx.journal.add(
+                f"You banked {card.name} for {paid} pts.", title=your_move(DEPOSIT)
+            )
         settings = XiaolinSettings.from_settings(self.ctx.settings.current)
         if state.player.points >= settings.point_limit:  # crossing the line ends the game at once
             state.has_ended = True

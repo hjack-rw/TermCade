@@ -213,15 +213,20 @@ class EngineApp(App[None]):
         if not self._closing and self.music_on:
             self._player.play_loop(self._theme)
 
-    def notify(self, message: str, *, title: str = "", **kwargs: Any) -> None:
+    def notify(self, message: str, *, title: str = "", log: bool = True, **kwargs: Any) -> None:
         """Raise a toast — and write it down, because a toast is a thing a player can miss.
 
         Every notification the game raises passes through here, so this is the one place that can
         record them all: the opponent's whole turn, the price they named, what a power did. They show
         for a few seconds and vanish, and the game does not pause while they do. The journal is what
         the Game Log reads back.
+
+        ``log=False`` raises the toast without recording it — for a toast that is not an *event*. Two
+        kinds: one that only answers a key ("there is no retreat from a showdown" is a refusal, not
+        something that happened), and one the game already writes down better elsewhere. A log is a
+        record of a run, not a transcript of its notifications.
         """
-        if self.ctx is not None:
+        if log and self.ctx is not None:
             self.ctx.journal.add(message, title=title)
         super().notify(message, title=title, **kwargs)
 

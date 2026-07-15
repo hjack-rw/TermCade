@@ -37,10 +37,11 @@ EMPTY = "Nothing has happened yet."
 _HEADING_LIFT = 0.6
 
 # The rule between turns. Dashed, not solid: a solid rule reads as a *border* — the edge of a panel —
-# and the log already has one of those around it.
-_RULE = "╌"
+# and the log already has one of those around it. Every second cell is blank, so the dashes read as a
+# broken line rather than a continuous one.
+_RULE = "╌ "
+_RULE_SHARE = 0.8  # of the screen: short enough to be a rule, long enough to divide the page
 _RULE_MIN = 20  # a very narrow terminal still gets a rule, not a hyphen
-_RULE_PAD = 2  # breathing room, so it never runs into the scrollbar
 
 
 class GameLogScreen(EngineScreen):
@@ -81,7 +82,7 @@ class GameLogScreen(EngineScreen):
                 # A dashed rule between turns, and only BETWEEN them: a line above the first would be
                 # dividing it from nothing. The turn heading is what a reader scrolls by; the rule is
                 # what tells them, at a glance, where one turn stopped being the other.
-                page.append(f"{_RULE * self._rule_width()}\n", style="dim")
+                page.append(f"{self._rule()}\n", style="dim")
             page.append(f"Turn {turn}\n", style=heading)
             for entry in lines:
                 page.append_text(self._entry(entry))
@@ -91,14 +92,15 @@ class GameLogScreen(EngineScreen):
                 page.append("\n")
         return page
 
-    def _rule_width(self) -> int:
-        """The rule spans the page it divides, whatever width that is — never a fixed 40 columns that
-        is a stub on a wide terminal and a wrap on a narrow one."""
-        try:
-            width = self.query_one("#log-body", VerticalScroll).content_size.width
-        except Exception:  # noqa: BLE001 — asked before the layout exists (a test reading `showing`)
-            width = 0
-        return max(_RULE_MIN, width - _RULE_PAD)
+    def _rule(self) -> str:
+        """A rule that spans most of the page it divides, whatever width that is.
+
+        Measured off the SCREEN, not off the scroll container: the page is built during `compose`, when
+        the container has no size yet — asking it then answers zero, and the rule came out as the bare
+        minimum, a stub in the middle of a wide terminal.
+        """
+        width = max(_RULE_MIN, int(self.app.size.width * _RULE_SHARE))
+        return (_RULE * (width // len(_RULE))).rstrip()
 
     def _heading_style(self) -> str:
         try:
@@ -120,13 +122,23 @@ class GameLogScreen(EngineScreen):
         # Every line of the message indented, not just the first: the opponent's whole move arrives as
         # one multi-line toast, and a block that hangs together under its title reads as one event —
         # which is what it is.
-        for line in entry.message.splitlines() or [""]:
+        for line in self._drawn(entry.message).split("\n"):
             text.append("    ")
-            text.append_text(self._drawn(line))
+            text.append_text(line)
             text.append("\n")
         return text
 
-    def _drawn(self, line: str) -> Text:
-        """The game's own hand on its own nouns — a Wu named here looks like a Wu named anywhere."""
+    def _drawn(self, message: str | Text) -> Text:
+        """The game's own hand on its own nouns — a Wu named here looks like a Wu named anywhere.
+
+        The WHOLE message at once, not line by line: a game that introduces a Wu with its stats and
+        then refers to it again by name needs to know it has already been introduced, and it cannot
+        know that if it is handed one line at a time.
+
+        Text that arrives already styled is left alone. The game built it that way because it knew
+        something the log cannot look up.
+        """
+        if isinstance(message, Text):
+            return message
         draw = self.game.log_line
-        return Text(line) if draw is None else draw(line)
+        return Text(message) if draw is None else draw(message)

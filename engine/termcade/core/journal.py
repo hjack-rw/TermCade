@@ -18,18 +18,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from rich.text import Text
+
 
 @dataclass(frozen=True)
 class Entry:
     """One thing that happened: which turn it happened in, what it was about, and what it said.
 
     ``title`` is the toast's title where it had one (``Opponent's move``) and empty where it did not.
-    All plain — the journal is `core`, and it stores what was *said*, not how it looked.
+
+    A ``message`` is normally plain text — a toast is a string, and the game paints its own nouns when
+    the log is drawn (``Game.log_line``). But a game may hand over Rich text instead, for a line whose
+    colour it alone can know: Xiaolin's arenas serve two elements apiece, and which one an arena was
+    summoned under is a fact about *that showdown*, not about the arena. No lookup could recover it, so
+    the line arrives already coloured.
     """
 
     turn: int
     title: str
-    message: str
+    message: str | Text
 
 
 class Journal:
@@ -58,10 +65,11 @@ class Journal:
     def turn(self) -> int:
         return self._turn
 
-    def add(self, message: str, *, title: str = "") -> None:
+    def add(self, message: str | Text, *, title: str = "") -> None:
         """Write a line under the turn in play. A blank one is dropped — it records nothing."""
-        message = message.strip()
-        if not message:
+        if isinstance(message, str):
+            message = message.strip()
+        if not str(message).strip():
             return
         self._entries.append(Entry(turn=self._turn, title=title.strip(), message=message))
         del self._entries[: max(0, len(self._entries) - self.LIMIT)]

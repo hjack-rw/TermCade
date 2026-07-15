@@ -9,6 +9,8 @@ those is empty for every purpose that decides a duel, and the loop would otherwi
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from termcade.core.rng import Rng
 from termcade.core.settings import Difficulty
 
@@ -238,13 +240,41 @@ def bank_value(card: Card, rng: Rng) -> int:
     return roll_gamble(rng) if is_gamble(card.power) else card.points
 
 
+# The names of the actions a vault turn can spend, for whoever spends them. One list, so a move of
+# theirs and the same move of yours are filed under the same word in the Game Log — "Deposit" is
+# "Deposit" whichever side of the table it happened on. (A power is filed under its own name, and the
+# Early Bird under this one, because the Bird is a power that belongs to no Wu.)
+DEPOSIT = "Deposit"
+DRAW = "Draw"
+EARLY_BIRD = "Early Bird"
+PASSED = "Pass"
+# Every Wu power is one action — "Powerup", the same word the screen that spends them is called. The
+# *power* is named in the line, not in the title: a title is a label, and a label that changes with
+# every card cannot be scanned for.
+POWERUP = "Powerup"
+
+
+@dataclass(frozen=True)
+class BotMove:
+    """One thing the opponent did: what KIND of action it was, and the line the player is shown.
+
+    Two fields, because they answer different questions. The ``line`` is prose — it names the Wu and
+    what it cost. The ``action`` is the action itself ("Deposit", "Draw", a power's name), which is
+    what the Game Log files the move under, so their moves read the same shape as yours: an action,
+    then what it did. Deriving one from the other would mean parsing the game's own sentences back.
+    """
+
+    action: str
+    line: str
+
+
 def bot_turn(
     state: XiaolinState,
     settings: XiaolinSettings,
     *,
     rng: Rng,
     difficulty: Difficulty = Difficulty.NORMAL,
-) -> list[str]:
+) -> list[BotMove]:
     """The bot's between-showdown vault turn; returns a short log of what it did, for the player.
 
     One turn, one action — the rule that binds the player binds the bot. It used to bank *and* top
@@ -252,7 +282,7 @@ def bot_turn(
     itself is not a resource, and a Wu spent out of one costs nothing.
     """
     name = state.bot.character.name.split("_")[0]
-    log: list[str] = []
+    log: list[BotMove] = []
 
     # Every action charges its own budget — `use_power` does it for the powers, and the draw and the
     # deposit below do it for themselves. Charging it here as well would bill the turn twice.
@@ -261,12 +291,12 @@ def bot_turn(
         if acted is None:
             break
         log.append(acted)
-    return log or [f"{name} passed"]
+    return log or [BotMove(PASSED, f"{name} does nothing this turn")]
 
 
 def _bot_acts(
     state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
-) -> str | None:
+) -> BotMove | None:
     """The bot's one action, or ``None`` when it has nothing worth doing.
 
     Draw first when the hand is too thin to field a full showdown: a duelist who banks its way down
@@ -290,20 +320,26 @@ def _bot_acts(
             target=play.target,
             rng=rng,
         )
-        return f"{name} played {play.card.name}"
+        return BotMove(
+            POWERUP, f"{name} played {play.card.power.name} from the {play.card.name}"
+        )
 
     # The Early Bird, before drawing or banking: a Wu off the pile with no showdown beats either, and
     # it is the only action here that takes from the *shared* pile rather than the bot's own shelf.
     bird = choose_early_bird(state, settings)
     if bird is not None:
         early_bird(state, bird, is_player=False)
-        return f"{name} was faster — the next Wu was stolen from under your nose"
+        return BotMove(
+            EARLY_BIRD,
+            f"{name} used Early Bird and sacrificed {bird.name} — the next Wu was taken from "
+            "under your nose",
+        )
 
     if len(state.bot.hand) < settings.max_wager and state.bot.deck:
         drawn = state.bot.deck.pop(0)
         state.bot.hand.append(drawn)
         state.bot_actions_taken += 1
-        return f"{name} drew a Wu from their deck"
+        return BotMove(DRAW, f"{name} drew a Wu from their deck")
 
     # Mirrors `can_deposit`: never cash the last card out of the hand.
     if len(state.bot.hand) > DUEL_FLOOR:
@@ -313,7 +349,10 @@ def _bot_acts(
             state.bot.points = max(0, state.bot.points + points)  # a bad gamble cannot go below zero
             state.bot.remove_card(banked)
             state.bot_actions_taken += 1
-            return f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}"
+            return BotMove(
+                DEPOSIT,
+                f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}",
+            )
     return None
 
 

@@ -21,7 +21,7 @@ from termcade.ui.screens.dialog import ChoiceModal
 from xiaolin_showdown.logic.mechanics.powers import is_gamble, trigger_of
 from xiaolin_showdown.logic.mechanics.scoring import initiative
 from xiaolin_showdown.screens.duel import DuelScreen
-from xiaolin_showdown.screens.format import card_label, points_label
+from xiaolin_showdown.screens.format import card_label, points_label, stats_line
 from xiaolin_showdown.screens.lookup import LookUpScreen
 from xiaolin_showdown.screens.outcome import OutcomeScreen
 from xiaolin_showdown.screens.rules import RulesScreen
@@ -95,7 +95,7 @@ async def test_save_then_continue_restores_the_hand(tmp_path):
         await pilot.pause()
         saved_hand = [card.id for card in app.ctx.state.player.hand]
 
-        await pilot.press("0")  # vault Save action -> slot picker
+        await pilot.press("9")  # vault Save action -> slot picker
         await pilot.pause()
         await pilot.click("#slot-0")  # save, back to vault
         await pilot.pause()
@@ -202,6 +202,25 @@ async def test_use_a_power_opens_the_picker_and_returns_to_the_vault(tmp_path):
         await _answer_any_modal(app, pilot)
 
         assert isinstance(app.screen, VaultScreen)
+
+
+async def test_a_power_is_offered_by_its_own_name_with_the_wu_that_pays_for_it(tmp_path):
+    """The button names the POWER, then the Wu it costs — the choice here is an effect, not a card."""
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await _boot(app, pilot)
+        await _new_game_at_vault(app, pilot)
+        state = app.ctx.state
+        state.player.hand.clear()  # one Wu in hand, so #pow-0 is the one we are reading
+        bras = deepcopy(next(card for card in state.catalog.cards if card.name == "Bras Finger"))
+        state.player.hand.append(bras)
+
+        await pilot.press("4")
+        await pilot.pause()
+
+        label = app.screen.query_one("#pow-0", Button).label.plain
+        # Read off the card, never restated: a rename or a re-stat must not need this test edited.
+        assert label == f"{bras.power.name} ({bras.name} {stats_line(bras.stats)})"
 
 
 async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):
@@ -550,7 +569,7 @@ async def test_rules_open_from_the_vault(tmp_path):
     async with app.run_test(size=(150, 60)) as pilot:
         await _new_game_at_vault(app, pilot)
 
-        await pilot.press("7")  # Rules
+        await pilot.press("8")  # Rules
         await pilot.pause()
 
         assert isinstance(app.screen, RulesScreen)
@@ -566,7 +585,7 @@ async def test_rules_open_mid_showdown(tmp_path):
         await pilot.pause()
         await _answer_any_modal(app, pilot)
 
-        await pilot.press("7")  # Rules
+        await pilot.press("8")  # Rules
         await pilot.pause()
 
         assert isinstance(app.screen, RulesScreen)
@@ -580,7 +599,7 @@ async def test_reading_the_rules_does_not_advance_the_showdown(tmp_path):
         duel = app.screen._duel
         before = str(app.screen.query_one("#duel-body", TooltipStatic).render())
 
-        await pilot.press("7")  # Rules
+        await pilot.press("8")  # Rules
         await pilot.pause()
         await pilot.press("escape")  # back out of the rulebook
         await pilot.pause()

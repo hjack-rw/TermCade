@@ -41,10 +41,13 @@ from .rules import RulesScreen
 from .format import (
     COLORS,
     CONTESTED_STYLE,
+    SHOWDOWN_LOG,
     STAT_ORDER,
+    opponent_move,
     absent_stats_text,
     stat_str,
     card_label,
+    card_headline,
     card_name_text,
     card_stats_text,
     display_name,
@@ -63,7 +66,7 @@ class DuelScreen(EngineScreen):
     # state, so it stays available for the whole showdown, long after Retreat has stopped being.
     BINDINGS = [
         ("enter,space", "continue", "Continue"),
-        ("7", "rules", "Rules"),
+        ("8", "rules", "Rules"),
         ("escape", "retreat", "Retreat"),
     ]
 
@@ -100,7 +103,9 @@ class DuelScreen(EngineScreen):
         coin is thrown) and the prize is drawn, so there is nothing left to walk away from.
         """
         if self._committed:
-            self.app.notify("Gong Yi Tanpai! There is no retreat from a showdown.")
+            # Not logged: this is a *refusal*, an answer to a key, not something that happened in the
+            # run. A log full of the game saying no is a log nobody reads.
+            self.app.notify("Gong Yi Tanpai! There is no retreat from a showdown.", log=False)
             return
         self._retreating = True
         self._continue.set()
@@ -127,7 +132,11 @@ class DuelScreen(EngineScreen):
         """You called the challenge, so your opponent sets the price — and names it to your face."""
         name = display_name(state.bot.character.name)
         self.app.notify(
-            f"{name} requested a {duel.wager}vs{duel.wager}", title="THE STAKES"
+            # Not logged: the showdown's own story tells who staked what, in the order it happened.
+            # Logging it here as well would say the same thing twice, once out of order.
+            f"{name} requested a {duel.wager}vs{duel.wager}",
+            title="The stakes",
+            log=False,
         )
 
     @work
@@ -161,16 +170,29 @@ class DuelScreen(EngineScreen):
                 break
             await self._await_continue("Continue")
 
+        # The result raises no toast — it is written across the board, and a toast over it would be
+        # telling a player what they are looking at. But the board is gone the moment they leave, so
+        # the one thing a showdown is *for* would be the one thing the log could not tell them.
+        #
+        # It is the LAST line of the turn it was fought in, and it belongs to neither duelist: a
+        # showdown is not somebody's move, it is what the two moves were leading to.
+        self.ctx.journal.add(_showdown_story(duel.duel, state), title=SHOWDOWN_LOG)
+
         # The result is already on screen, so head straight into the vault turn (no extra Continue):
         # you shelve any surplus Wu (your choice), the bot banks points, then the
         # hands settle (which may flag the run over on the point limit). Skip once the pile is spent.
         if not state.has_ended:
             await self._discard_surplus(state, settings)
+            # The showdown closed the turn. What follows is the *next* one opening — starting with
+            # their half of it, which is why the log must be cut here and not after.
+            self.ctx.journal.next_turn()
             # Their half of the vault turn that is about to open. The first turn of a run has no
             # showdown in front of it, so that one is taken at character select instead.
             difficulty = self.ctx.settings.current.difficulty  # the bot's deposit skill follows it
+            moves = bot_turn(state, settings, rng=rng, difficulty=difficulty)
             self.app.notify(
-                "\n".join(bot_turn(state, settings, rng=rng, difficulty=difficulty)), title="Opponent's turn"
+                "\n".join(move.line for move in moves),
+                title=opponent_move([move.action for move in moves]),
             )
             state.bot_turn_done = True
             refill_hands(state, settings, rng=rng)
@@ -511,6 +533,114 @@ class _CardsLine:
         yield line
 
 
+def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
+    """The whole showdown, told in order — the Game Log's account of what was fought over and how.
+
+    A single line ("X wins and claims Y") is a *result*, and a result is not what a showdown was. The
+    Wu surfaced, someone named the ground it would be fought on, someone else named the price, and only
+    then did it end. Read back a turn later, the build-up is the part that says why the result was what
+    it was — and the board that showed it is long gone.
+
+    Every line is a fact the duel already holds. Nothing here is invented, and nothing that did not
+    happen is printed: a tournament prices itself, so nobody staked anything, so no line says they did.
+    """
+    if duel.stakes is None:  # retreated, or the pile ran dry: no prize was ever drawn
+        return Text()
+
+    # The duelist who holds priority names the challenge; the other answers with the background and,
+    # on a stat challenge, with the price.
+    caller, answerer = _duelists(duel, state)
+
+    story = Text()
+    _line(story, card_headline(duel.stakes), Text(" revealed itself!"))
+
+    if duel.challenge == TOURNAMENT:
+        _line(story, Text(f"{caller} challenged {answerer} to a tournament!"))
+    elif duel.challenge:
+        _line(story, Text(f"{caller} challenged {answerer} in a battle of {duel.challenge.upper()}!"))
+    if duel.background:
+        # The background and the price are ONE move: the duelist who did not call the challenge answers
+        # with both. Two lines made them read as two turns.
+        #
+        # The PLACE, coloured by the element it was summoned under — which is what scores, and which no
+        # lookup could recover: half the arenas serve two elements, and the same name reads green today
+        # and red tomorrow. The board colours it the same way, from the same fact.
+        place = display_name(duel.background_name or duel.background)
+        answer = [
+            Text("The background was "),
+            Text(place, style=f"bold {COLORS.get(duel.background, 'white')}"),
+        ]
+        # A tournament is three battles of one Wu — its price is fixed by the shape of it, and there is
+        # nothing left for the answerer to name. On a stat challenge they name the width of the field,
+        # in the same words the toast used when they named it to your face.
+        if duel.challenge != TOURNAMENT and duel.wager:
+            answer.append(Text(f", and {answerer} requested a {duel.wager}v{duel.wager}"))
+        answer.append(Text("!"))
+        _line(story, *answer)
+
+    _line(story, *_showdown_result(duel))
+    _spoils(story, duel)
+    return story
+
+
+def _spoils(story: Text, duel: DuelState) -> None:
+    """What changed hands — the loser's field, which is the winner's gain.
+
+    The *wager* is not written down: by the time this is read the price is history, and a line naming
+    what each side laid out only pushes the one that matters off the top. What a duelist walked away
+    with is the fact a player comes back for.
+
+    Nothing is added when nothing moved (a dead heat), because a line saying so would be a line saying
+    nothing.
+    """
+    if duel.winner is None:
+        return
+    taken = duel.duelist(not duel.winner).stakes
+    if not taken:
+        return
+    parts: list[Text] = []
+    for index, card in enumerate(taken):
+        if index:
+            parts.append(Text(", "))
+        parts.append(card_headline(card))
+    plural = "Wu" if len(taken) == 1 else "Wus"
+    _line(story, *parts, Text(f" {plural} transferred hands!"))
+
+
+def _line(story: Text, *parts: Text) -> None:
+    """Append one line of the story, newline included — except before the first."""
+    if story.plain:
+        story.append("\n")
+    for part in parts:
+        story.append_text(part)
+
+
+def _duelists(duel: DuelState, state: XiaolinState) -> tuple[str, str]:
+    """``(who called it, who answered)`` — by priority, which is who names the challenge."""
+    player = display_name(state.player.character.name)
+    bot = display_name(state.bot.character.name)
+    return (player, bot) if duel.player_priority else (bot, player)
+
+
+def _showdown_result(duel: DuelState) -> tuple[Text, ...]:
+    """The last line of the story.
+
+    Winning the showdown and winning the *Wu* are two different things — a duelist can take the duel
+    and still see the prize lost — so this says which happened, and never implies the other.
+
+    The prize is named, not re-introduced: its stats were printed the moment it surfaced, three lines
+    up, and a second copy of the same triple tells a reader nothing.
+    """
+    assert duel.stakes is not None
+    prize = card_name_text(duel.stakes)
+    if duel.winner_character is None:
+        return (Text("A dead heat — "), prize, Text(" is lost!"))
+    who = display_name(duel.winner_character)
+    if duel.prize_route is None:
+        return (Text(f"{who} wins the showdown, but not the Wu — "), prize, Text(" is lost!"))
+    return (Text(f"{who} wins and claims "), prize, Text(f" by {duel.prize_route.value}!"))
+
+
 def _prize_line(duel: DuelState) -> Text:
     """The Wu both duelists are racing for, and — once it is settled — how it was taken.
 
@@ -551,7 +681,13 @@ def _cards_line(
     """One line of the board. ``negated`` means a Sphere, Scorpion or Mirror has taken it for this
     battle: the Wu are still named — you must see what was turned off — but they read ``-/-/-`` and
     take no elemental colour, because they are not there to resonate with anything."""
-    tag = Text(f"     {label}: ", style="dim")
+    # The label's dim is a SPAN, never the Text's base style. `_CardsLine` builds the row by copying
+    # this label and appending the Wu into it, and a base style covers everything appended after it —
+    # so a dim label quietly dimmed the whole line: the contested stat's bright white was muted back to
+    # grey, and a water Wu came out a darker blue here than the same element named anywhere else on the
+    # board. Third time this trap has bitten (see `card_label`, `card_headline`).
+    tag = Text()
+    tag.append(f"     {label}: ", style="dim")
     if not cards:
         return _CardsLine(tag, [Text("—")], [Text()])
 

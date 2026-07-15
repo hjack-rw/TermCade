@@ -13,7 +13,16 @@ from xiaolin_showdown.logic.models import Card, Character, Mechanic, Player, Pow
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.state import XiaolinState
 from xiaolin_showdown.logic.mechanics.powers import GAMBLE_SPREAD
-from xiaolin_showdown.logic.turn import DUEL_FLOOR, bank_value, bot_turn, max_hand_size, oversee_hand_size, refill_hands
+from xiaolin_showdown.logic.turn import (
+    DEPOSIT,
+    DUEL_FLOOR,
+    PASSED,
+    bank_value,
+    bot_turn,
+    max_hand_size,
+    oversee_hand_size,
+    refill_hands,
+)
 
 
 def _card(*, mechanic=Mechanic.INITIATIVE, points=0, stats=None) -> Card:
@@ -184,7 +193,7 @@ def test_a_bot_passes_when_nothing_in_hand_is_worth_points():
     log = bot_turn(_state(_player(3), bot, main=5), _SETTINGS, rng=Rng(1), difficulty=Difficulty.HARD)
 
     assert bot.points == 0
-    assert log == ["C passed"]
+    assert [move.action for move in log] == [PASSED]
 
 
 def test_bot_turn_swaps_a_deposit_power_wu_for_a_fresh_draw():
@@ -228,13 +237,21 @@ def test_bot_turn_draws_one_wu_and_pays_its_action_for_it():
 
 
 def test_bot_turn_reports_what_it_did():
+    """Both halves of a move: the action it is filed under, and a line of prose to show for it.
+
+    The prose is not restated here — it is the game's wording and the game may reword it. What must
+    hold is that a move always carries one, and that it names the duelist it belonged to.
+    """
     idle = _state(_player(3), _player(3))  # nothing to deposit, empty deck
-    assert bot_turn(idle, _SETTINGS, rng=Rng(1)) == ["C passed"]
+    passed = bot_turn(idle, _SETTINGS, rng=Rng(1))
+    assert [move.action for move in passed] == [PASSED]
+    assert passed[0].line.startswith("C ")
 
     banker = _player(2)
     banker.hand.append(_card(mechanic=Mechanic.FILLER, points=3))
     log = bot_turn(_state(_player(3), banker, main=5), _SETTINGS, rng=Rng(1), difficulty=Difficulty.EASY)
-    assert any("deposited" in line for line in log)
+    assert any("deposited" in move.line for move in log)
+    assert DEPOSIT in [move.action for move in log]
 
 
 def test_a_bot_never_banks_its_hand_below_the_duel_floor():

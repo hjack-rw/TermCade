@@ -14,6 +14,7 @@ from .console import COMMANDS
 from .logic.settings import default_settings, refreshed_for_pool, save_note
 from .logic.state import XiaolinState
 from .music import XIAOLIN
+from .screens.format import wu_in_prose
 from .screens.start import StartScreen
 
 THEME = Path(__file__).resolve().parent / "theme" / "xiaolin.tcss"
@@ -42,6 +43,9 @@ def build_game() -> Game:
         # deal it into a hand, stack the pile with it, and play the thing you are judging by the
         # same rules a dealt Wu would be played by.
         console_commands=COMMANDS,
+        # The Game Log is the engine's; the Wu in it are ours. Without this a card is plain grey words
+        # on the one screen that recounts the whole run.
+        log_line=wu_in_prose,
         saves_enabled=True,
         max_slots=4,
         root_screen=StartScreen,
