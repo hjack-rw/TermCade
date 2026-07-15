@@ -110,6 +110,20 @@ def test_a_wu_that_moves_no_stat_is_still_standing_on_the_ground():
     assert _claim([battle], background="water") is None
 
 
+def test_a_curse_you_cast_is_a_wu_you_brought_to_the_ground():
+    """It prints on the OPPONENT's Defensive line — that is where it landed, not who played it.
+
+    The caster's own copy is spent to zero, so the Wu is absent from their Offensive line entirely.
+    Reading only your own side loses every curse you fielded: a duelist could stand in a water canal
+    throwing metal at their opponent and still be told they were in tune with the water.
+    """
+    battle = _battle(1, 1, 1)  # nowhere near any stat bar — only resonance could claim this
+    battle.player.queue = [_wu("water")]  # what the player's Offensive line shows: +1
+    battle.bot.suffered = [_wu("metal"), _wu("metal")]  # two metal curses the PLAYER cast: −1 −1
+
+    assert _claim([battle], background="water") is None
+
+
 def test_a_wu_at_odds_with_the_ground_claims_nothing():
     battle = _battle(1, 1, 1)
     battle.player.queue = [_wu("fire")]  # fire on water: opposed

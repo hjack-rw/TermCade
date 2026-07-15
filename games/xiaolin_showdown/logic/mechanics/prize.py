@@ -81,16 +81,25 @@ def _elemental_surplus(rounds: list[Round], winner_is_player: bool, background: 
     +1 for a Wu of the ground's element, −1 for its opposite — and −1 for metal on any coloured
     ground, which is the price metal pays for being at home everywhere and favoured almost nowhere.
 
-    **Every Wu the duelist FIELDED counts** — the whole Offensive line, exactly as the board prints
-    it. Being in tune asks what you *brought* to the ground, not what it did once it got there: a
-    negation Wu prints 0/0/0 and moves no stat, and it is still a lump of metal standing in a water
-    canal. This used to read `contributors()`, which drops any Wu whose stats move nothing — so two
-    metal Wu could be fielded on a water ground, one of them a negation, and only the *other* one was
-    counted against you. A player who fielded metal, metal and one water dragon was told they were in
-    tune with the water.
+    **Every Wu the duelist FIELDED counts.** Being in tune asks what you *brought* to the ground, not
+    what it did once it got there, and there are two ways to get a Wu wrong here:
+
+    * A Wu that moves no stat is still standing in the arena. A negation prints 0/0/0, and it is still
+      a lump of metal in a water canal. (This read `contributors()`, which drops anything whose stats
+      move nothing — so a player who fielded metal, metal and one water dragon was told they were in
+      tune with the water.)
+    * **A curse you cast is a Wu you played**, even though it prints on the *opponent's* Defensive
+      line — that is where it lands, not who brought it. Your own copy is spent to zero, so the Wu is
+      absent from your Offensive line entirely, and reading only your own side loses it.
+
+    So: your Offensive line, plus their Defensive line. Which, between the two of them, is every Wu you
+    put on the table.
     """
-    return sum(
-        element_score(card.element, background)
-        for battle in rounds
-        for card in battle.sides(winner_is_player)[0].mine()
-    )
+    total = 0
+    for battle in rounds:
+        mine, theirs = battle.sides(winner_is_player)
+        # `mine()` drops the spent copies of the curses I cast; `theirs.suffered` is where those curses
+        # actually are. Together they are each Wu once — never twice.
+        for card in [*mine.mine(), *theirs.suffered]:
+            total += element_score(card.element, background)
+    return total
