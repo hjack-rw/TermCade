@@ -4,9 +4,9 @@ The stage machine awaits the player's decisions; here each ``await`` raises a :c
 via ``push_screen_wait`` and resolves with the chosen value. The whole showdown runs in an async
 worker so the UI stays responsive and the pure game logic never touches Textual.
 
-One press of "Gong Yi Tanpai" plays exactly one showdown (stages 1→6→0). The vault turn runs here
+One press of "Gong Yi Tanpai" plays exactly one showdown (stages 1→6→0). The temple turn runs here
 too, at the end — you shelve any surplus Wu, the bot takes its turn, and the hands settle — so
-control returns to the vault, or, when the draw pile is spent, to the :class:`~.outcome.OutcomeScreen`.
+control returns to the temple, or, when the draw pile is spent, to the :class:`~.outcome.OutcomeScreen`.
 """
 
 from __future__ import annotations
@@ -97,7 +97,7 @@ class DuelScreen(XiaolinScreen):
         self.app.push_screen(RulesScreen())
 
     def action_retreat(self) -> None:
-        """Back out before the showdown begins — return to the vault.
+        """Back out before the showdown begins — return to the temple.
 
         Only the opening board offers this: from the first "Continue" the priority is locked (or the
         coin is thrown) and the prize is drawn, so there is nothing left to walk away from.
@@ -151,7 +151,7 @@ class DuelScreen(XiaolinScreen):
         self._show_board(duel)
         await self._await_continue("Continue to begin the showdown        Esc Retreat")
         if self._retreating:
-            self._retreat_to_vault()
+            self._retreat_to_temple()
             return
         self._committed = True
 
@@ -176,7 +176,7 @@ class DuelScreen(XiaolinScreen):
         # showdown is not somebody's move, it is what the two moves were leading to.
         self.ctx.journal.add(_showdown_story(duel.duel, state), title=SHOWDOWN_LOG)
 
-        # The result is already on screen, so head straight into the vault turn (no extra Continue):
+        # The result is already on screen, so head straight into the temple turn (no extra Continue):
         # you shelve any surplus Wu (your choice), the bot banks points, then the
         # hands settle (which may flag the run over on the point limit). Skip once the pile is spent.
         if not state.has_ended:
@@ -184,7 +184,7 @@ class DuelScreen(XiaolinScreen):
             # The showdown closed the turn. What follows is the *next* one opening — starting with
             # their half of it, which is why the log must be cut here and not after.
             self.ctx.journal.next_turn()
-            # Their half of the vault turn that is about to open. The first turn of a run has no
+            # Their half of the temple turn that is about to open. The first turn of a run has no
             # showdown in front of it, so that one is taken at character select instead.
             difficulty = self.ctx.settings.current.difficulty  # the bot's deposit skill follows it
             moves = bot_turn(state, settings, rng=rng, difficulty=difficulty)
@@ -213,13 +213,13 @@ class DuelScreen(XiaolinScreen):
         if self.state.has_ended:
             self.end_run()
         else:
-            self._retreat_to_vault()
+            self._retreat_to_temple()
 
-    def _retreat_to_vault(self) -> None:
+    def _retreat_to_temple(self) -> None:
         """Abandon an uncommitted showdown — no prize drawn, no cards staked, nothing to undo."""
-        from .vault import VaultScreen
+        from .temple import TempleScreen
 
-        self.app.switch_screen(VaultScreen())
+        self.app.switch_screen(TempleScreen())
 
     def _show_board(self, duel: Duel) -> None:
         self.query_one("#duel-body", TooltipStatic).update(

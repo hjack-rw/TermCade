@@ -1,4 +1,4 @@
-"""The vault turn — what both duelists do between showdowns.
+"""The temple turn — what both duelists do between showdowns.
 
 Keeps a hand within its size limit (the surplus goes to the personal deck) and flags the run finished
 when a point limit is reached or the draw pile runs dry. A short hand is *not* topped up: the player
@@ -41,7 +41,7 @@ DUEL_FLOOR = 2
 def refill_hands(state: XiaolinState, settings: XiaolinSettings, *, rng: Rng) -> None:
     """Bring both hands within their size limit and update ``has_ended``.
 
-    Runs each time control returns to the vault (between showdowns). Re-balances until both hands
+    Runs each time control returns to the temple (between showdowns). Re-balances until both hands
     are stable — loops :func:`oversee_hand_size` over both until neither reports more work. The
     player's interactive over-limit discard is handled by the screen *before* this runs, so any
     shedding here (the bot's) is random.
@@ -147,7 +147,7 @@ _WORTH_NOTHING_ON_THE_TABLE: frozenset[Mechanic] = frozenset(
     {
         Mechanic.FILLER,  # deck padding: no stats, no power, no business being fielded
         # The joke Wu prints `? ? ?` and does nothing in a battle. Everything it is worth is at the
-        # vault, where it is rolled for points — so zero on the table is honest, not an oversight.
+        # temple, where it is rolled for points — so zero on the table is honest, not an oversight.
         Mechanic.GAMBLE,
     }
 )
@@ -158,7 +158,7 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         Mechanic.INITIATIVE,  # its bonus is a hand power; in a battle it is only its stats
         Mechanic.HAND_SIZE,  # likewise — it buys a hand slot, not a blow
         Mechanic.HAND_FIZZLE,  # unprinted (see `powers.UNPRINTED`)
-        Mechanic.CHRONOKINESIS,  # a vault power; on the table it is just its printed stats
+        Mechanic.CHRONOKINESIS,  # a temple power; on the table it is just its printed stats
         Mechanic.DIASKOPIA,  # likewise
         Mechanic.TELESKOPIA,  # likewise
         Mechanic.TELEPATHEIA,  # likewise
@@ -252,7 +252,7 @@ def bot_turn(
     rng: Rng,
     difficulty: Difficulty = Difficulty.NORMAL,
 ) -> list[BotMove]:
-    """The bot's between-showdown vault turn; returns a short log of what it did, for the player.
+    """The bot's between-showdown temple turn; returns a short log of what it did, for the player.
 
     One turn, one action — the rule that binds the player binds the bot. It used to bank *and* top
     its hand back up for free, which is not a game either duelist is playing: a hand that refills
@@ -282,12 +282,12 @@ def _bot_acts(
     :func:`pick_deposit`).
     """
     # A Wu's power, when one of them is worth more than the points it would bank. The opponent reads
-    # only what a player could — see `vault_ai`, which is also where two of the Wu are explained as
+    # only what a player could — see `temple_ai`, which is also where two of the Wu are explained as
     # worthless *to it* and banked instead.
     from .actions import early_bird, use_power  # local: actions imports this module
-    from .vault_ai import choose_early_bird, choose_vault_power
+    from .temple_ai import choose_early_bird, choose_temple_power
 
-    play = choose_vault_power(state, settings)
+    play = choose_temple_power(state, settings)
     if play is not None:
         report = use_power(
             state,

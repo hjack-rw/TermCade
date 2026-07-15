@@ -20,7 +20,7 @@ from termcade.ui.screens.console import DEBUG_ENV, ConsoleScreen
 
 from xiaolin_showdown.console import COMMANDS
 from xiaolin_showdown.game import build_game
-from xiaolin_showdown.screens.vault import VaultScreen
+from xiaolin_showdown.screens.temple import TempleScreen
 
 ROOSTER_BOOSTER = 43
 SHIMO_STAFF = 44
@@ -44,7 +44,7 @@ def console(tmp_path, state):
         async with app.run_test(size=(150, 50)) as pilot:
             await pilot.pause()
             app.ctx.state = state
-            app.push_screen(VaultScreen())
+            app.push_screen(TempleScreen())
             await pilot.pause()
             await pilot.press("grave_accent")  # the key a terminal really sends for `
             await pilot.pause()
@@ -77,7 +77,7 @@ async def test_it_floats_over_the_game_rather_than_replacing_it(console):
     """
     async with console() as (app, _run):
         assert isinstance(app.screen, ConsoleScreen)
-        assert isinstance(app.screen_stack[-2], VaultScreen)  # the board is still there, underneath
+        assert isinstance(app.screen_stack[-2], TempleScreen)  # the board is still there, underneath
         assert app.screen.styles.background.a < 1  # ...and it shows through
 
 
@@ -92,7 +92,7 @@ async def test_the_key_that_opens_it_shuts_it(console):
     async with console() as (app, _run):
         await app._press_console_key()
 
-        assert isinstance(app.screen, VaultScreen)
+        assert isinstance(app.screen, TempleScreen)
 
 
 async def test_the_closing_key_is_never_typed_into_the_field(console):
@@ -257,13 +257,13 @@ async def test_a_shipped_build_has_no_console_at_all(tmp_path, state, monkeypatc
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         app.ctx.state = state
-        app.push_screen(VaultScreen())
+        app.push_screen(TempleScreen())
         await pilot.pause()
 
         await pilot.press("grave_accent")
         await pilot.pause()
 
-        assert isinstance(app.screen, VaultScreen)  # the key did nothing at all
+        assert isinstance(app.screen, TempleScreen)  # the key did nothing at all
 
 
 async def test_the_switch_takes_the_usual_words(monkeypatch):

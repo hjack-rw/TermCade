@@ -25,7 +25,7 @@ class Timing(StrEnum):
     """When the mechanic acts. The value is the heading a player reads."""
 
     IN_HAND = "While it sits in your hand"
-    AT_VAULT = "Spent at the vault"
+    AT_TEMPLE = "Spent at the temple"
     IN_DUEL = "Played in a showdown"
     NEVER = "No mechanic"
 
@@ -34,7 +34,7 @@ class Timing(StrEnum):
 class Rule:
     """What a mechanic is: when it fires, when it *acts*, and what it says to a player.
 
-    ``trigger`` is the slot the duel machinery reads — a Wu is offered at the vault (``use``), sits
+    ``trigger`` is the slot the duel machinery reads — a Wu is offered at the temple (``use``), sits
     in the hand (``hand``), goes down in the boost slot (``boost``) or is fielded (``play``). It used
     to be a DB column; it is a property of the mechanic, and this is the one place that says so.
     """
@@ -102,59 +102,59 @@ RULES: dict[Mechanic, Rule] = {
     Mechanic.HAND_FIZZLE: Rule(
         Mechanic.HAND_FIZZLE,
         "hand",
-        Timing.AT_VAULT,
-        "Can be spent from the vault, but its power fizzles — it is discarded for no points.",
+        Timing.AT_TEMPLE,
+        "Can be spent at the temple, but its power fizzles — it is discarded for no points.",
     ),
     Mechanic.GAMBLE: Rule(
         Mechanic.GAMBLE,
         "use",
-        Timing.AT_VAULT,
+        Timing.AT_TEMPLE,
         f"Nobody knows what it is worth. Deposit it and find out: anywhere from "
         f"{GAMBLE_SPREAD[0]:+d} to {GAMBLE_SPREAD[1]:+d} points.",
     ),
     Mechanic.CHRONOKINESIS: Rule(
         Mechanic.CHRONOKINESIS,
         "use",
-        Timing.AT_VAULT,
+        Timing.AT_TEMPLE,
         "Spend it to draw a Wu from the pile. Depositing it forfeits that.",
     ),
     Mechanic.DIASKOPIA: Rule(
         Mechanic.DIASKOPIA,
         "use",
-        Timing.AT_VAULT,
+        Timing.AT_TEMPLE,
         "Spend it to read your opponent's personal deck. Only offered while they hold one.",
     ),
     Mechanic.TELESKOPIA: Rule(
         Mechanic.TELESKOPIA,
         "use",
-        Timing.AT_VAULT,
+        Timing.AT_TEMPLE,
         f"Spend it to look at the next {SCOPE_DEPTH} Wu in the draw pile, in the order they will "
         f"come.",
     ),
     Mechanic.TELEPATHEIA: Rule(
         Mechanic.TELEPATHEIA,
         "use",
-        Timing.AT_VAULT,
+        Timing.AT_TEMPLE,
         "Spend it to see the next Wu in the pile, then take or refuse initiative in the next "
         "showdown — whatever the two hands add up to.",
     ),
     Mechanic.ATTRACTION: Rule(
         Mechanic.ATTRACTION,
         "use",
-        Timing.AT_VAULT,
+        Timing.AT_TEMPLE,
         "Spend it to pull any one Wu out of your own deck and into your hand.",
     ),
     Mechanic.REPULSION: Rule(
         Mechanic.REPULSION,
         "use",
-        Timing.AT_VAULT,
+        Timing.AT_TEMPLE,
         "Spend it to shove one Wu out of your opponent's hand. They bank it, and keep the points.",
     ),
     Mechanic.EUTHYMIA: Rule(
         Mechanic.EUTHYMIA,
         "use",
-        Timing.AT_VAULT,
-        "Spend it at the vault to bring the oldest lost Wu back — into your hand, not the pile.",
+        Timing.AT_TEMPLE,
+        "Spend it at the temple to bring the oldest lost Wu back — into your hand, not the pile.",
     ),
     Mechanic.DRAGON: Rule(
         Mechanic.DRAGON,

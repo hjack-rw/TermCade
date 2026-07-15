@@ -16,7 +16,7 @@ from xiaolin_showdown.logic.models import Card
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.state import XiaolinState
-from xiaolin_showdown.screens.vault import VaultScreen
+from xiaolin_showdown.screens.temple import TempleScreen
 
 SEED = 1234
 
@@ -62,7 +62,7 @@ def open_vault(tmp_path):
         async with app.run_test(size=size, tooltips=True) as pilot:
             await pilot.pause()
             app.ctx.state = state
-            app.push_screen(VaultScreen())
+            app.push_screen(TempleScreen())
             await pilot.pause()
             await pilot.pause()
             yield app, pilot

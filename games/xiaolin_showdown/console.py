@@ -139,9 +139,9 @@ def clear(ctx: GameContext, args: Sequence[str]) -> str:
 
 
 def refresh(ctx: GameContext, args: Sequence[str]) -> str:
-    """Give the turn's action back, so several powers can be spent in one vault turn.
+    """Give the turn's action back, so several powers can be spent in one temple turn.
 
-    The one-action economy is the whole of the vault: a Wu spent is a Wu not banked, and that is what
+    The one-action economy is the whole of the temple: a Wu spent is a Wu not banked, and that is what
     makes a hand a resource rather than a thing that refills itself. It is also what makes *testing* a
     power slow — two powers cost two turns, with a showdown in between whether you wanted one or not.
 

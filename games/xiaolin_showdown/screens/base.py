@@ -25,7 +25,7 @@ class _Run:
         return XiaolinSettings.from_settings(self.ctx.settings.current)  # type: ignore[attr-defined]
 
     def end_run(self) -> None:
-        """Flag the run over and show the outcome. Lazy import: outcome.py imports the vault."""
+        """Flag the run over and show the outcome. Lazy import: outcome.py imports the temple."""
         self.state.has_ended = True
         from .outcome import OutcomeScreen
 

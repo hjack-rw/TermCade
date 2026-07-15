@@ -15,7 +15,7 @@ from ._logo import SUBTITLE_ART, TITLE_ART
 from .character_select import CharacterSelectScreen
 from .rules import RulesScreen
 from .settings import SettingsScreen
-from .vault import VaultScreen
+from .temple import TempleScreen
 
 
 class StartScreen(EngineScreen):
@@ -42,7 +42,7 @@ class StartScreen(EngineScreen):
         if event.button.id == "play":
             self.app.push_screen(CharacterSelectScreen())
         elif event.button.id == "continue":
-            self.app.push_screen(SaveSlotScreen("load", next_screen=VaultScreen))
+            self.app.push_screen(SaveSlotScreen("load", next_screen=TempleScreen))
         elif event.button.id == "rules":
             self.app.push_screen(RulesScreen())
         elif event.button.id == "settings":

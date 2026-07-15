@@ -27,7 +27,7 @@ from xiaolin_showdown.logic.mechanics.cards import is_one_of
 from xiaolin_showdown.logic.mechanics.scoring import initiative
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.turn import duel_value
-from xiaolin_showdown.logic.vault_ai import choose_early_bird
+from xiaolin_showdown.logic.temple_ai import choose_early_bird
 
 # Read by property, never by id — the pool is rebalanced constantly and these must survive it.
 

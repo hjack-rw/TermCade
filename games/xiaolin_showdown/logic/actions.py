@@ -1,4 +1,4 @@
-"""Pure vault actions between duels — no I/O: deposit, use-power, and draw.
+"""Pure temple actions between duels — no I/O: deposit, use-power, and draw.
 
 Draw pulls from the player's *personal* deck, which fills when they shelve surplus cards over the
 hand limit. Together, shelving a card and drawing a fresh one is how the player cycles their hand.
@@ -50,7 +50,7 @@ REPORTS: dict[Mechanic, PowerReport] = {
         "{caster} drew a Wu.",
     ),
     # Diaskopia and Teleskopia reveal to the CASTER, and the opponent never spends them (they are always
-    # banked — see vault_ai), so their log only ever reads player-cast. Left first-person.
+    # banked — see temple_ai), so their log only ever reads player-cast. Left first-person.
     Mechanic.DIASKOPIA: PowerReport(
         "Diaskopia saw through the wall — their Deck holds: {cards}",
         "Their Deck holds: {cards}",
@@ -78,7 +78,7 @@ REPORTS: dict[Mechanic, PowerReport] = {
 }
 
 # Repulsion's OTHER destination: shoved into their deck (no points), not banked. Picked by `_fire` when
-# the caster chose the deck — it sits by the vault version above, so both wordings tweak together.
+# the caster chose the deck — it sits by the temple version above, so both wordings tweak together.
 REPULSION_TO_DECK = PowerReport(
     "Repulsion shoved {name} out of their Hand — it is lost in their Deck.",
     "{name} was shoved out of {victim_poss} Hand into {victim_poss} Deck.",
@@ -120,7 +120,7 @@ SPENT_MESSAGE = "You have already acted this turn."
 def has_acted(state: XiaolinState, actions_per_turn: int) -> bool:
     """Is the turn's action already spent? Banking, using a power and drawing all cost the same one.
 
-    The single budget is the whole of the vault economy: a Wu spent is a Wu not replaced, and the
+    The single budget is the whole of the temple economy: a Wu spent is a Wu not replaced, and the
     Wu whose power is worth more than its points is a Wu you must choose to keep.
     """
     return state.actions_taken >= actions_per_turn
@@ -339,7 +339,7 @@ def use_power(
     (take the next showdown's initiative, or refuse it), ``target`` is the Wu Attraction pulls or the
     one Repulsion shoves, ``to_deck`` is Repulsion's destination (shelve it into their deck for no
     points, instead of banking it for points), and ``rng`` is Repulsion's, because a Wu shoved into the
-    vault might be the one whose worth is rolled — and a Wu shoved into a deck is shuffled in.
+    temple might be the one whose worth is rolled — and a Wu shoved into a deck is shuffled in.
     """
     if trigger_of(card.power) != "use":  # a hand power-up is passive — nothing to trigger, kept
         return FIZZLE_MESSAGE
@@ -364,7 +364,7 @@ class _Spend:
     is_player: bool = True
     priority: bool | None = None
     target: Card | None = None
-    to_deck: bool = False  # Repulsion: shove into their deck (no points), not into their vault
+    to_deck: bool = False  # Repulsion: shove into their deck (no points), not into their temple
     rng: Rng | None = None
 
     @property

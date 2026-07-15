@@ -27,7 +27,7 @@ from xiaolin_showdown.screens.outcome import OutcomeScreen
 from xiaolin_showdown.screens.rules import RulesScreen
 from xiaolin_showdown.screens.start import StartScreen
 from xiaolin_showdown.screens.use_power import UsePowerScreen
-from xiaolin_showdown.screens.vault import VaultScreen
+from xiaolin_showdown.screens.temple import TempleScreen
 
 
 async def _boot(app, pilot):
@@ -79,7 +79,7 @@ async def test_play_selects_a_character_then_deals_into_the_vault(tmp_path):
 
         await pilot.click("#char-1")  # Omi
         await pilot.pause()
-        assert isinstance(app.screen, VaultScreen)
+        assert isinstance(app.screen, TempleScreen)
         assert app.ctx is not None
         assert app.ctx.state is not None
         assert app.ctx.state.player.character.name == "Omi"
@@ -99,7 +99,7 @@ async def test_save_then_continue_restores_the_hand(tmp_path):
         await pilot.pause()
         await pilot.click("#slot-0")  # save, back to vault
         await pilot.pause()
-        assert isinstance(app.screen, VaultScreen)
+        assert isinstance(app.screen, TempleScreen)
 
         await pilot.press("escape")  # vault -> start
         await pilot.pause()
@@ -109,7 +109,7 @@ async def test_save_then_continue_restores_the_hand(tmp_path):
         await pilot.pause()
         await pilot.click("#slot-0")  # load, -> vault
         await pilot.pause()
-        assert isinstance(app.screen, VaultScreen)
+        assert isinstance(app.screen, TempleScreen)
         assert [card.id for card in app.ctx.state.player.hand] == saved_hand
 
 
@@ -148,7 +148,7 @@ async def test_deposit_banks_a_card_for_points(tmp_path):
         await pilot.click(f"#dep-{index}")  # cash it, back to the vault
         await pilot.pause()
 
-        assert isinstance(app.screen, VaultScreen)
+        assert isinstance(app.screen, TempleScreen)
         assert len(app.ctx.state.player.hand) == hand_before - 1
         assert app.ctx.state.player.points == points_before + gained
 
@@ -158,7 +158,7 @@ async def test_gong_yi_tanpai_plays_a_showdown_and_returns_to_the_vault(tmp_path
     async with app.run_test(size=(150, 60)) as pilot:
         await _boot(app, pilot)
         await _new_game_at_vault(app, pilot)
-        assert isinstance(app.screen, VaultScreen)
+        assert isinstance(app.screen, TempleScreen)
 
         await pilot.press("1")  # Gong Yi Tanpai — the showdown runs in an async worker
         assert isinstance(app.screen, (DuelScreen, ChoiceModal))
@@ -177,7 +177,7 @@ async def test_gong_yi_tanpai_plays_a_showdown_and_returns_to_the_vault(tmp_path
                 break
 
         # One showdown does not exhaust the deck, so control returns to a fresh vault.
-        assert isinstance(landed, VaultScreen)
+        assert isinstance(landed, TempleScreen)
         assert app.ctx.state.card_deck  # the run is not over
 
 
@@ -201,7 +201,7 @@ async def test_use_a_power_opens_the_picker_and_returns_to_the_vault(tmp_path):
         await pilot.pause()
         await _answer_any_modal(app, pilot)
 
-        assert isinstance(app.screen, VaultScreen)
+        assert isinstance(app.screen, TempleScreen)
 
 
 async def test_a_power_is_offered_by_its_own_name_with_the_wu_that_pays_for_it(tmp_path):
@@ -236,7 +236,7 @@ async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):
         await pilot.press("2")  # Draw a card
         await pilot.pause()
 
-        assert isinstance(app.screen, VaultScreen)  # a fresh vault reflecting the draw
+        assert isinstance(app.screen, TempleScreen)  # a fresh vault reflecting the draw
         assert len(app.ctx.state.player.hand) == hand_before + 1
         assert not app.ctx.state.player.deck
 
@@ -441,11 +441,11 @@ async def test_a_zoomed_in_board_scrolls_instead_of_gating(tmp_path):
         await pilot.pause()
         catalog = load_catalog()
         app.ctx.state = new_game(catalog, Rng(1234), catalog.character(1))
-        app.push_screen(VaultScreen())
+        app.push_screen(TempleScreen())
         await pilot.pause()
         await pilot.pause()
 
-        assert isinstance(app.screen, VaultScreen)  # no "too small" overlay took over
+        assert isinstance(app.screen, TempleScreen)  # no "too small" overlay took over
         assert app.screen.show_vertical_scrollbar
         assert app.screen.max_scroll_y > 0
 
@@ -535,7 +535,7 @@ async def test_the_opening_board_stakes_nothing_so_you_may_retreat(tmp_path):
         await pilot.press("escape")
         await pilot.pause()
 
-        assert isinstance(app.screen, VaultScreen)
+        assert isinstance(app.screen, TempleScreen)
 
 
 async def test_the_first_continue_draws_the_prize_and_locks_you_in(tmp_path):
@@ -614,7 +614,7 @@ async def test_every_vault_action_says_what_it_does(tmp_path):
     """A greyed action shows why; an available one shows what it is for. Neither can be silent.
 
     """
-    from xiaolin_showdown.screens.vault import _ACTION_HELP, _ACTIONS
+    from xiaolin_showdown.screens.temple import _ACTION_HELP, _ACTIONS
 
     keys = [action.split(".")[0] for action in _ACTIONS]
 

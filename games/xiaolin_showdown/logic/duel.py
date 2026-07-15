@@ -22,7 +22,7 @@ draws the coin toss that breaks a tie. Nothing is staked until then, so that pre
 return.
 
 **Transient — never saved.** The machine mutates deep-copied scratch cards in place; a save's
-``snapshot()`` is valid only at the vault (no active duel). Every human decision is an injected
+``snapshot()`` is valid only at the temple (no active duel). Every human decision is an injected
 :class:`DuelChoices` callback, so this layer blocks on nothing and tests headlessly; the bot's
 decisions come from :mod:`.bot`. Advancing one stage per call mirrors one "Continue" press.
 """
@@ -391,7 +391,7 @@ class Duel:
         # The action counters are NOT reset here. A turn turns over in `turn.refill_hands`, which runs
         # after the opponent has taken theirs — and which may spend the coming turn's action for you,
         # by dealing you back in. Reset here and that charge would be wiped before it ever bit.
-        self.state.bot_turn_done = False  # a new vault turn, for both of you
+        self.state.bot_turn_done = False  # a new temple turn, for both of you
         self.state.forced_priority = None  # the Conch's answer was for this showdown, and is spent
         if not self.state.card_deck:
             self.state.has_ended = True

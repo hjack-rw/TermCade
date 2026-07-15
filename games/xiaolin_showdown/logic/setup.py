@@ -27,7 +27,7 @@ def new_game(
     settings: XiaolinSettings | None = None,
     hard_opponents: bool = False,
 ) -> XiaolinState:
-    """A fresh vault-menu state: shuffled draw pile, both hands dealt, starting points.
+    """A fresh temple-menu state: shuffled draw pile, both hands dealt, starting points.
     ``settings`` are the (player-chosen) settings for this run; defaults are used when omitted.
     ``hard_opponents`` picks the bot from the tougher roster instead of the easy one.
     """

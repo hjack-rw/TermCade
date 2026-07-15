@@ -1,4 +1,4 @@
-"""Vault screen — the between-duel menu.
+"""Temple screen — the between-duel hub (the *deposit* screen is the Vault).
 
 Three stacked panels: game state, both hands (element-coloured), and actions. Each panel's
 content is a Rich grid that expands to fill the box; secondary labels are dimmed and names
@@ -48,7 +48,7 @@ from .rules import RulesScreen
 from .use_power import UsePowerScreen
 
 
-class VaultScreen(XiaolinScreen):
+class TempleScreen(XiaolinScreen):
     BINDINGS = [
         ("1", "gong_yi_tanpai", "Duel"),
         ("2", "draw", "Draw"),
@@ -123,7 +123,7 @@ class VaultScreen(XiaolinScreen):
         if can_draw(self.state, self.rules):
             card = draw(self.state)
             self.app.notify(f"Drew {card.name}.", title=your_move(DRAW))
-            self.rebuild()  # show the drawn Wu without leaving the vault
+            self.rebuild()  # show the drawn Wu without leaving the temple
 
     def action_use_power(self) -> None:
         state, rules = self.state, self.rules
@@ -152,7 +152,7 @@ class VaultScreen(XiaolinScreen):
         self.app.push_screen(SaveSlotScreen("save", title=title))
 
 
-# Vault actions, laid out row-major into three columns that fill the panel (see _actions_grid).
+# Temple actions, laid out row-major into three columns that fill the panel (see _actions_grid).
 _ACTIONS = [
     '1. "Gong Yi Tanpai!"',
     "2. Draw a Card",
@@ -164,7 +164,7 @@ _ACTIONS = [
     "8. Rules",
     "9. Save game",
     # Escape is NOT listed. It is on the footer, where every screen's escape is, and a panel of things
-    # to *do* in the vault is not where "leave the vault" belongs. Nine actions fill the three columns
+    # to *do* in the temple is not where "leave the temple" belongs. Nine actions fill the three columns
     # exactly; a tenth entry left one hanging alone on a fourth row.
 ]
 

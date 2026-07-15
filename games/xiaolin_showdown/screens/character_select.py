@@ -1,4 +1,4 @@
-"""Character select — pick a playable dragon, then deal a fresh game into the vault.
+"""Character select — pick a playable dragon, then deal a fresh game into the temple.
 
 Feeds the chosen character into ``new_game`` with the current (settings-derived) ruleset.
 """
@@ -12,7 +12,7 @@ from ..logic.settings import XiaolinSettings, is_hard
 from ..logic.setup import new_game
 from ..logic.turn import bot_turn
 from .format import affiliation_icon, char_stats, display_name, opponent_move
-from .vault import VaultScreen
+from .temple import TempleScreen
 
 
 class CharacterSelectScreen(MenuScreen):
@@ -46,13 +46,13 @@ class CharacterSelectScreen(MenuScreen):
         )
         self.ctx.state = state
 
-        # The vault turn is one turn and both of you take it. Every later one of theirs runs as a
-        # showdown ends; the first has no showdown to end, so it runs here, before the vault opens.
+        # The temple turn is one turn and both of you take it. Every later one of theirs runs as a
+        # showdown ends; the first has no showdown to end, so it runs here, before the temple opens.
         # Without it the opponent sits out the whole opening turn and meets you with a hand they
         # never got to shape.
         moves = bot_turn(state, settings, rng=self.ctx.rng, difficulty=current.difficulty)
         state.bot_turn_done = True
-        self.app.switch_screen(VaultScreen())
+        self.app.switch_screen(TempleScreen())
         self.app.notify(
             "\n".join(move.line for move in moves),
             title=opponent_move([move.action for move in moves]),

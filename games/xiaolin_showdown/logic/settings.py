@@ -49,7 +49,7 @@ class XiaolinSettings:
     point_limit: int = 21
     starting_points_player: int = 0
     starting_points_bot: int = 0
-    # One vault turn, one action: deposit, spend a power, or draw. One budget, so a hand is a resource
+    # One temple turn, one action: deposit, spend a power, or draw. One budget, so a hand is a resource
     # and a Wu whose power beats its points has a price.
     actions_per_turn: int = 1
     # Mercy rule: a duelist with nothing fieldable is dealt back up to this many Wu (running dry must

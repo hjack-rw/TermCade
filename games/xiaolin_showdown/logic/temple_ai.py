@@ -1,4 +1,4 @@
-"""The opponent's vault-power decisions — and it is fair: it reads only what a player across the table
+"""The opponent's temple-power decisions — and it is fair: it reads only what a player across the table
 could (both hands, both scores, pile size), never inside the pile or a personal deck.
 
 Diaskopia and Teleskopia are always banked, never spent: no decision here turns on the player's shelf,
@@ -28,23 +28,23 @@ ATTRACTION_MARGIN = 2
 REVIVAL_MARGIN = 5
 
 # How dangerous a Wu in the player's hand must be before the Ruby of Ramses shoves it into their
-# vault. It is a Wu for a Wu, and it *pays them* — so the thing it removes had better be a weapon.
+# temple. It is a Wu for a Wu, and it *pays them* — so the thing it removes had better be a weapon.
 REPULSION_THRESHOLD = 4
 
 
 @dataclass(frozen=True)
-class VaultPlay:
+class TemplePlay:
     """A Wu a duelist means to spend, and the answers its power will ask for."""
 
     card: Card
     priority: bool | None = None
     target: Card | None = None
-    to_deck: bool = False  # Repulsion: shove into their deck (no points) rather than their vault
+    to_deck: bool = False  # Repulsion: shove into their deck (no points) rather than their temple
 
 
-def choose_vault_power(
+def choose_temple_power(
     state: XiaolinState, settings: XiaolinSettings, *, is_player: bool = False
-) -> VaultPlay | None:
+) -> TemplePlay | None:
     """The Wu this duelist spends this turn, or ``None`` to bank instead.
 
     Ordered by how decisive the power is, not by what it costs: a Wu that wins the next showdown is
@@ -59,23 +59,23 @@ def choose_vault_power(
         mechanic = mechanic_of(card.power)
 
         if mechanic is Mechanic.REPULSION and _worth_shoving(state, is_player):
-            return VaultPlay(
+            return TemplePlay(
                 card,
                 target=_their_best(state, is_player),
                 to_deck=_shove_to_deck(state, settings, is_player),
             )
 
         if mechanic is Mechanic.TELEPATHEIA and _initiative_is_wrong(state, is_player):
-            return VaultPlay(card, priority=_wants_initiative(state, is_player))
+            return TemplePlay(card, priority=_wants_initiative(state, is_player))
 
         if mechanic is Mechanic.ATTRACTION and _worth_reaching_for(state, is_player):
-            return VaultPlay(card, target=_best_on_the_shelf(state, is_player))
+            return TemplePlay(card, target=_best_on_the_shelf(state, is_player))
 
         if mechanic is Mechanic.CHRONOKINESIS and _worth_drawing(state, settings, is_player):
-            return VaultPlay(card)
+            return TemplePlay(card)
 
         if mechanic is Mechanic.EUTHYMIA and _worth_reviving(state):
-            return VaultPlay(card)
+            return TemplePlay(card)
 
     return None
 

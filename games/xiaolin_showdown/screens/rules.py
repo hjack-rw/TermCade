@@ -40,7 +40,7 @@ PRIMER = "How to Play"  # the first entry in the rail, and where a player with n
 # reference below is an answer to a question this raises — and none of them has to be read first.
 HOW_TO_PLAY: list[str] = [
     "Collect Shen Gong Wu, bank them for points, and reach the target before your opponent does.",
-    "A turn at the vault allows for ONE action: bank a Wu for its points, spend a Wu for its power, or "
+    "A turn at the temple allows for ONE action: bank a Wu for its points, spend a Wu for its power, or "
     "draw one into your hand. Banking a Wu forfeits its power; keeping the power forfeits the points. ",
     "Then call `Gong Yi Tanpai!` —  a Showdown for the next Wu on the pile.",
     "Whoever is faster (Initiative) says what is contested.",
@@ -61,7 +61,7 @@ def _route(route: PrizeRoute) -> str:
 def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
     """The rulebook, with the game's own numbers in it."""
     return {
-        "At the Vault": [
+        "At the Temple": [
             f"A turn buys you {settings.actions_per_turn} action: deposit a Wu for its "
             "points, use its power, or draw one from your Deck.",
             "Depositing a Wu forfeits its power. You are vaulting it, not spending it.",

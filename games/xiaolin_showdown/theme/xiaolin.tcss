@@ -29,26 +29,26 @@ StartScreen {
     margin-top: 2;
 }
 
-/* --- Vault --------------------------------------------------------------- */
-VaultScreen > BoxedPanel {
+/* --- Temple --------------------------------------------------------------- */
+TempleScreen > BoxedPanel {
     width: 84%;
     margin: 1 0 0 0;
     align-horizontal: center;  /* centre the auto-width children (summary line, actions block) */
 }
-VaultScreen #state {
+TempleScreen #state {
     width: 100%;  /* the state grid fills the panel; the summary stays auto-width and centres */
     padding: 0 8;  /* inset both edges — the duelist rows shouldn't run into the border */
 }
-VaultScreen #summary {
+TempleScreen #summary {
     width: 100%;
     text-align: center;
     margin-bottom: 1;
 }
-VaultScreen #actions {
+TempleScreen #actions {
     width: 100%;  /* the three action columns spread across the panel rather than clustering */
     padding: 0 4;
 }
-VaultScreen > #hands {
+TempleScreen > #hands {
     width: 84%;
     height: auto;
     margin: 1 0 0 0;
@@ -64,23 +64,23 @@ VaultScreen > #hands {
 }
 
 /* Narrow terminals (engine breakpoint `-narrow`): the hand panels can't sit side by side. */
-VaultScreen.-narrow > BoxedPanel,
-VaultScreen.-narrow > #hands {
+TempleScreen.-narrow > BoxedPanel,
+TempleScreen.-narrow > #hands {
     width: 100%;
 }
-VaultScreen.-narrow > #hands {
+TempleScreen.-narrow > #hands {
     layout: vertical;
     height: auto;
 }
-VaultScreen.-narrow {
+TempleScreen.-narrow {
     align-vertical: top;  /* stacking is taller than the window; start at the top, then scroll */
 }
-VaultScreen.-narrow #hands > BoxedPanel {
+TempleScreen.-narrow #hands > BoxedPanel {
     width: 100%;
     margin: 0 0 1 0;
 }
-VaultScreen.-narrow #state,
-VaultScreen.-narrow #actions {
+TempleScreen.-narrow #state,
+TempleScreen.-narrow #actions {
     padding: 0 1;
 }
 DuelScreen.-narrow > BoxedPanel {

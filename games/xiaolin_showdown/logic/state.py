@@ -2,7 +2,7 @@
 
 Implements the engine's ``GameState`` protocol (``schema_version`` / ``snapshot`` /
 ``restore``). Saving is menu-only, so this captures exactly the state that exists at the
-vault menu (``duel_stage == 0``): both duelists' hands/decks/points/character, the draw
+temple menu (``duel_stage == 0``): both duelists' hands/decks/points/character, the draw
 pile, and the cross-duel challenge/background history. Transient in-duel scratch is never
 here — it does not exist between duels.
 
@@ -30,7 +30,7 @@ class XiaolinState:
     previous_challenge: list[str] = field(default_factory=list)
     previous_background: list[str] = field(default_factory=list)
     has_ended: bool = False
-    # Actions spent this turn, one counter each (both reset by the duel end phase). A vault turn buys
+    # Actions spent this turn, one counter each (both reset by the duel end phase). A temple turn buys
     # one action — bank a Wu, spend a Wu's power, or draw one off your shelf — so the hand is a
     # resource and a Wu spent is a Wu not replaced.
     #
@@ -39,7 +39,7 @@ class XiaolinState:
     # spent for them. The cards are the action, not a gift on top of it.
     actions_taken: int = 0
     bot_actions_taken: int = 0
-    # The opponent takes the same vault turn you do, and takes it once. Retreating from a
+    # The opponent takes the same temple turn you do, and takes it once. Retreating from a
     # showdown returns you to a turn you have already spent, so this keeps them from banking
     # twice on the way back in. Reset, like the counters, by the duel end phase.
     bot_turn_done: bool = False

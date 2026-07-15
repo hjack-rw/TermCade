@@ -25,7 +25,7 @@ from xiaolin_showdown.screens.format import (
     wu_in_prose,
     your_move,
 )
-from xiaolin_showdown.screens.vault import VaultScreen
+from xiaolin_showdown.screens.temple import TempleScreen
 
 
 def _log(app) -> str:
@@ -73,7 +73,7 @@ async def test_a_banked_wu_reaches_the_log(open_vault, state, catalog, card):
         await pilot.click("#dep-0")
         await pilot.pause()
 
-        assert isinstance(app.screen, VaultScreen)
+        assert isinstance(app.screen, TempleScreen)
         # Read off the card, never restated — a re-cost must not need this test edited.
         assert f"{banked.name} for {banked.points} pts" in _log(app)
 

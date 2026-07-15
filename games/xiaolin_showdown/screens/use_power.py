@@ -1,4 +1,4 @@
-"""Powers — spend a Wu for its power (no points), then back to the vault.
+"""Powers — spend a Wu for its power (no points), then back to the temple.
 
 The Conch asks a question back, so firing a power runs in a worker that can await a modal: the logic
 layer cannot ask, it takes the answer as an argument.
@@ -101,7 +101,7 @@ class UsePowerScreen(XiaolinMenu):
 
     async def _ask_target(self, mechanic: Mechanic) -> Card | None:
         """The Wu a power is aimed at. Both lists are ones the player may read: their own deck, and
-        the opponent's hand (already face up on the vault board)."""
+        the opponent's hand (already face up on the temple board)."""
         if mechanic is Mechanic.ATTRACTION:
             return await self.choose(
                 "Pull which Wu from your deck?",
@@ -126,7 +126,7 @@ class UsePowerScreen(XiaolinMenu):
         else:
             asked.append("Where does the shoved Wu go?")
         asked.append("\n\n")
-        asked.append("Their vault pays them points but is final; their deck pays nothing but returns.")
+        asked.append("Their temple pays them points but is final; their deck pays nothing but returns.")
 
         return await self.confirm(
             asked,

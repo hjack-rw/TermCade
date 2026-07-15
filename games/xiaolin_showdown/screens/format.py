@@ -157,7 +157,7 @@ def element_text(element: str) -> Text:
 
 
 def labelled(label: str, value: str | Text, *, strong: bool = False, style: str = "") -> Text:
-    """``Points: 12`` — a dim label, a bright value. The pairing used on the vault and the board."""
+    """``Points: 12`` — a dim label, a bright value. The pairing used on the temple and the board."""
     text = Text()
     text.append(f"{label}: ", style="dim")
     if isinstance(value, Text):
@@ -240,7 +240,7 @@ def card_headline(card: Card) -> Text:
     """One Wu, named: its name in its element's colour, then its stats in brackets. Nothing else.
 
     **The established shape for a card anywhere it is named** — a button, a dialog, a reveal. The type
-    glyph is deliberately absent: it belongs to the vault's hand panels, where it says what can build
+    glyph is deliberately absent: it belongs to the temple's hand panels, where it says what can build
     Mala Mala Jong and gives the eye something to sort by. On a button it is decoration, and decoration
     on a button is noise.
 
