@@ -20,6 +20,7 @@ from termcade.core.audio import MUSIC_OPTION, SFX_OPTION, make_player
 
 from .screens.base import EngineScreen
 from .theme import TERMCADE_THEME
+from .typography import spaced_dashes
 
 # "TermCade" in an ANSI-shadow figure font — the cabinet's brand banner.
 BANNER = """\
@@ -208,10 +209,14 @@ class EngineApp(App[None]):
 
         ``log=False`` for a toast that is not an *event*: a refusal ("no retreat from a showdown"), or
         something the game writes down better itself.
+
+        The toast is spaced through `spaced_dashes` on the way to the screen — the em dash is drawn a
+        full cell wide and eats the space after it. The JOURNAL keeps the raw text, so the Game Log
+        applies its own spacing when it draws.
         """
         if log and self.ctx is not None:
             self.ctx.journal.add(message, title=title)
-        super().notify(message, title=title, **kwargs)
+        super().notify(spaced_dashes(message), title=title, **kwargs)
 
     def report_crash(self, error: BaseException, *, where: str) -> None:
         """A crashed worker's exception, named and dismissible, instead of a dead game. See

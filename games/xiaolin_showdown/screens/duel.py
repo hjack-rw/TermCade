@@ -532,7 +532,7 @@ def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
     _line(story, card_headline(duel.stakes), Text(" revealed itself!"))
 
     if duel.challenge == TOURNAMENT:
-        _line(story, Text(f"{caller} challenged {answerer} to a tournament!"))
+        _line(story, Text(f"{caller} challenged {answerer} to a Tournament!"))
     elif duel.challenge:
         _line(story, Text(f"{caller} challenged {answerer} in a battle of {duel.challenge.upper()}!"))
     if duel.background:
