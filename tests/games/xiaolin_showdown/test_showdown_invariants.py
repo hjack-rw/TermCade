@@ -13,9 +13,10 @@ import pytest
 from termcade.core.rng import Rng
 
 from xiaolin_showdown.logic.constants import TOURNAMENT, TOURNAMENT_BATTLES
-from xiaolin_showdown.logic.duel import Duel, DuelChoices
+from xiaolin_showdown.logic.duel import END, Duel, DuelChoices
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
+from factories import run_showdown
 
 SETTINGS = XiaolinSettings()
 
@@ -136,12 +137,9 @@ async def test_a_showdown_never_breaks_its_own_rules(catalog, strategy, seed):
     duel = Duel(state, Rng(seed), _strategy(strategy, duel_ref), SETTINGS)
     duel_ref.append(duel)
 
-    stage, guard = -1, 0
-    while stage != 0 and guard < 40:
-        stage = await duel.advance()
-        guard += 1
+    stage = await run_showdown(duel, SETTINGS)
 
-    assert stage == 0, "the showdown never reached its End"
+    assert stage == END
     _assert_invariants(duel, state, before_hand)
 
 
@@ -174,10 +172,7 @@ async def test_the_loser_forfeits_exactly_what_they_staked(catalog, seed):
     duel = Duel(state, Rng(seed), _strategy("reckless", duel_ref), SETTINGS)
     duel_ref.append(duel)
 
-    stage, guard = -1, 0
-    while stage != 0 and guard < 40:
-        stage = await duel.advance()
-        guard += 1
+    await run_showdown(duel, SETTINGS)
 
     d = duel.duel
     winner_hand = state.player.whole_hand if d.winner else state.bot.whole_hand

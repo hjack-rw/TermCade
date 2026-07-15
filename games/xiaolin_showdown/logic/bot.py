@@ -252,25 +252,9 @@ def _most_common_element(hand: Sequence[Card]) -> str:
 def choose_wager(options: Sequence[int], own_hand: Sequence[Card], opponent_hand: Sequence[Card]) -> int:
     """How wide to make the battle — the answer to a stat challenge you did not call.
 
-    **The width is the size of the bet.** Every wagered Wu lands at once and they are summed, and the
-    loser forfeits every Wu they fielded *to the winner* (`duel._award`). So a field of three is not a
-    bigger version of a field of one: it is the same bet at triple stakes. Win it and you take three of
-    their Wu; lose it and they take three of yours.
-
-    That is what the old rule missed. It widened only while the *next* Wu beat theirs rung by rung —
-    which asks "am I ahead?" and never "is the extra Wu worth staking?". Both hands are drawn from the
-    same pool, so beating them on a given rung is a coin flip that a tie breaks, and the field could
-    only ever widen as a *reward for already leading*. A wide field was never a decision.
-
-    Priced properly it is one. For each width, read the margin the whole field would carry, turn it into
-    a rough chance of winning, and take the width whose **expected swing in Wu** is best:
-
-        swing(w) = w x (2 x P(win at w) - 1)
-
-    A deep bench widens, because its second and third Wu carry their weight. One monster and two
-    trinkets narrows, because the trinkets drag the average down and stake two more Wu on a worse fight.
-    And a duelist who is simply behind on the field takes the *narrowest* bet it can, which is exactly
-    what a person does when they are losing.
+    Width IS the bet: every wagered Wu lands at once and the loser forfeits all of them. So price it by
+    the whole field's margin, not rung by rung — take the widest width you lead at, else the narrowest.
+    A deep bench widens; one monster and two trinkets narrows.
     """
     if not options:
         return 1

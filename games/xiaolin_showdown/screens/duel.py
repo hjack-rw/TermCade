@@ -12,7 +12,6 @@ control returns to the vault, or, when the draw pile is spent, to the :class:`~.
 from __future__ import annotations
 
 import asyncio
-from typing import cast
 
 from rich.align import Align
 from rich.console import Console, ConsoleOptions, Group, RenderableType, RenderResult
@@ -24,7 +23,6 @@ from textual.app import ComposeResult
 from textual.content import ContentText
 from textual.widgets import Footer, Header, Static
 
-from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
 from ..logic.battle import Round, Side
@@ -37,6 +35,7 @@ from ..logic.state import XiaolinState
 from ..logic.turn import bot_turn, max_hand_size, refill_hands
 from ..logic.mechanics.powers import is_boost_slot
 from ..logic.mechanics.scoring import contributing, element_score
+from .base import XiaolinScreen
 from .rules import RulesScreen
 from .format import (
     COLORS,
@@ -49,6 +48,7 @@ from .format import (
     card_label,
     card_headline,
     card_name_text,
+    labelled,
     card_stats_text,
     display_name,
     element_text,
@@ -57,7 +57,7 @@ from .format import (
 )
 
 
-class DuelScreen(EngineScreen):
+class DuelScreen(XiaolinScreen):
     """One showdown, stepped through a phase at a time — the player presses Continue to advance,
     seeing each phase resolve, and the choice phases raise their modal inline."""
 
@@ -141,9 +141,7 @@ class DuelScreen(EngineScreen):
 
     @work
     async def _run_showdown(self) -> None:
-        state = cast(XiaolinState, self.ctx.state)
-        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        rng = self.ctx.rng
+        state, settings, rng = self.state, self.rules, self.ctx.rng
 
         duel = Duel(state, rng, self._choices(), settings)
         self._duel = duel
@@ -212,15 +210,10 @@ class DuelScreen(EngineScreen):
             state.player.deck.append(card)
 
     def _leave(self) -> None:
-        # Lazy imports: the vault imports this screen, so importing it at module load would cycle.
-        if cast(XiaolinState, self.ctx.state).has_ended:
-            from .outcome import OutcomeScreen
-
-            self.app.switch_screen(OutcomeScreen())
+        if self.state.has_ended:
+            self.end_run()
         else:
-            from .vault import VaultScreen
-
-            self.app.switch_screen(VaultScreen())
+            self._retreat_to_vault()
 
     def _retreat_to_vault(self) -> None:
         """Abandon an uncommitted showdown — no prize drawn, no cards staked, nothing to undo."""
@@ -230,7 +223,7 @@ class DuelScreen(EngineScreen):
 
     def _show_board(self, duel: Duel) -> None:
         self.query_one("#duel-body", TooltipStatic).update(
-            _board_text(duel.duel, cast(XiaolinState, self.ctx.state))
+            _board_text(duel.duel, self.state)
         )
 
     # --- player decisions: raise a modal, resolve with what they pick ---------------------
@@ -294,12 +287,7 @@ class DuelScreen(EngineScreen):
 
 
 def _wager_label(wager: int) -> str:
-    """``2 vs 2`` — the width of the field, wherever it is printed.
-
-    Spaced: ``2vs2`` runs the three glyphs into one word and reads as a token, not as two sides facing
-    each other. One helper, because the board, the toast and the log all print it and three of them
-    used to build it themselves.
-    """
+    """``2 vs 2`` — spaced, or the glyphs read as one token. Board, toast and log all print it."""
     return f"{wager} vs {wager}"
 
 
@@ -349,15 +337,6 @@ def _won(duel: DuelState) -> str:
     return display_name(duel.winner_character or "").upper()
 
 
-def _labelled(label: str, value: str, *, strong: bool = False, style: str = "") -> Text:
-    """A dim label followed by its value — the muted-label / bright-value pairing used on the board.
-
-    ``style`` tints the value; the background carries its element colour, as Wu names do.
-    """
-    text = Text()
-    text.append(f"{label}: ", style="dim")
-    text.append(value, style=f"{style} bold".strip() if strong else style)
-    return text
 
 
 _DIVIDER_MIN = 36  # the rule under the prize never shrinks below this, however short the line is
@@ -385,8 +364,8 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
     meta.add_column(justify="center")
     meta.add_column(justify="right")
     meta.add_row(
-        _labelled("Challenge", (duel.challenge or "—").upper(), strong=bool(duel.challenge)),
-        _labelled(
+        labelled("Challenge", (duel.challenge or "—").upper(), strong=bool(duel.challenge)),
+        labelled(
             "Background",
             # The place, not the element — but coloured by the element, which is what scores. A place
             # can serve two pools, so the same name may read green today and red tomorrow.
@@ -394,7 +373,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             strong=bool(duel.background),
             style=COLORS.get(duel.background or "", ""),
         ),
-        _labelled("Initiative", f"P1: {duel.player.initiative}  P2: {duel.bot.initiative}"),
+        labelled("Initiative", f"P1: {duel.player.initiative}  P2: {duel.bot.initiative}"),
     )
 
     # A tournament runs three battles and needs its running score. A wagered stat challenge runs one
@@ -540,16 +519,8 @@ class _CardsLine:
 
 
 def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
-    """The whole showdown, told in order — the Game Log's account of what was fought over and how.
-
-    A single line ("X wins and claims Y") is a *result*, and a result is not what a showdown was. The
-    Wu surfaced, someone named the ground it would be fought on, someone else named the price, and only
-    then did it end. Read back a turn later, the build-up is the part that says why the result was what
-    it was — and the board that showed it is long gone.
-
-    Every line is a fact the duel already holds. Nothing here is invented, and nothing that did not
-    happen is printed: a tournament prices itself, so nobody staked anything, so no line says they did.
-    """
+    """The whole showdown in order, for the Game Log — the build-up says why the result was what it was,
+    and the board that showed it is gone. Every line is a fact the duel already holds."""
     if duel.stakes is None:  # retreated, or the pile ran dry: no prize was ever drawn
         return Text()
 
@@ -659,8 +630,7 @@ def _prize_line(duel: DuelState) -> Text:
         line.append("? ? ?", style="dim")  # not drawn yet — spaced, as the hidden power reads
         return line
 
-    line.append_text(card_name_text(duel.stakes, bold=True))
-    line.append(f" ({stats_line(duel.stakes.stats)})")
+    line.append_text(card_headline(duel.stakes))
     if duel.winner is None:  # still being fought over
         return line
     # The reason is set apart on purpose. Run it straight on from the Wu's name and a reader joins the
@@ -687,11 +657,8 @@ def _cards_line(
     """One line of the board. ``negated`` means a Sphere, Scorpion or Mirror has taken it for this
     battle: the Wu are still named — you must see what was turned off — but they read ``-/-/-`` and
     take no elemental colour, because they are not there to resonate with anything."""
-    # The label's dim is a SPAN, never the Text's base style. `_CardsLine` builds the row by copying
-    # this label and appending the Wu into it, and a base style covers everything appended after it —
-    # so a dim label quietly dimmed the whole line: the contested stat's bright white was muted back to
-    # grey, and a water Wu came out a darker blue here than the same element named anywhere else on the
-    # board. Third time this trap has bitten (see `card_label`, `card_headline`).
+    # The label's dim MUST be a span, never the Text's base style: `_CardsLine` appends the Wu into a
+    # COPY of this label, and a base style would dim everything appended after it.
     tag = Text()
     tag.append(f"     {label}: ", style="dim")
     if not cards:
@@ -727,14 +694,9 @@ def _cards_line(
 def _played_stats_text(
     card: Card, challenge: str | None, background: str | None, sign: int = 1
 ) -> Text:
-    """The card's stats as they will score, showing the elemental bonus where it lands.
-
-    The background lifts a resonant Wu by 1 on the contested stat and drags an opposed one down by
-    1 — invisible in the printed triple, which is why a Wu could read ``0/0/4`` and score 3. Where it
-    bites, the printed value is struck and the value that counts follows it: ``0/0/4 3``.
-
-    ``sign`` is ``-1`` on the Defensive line: a curse resonating with the background harms you more,
-    so its printed value drops further.
+    """The stats as they will SCORE: the elemental shift is invisible in the printed triple, so a Wu
+    could read ``0/0/4`` and score 3. Where it bites, the printed value is struck and the effective one
+    follows. ``sign`` is -1 on the Defensive line — a resonant curse harms you more.
     """
     text = Text()
     shift = sign * _elemental_shift(card, challenge, background)
@@ -742,23 +704,17 @@ def _played_stats_text(
         if index:
             text.append("/", style="dim")
         value = card.stats[stat]
-        # The contested stat is drawn BRIGHT — an explicit colour, not just bold. Bold alone is what a
-        # terminal is free to ignore, and on a dim or element-coloured ground it reads as nothing at
-        # all; the whole point is that the number deciding the battle should be the one you see first.
+        # Contested stat in an explicit BRIGHT colour: bold alone is advisory and vanishes on a dim or
+        # element-coloured ground.
         style = "dim" if challenge and stat != challenge else CONTESTED_STYLE
         if stat != challenge or not shift or value is None:
             text.append(stat_str(value), style=style)
             continue
-        # A terminal cell is indivisible, so no gap can be *narrower* than a column. Separate the two
-        # numbers vertically instead: the printed one keeps its size and is struck, the one that
-        # counts drops to a subscript beneath. No column spent on a gap, and they cannot read as one
-        # number.
-        # No column can be spared for a gap, so the two numbers part by height: the printed one struck
-        # at full size, the one that counts subscripted behind a bottom-left corner (U+231E), whose
-        # upright stops at the subscript's height rather than the digit's.
-        text.append(str(value), style="dim strike")  # what the card prints
+        # No cell can be spared for a gap, so the two numbers part by HEIGHT: printed value struck,
+        # effective value subscripted behind U+231E (whose upright stops at subscript height).
+        text.append(str(value), style="dim strike")
         text.append("⌞", style="dim")
-        text.append(_subscript(value + shift), style=style)  # what it is worth here
+        text.append(_subscript(value + shift), style=style)
     return text
 
 

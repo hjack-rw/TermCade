@@ -1,25 +1,8 @@
-"""What the opponent does with a Wu's power at the vault — and, just as often, why it does nothing.
+"""The opponent's vault-power decisions — and it is fair: it reads only what a player across the table
+could (both hands, both scores, pile size), never inside the pile or a personal deck.
 
-Fair, and that is the whole design constraint. The opponent reads only what a player sitting across
-the table can read: both hands (they are face up), both point totals, the size of the pile, the size
-of a personal deck. It never looks inside the pile or inside the player's deck. Where it cannot see,
-it reasons about what is *likely* — the catalog is public, and so is what a Wu is worth.
-
-Two of the new Wu therefore do nothing for it, and this is the honest reason:
-
-**Diaskopia** (read the opponent's shelf) informs no decision the opponent makes. Nothing in
-:mod:`bot` — not the challenge, not the wager, not what to field — turns on what the *player* has
-shelved. Knowledge with no decision behind it is worth exactly nothing, so the opponent banks the
-Falcon's Eye for its points. Give it a decision that depends on the player's future hand and the card
-wakes up.
-
-**Teleskopia** is worth only what it lets the opponent do differently, and under a one-action turn it
-cannot look and then act: the Scope *is* the turn. Reading three Wu it can do nothing about buys it
-nothing, so it banks the Eagle Scope too.
-
-Both remain strong in a *player's* hand — a player carries the information forward across turns in
-their head, which is a thing this opponent has no way to do. That asymmetry is real, and it is not a
-bug: it is the difference between a mind and a policy.
+Diaskopia and Teleskopia are always banked, never spent: no decision here turns on the player's shelf,
+and a one-action turn cannot look *and* act. Give either one a decision and it wakes up.
 """
 
 from __future__ import annotations
@@ -28,7 +11,7 @@ from dataclasses import dataclass
 
 from .mechanics.powers import GAMBLE_SPREAD, Mechanic, is_gamble, mechanic_of
 from .mechanics.scoring import initiative
-from .models import Card, Player
+from .models import Card
 from .settings import XiaolinSettings
 from .state import XiaolinState
 from .turn import duel_value
@@ -58,14 +41,6 @@ class VaultPlay:
     target: Card | None = None
 
 
-def _me(state: XiaolinState, is_player: bool) -> Player:
-    return state.player if is_player else state.bot
-
-
-def _them(state: XiaolinState, is_player: bool) -> Player:
-    return state.bot if is_player else state.player
-
-
 def choose_vault_power(
     state: XiaolinState, settings: XiaolinSettings, *, is_player: bool = False
 ) -> VaultPlay | None:
@@ -79,7 +54,7 @@ def choose_vault_power(
     can sit a player in the same chair. Without that the harness only ever banked and drew, never spent
     a power, and every player win rate it reported was a floor.
     """
-    for card in _me(state, is_player).whole_hand:
+    for card in state.duelist(is_player).whole_hand:
         mechanic = mechanic_of(card.power)
 
         if mechanic is Mechanic.REPULSION and _worth_shoving(state, settings, is_player):
@@ -112,7 +87,7 @@ def expected_points(card: Card) -> float:
 
 
 def _their_best(state: XiaolinState, is_player: bool = False) -> Card:
-    return max(_them(state, is_player).hand, key=duel_value)
+    return max(state.opponent(is_player).hand, key=duel_value)
 
 
 def _worth_shoving(state: XiaolinState, settings: XiaolinSettings, is_player: bool = False) -> bool:
@@ -121,7 +96,7 @@ def _worth_shoving(state: XiaolinState, settings: XiaolinSettings, is_player: bo
     That is the trap the card carries: it is a denial that *pays the duelist you are denying*. Fire
     it while they are near the target and you lose the game with your own Wu.
     """
-    them = _them(state, is_player)
+    them = state.opponent(is_player)
     if len(them.hand) <= 1:  # a deposit may never empty a hand — theirs no more than yours
         return False
     best = _their_best(state, is_player)
@@ -140,7 +115,7 @@ def _wants_initiative(state: XiaolinState, is_player: bool = False) -> bool:
     strong hand wants it and a weak one is glad to be rid of it — the Conch is spent on whichever
     answer the hands are not already giving.
     """
-    me, them = _me(state, is_player), _them(state, is_player)
+    me, them = state.duelist(is_player), state.opponent(is_player)
     edges = [
         me.character.stats[stat]
         + max((card.stats[stat] or 0 for card in me.hand), default=0)
@@ -168,7 +143,7 @@ def _initiative_is_wrong(state: XiaolinState, is_player: bool = False) -> bool:
 
 
 def _best_on_the_shelf(state: XiaolinState, is_player: bool = False) -> Card:
-    return max(_me(state, is_player).deck, key=duel_value)
+    return max(state.duelist(is_player).deck, key=duel_value)
 
 
 def _worth_reaching_for(state: XiaolinState, is_player: bool = False) -> bool:
@@ -177,7 +152,7 @@ def _worth_reaching_for(state: XiaolinState, is_player: bool = False) -> bool:
     A Draw costs the same action and costs no Wu. So the Glove has to buy a real upgrade over the
     top of the deck — otherwise it is two Wu spent to get one back.
     """
-    shelf = _me(state, is_player).deck
+    shelf = state.duelist(is_player).deck
     if not shelf:
         return False
     upgrade = duel_value(_best_on_the_shelf(state, is_player)) - duel_value(shelf[0])
@@ -190,29 +165,16 @@ def _worth_reaching_for(state: XiaolinState, is_player: bool = False) -> bool:
 def choose_early_bird(
     state: XiaolinState, settings: XiaolinSettings, *, is_player: bool = False
 ) -> Card | None:
-    """The Wu this duelist surrenders to outrun the other, or ``None`` to do something else.
+    """The Wu surrendered to outrun the other duelist, or ``None``.
 
-    It reads the board a player can read and no more: it cannot see the Wu it is about to take (the
-    pile is face down), so it is trading a *known* Wu for an unknown one, plus the turn's action.
-
-    **Flying this is not free, and the simulation says so plainly.** An opponent that took it whenever
-    it could lost ~8 points of win rate on the hard tier against one that never did (120 runs a tier).
-    The reasons are the same three that price it for a player: the surrendered Wu is real, the *lead*
-    it spends is what decides who names the challenge until it is rebuilt, and the action it costs
-    could have banked points — and points, not Wu, are the win condition (see :func:`pick_deposit`,
-    where the same lesson was measured).
-
-    There is no cheap flight, either: the gap of three is barely reachable without a ±2 in hand, and
-    the price is always your *highest*, so the Wu surrendered is essentially always a real one.
-
-    So it flies as a **comeback**, not as an appetite: only while it is behind on points. Losing costs
-    it nothing it was going to keep, and a fresh Wu off the pile is the fastest way back into the run.
-    Ahead, it banks instead and lets the lead do its work.
+    Flown only as a comeback (behind on points). An opponent that took it whenever it could lost ~8
+    points of hard-tier win rate over 120 runs a tier: it costs a real Wu, the initiative lead that
+    names the challenge, and the turn's action — and points are the win condition.
     """
     from .actions import early_bird_options, initiative_lead  # local: actions imports this module
 
-    me, them = _me(state, is_player), _them(state, is_player)
-    spent = state.actions_taken if is_player else state.bot_actions_taken
+    me, them = state.duelist(is_player), state.opponent(is_player)
+    spent = state.actions_spent(is_player)
     if spent >= settings.actions_per_turn or not state.card_deck:
         return None
     if initiative_lead(state, is_player=is_player) < settings.early_bird_gap:
@@ -270,7 +232,7 @@ def _worth_drawing(state: XiaolinState, settings: XiaolinSettings, is_player: bo
     """
     if not state.card_deck:
         return False
-    hand = _me(state, is_player).whole_hand
+    hand = state.duelist(is_player).whole_hand
     chrono = next((c for c in hand if mechanic_of(c.power) is Mechanic.CHRONOKINESIS), None)
     if chrono is None:
         return False

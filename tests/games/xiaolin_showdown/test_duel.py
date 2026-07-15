@@ -24,13 +24,13 @@ from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.turn import refill_hands
+from factories import run_showdown, wu
 
 _STATS = ("force", "agility", "intellect")
 
 
 def _card(force, agility, intellect, *, element="water", mechanic=Mechanic.INITIATIVE) -> Card:
-    stats = {"force": force, "agility": agility, "intellect": intellect}
-    return Card(1, "Wu", stats, Power(0, "", mechanic, ""), element, "item", 0)
+    return wu(force, agility, intellect, element=element, mechanic=mechanic, id=1)
 
 
 def test_a_plain_card_enters_the_caster_queue_as_an_inert_stand_in():
@@ -189,10 +189,10 @@ async def test_a_scripted_showdown_walks_all_six_stages():
     battles = TOURNAMENT_BATTLES if tournament else 1
     wu_per_battle = 1 if tournament else duel.duel.wager
 
-    for wu in range(1, battles * wu_per_battle + 1):
+    for nth_wu in range(1, battles * wu_per_battle + 1):
         assert await duel.advance() == 3  # Boost (both decline here)
         assert await duel.advance() == 4  # Card — each fields one Wu
-        assert duel.duel.round_number == (wu - 1) // wu_per_battle + 1
+        assert duel.duel.round_number == (nth_wu - 1) // wu_per_battle + 1
         assert duel.duel.round.player.queue and duel.duel.round.bot.queue
         full = duel.duel.round.fielded == wu_per_battle
         assert len(duel.duel.round.player.result) == (3 if full else 0)
@@ -560,11 +560,6 @@ def test_a_second_boost_in_a_battle_lifts_the_second_wu_not_the_first():
     assert first_boost.stats == {"force": 1, "agility": 0, "intellect": 0}, "the first boost fired twice"
 
 
-async def _run(duel) -> None:
-    stage, guard = -1, 0
-    while stage != 0 and guard < 40:
-        stage = await duel.advance()
-        guard += 1
 
 
 def _forced(challenge: str, wager: int) -> DuelChoices:
@@ -599,7 +594,7 @@ async def test_a_wagered_stat_challenge_is_one_battle_fielding_every_wu_at_once(
     cat = load_catalog()
     duel = await _leading_player(cat, "force", 3)
 
-    await _run(duel)
+    await run_showdown(duel)
 
     assert duel.duel.challenge == "force"
     assert len(duel.duel.rounds) == 1, "a wager bought extra battles — it must only widen the one"
@@ -611,7 +606,7 @@ async def test_a_tournament_is_three_battles_contesting_each_stat_left_to_right(
     cat = load_catalog()
     duel = await _leading_player(cat, TOURNAMENT, 1)
 
-    await _run(duel)
+    await run_showdown(duel)
 
     if duel.duel.challenge != TOURNAMENT:
         pytest.skip("a tournament was not on the table for this seed (a hand held under three Wu)")
@@ -657,10 +652,7 @@ async def test_neither_duelist_can_see_the_wu_the_other_fields():
         ref.append(duel)
 
         ahead.clear()
-        stage, guard = -1, 0
-        while stage != 0 and guard < 40:
-            stage = await duel.advance()
-            guard += 1
+        await run_showdown(duel)
 
         assert not any(ahead), f"seed {seed}: the player was answering a Wu the opponent had just fielded"
 
@@ -687,11 +679,8 @@ async def test_the_opponent_chooses_against_the_board_before_you_moved():
             rng = Rng(seed)
             state = new_game(cat, rng, cat.character(1))
             duel = Duel(state, rng, _auto_choices(), XiaolinSettings())
-            stage, guard = -1, 0
             boards.clear()
-            while stage != 0 and guard < 40:
-                stage = await duel.advance()
-                guard += 1
+            await run_showdown(duel)
             # within a battle the opponent may see Wu fielded in EARLIER exchanges of that battle,
             # but never the one the player is committing to right now
             assert boards == sorted(boards), f"seed {seed}: the opponent read a Wu mid-exchange"

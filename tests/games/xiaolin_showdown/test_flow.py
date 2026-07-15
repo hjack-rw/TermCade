@@ -21,7 +21,7 @@ from termcade.ui.screens.dialog import ChoiceModal
 from xiaolin_showdown.logic.mechanics.powers import is_gamble, trigger_of
 from xiaolin_showdown.logic.mechanics.scoring import initiative
 from xiaolin_showdown.screens.duel import DuelScreen
-from xiaolin_showdown.screens.format import card_label, points_label, stats_line
+from xiaolin_showdown.screens.format import card_label, points_label
 from xiaolin_showdown.screens.lookup import LookUpScreen
 from xiaolin_showdown.screens.outcome import OutcomeScreen
 from xiaolin_showdown.screens.rules import RulesScreen

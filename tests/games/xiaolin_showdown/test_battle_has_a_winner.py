@@ -13,15 +13,15 @@ from __future__ import annotations
 import pytest
 
 from xiaolin_showdown.logic.battle import Ground, Round, Side, score_battle
-from xiaolin_showdown.logic.models import Card, Mechanic, Power
+from xiaolin_showdown.logic.models import Card, Mechanic
+from factories import wu
 
 STATS = ("force", "agility", "intellect")
 FLAT = {"force": 0, "agility": 0, "intellect": 0}  # characters lend nothing, so the Wu decide
 
 
 def _wu(force: int, agility: int, intellect: int) -> Card:
-    stats = {"force": force, "agility": agility, "intellect": intellect}
-    return Card(1, "Wu", stats, Power(0, "", Mechanic.FILLER, ""), "metal", "item", 0)
+    return wu(force, agility, intellect, mechanic=Mechanic.FILLER, id=1)
 
 
 def _ground(*, challenger_is_player: bool = True) -> Ground:

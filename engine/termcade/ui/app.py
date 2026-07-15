@@ -94,19 +94,9 @@ class EngineApp(App[None]):
         # app-level priority binding beats a screen's, so a `Binding("tab", ...)` added to EngineScreen
         # is dead the moment it is written.
         Binding("tab", "toggle_focus", "Focus", show=True, priority=True),
-        # The dev console. `show=False` and no menu entry anywhere: a player who has not been told is
-        # never going to find it, and that is the whole of the access control. `priority=True` so it
-        # opens from a screen that has bound the key to something of its own.
-        # The dev console, on FOUR names, and every one of them earns its place.
-        #
-        # `~` needs Shift, and the packaged game runs in a browser (textual-serve over xterm.js) where a
-        # shifted key may never arrive as the key Textual is watching for. The backtick below it needs no
-        # modifier at all, which is why it is the one that actually works; `f12` is there for a keyboard
-        # layout where the backtick is somewhere else entirely.
-        #
-        # Bound as `~` alone this passed every test and did nothing in the real game: `Pilot.press("~")`
-        # maps the character for you, so the test was flattering the binding rather than checking it. A
-        # key binding is not tested until a *terminal* has sent it.
+        # Dev console, four names. `~` needs Shift and may never arrive over textual-serve/xterm.js;
+        # the backtick needs no modifier and is the one that works. `Pilot.press("~")` maps the
+        # character for you, so a passing test proves nothing here — only a terminal does.
         Binding("grave_accent,~,tilde,f12", "console", "Console", show=False, priority=True),
         Binding("up", "focus_previous", "Previous", show=False),
         Binding("down", "focus_next", "Next", show=False),
@@ -214,34 +204,18 @@ class EngineApp(App[None]):
             self._player.play_loop(self._theme)
 
     def notify(self, message: str, *, title: str = "", log: bool = True, **kwargs: Any) -> None:
-        """Raise a toast — and write it down, because a toast is a thing a player can miss.
+        """Raise a toast, and journal it — the Game Log reads the journal back.
 
-        Every notification the game raises passes through here, so this is the one place that can
-        record them all: the opponent's whole turn, the price they named, what a power did. They show
-        for a few seconds and vanish, and the game does not pause while they do. The journal is what
-        the Game Log reads back.
-
-        ``log=False`` raises the toast without recording it — for a toast that is not an *event*. Two
-        kinds: one that only answers a key ("there is no retreat from a showdown" is a refusal, not
-        something that happened), and one the game already writes down better elsewhere. A log is a
-        record of a run, not a transcript of its notifications.
+        ``log=False`` for a toast that is not an *event*: a refusal ("no retreat from a showdown"), or
+        something the game writes down better itself.
         """
         if log and self.ctx is not None:
             self.ctx.journal.add(message, title=title)
         super().notify(message, title=title, **kwargs)
 
     def report_crash(self, error: BaseException, *, where: str) -> None:
-        """Put a crashed worker's exception in front of the player, and hand them back their game.
-
-        Textual's own `@work` defaults to `exit_on_error=True`, so an exception inside any of the
-        dialogs a screen raises — the deposit confirm, the Morpher's element, the Early Bird's price —
-        **takes the whole game down**: a traceback where the board was, and the run with it. For a game
-        that is the wrong trade. A bug in one dialog should cost you that dialog, not your afternoon.
-
-        `termcade.ui.work` turns that default off; `EngineScreen` catches the dead worker and calls
-        this. The exception is named, so it can be reported, and the dialog is dismissible, so the
-        player is put back where they were.
-        """
+        """A crashed worker's exception, named and dismissible, instead of a dead game. See
+        `termcade.ui.work`."""
         self.log.error(f"worker {where!r} crashed", error)
         self.push_screen(
             ChoiceModal(

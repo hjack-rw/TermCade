@@ -71,7 +71,7 @@ def oversee_hand_size(
     tops up manually with Draw), unless there is nothing in it that can be *fielded*, which is drawn
     for from the main pile. Returns ``False`` after shedding (the caller re-checks), ``True`` else.
     """
-    player = state.player if is_player else state.bot
+    player = state.duelist(is_player)
     over = len(player.whole_hand) - max_hand_size(player, settings.max_hand_size)
     if over <= 0:
         if not player.hand:  # nothing fieldable — see `Player.hand` vs `inalienable_hand`
@@ -101,20 +101,13 @@ def _charge_the_turn(state: XiaolinState, settings: XiaolinSettings, *, is_playe
 
 
 def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettings) -> None:
-    """Refill a hand with nothing playable in it — from its own shelf first, then the pile.
+    """Refill a hand with nothing FIELDABLE in it — own shelf first, then the pile (emptying it ends
+    the run).
 
-    Your own deck answers before the pile does: those Wu are already yours, shelved by your own hand,
-    and handing you fresh cards off the pile while your shelf sits full would be paying you for
-    forgetting about it. The pile is the *last* resort, and emptying it ends the run.
-
-    "Nothing playable" is not the same as "nothing at all". A dragon (``boost``/0) can only ever be
-    laid as a boost — it is never staked, lost or fielded as a Wu — so a hand holding only one has no
-    answer to a showdown and is empty for every purpose that decides a duel. An amplifier
-    (``boost``/+1) is a different matter: it sits in the hand and *can* be fielded, badly.
-
-    ``empty_draw_limit`` is the hand you are brought back up to, not a count of cards handed over.
-    A Wu that cannot be fielded still fills one of those slots, so a duelist holding one is dealt one
-    fewer: it is a mercy rule, and what is already on the shelf counts toward the mercy.
+    "Nothing playable" is not "nothing at all": a dragon (``boost``/0) can only ever be laid as a
+    boost, so a hand of them has no answer to a showdown. An amplifier (``boost``/+1) *can* be fielded,
+    badly. ``empty_draw_limit`` is the target hand size, not a card count — an unfieldable Wu still
+    fills one of the slots.
     """
     target = min(settings.empty_draw_limit, max_hand_size(player, settings.max_hand_size))
     while player.deck and len(player.whole_hand) < target:
@@ -123,18 +116,10 @@ def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettin
         _draw_from_main(state, player)
 
 
-# What a Wu is worth in a showdown when its printed stats say nothing about it. A card that resolves
-# at play prints `? ? ?` or 0/0/0, and reading the stats off it gives *zero* — which is how the whole
-# in-duel half of the card pool came to look like junk to the opponent, get banked first, and be
-# counted as an empty slot when a wager was priced.
-#
-# Each number is what the Wu is *worth on the table*, in the same currency as a printed stat:
-#   pours  — it puts NAMED_STAT_VALUE into a stat of your choosing; that is what it is worth.
-#   negations — it takes a whole line off the opponent for the battle, which is worth more than any
-#     one Wu contributes, and the three of them are the strongest cards in the game.
+# What a Wu is worth on the table when its printed stats say nothing (a `? ? ?` card reads as ZERO).
+# Same currency as a printed stat.
 _MECHANIC_VALUE: dict[Mechanic, int] = {
-    # The Morpher prints `? ? ?` and takes a known shape at play, so it is priced off that shape
-    # rather than a flat premium — retune the rule and the bot re-prices itself.
+    # Priced off the Morph rule itself, so retuning the rule re-prices the bot.
     Mechanic.MORPH: MORPH_ASIDE * 2 + MORPH_CONTESTED,
     Mechanic.HYDROKINESIS: NAMED_STAT_VALUE,
     Mechanic.MISFORTUNE: NAMED_STAT_VALUE,
@@ -143,14 +128,9 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     Mechanic.REVERSAL: 4,
 }
 
-# Mechanics whose printed stats are the whole of what they are worth, declared rather than assumed.
-#
-# The two sets together must cover every `Mechanic` — `test_every_mechanic_is_priced` fails otherwise,
-# and that test is the whole point. A new Wu that resolves at play prints `? ? ?`, so `duel_value`
-# reads *zero* off it and nothing complains: the opponent banks the strongest card in the game for two
-# points and prices a wager as though the slot were empty. That is not hypothetical — it is what
-# happened to the pours and the negations, and it cost the opponent 16 points of win rate before the
-# simulation caught it. So a mechanic must be *priced or excused*, never merely forgotten.
+# Mechanics whose printed stats are the whole value, declared rather than assumed. The two sets must
+# cover every `Mechanic` — `test_every_mechanic_is_priced` enforces it. An unpriced `? ? ?` Wu reads as
+# zero: the bot banks the strongest card in the game for 2 points. That cost 16 points of win rate once.
 #
 # Two of them are excused for a *different* reason: they are worth nothing on the table at all, and
 # that is deliberate. Kept apart from the rest because "its stats say what it is worth" and "it is
@@ -208,19 +188,11 @@ def duel_value(card: Card) -> int:
 
 
 def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
-    """Which Wu the bot banks this turn — its deposit skill, dialled by difficulty.
+    """Which Wu the bot deposits, by difficulty. ``None`` when nothing in hand is worth points.
 
-    **The hard bot takes the points, and it is right to.** A run is won by banking to
-    ``point_limit``, so the strong line is to cash the biggest number in hand and fight on with what
-    is left. Protecting good Wu is the clever-sounding play and it loses: over 250 runs, weighting
-    the choice by ``duel_value`` costs the bot ground at every weight tried, and refusing to bank a
-    booster costs it five points of win rate. Points are not merely the currency — they are the win
-    condition, and a duelist who hoards its weapons never reaches it.
-
-    The easy bot does the reverse: it sheds its least useful Wu and holds its weapons. It duels
-    exactly as well as the hard bot — it simply never banks enough to close a run out.
-
-    Returns ``None`` when nothing in hand is worth points.
+    Hard takes the highest points, full stop: over 250 runs, weighting by ``duel_value`` lost ground at
+    every weight, and refusing to deposit a booster cost 5 points of win rate. Points are the win
+    condition. Easy sheds its least useful Wu and hoards weapons — it duels as well, and never closes.
     """
     candidates = [card for card in hand if card.points > 0]
     if not candidates:
@@ -240,23 +212,14 @@ def bank_value(card: Card, rng: Rng) -> int:
     return roll_gamble(rng) if is_gamble(card.power) else card.points
 
 
-# The names of the actions a vault turn can spend, for whoever spends them. One list, so a move of
-# theirs and the same move of yours are filed under the same word in the Game Log — "Deposit" is
-# "Deposit" whichever side of the table it happened on. (A power is filed under its own name, and the
-# Early Bird under this one, because the Bird is a power that belongs to no Wu.)
-# The PLACE, not the verb. You go to the Vault; what you do there is bank a Wu, and the line under
-# the title says so ("You deposited Golden Tiger Claws for 2 pts"). A title names where a move was made;
-# the prose names what it was.
+# Game Log action names, for whoever spends the turn — one list, so a move of theirs files under the
+# same word as the same move of yours. VAULT is the PLACE (the verb "deposited" goes in the line
+# beneath it), and a power's own name goes in the line too: a title that changes per card cannot be
+# scanned for. See docs/design/VOICE.md.
 VAULT = "Vault"
 DRAW = "Draw"
 EARLY_BIRD = "Early Bird"
 PASSED = "Pass"
-# Every Wu power is one action, and the game already has a word for it: the vault offers "Use a Power",
-# the rulebook says power, the code says `use_power`. A second word for the same thing is the thing
-# that reads wrong, whichever word it is.
-#
-# The *power's own name* goes in the line, not in the title: a title is a label, and a label that
-# changes with every card cannot be scanned for.
 POWER = "Power"
 
 

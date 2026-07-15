@@ -7,8 +7,6 @@ are emphasised, and the whole screen rebuilds on return so deposits and draws sh
 
 from __future__ import annotations
 
-from typing import cast
-
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
@@ -16,7 +14,6 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header, Static
 
-from termcade.ui.screens.base import EngineScreen
 from termcade.ui.screens.log import GameLogScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
@@ -33,9 +30,9 @@ from ..logic.actions import (
 )
 from ..logic.mechanics.scoring import initiative, initiative_sources
 from ..logic.models import Player
-from ..logic.turn import DRAW
-from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
+from ..logic.turn import DRAW
+from .base import XiaolinScreen
 from .deposit import DepositScreen
 from .format import (
     affiliation_icon,
@@ -43,6 +40,7 @@ from .format import (
     char_stats,
     display_name,
     hands_lines,
+    labelled,
     your_move,
 )
 from .lookup import LookUpScreen
@@ -50,7 +48,7 @@ from .rules import RulesScreen
 from .use_power import UsePowerScreen
 
 
-class VaultScreen(EngineScreen):
+class VaultScreen(XiaolinScreen):
     BINDINGS = [
         ("1", "gong_yi_tanpai", "Duel"),
         ("2", "draw", "Draw"),
@@ -69,7 +67,7 @@ class VaultScreen(EngineScreen):
         self._suspended = False
 
     def compose(self) -> ComposeResult:
-        state = cast(XiaolinState, self.ctx.state)
+        state, rules = self.state, self.rules
         player, bot = state.player, state.bot
         init_player, init_bot = initiative(player, bot)
 
@@ -84,18 +82,17 @@ class VaultScreen(EngineScreen):
             yield _hand_panel(player.character.name, player_rows)
             yield _hand_panel(bot.character.name, bot_rows)
 
-        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        # Keyed by the shown number, so the greying and the hover reason come from the same source.
+        # Keyed by the shown number, so the greying and the hover reason come from one source.
+        # "4" opens on the Early Bird alone: it is a power, and a fast duelist has one to spend even
+        # holding no Wu that acts.
         blocked: dict[str, str | None] = {
             "1": "The run is over." if state.has_ended else None,
-            "2": draw_blocked(state, settings),
-            "3": deposit_blocked(state, settings.actions_per_turn),
-            # The Early Bird is a power like any other, so it opens this screen on its own — a
-            # duelist fast enough to fly it has something to spend, even holding no Wu that acts.
+            "2": draw_blocked(state, rules),
+            "3": deposit_blocked(state, rules.actions_per_turn),
             "4": (
                 None
-                if can_early_bird(state, settings)
-                else use_power_blocked(state, settings.actions_per_turn)
+                if can_early_bird(state, rules)
+                else use_power_blocked(state, rules.actions_per_turn)
             ),
         }
         with BoxedPanel(title="ACTIONS"):
@@ -103,8 +100,7 @@ class VaultScreen(EngineScreen):
 
         yield Footer()
 
-    # Returning from a sub-screen (deposit / use-power / look-up) rebuilds the panels, so the
-    # hands and points always reflect the latest state. Suspend→resume brackets that round trip.
+    # A sub-screen may have changed the hands or the points, so the panels rebuild on the way back.
     def on_screen_suspend(self) -> None:
         self._suspended = True
 
@@ -114,13 +110,9 @@ class VaultScreen(EngineScreen):
             self.rebuild()
 
     def action_gong_yi_tanpai(self) -> None:
-        state = cast(XiaolinState, self.ctx.state)
-        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        if state.has_ended or max(state.player.points, state.bot.points) >= settings.point_limit:
-            state.has_ended = True  # someone already reached the point limit — end now, no more duels
-            from .outcome import OutcomeScreen
-
-            self.app.switch_screen(OutcomeScreen())
+        state = self.state
+        if state.has_ended or max(state.player.points, state.bot.points) >= self.rules.point_limit:
+            self.end_run()  # someone is already at the limit — no more duels
             return
 
         from .duel import DuelScreen  # lazy: DuelScreen returns here, so a top import would cycle
@@ -128,23 +120,18 @@ class VaultScreen(EngineScreen):
         self.app.switch_screen(DuelScreen())
 
     def action_draw(self) -> None:
-        state = cast(XiaolinState, self.ctx.state)
-        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        if can_draw(state, settings):
-            card = draw(state)
+        if can_draw(self.state, self.rules):
+            card = draw(self.state)
             self.app.notify(f"Drew {card.name}.", title=your_move(DRAW))
             self.rebuild()  # show the drawn Wu without leaving the vault
 
     def action_use_power(self) -> None:
-        state = cast(XiaolinState, self.ctx.state)
-        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        if usable_powers(state, settings.actions_per_turn) or can_early_bird(state, settings):
+        state, rules = self.state, self.rules
+        if usable_powers(state, rules.actions_per_turn) or can_early_bird(state, rules):
             self.app.push_screen(UsePowerScreen())
 
     def action_deposit(self) -> None:
-        state = cast(XiaolinState, self.ctx.state)
-        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        if can_deposit(state, settings.actions_per_turn):
+        if can_deposit(self.state, self.rules.actions_per_turn):
             self.app.push_screen(DepositScreen())
 
     def action_lookup_cards(self) -> None:
@@ -160,8 +147,8 @@ class VaultScreen(EngineScreen):
         self.app.push_screen(RulesScreen())
 
     def action_save_game(self) -> None:
-        state = cast(XiaolinState, self.ctx.state)
-        title = f"{state.player.character.name} —  {state.player.points} pts"
+        player = self.state.player
+        title = f"{player.character.name} —  {player.points} pts"
         self.app.push_screen(SaveSlotScreen("save", title=title))
 
 
@@ -195,22 +182,11 @@ _ACTION_HELP = {
 }
 
 
-def _labelled(label: str, value: str | Text) -> Text:
-    """A dimmed label with its value — the muted-label pairing used across the state panel."""
-    text = Text()
-    text.append(f"{label}: ", style="dim")
-    if isinstance(value, Text):
-        text.append_text(value)
-    else:
-        text.append(value)
-    return text
-
-
 def _summary_line(player: Player, bot: Player, state: XiaolinState) -> Text:
     line = Text()  # centred by the #summary `text-align`, not Rich justify (which uses natural width)
-    line.append_text(_labelled("Points", f"{player.points}/{bot.points}"))
+    line.append_text(labelled("Points", f"{player.points}/{bot.points}"))
     line.append("       ")
-    line.append_text(_labelled("Remaining Wu", str(len(state.card_deck))))
+    line.append_text(labelled("Remaining Wu", str(len(state.card_deck))))
     return line
 
 
@@ -238,12 +214,12 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
         # nothing applied, so a hover that shows nothing means the cursor missed, not that the
         # duelist is unbuffed.
         bonuses = [card.power.initiative_bonus for card in sources]
-        initiative_cell = _labelled("Initiative", str(init))
+        initiative_cell = labelled("Initiative", str(init))
         initiative_cell.stylize(Style(meta={"tooltip": bonus_tooltip(bonuses)}))
         grid.add_row(
             Text(f"{label}:", style="dim"),
             name,
-            _labelled("Deck", str(len(duelist.deck))),
+            labelled("Deck", str(len(duelist.deck))),
             initiative_cell,
         )
     return grid

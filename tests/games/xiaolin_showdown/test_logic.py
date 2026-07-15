@@ -27,11 +27,12 @@ from xiaolin_showdown.logic.bot import choose_background, choose_boost, choose_c
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.catalog import load_catalog
 from xiaolin_showdown.logic.mechanics.scoring import count_end_stats, initiative
-from xiaolin_showdown.logic.models import Card, Character, Mechanic, Player, Power
+from xiaolin_showdown.logic.models import Card, Mechanic, Player, Power
 from xiaolin_showdown.logic.outcome import final_score
 from xiaolin_showdown.logic.settings import XiaolinSettings, deck_size_for, point_limit_for
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.state import XiaolinState
+from factories import duelist, wu
 
 
 def _omi(catalog):
@@ -40,13 +41,8 @@ def _omi(catalog):
 
 def _player_with_initiative(*bonuses: int) -> Player:
     """A Player whose hand contributes the given initiative bonuses (nothing else matters)."""
-    stats = {"force": 0, "agility": 0, "intellect": 0}
-    character = Character(0, "", dict(stats), Power(0, "", Mechanic.FILLER, ""), "xiaolin", True)
-    hand = [
-        Card(0, "", dict(stats), Power(0, "", Mechanic.INITIATIVE, "", bonus), "metal", "item", 0)
-        for bonus in bonuses
-    ]
-    return Player(character=character, hand=hand)
+    hand = [wu(mechanic=Mechanic.INITIATIVE, bonus=bonus, name="") for bonus in bonuses]
+    return duelist(hand=hand, name="")
 
 
 def test_catalog_loads_all_tables():
@@ -124,8 +120,7 @@ def test_snapshot_round_trips_through_savemanager(tmp_path):
 
 
 def _card(force, agility, intellect, element="metal", *, mechanic=Mechanic.PRINTED_STATS):
-    stats = {"force": force, "agility": agility, "intellect": intellect}
-    return Card(0, "", stats, Power(0, "", mechanic, ""), element, "wudai", 0)
+    return wu(force, agility, intellect, element=element, mechanic=mechanic, name="", type="wudai")
 
 
 _NO_STATS = {"force": 0, "agility": 0, "intellect": 0}

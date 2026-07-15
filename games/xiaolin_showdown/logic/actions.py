@@ -110,9 +110,8 @@ def draw(state: XiaolinState) -> Card:
 def usable_powers(state: XiaolinState, actions_per_turn: int, *, is_player: bool = True) -> list[Card]:
     """Wu whose power this duelist can actively use now: a hand power-up (``hand``/+1), or a
     ``use``-trigger Wu while the turn's action is unspent — and only if it has something to act on."""
-    spent = state.actions_taken if is_player else state.bot_actions_taken
-    unspent = spent < actions_per_turn
-    mine = state.player if is_player else state.bot
+    unspent = state.actions_spent(is_player) < actions_per_turn
+    mine = state.duelist(is_player)
     return [
         card
         for card in mine.whole_hand
@@ -129,8 +128,7 @@ def _has_target(state: XiaolinState, card: Card, is_player: bool = True) -> bool
     revealing powers ask this — the gag Wu fizzles by design, and Chronokinesis against an empty
     pile ends the run, which is a fizzle a duelist is allowed to walk into.
     """
-    me = state.player if is_player else state.bot
-    them = state.bot if is_player else state.player
+    me, them = state.duelist(is_player), state.opponent(is_player)
     mechanic = mechanic_of(card.power)
     if mechanic is Mechanic.DIASKOPIA:
         return bool(them.deck)
@@ -156,7 +154,7 @@ def early_bird_options(state: XiaolinState, *, is_player: bool = True) -> list[C
     That it must be a *highest* one is what keeps the rule honest — outrunning them costs you the very
     thing you outran them with, so the Early Bird cannot be flown twice on the same wings.
     """
-    me = state.player if is_player else state.bot
+    me = state.duelist(is_player)
     speed = [card for card in me.hand if card.power.initiative_bonus]
     if not speed:
         return []
@@ -208,14 +206,11 @@ def early_bird(state: XiaolinState, surrendered: Card, *, is_player: bool = True
 
     ``is_player`` is which duelist flew it. The bot is held to the same rule, down to the surrender.
     """
-    me = state.player if is_player else state.bot
+    me = state.duelist(is_player)
     me.remove_card(surrendered)
     taken = state.card_deck.pop(0)
     me.hand.append(taken)
-    if is_player:
-        state.actions_taken += 1
-    else:
-        state.bot_actions_taken += 1
+    state.spend_action(is_player)
     if not state.card_deck:
         state.has_ended = True
     return EARLY_BIRD_MESSAGE.format(taken=taken.name, given=surrendered.name)
@@ -271,10 +266,7 @@ def use_power(
 
     spend = _Spend(state, card, is_player, priority, target, rng)
     message = _fire(spend)
-    if is_player:
-        state.actions_taken += 1
-    else:
-        state.bot_actions_taken += 1
+    state.spend_action(is_player)
     spend.me.remove_card(card)  # discarded, no points
     return message
 

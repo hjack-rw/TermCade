@@ -57,6 +57,23 @@ class XiaolinState:
 
     schema_version: int = 1
 
+    # --- whose side is this ---------------------------------------------------------
+    # Mirrors `DuelState.duelist` (the in-duel half), so one question has one spelling.
+    def duelist(self, is_player: bool) -> Player:
+        return self.player if is_player else self.bot
+
+    def opponent(self, is_player: bool) -> Player:
+        return self.bot if is_player else self.player
+
+    def actions_spent(self, is_player: bool) -> int:
+        return self.actions_taken if is_player else self.bot_actions_taken
+
+    def spend_action(self, is_player: bool, count: int = 1) -> None:
+        if is_player:
+            self.actions_taken += count
+        else:
+            self.bot_actions_taken += count
+
     # --- engine GameState protocol -------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
         return {

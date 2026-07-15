@@ -6,21 +6,18 @@ tie), and a way on — play again with a fresh dragon, back to the menu, or quit
 
 from __future__ import annotations
 
-from typing import cast
-
 from textual.app import ComposeResult
 from textual.widgets import Footer, Header, Static
 
-from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.outcome import final_score
-from ..logic.state import XiaolinState
+from .base import XiaolinScreen
 
 
-class OutcomeScreen(EngineScreen):
+class OutcomeScreen(XiaolinScreen):
     def compose(self) -> ComposeResult:
-        outcome = final_score(cast(XiaolinState, self.ctx.state), self.ctx.rng)
+        outcome = final_score(self.state, self.ctx.rng)
         verdict = (
             "A TIE —  NOBODY WINS!"
             if outcome.winner is None

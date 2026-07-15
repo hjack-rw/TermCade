@@ -11,7 +11,8 @@ import pytest
 
 from xiaolin_showdown.logic.battle import Round
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute, claim_route
-from xiaolin_showdown.logic.models import Card, Mechanic, Power
+from xiaolin_showdown.logic.models import Card
+from factories import run_showdown, wu
 
 THRESHOLD = 7  # the shipped `prize_threshold`; a decisive blow must reach 8
 
@@ -25,8 +26,7 @@ def _battle(*end_values: int, stat: str = "force") -> Round:
 
 
 def _wu(element: str) -> Card:
-    stats = {"force": 1, "agility": 0, "intellect": 0}  # something, so it counts as contributing
-    return Card(1, "Wu", stats, Power(0, "", Mechanic.PRINTED_STATS, ""), element, "item", 0)
+    return wu(1, 0, 0, element=element, id=1)
 
 
 def _claim(rounds, background="metal", cancelled=False):
@@ -219,10 +219,7 @@ async def test_a_prize_nobody_claims_goes_to_the_lost_pile(catalog, settings):
         state = new_game(catalog, Rng(seed), catalog.character(1), settings=settings)
         duel = Duel(state, Rng(seed), choices, settings)
 
-        stage, guard = -1, 0
-        while stage != 0 and guard < 40:
-            stage = await duel.advance()
-            guard += 1
+        await run_showdown(duel, settings)
 
         if not duel.duel.card_won:
             assert duel.duel.prize_route is None
@@ -255,10 +252,7 @@ async def test_a_prize_that_is_claimed_never_reaches_the_lost_pile(catalog, sett
         state = new_game(catalog, Rng(seed), catalog.character(1), settings=settings)
         duel = Duel(state, Rng(seed), choices, settings)
 
-        stage, guard = -1, 0
-        while stage != 0 and guard < 40:
-            stage = await duel.advance()
-            guard += 1
+        await run_showdown(duel, settings)
 
         if duel.duel.card_won:
             assert duel.duel.prize_route is not None

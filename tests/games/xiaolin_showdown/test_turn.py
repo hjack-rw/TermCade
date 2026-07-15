@@ -9,7 +9,7 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 from termcade.core.settings import Difficulty
 
-from xiaolin_showdown.logic.models import Card, Character, Mechanic, Player, Power
+from xiaolin_showdown.logic.models import Card, Mechanic, Player
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.state import XiaolinState
 from xiaolin_showdown.logic.mechanics.powers import GAMBLE_SPREAD
@@ -24,18 +24,19 @@ from xiaolin_showdown.logic.turn import (
     refill_hands,
 )
 
+from factories import duelist, wu
+
 
 def _card(*, mechanic=Mechanic.INITIATIVE, points=0, stats=None) -> Card:
     stats = {"force": 1, "agility": 1, "intellect": 1} if stats is None else stats
-    return Card(0, "Wu", stats, Power(0, "", mechanic, ""), "metal", "item", points)
+    return wu(**stats, mechanic=mechanic, points=points)
 
 
 _JUNK = {"force": 0, "agility": 0, "intellect": 0}  # no duel value — a hard bot banks this first
 
 
 def _player(hand: int, *, deck: int = 0) -> Player:
-    character = Character(0, "C", {"force": 0, "agility": 0, "intellect": 0}, _card().power, "xiaolin", True)
-    return Player(character=character, hand=[_card() for _ in range(hand)], deck=[_card() for _ in range(deck)])
+    return duelist(hand=[_card() for _ in range(hand)], deck=[_card() for _ in range(deck)])
 
 
 def _state(player: Player, bot: Player, *, main: int = 0) -> XiaolinState:

@@ -49,25 +49,13 @@ class XiaolinSettings:
     point_limit: int = 21
     starting_points_player: int = 0
     starting_points_bot: int = 0
-    # One vault turn, one action: bank a Wu, spend a Wu's power, or draw one off your own deck.
-    # They come out of the same budget on purpose — that is what makes a hand a resource rather than
-    # a thing that refills itself, and it prices every Wu whose power is worth more than its points.
+    # One vault turn, one action: deposit, spend a power, or draw. One budget, so a hand is a resource
+    # and a Wu whose power beats its points has a price.
     actions_per_turn: int = 1
-    # The mercy rule: a duelist with nothing they can field is dealt back in, to this many Wu. Running
-    # out must not be an auto-loss — that would end a run on a dealt hand rather than on a played one.
-    #
-    # But it is *income*, and it is paid to whoever is losing: a hand empties because it was staked and
-    # forfeited, and the refill comes off the contested pile (your own shelf answers first, but a
-    # duelist who keeps losing never overflows their hand, so their shelf is bare). Measured, it fires
-    # ~3.8 times a run and hands the losing side ~7.5 Wu off a pile of ~30 — the largest single source
-    # of Wu in the game.
-    #
-    # So it is CLAMPED to `max_wager` in `__post_init__`: you are dealt back in, but never dealt more
-    # than you could have staked. This is a **guardrail, not a lock** — nobody raising a number on the
-    # Settings screen is cheating, that screen is there to build a custom game. It is there so a player
-    # cannot quietly wreck their own run without knowing they did: unclamped, nudging this from 3 to 4
-    # took the hard tier from 37% to 72% and to 75% at 5, and nothing on screen would have said why the
-    # game had stopped being hard.
+    # Mercy rule: a duelist with nothing fieldable is dealt back up to this many Wu (running dry must
+    # not be an auto-loss). It is INCOME paid to whoever is losing — ~3.8 fires a run, ~7.5 Wu off a
+    # ~30-Wu pile, the largest source of Wu in the game. Clamped to `max_wager` in `__post_init__`:
+    # unclamped, 3 -> 4 took the hard tier 37% -> 72%, and 5 -> 75%. A guardrail, not a lock.
     empty_draw_limit: int = 3
     # The bar a winner's stats must clear to claim the prize Wu — the one number deciding whether Wu
     # circulate or the pile just drains. Measured across 6..9 (see BALANCE.md): 7 is the only value at
@@ -148,26 +136,13 @@ def is_hard(difficulty: Difficulty) -> bool:
 
 
 def point_limit_for(cards: Iterable[Card], *, dealt: int | None = None) -> int:
-    """How many points win the run — a share of the points still *in the pile* once hands are dealt.
+    """Points that win the run: ``POINT_SHARE`` of the points left in the pile *after* the opening
+    hands.
 
-    Derived, not hardcoded: the pool only ever grows, and a fixed target would quietly get easier
-    with every Wu added. The player can still override it on the Settings screen; this is only what
-    the game ships with.
-
-    ``dealt`` is what the two opening hands take off the top, and it is subtracted before the share
-    is taken. The pile — not the printed pool — is what a run is actually fought over: ten Wu are in
-    somebody's hand before a single showdown is called. Counting them toward the bar sets a target
-    against cards nobody has to win.
-
-    Which Wu land in those hands is random, so this cannot know their points — it scales by the
-    pile's *average* card instead. **Ten cards of various points is not a fixed number of points**:
-    a fat deal can take 30 off the table and a lean one barely 10, and the same target is set either
-    way. That variance is real and it is not modelled — it makes a run with a rich opening hand a
-    shorter run. Averaging is the only honest option here (a target is chosen before a card is dealt),
-    but do not read the number as though the hands always cost the same.
-
-    A Xiaolin duelist is dealt one fewer (their birthright fills the slot), so the real pile is 30 or
-    31; that difference is one average card, well inside the rounding.
+    Derived, not hardcoded — the pool only grows, so a fixed target gets easier with every new Wu.
+    ``dealt`` is subtracted first: ten Wu sit in hands before the first showdown, and counting them
+    sets a bar against cards nobody can win. Scaled by the pile's *average* card, so a rich opening
+    deal shortens the run — that variance is real and unmodelled.
     """
     pile = [card for card in cards if card.id >= FIRST_DECK_CARD]
     if not pile:

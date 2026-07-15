@@ -113,13 +113,6 @@ def affiliation_icon(character: Character) -> str:
     return ICONS.get(character.affiliation, "")
 
 
-def card_markup(card: Card) -> str:
-    """``[colour]NAME[/]  f/a/i  icon`` — a single hand row (unaligned)."""
-    colour = COLORS.get(card.element, "white")
-    icon = ICONS.get(card.type, "")
-    return f"[{colour}]{card.name}[/]  {stats_line(card.stats)}  {icon}"
-
-
 def power_label(item: Card | Character) -> str:
     """The power's name, or an em-dash for the blank/no-op power (power id 0)."""
     return item.power.name if item.power.id else "—"
@@ -161,6 +154,17 @@ def power_name_text(power: Power) -> Text:
 def element_text(element: str) -> Text:
     """``Water`` in water's colour — the element named in its own colour, as Wu names are."""
     return Text(element.capitalize(), style=COLORS.get(element, "white"))
+
+
+def labelled(label: str, value: str | Text, *, strong: bool = False, style: str = "") -> Text:
+    """``Points: 12`` — a dim label, a bright value. The pairing used on the vault and the board."""
+    text = Text()
+    text.append(f"{label}: ", style="dim")
+    if isinstance(value, Text):
+        text.append_text(value)
+    else:
+        text.append(value, style=f"{'bold ' if strong else ''}{style}".strip())
+    return text
 
 
 def card_label(card: Card, suffix: str = "", *, prefix: str = "") -> Text:

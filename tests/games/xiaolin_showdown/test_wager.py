@@ -19,23 +19,15 @@ from __future__ import annotations
 import pytest
 
 from xiaolin_showdown.logic.bot import choose_wager
-from xiaolin_showdown.logic.models import Card, Mechanic, Power
+from xiaolin_showdown.logic.models import Card
 from xiaolin_showdown.logic.turn import duel_value
 
-_PLAIN = Power(id=0, name="", mechanic=Mechanic.PRINTED_STATS, description="")
+from factories import wu as _built
 
 
 def wu(force: int) -> Card:
     """A Wu worth exactly ``force`` in a showdown — ``duel_value`` sums the magnitudes a card prints."""
-    return Card(
-        id=0,
-        name=f"Wu({force})",
-        stats={"force": force, "agility": 0, "intellect": 0},
-        power=_PLAIN,
-        element="metal",
-        type="item",
-        points=1,
-    )
+    return _built(force, name=f"Wu({force})", points=1)
 
 
 @pytest.fixture(autouse=True)
