@@ -7,6 +7,7 @@ version of this; they are all this one, with different defaults.
 
 from __future__ import annotations
 
+from xiaolin_showdown.logic.battle import Ground
 from xiaolin_showdown.logic.constants import TOURNAMENT_BATTLES
 from xiaolin_showdown.logic.duel import END
 from xiaolin_showdown.logic.models import Card, Character, Mechanic, Player, Power
@@ -14,6 +15,25 @@ from xiaolin_showdown.logic.settings import XiaolinSettings
 
 STATS = ("force", "agility", "intellect")
 NO_STATS = dict.fromkeys(STATS, 0)
+
+
+def ground(
+    *,
+    background: str = "metal",
+    player_stats: dict[str, int] | None = None,
+    bot_stats: dict[str, int] | None = None,
+    **terms: object,
+) -> Ground:
+    """A battle's Ground with ``stats`` fixed to the game's three and characters that lend nothing —
+    a metal arena, no resonance to read. ``**terms`` sets Ground's flags (``bonus_cancelled``,
+    ``challenger_is_player``, ``bonus_reversed``)."""
+    return Ground(
+        stats=STATS,
+        background=background,
+        player_stats=dict(player_stats or NO_STATS),
+        bot_stats=dict(bot_stats or NO_STATS),
+        **terms,  # type: ignore[arg-type]
+    )
 
 
 async def run_showdown(duel, settings: XiaolinSettings | None = None) -> int:

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from xiaolin_showdown.logic.battle import Ground, Round, score_battle
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
+from factories import ground
 
 SPHERE_OF_JIANYU = 32  # negates the opponent's own stats
 REVERSING_MIRROR = 33  # negates the curses laid on you
@@ -24,19 +25,12 @@ TWO_TON_TUNIC = 17  # a plain Wu with negative force — a curse; the mirror lan
 # Read off the cards, never restated. A negation test is about what is *taken away*, so it must keep
 # holding when the card it takes it from is rebalanced.
 
-STATS = ("force", "agility", "intellect")
 PLAYER_BASE = {"force": 2, "agility": 3, "intellect": 4}
 BOT_BASE = {"force": 3, "agility": 3, "intellect": 3}
 
 
 def _ground(*, bonus_cancelled: bool = True) -> Ground:
-    return Ground(
-        stats=STATS,
-        background="metal",
-        player_stats=PLAYER_BASE,
-        bot_stats=BOT_BASE,
-        bonus_cancelled=bonus_cancelled,
-    )
+    return ground(player_stats=PLAYER_BASE, bot_stats=BOT_BASE, bonus_cancelled=bonus_cancelled)
 
 
 def _force(battle: Round) -> tuple[int, int]:

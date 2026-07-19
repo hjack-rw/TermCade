@@ -146,9 +146,8 @@ def score_battle(battle: Round, ground: Ground) -> None:
     the player leads, and the bot plays to make it negative.
 
     **Level goes to initiative, and so every battle has a winner.** Level is not a corner case — take
-    the contested stat, lose the other two, and it is exactly level: +2 −1 −1 = 0. That used to be
-    recorded as a draw, which is how a tournament could end 0:0 with three battles fought and the Wu
-    handed over on aggregate margin. Three battles, three winners: a tournament ends 2:1 or 3:0.
+    the contested stat, lose the other two, and it is exactly level: +2 −1 −1 = 0. Three battles,
+    three winners: a tournament ends 2:1 or 3:0, never a draw.
     """
     battle.player.result.clear()
     battle.bot.result.clear()

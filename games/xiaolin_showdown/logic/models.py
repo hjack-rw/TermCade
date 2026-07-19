@@ -59,10 +59,9 @@ class Mechanic(StrEnum):
 class Power:
     """What a Wu does, named — never encoded.
 
-    The DB stores the *mechanic*, so a row says ``subjugation`` and means it. It used to store a
-    ``(trigger, effect)`` pair of integers: nothing but a lookup table said what ``use``/+5 meant, two
-    cards could silently claim the same pair, and a typo became a Wu that quietly did nothing rather
-    than a load that failed. Now an unknown name cannot survive :func:`~.catalog.load_catalog`.
+    The DB stores the *mechanic* by name, so a row says ``nullify_wu`` and means it: an unknown name
+    cannot survive :func:`~.catalog.load_catalog`, so a typo is a DB that refuses to open rather than
+    a Wu that quietly does nothing.
 
     ``trigger`` is not stored either — *when* a power fires follows from *what it is*, and
     :data:`~.mechanics.powers.RULES` is the one place that says so.

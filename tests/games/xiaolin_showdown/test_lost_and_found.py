@@ -18,19 +18,14 @@ from xiaolin_showdown.logic.battle import Ground, Round, score_battle
 from xiaolin_showdown.logic.mechanics.cards import is_one_of
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, is_boost_slot, mechanic_of
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
+from factories import ground
 
 PLAYER_FORCE = 2  # the duelist this battle is scored for; the Staff's own stats sit on top of it
 
 
 def _metal_ground() -> Ground:
     """A metal arena with the elemental bonus off — this is about what a dragon *lends*, nothing else."""
-    return Ground(
-        stats=("force", "agility", "intellect"),
-        background="metal",
-        player_stats={"force": PLAYER_FORCE, "agility": 0, "intellect": 0},
-        bot_stats={"force": 0, "agility": 0, "intellect": 0},
-        bonus_cancelled=True,
-    )
+    return ground(player_stats={"force": PLAYER_FORCE, "agility": 0, "intellect": 0}, bonus_cancelled=True)
 
 ROOSTER_BOOSTER = 43
 SHIMO_STAFF = 44

@@ -47,9 +47,6 @@ class EngineScreen(Screen[None]):
         the screen offers silently vanishes from the bottom of the terminal — the screen still works,
         it just stops telling anyone how.
 
-        That bit the vault, which recomposes on every return from a sub-screen and after every draw, so
-        looking one card up cost you the whole hint line for the rest of the run.
-
         `refresh_bindings` after the recompose is what refills it. Deferred, because the new Footer does
         not exist yet at the moment we ask.
         """

@@ -6,10 +6,9 @@ a game served over ``textual-serve`` would play out of the *server*, which is wo
 Every one of those resolves to :class:`NullPlayer` and nothing upstream has to know.
 
 Where there is a device, :class:`StreamPlayer` holds one open output stream and feeds it from a
-:class:`~termcade.core.mixer.Mixer`. This is what buys sound effects: the previous backend handed a
-WAV file to ``winsound``, which plays exactly one sound at a time, so an effect would have cut the
-music off rather than sounding over it. Mixing in our own process means the samples — which we
-generate anyway — are summed before the device ever sees them.
+:class:`~termcade.core.mixer.Mixer`. This is what buys sound effects: mixing in our own process sums
+the samples — which we generate anyway — before the device sees them, so an effect sounds *over* the
+music instead of cutting it off.
 
 ``sounddevice`` is the one runtime dependency beyond Textual. It is used through
 ``RawOutputStream``, which hands the callback a plain writable buffer, so NumPy is not pulled in.

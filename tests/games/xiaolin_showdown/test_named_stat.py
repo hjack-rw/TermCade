@@ -15,12 +15,10 @@ from xiaolin_showdown.logic.battle import Ground, Round, score_battle
 from xiaolin_showdown.logic.bot import choose_stat
 from xiaolin_showdown.logic.mechanics.powers import NAMED_STAT_VALUE
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
+from factories import ground
 
 ORB_OF_TORNAMI = 28
 KAIJINS_CURSE = 29
-
-STATS = ("force", "agility", "intellect")
-
 
 def _ground(stat_totals: dict[str, int] | None = None, background: str = "metal") -> Ground:
     """A board with the elemental bonus switched off, so only the pour is being measured.
@@ -29,14 +27,7 @@ def _ground(stat_totals: dict[str, int] | None = None, background: str = "metal"
     contributes, whichever stat that card poured itself into. A water Orb on a metal ground is −1 on
     the challenge before it has done anything — real, and tested elsewhere, but not this rule.
     """
-    blank = {stat: 0 for stat in STATS}
-    return Ground(
-        stats=STATS,
-        background=background,
-        player_stats=stat_totals or dict(blank),
-        bot_stats=dict(blank),
-        bonus_cancelled=True,
-    )
+    return ground(background=background, player_stats=stat_totals, bonus_cancelled=True)
 
 
 def test_the_orb_pours_everything_into_the_named_stat(card):

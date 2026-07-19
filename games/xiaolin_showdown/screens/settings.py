@@ -18,10 +18,10 @@ from textual.widgets import Footer, Header, Input, Static
 from termcade.core.audio import MUSIC_OPTION, SFX_OPTION
 from termcade.core.settings import Difficulty
 from termcade.ui.app import EngineApp
-from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.settings import XiaolinSettings
+from .base import XiaolinScreen
 
 # The difficulty button cycles these in order. NORMAL (an old file or the engine default) folds to EASY.
 _DIFFICULTY_CYCLE = (Difficulty.EASY, Difficulty.HARD, Difficulty.BOSS)
@@ -47,7 +47,7 @@ def _sfx_label(on: bool) -> str:
     return f"Sound FX:  {'ON' if on else 'OFF'}"
 
 
-class SettingsScreen(EngineScreen):
+class SettingsScreen(XiaolinScreen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
     # The pending choices, toggled by their buttons and only written on Save.
@@ -63,7 +63,7 @@ class SettingsScreen(EngineScreen):
         )
         self._music = bool(current.options.get(MUSIC_OPTION, True))
         self._sfx = bool(current.options.get(SFX_OPTION, True))
-        rules = XiaolinSettings.from_settings(current)
+        rules = self.rules
         yield Header()
         with BoxedPanel(title="SETTINGS"):
             for field in fields(XiaolinSettings):

@@ -20,19 +20,11 @@ from .constants import FIRST_DECK_CARD
 from .models import Card
 
 # A duelist wins by banking this share of the points left in the *pile* — see `point_limit_for`, which
-# takes the two opening hands off the top first. Kept as a *share* so the target grows with the card
-# pool: a hardcoded number would quietly get easier every time a Wu is added.
-# Measured, not guessed: at 0.4 the target was decorative — 200 simulated runs ended on an empty
-# pile 94% of the time, and "bank the target and the run is yours" was a promise the game almost
-# never kept. At 0.3 about half of them are decided by someone actually reaching it, and the pile can
-# still run out from under a duelist who dawdles. It is a *pacing* knob, not a balance one: the win
-# rate did not move by a point across the whole sweep.
-#
-# Re-measured after the base changed from the whole pool to the pile-after-the-deal, because that made
-# the old tuning meaningless: at the current target (21) **56% of easy runs end on someone banking the
-# target** and 44% on an empty pile — which is the split this number was chosen for, kept. Win rate is
-# still flat across 17/21/25/28, so it is still pacing. (The hard tier ends on the target 93% of the
-# time: that opponent banks its way to the win rather than grinding you out of cards.)
+# takes the two opening hands off the top first. Kept as a *share* so the target grows with the pool;
+# a hardcoded number would quietly get easier every time a Wu is added.
+# A pacing knob, not a balance one: win rate is flat across the 17/21/25/28 sweep. At the shipped 0.3,
+# 56% of easy runs end on someone banking the target and 44% on an empty pile — the split it was chosen
+# for. (The hard tier reaches the target 93% of the time: it banks its way to the win.)
 POINT_SHARE = 0.3
 
 
@@ -41,10 +33,8 @@ class XiaolinSettings:
     max_hand_size: int = 6
     starting_hand_player: int = 5
     starting_hand_bot: int = 5
-    # Both track the card pool, and `default_settings` recomputes them from it. They are written out
-    # here too because a bare `XiaolinSettings()` deals a real game: a stale `max_deck_size` would
-    # shuffle the pool and then truncate it, quietly leaving the newest Wu out of the run.
-    # `test_settings_defaults_match_the_card_pool` fails when a printed Wu leaves them behind.
+    # Derived from the pool (see `pool_fingerprint`), but written out so a bare `XiaolinSettings()`
+    # still deals a real game. `test_settings_defaults_match_the_card_pool` fails when they fall stale.
     max_deck_size: int = 51
     point_limit: int = 30
     starting_points_player: int = 0
@@ -167,13 +157,8 @@ def point_limit_for(cards: Iterable[Card], *, dealt: int | None = None) -> int:
 
 
 def deck_size_for(cards: Iterable[Card]) -> int:
-    """How many Wu a run deals — every card in the draw pool.
-
-    Derived for the same reason as :func:`point_limit_for`: the pool grows as Wu are printed, and a
-    hardcoded deck would quietly leave the newest ones out of the run. Deal fewer than the pool and
-    ``new_game`` shuffles, then truncates — so a Wu would sit out at random, and the win target
-    (a share of *every* card's points) would still be counting the points it took with it.
-    """
+    """How many Wu a run deals — every card in the draw pool. Derived, not fixed, for the reason
+    :func:`pool_fingerprint` spells out: a hardcoded deck would leave newly printed Wu out of the run."""
     return sum(1 for card in cards if card.id >= FIRST_DECK_CARD)
 
 

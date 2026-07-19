@@ -24,9 +24,7 @@ from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.turn import refill_hands
-from factories import run_showdown, wu
-
-_STATS = ("force", "agility", "intellect")
+from factories import STATS, run_showdown, wu
 
 
 def _card(force, agility, intellect, *, element="water", mechanic=Mechanic.INITIATIVE) -> Card:
@@ -180,7 +178,7 @@ async def test_a_scripted_showdown_walks_all_six_stages():
     assert isinstance(duel.duel.player_priority, bool)
 
     assert await duel.advance() == 2  # Challenge / Background — both contested terms now set
-    assert duel.duel.challenge in (*_STATS, TOURNAMENT)
+    assert duel.duel.challenge in (*STATS, TOURNAMENT)
     assert duel.duel.background in ELEMENTS
 
     # Boost and Card repeat once per Wu that must be fielded — three into one battle, or one into
@@ -611,7 +609,7 @@ async def test_a_tournament_is_three_battles_contesting_each_stat_left_to_right(
     if duel.duel.challenge != TOURNAMENT:
         pytest.skip("a tournament was not on the table for this seed (a hand held under three Wu)")
 
-    assert [battle.stat for battle in duel.duel.rounds] == list(_STATS)
+    assert [battle.stat for battle in duel.duel.rounds] == list(STATS)
     assert all(battle.fielded == 1 for battle in duel.duel.rounds), "a tournament fields one Wu a battle"
     assert len(duel.duel.player.stakes) <= TOURNAMENT_BATTLES + 1  # three Wu, plus a boost at most
 

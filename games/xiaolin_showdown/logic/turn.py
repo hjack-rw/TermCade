@@ -291,9 +291,8 @@ def bot_turn(
 ) -> list[BotMove]:
     """The bot's between-showdown temple turn; returns a short log of what it did, for the player.
 
-    One turn, one action — the rule that binds the player binds the bot. It used to bank *and* top
-    its hand back up for free, which is not a game either duelist is playing: a hand that refills
-    itself is not a resource, and a Wu spent out of one costs nothing.
+    One turn, one action — the rule that binds the player binds the bot: a hand that refilled itself
+    for free would not be a resource, and a Wu spent out of one would cost nothing.
     """
     name = state.bot.character.name.split("_")[0]
     log: list[BotMove] = []

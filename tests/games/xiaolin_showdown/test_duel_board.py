@@ -20,7 +20,7 @@ from xiaolin_showdown.logic.constants import TOURNAMENT
 from xiaolin_showdown.logic.battle import Round, Side
 from xiaolin_showdown.logic.duel import DuelState
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
-from xiaolin_showdown.screens.duel import _board_text, _cards_line
+from xiaolin_showdown.screens.duel_board import _board_text, _cards_line
 from xiaolin_showdown.screens.format import COLORS
 
 SILVER_MANTA_RAY = 1  # water, boost/0 — a dragon, lends 1/1/1

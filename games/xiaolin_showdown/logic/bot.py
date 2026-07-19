@@ -306,10 +306,7 @@ def choose_wager(options: Sequence[int], own_hand: Sequence[Card], opponent_hand
     # Take the WIDEST field you are still ahead in; if you are behind in all of them, take the
     # narrowest bet on offer.
     #
-    # That is the expected-swing rule written out. The swing is `w x (2P - 1)`, and any sane reading of
-    # a margin into a chance is monotone — so the best width turns on the *sign* of the margin, never on
-    # the scale you map it through. (This was written with a `WAGER_SPREAD` constant first. Swept from 2
-    # to 40 it changed not one decision in a full run, because it could not: it divided every width by
-    # the same number. A knob that cannot move anything is worse than no knob, so it is gone.)
+    # That is the expected-swing rule: the swing is `w x (2P - 1)`, and any sane reading of a margin
+    # into a chance is monotone — so the best width turns on the *sign* of the margin, not its scale.
     ahead = [width for width in options if margin(width) > 0]
     return max(ahead) if ahead else min(options)

@@ -11,6 +11,7 @@ A screen that needs more than a flat button list (extra layout, art, inputs) sub
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -50,6 +51,13 @@ class MenuItem:
     # its rules are not the default ones, say, which is meaningless until you hover it.
     tooltip: str | None = None
 
+    @classmethod
+    def indexed(cls, prefix: str, index: int, label: str | Text, **kw: Any) -> MenuItem:
+        """A row whose id encodes an integer key — a list index or an entity id — as
+        ``id = f"{prefix}-{index}"``. Decode it back with :meth:`MenuScreen.index_of`; the two share
+        ``prefix``, so it cannot drift between them."""
+        return cls(id=f"{prefix}-{index}", label=label, **kw)
+
 
 class MenuScreen(EngineScreen):
     # Non-root menus go back on escape; a root menu (no screen beneath it) overrides with `[]`.
@@ -65,6 +73,11 @@ class MenuScreen(EngineScreen):
 
     def on_select(self, item_id: str) -> None:
         raise NotImplementedError
+
+    @staticmethod
+    def index_of(item_id: str, prefix: str) -> int:
+        """The integer key :meth:`MenuItem.indexed` encoded into ``item_id`` under ``prefix``."""
+        return int(item_id.removeprefix(f"{prefix}-"))
 
     def compose(self) -> ComposeResult:
         yield Header()

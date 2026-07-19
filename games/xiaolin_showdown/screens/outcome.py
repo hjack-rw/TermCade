@@ -13,6 +13,7 @@ from termcade.ui.widgets import BoxedPanel, Button
 
 from ..logic.outcome import final_score
 from .base import XiaolinScreen
+from .format import display_name
 
 
 class OutcomeScreen(XiaolinScreen):
@@ -21,7 +22,7 @@ class OutcomeScreen(XiaolinScreen):
         verdict = (
             "A TIE —  NOBODY WINS!"
             if outcome.winner is None
-            else f"{outcome.winner.name.upper().replace('_', ' ')} WINS!"
+            else f"{display_name(outcome.winner.name, upper=True)} WINS!"
         )
 
         yield Header()

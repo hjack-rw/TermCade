@@ -1,13 +1,9 @@
 """The journal — what happened in this run, in the order it happened.
 
-**A toast is a thing you can miss.** It shows for a few seconds in a corner and then it is gone, and
-the game does not stop while it is up: the opponent's whole turn, the price they named, what the
-mystery Wu turned out to be worth. A player who looked away has no way back to any of it, and "what
-just happened?" is not a question a game should refuse to answer.
-
-So every notification is written down as it is raised (see ``EngineApp.notify``), and a game may add
-what it does *without* a popup — a Wu banked, a showdown settled. The journal is the record; the
-Game Log screen is one way of reading it.
+A toast is a thing you can miss — a few seconds in a corner, and the game does not pause for it. So
+every notification is written down as it is raised (see ``EngineApp.notify``), and a game may add what
+it does *without* a popup — a Wu banked, a showdown settled. The journal is the record; the Game Log
+screen is one way of reading it.
 
 Emptied when a new state is dealt (see ``GameContext.state``), so a *new* run never opens on the tail
 of the game before it. A **loaded save** is the exception: it carries its own log (:meth:`snapshot` /

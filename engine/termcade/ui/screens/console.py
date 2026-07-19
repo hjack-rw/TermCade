@@ -58,9 +58,8 @@ class _CommandLine(Input):
     """The console's field — and the only place the closing key can be caught.
 
     A focused ``Input`` swallows every printable key to type it, *before* any binding is consulted —
-    app-level and `priority=True` included. So the backtick that opens the console was being typed into
-    it instead of shutting it, and no binding anywhere could have stopped that. The field has to refuse
-    the character itself.
+    app-level and `priority=True` included. So the closing key would be typed into the field instead of
+    shutting it, and no binding could stop that: the field has to refuse the character itself.
     """
 
     def on_key(self, event: events.Key) -> None:

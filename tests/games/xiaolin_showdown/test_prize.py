@@ -12,9 +12,10 @@ import pytest
 from xiaolin_showdown.logic.battle import Round
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute, claim_route
 from xiaolin_showdown.logic.models import Card
+from xiaolin_showdown.logic.settings import XiaolinSettings
 from factories import run_showdown, wu
 
-THRESHOLD = 7  # the shipped `prize_threshold`; a decisive blow must reach 8
+THRESHOLD = XiaolinSettings().prize_threshold  # the shipped bar; a decisive blow must reach one past it
 
 
 def _battle(*end_values: int, stat: str = "force") -> Round:

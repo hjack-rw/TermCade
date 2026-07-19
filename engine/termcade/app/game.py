@@ -58,14 +58,9 @@ class Game:
     # voice, so a game that says nothing still gets a soundtrack that sounds like it belongs.
     music_style: Style = ARCADE
     # A last word over the settings once they are loaded, for a game whose defaults are DERIVED from
-    # its own data rather than chosen by a player.
-    #
-    # `SettingsStore` merges a saved file *over* the defaults — which is right for a preference and
-    # wrong for a derived value: the file keeps whatever it was written with, forever. Xiaolin's deck
-    # size and win target are read off the card pool, and a `settings.json` written when the pool held
-    # ~20 Wu went on dealing 20 of 40 cards and ending at a target meant for a game half the size,
-    # months after the pool grew. Every Wu printed since that file was written could simply never
-    # appear. This is where a cartridge gets to notice that and put it right.
+    # its own data rather than chosen by a player. `SettingsStore` merges a saved file *over* the
+    # defaults — right for a preference, wrong for a derived value the file would then pin forever.
+    # This is where a cartridge re-derives such values against its current data.
     refresh_settings: Callable[[Settings], Settings] | None = None
     # Option keys the game writes for its own bookkeeping rather than for a player. They survive the
     # settings prune (which drops anything nobody declares) but are not preferences — see

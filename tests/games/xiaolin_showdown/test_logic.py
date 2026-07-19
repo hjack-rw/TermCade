@@ -32,7 +32,7 @@ from xiaolin_showdown.logic.outcome import final_score
 from xiaolin_showdown.logic.settings import XiaolinSettings, deck_size_for, point_limit_for
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.state import XiaolinState
-from factories import duelist, wu
+from factories import NO_STATS, STATS, duelist, ground, wu
 
 
 def _omi(catalog):
@@ -123,8 +123,6 @@ def _card(force, agility, intellect, element="metal", *, mechanic=Mechanic.INNAT
     return wu(force, agility, intellect, element=element, mechanic=mechanic, name="", type="wudai")
 
 
-_NO_STATS = {"force": 0, "agility": 0, "intellect": 0}
-_STATS = ["force", "agility", "intellect"]
 _ELEMENTS = ["water", "fire", "wind", "earth", "metal"]
 _NO_POWER = Power(0, "", Mechanic.FILLER, "")
 
@@ -132,13 +130,11 @@ _NO_POWER = Power(0, "", Mechanic.FILLER, "")
 def test_bot_picks_the_challenge_where_it_is_strongest():
     strong_force = {"force": 5, "agility": 1, "intellect": 1}
     hand = [_card(3, 0, 0)]  # a card that boosts force
-    assert choose_challenge(strong_force, _STATS, hand, _NO_STATS, Rng(1)) == "force"
+    assert choose_challenge(strong_force, list(STATS), hand, NO_STATS, Rng(1)) == "force"
 
 
 def _ground(stat: str = "force", background: str = "metal") -> Ground:
-    return Ground(
-        stats=list(_STATS), background=background, player_stats=_NO_STATS, bot_stats=_NO_STATS
-    )
+    return ground(background=background)
 
 
 def test_bot_plays_the_strongest_card_for_the_challenge():
@@ -179,7 +175,7 @@ def test_bot_background_favours_its_own_boosting_element():
     strong_force = {"force": 5, "agility": 0, "intellect": 0}
     bot_hand = [_card(3, 0, 0, "water")]
     player_hand = [_card(0, 0, 0, "fire")]
-    chosen = choose_background(strong_force, _ELEMENTS, (bot_hand, player_hand), _NO_STATS, Rng(1))
+    chosen = choose_background(strong_force, _ELEMENTS, (bot_hand, player_hand), NO_STATS, Rng(1))
     assert chosen == "water"
 
 
@@ -204,8 +200,8 @@ def test_count_end_stats_absolute_false_ignores_negatives():
 def test_count_end_stats_elemental_bonus_rewards_match_penalises_opposite():
     same = [_card(0, 0, 0, "water")]
     opposite = [_card(0, 0, 0, "fire")]  # fire is water's opposite
-    assert count_end_stats("force", 2, same, _NO_STATS, "water") == 2
-    assert count_end_stats("force", 2, opposite, _NO_STATS, "water") == -2
+    assert count_end_stats("force", 2, same, NO_STATS, "water") == 2
+    assert count_end_stats("force", 2, opposite, NO_STATS, "water") == -2
 
 
 def test_count_end_stats_does_not_inspect_powers():
@@ -216,7 +212,7 @@ def test_count_end_stats_does_not_inspect_powers():
     covered it built a queue by hand.
     """
     tail = _card(0, 0, 0, "water", mechanic=Mechanic.NULLIFY_ELEMENT)
-    assert count_end_stats("force", 2, [tail], _NO_STATS, "water") == 2
+    assert count_end_stats("force", 2, [tail], NO_STATS, "water") == 2
 
 
 def test_deposit_cashes_a_card_for_its_points():
@@ -478,9 +474,9 @@ def test_a_curse_mirror_costs_you_the_bonus_it_would_have_earned_its_caster():
     """A resonant curse cast at you bites deeper: the ±1 is negated, not ignored."""
     water_curse = Card(1, "Curse", {"force": 0, "agility": 0, "intellect": 0}, _NO_POWER, "water", "item", 0)
 
-    assert count_end_stats("force", 1, [water_curse], _NO_STATS, "water", earns_bonus=[]) == 0
+    assert count_end_stats("force", 1, [water_curse], NO_STATS, "water", earns_bonus=[]) == 0
     assert (
-        count_end_stats("force", 1, [water_curse], _NO_STATS, "water", earns_bonus=[], suffers_bonus=[water_curse])
+        count_end_stats("force", 1, [water_curse], NO_STATS, "water", earns_bonus=[], suffers_bonus=[water_curse])
         == -1
     )
 
@@ -489,4 +485,4 @@ def test_the_same_wu_earns_the_bonus_when_you_are_the_one_who_played_it():
     """Guards the sign: identical card, opposite side of the table, opposite result."""
     water_wu = Card(1, "Wu", {"force": 0, "agility": 0, "intellect": 0}, _NO_POWER, "water", "item", 0)
 
-    assert count_end_stats("force", 1, [water_wu], _NO_STATS, "water", earns_bonus=[water_wu]) == 1
+    assert count_end_stats("force", 1, [water_wu], NO_STATS, "water", earns_bonus=[water_wu]) == 1

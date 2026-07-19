@@ -46,11 +46,12 @@ from .deposit import DepositScreen
 from .format import (
     affiliation_icon,
     bonus_tooltip,
-    card_label,
+    card_options,
     char_stats,
     display_name,
     hands_lines,
     labelled,
+    prompt,
     your_move,
 )
 from .lookup import LookUpScreen
@@ -160,12 +161,9 @@ class TempleScreen(XiaolinScreen):
     @work
     async def _swap_draw(self) -> None:
         """Full hand: choose a Wu to shelve, then draw one back — one action, hand size unchanged."""
-        asked = Text("Your hand is full.")
-        asked.append("\n\n")
-        asked.append("Shelve which Wu to your Deck, and draw another?")
         shelved = await self.choose(
-            asked,
-            [(card_label(card), card) for card in self.state.player.hand],
+            prompt("Your hand is full.", "Shelve which Wu to your Deck, and draw another?"),
+            card_options(self.state.player.hand),
             title="SWAP",
         )
         if shelved is None:
@@ -205,11 +203,8 @@ class TempleScreen(XiaolinScreen):
         """A full bar pays out: the player picks which base stat rises (the bot shores up its lowest
         on its own — see `logic.training`). Free, even on a spent turn: the ten fills paid for it."""
         player = self.state.player
-        asked = Text("Your training paid off!")
-        asked.append("\n\n")
-        asked.append("Which stat do you raise?")
         stat = await self.choose(
-            asked,
+            prompt("Your training paid off!", "Which stat do you raise?"),
             [(stat.capitalize(), stat) for stat in trainable_stats(player)],
             title="TRAINING",
         )
@@ -310,7 +305,7 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
     for label, duelist, init, sources in rows:
         char = duelist.character
         name = Text(f"{affiliation_icon(char)} ")
-        name.append(display_name(char.name).upper(), style="bold")
+        name.append(display_name(char.name, upper=True), style="bold")
         name.append(f" ({char_stats(char)})", style="dim")  # stats in brackets, next to the name
         # The two rows share one Static, so a widget-level tooltip could not tell them apart — the
         # bonuses ride on this cell's own span instead (see TooltipStatic). Always tagged, even with
@@ -382,7 +377,7 @@ def _action_cell(entry: str, blocked: dict[str, str | None]) -> Text:
 
 
 def _hand_panel(character_name: str, rows: list[Text]) -> BoxedPanel:
-    title = f"{display_name(character_name).split(' ')[0].upper()}'S HAND"
+    title = f"{display_name(character_name, upper=True).split(' ')[0]}'S HAND"
     # All rows in one widget so the panel centres them as a block (rows stay left-aligned within
     # it) — a TooltipStatic, so each row's own wear tooltip answers on hover (see format._rows).
     return BoxedPanel(TooltipStatic(Text("\n").join(rows), classes="hand-block"), title=title)

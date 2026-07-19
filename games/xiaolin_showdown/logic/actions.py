@@ -6,21 +6,18 @@ hand limit. Together, shelving a card and drawing a fresh one is how the player 
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
 
 from termcade.core.rng import Rng
 
 from .constants import WEAR_LIMIT
-from .mechanics.cards import index_of
 from .mechanics.scoring import initiative
-from .mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of, trigger_of
-from .models import Card, Player
+from .mechanics.powers import Mechanic, mechanic_of, trigger_of
+from .models import Card
 from .settings import XiaolinSettings, player_actions
 from .state import XiaolinState
 from .training import add_progress, can_train, payout_ready
 from .turn import bank_value, duel_value, max_hand_size, shelve
-from .wear import hand_over
+from .power_effects import FIZZLE_MESSAGE, PowerReport, _Spend, _fire
 
 # Whether Wuya's witchcraft-restored Wu wear out (vault on the third use) or reuse forever, and
 # whether it returns them at all. Balance knobs for how hard the witch is — the harness flips them
@@ -28,109 +25,9 @@ from .wear import hand_over
 WITCHCRAFT_WEARS = True
 WITCHCRAFT_RETURNS = True
 
-# A fired power says its piece TWICE. The toast names the power and sets the scene; the log line drops
-# the name and states only the outcome, because the Game Log entry above it already read "You played
-# Chronokinesis from the...". See docs/design/VOICE.md.
-#
-# All past tense: a report is raised AFTER the thing happened and re-read a turn later, so "you draw a
-# Wu" would read as an instruction for a move the game already spent.
-
-
-@dataclass(frozen=True)
-class PowerReport:
-    """What a fired power says — twice. `toast` names the power and sets the scene; `log` states only
-    the outcome, because the Game Log entry above it already read "You played <power> from the <Wu>".
-    A template (with `{...}` fields) fills both forms at once through `_report`."""
-
-    toast: str
-    log: str
-
-
-# Every acting power's two lines, keyed by mechanic — the same shape as `RULES` and `_FIRE`, so a power
-# is defined once, in one place. To tweak a power's wording, edit its row here and nothing else.
-#
-# The TOAST is player-only (only you see a toast for your own action), so it is written first-person.
-# The LOG is read by BOTH sides — your own move, and the opponent's — so it takes pronoun inserts that
-# flip by who cast it (see `_voice`): {caster} You/They, {caster_poss} your/their, {victim}/{victim_poss}
-# the other duelist. The rest (`{name}`, `{cards}`, `{answer}`, `{paid}`) come from the handler.
-REPORTS: dict[Mechanic, PowerReport] = {
-    Mechanic.DRAW: PowerReport(
-        "Chronokinesis stopped time — you drew {name}!",
-        "{caster} drew {name}.",
-    ),
-    # Diaskopia and Teleskopia reveal to the CASTER, and the opponent never spends them (they are always
-    # banked — see temple_ai), so their log only ever reads player-cast. Left first-person.
-    Mechanic.READ_DECK: PowerReport(
-        "Diaskopia saw through the wall — their Deck holds: {cards}",
-        "Their Deck holds: {cards}",
-    ),
-    Mechanic.SCRY: PowerReport(
-        "Teleskopia saw down the line — next will come: {cards}",
-        "Next will come: {cards}",
-    ),
-    Mechanic.ENHANCED_VISION: PowerReport(
-        "Oxyderkia saw them coming — you {answer} Initiative in the next Showdown.",
-        "{caster} {answer} Initiative in the next Showdown.",
-    ),
-    Mechanic.FETCH: PowerReport(
-        "Attraction pulled {name} out of your Deck and into your Hand.",
-        "{name} came out of {caster_poss} Deck and into {caster_poss} Hand.",
-    ),
-    Mechanic.BOUNCE: PowerReport(
-        "Repulsion shoved {name} out of their Hand — they deposited it for {paid} points.",
-        "{name} was deposited out of {victim_poss} Hand for {paid} points.",
-    ),
-    Mechanic.LUCK: PowerReport(
-        "Euthymia called {name} back from the lost — it is yours.",
-        "{name} came back from the lost into {caster_poss} possession.",
-    ),
-    Mechanic.PROGNOSIS: PowerReport(
-        "The Conch read them — next Showdown they lead with {answer}, but the ground is yours.",
-        "{caster} let {victim} lead the next Showdown, but kept the challenger's ground.",
-    ),
-    Mechanic.TRANSFER: PowerReport(
-        "The Lantern shone on you both — every Wu in your hand is theirs, and theirs are yours.",
-        "{caster} swapped the two hands entirely: {count} Wu crossed to {caster_poss} side.",
-    ),
-}
-
-# Repulsion's OTHER destination: shoved into their deck (no points), not banked. Picked by `_fire` when
-# the caster chose the deck — it sits by the temple version above, so both wordings tweak together.
-REPULSION_TO_DECK = PowerReport(
-    "Repulsion shoved {name} out of their Hand — it is lost in their Deck.",
-    "{name} was shoved out of {victim_poss} Hand into {victim_poss} Deck.",
-)
-
-# The fizzle is not keyed to an acting power: the gag Wu (use/0) hits it, so does any power with
-# nothing to act on. No outcome to keep — the non-event IS the joke, so both lines are the same.
-FIZZLE_MESSAGE = PowerReport(
-    "Something should have happened...",
-    "Something should have happened...",
-)
-
-
-def _voice(is_player: bool) -> dict[str, str]:
-    """The pronoun inserts for a log line, flipped by who cast the power — so one line reads right from
-    either seat. The toast has no such inserts (it is first-person, and player-only)."""
-    return {
-        "caster": "You" if is_player else "They",
-        "caster_poss": "your" if is_player else "their",
-        "victim": "they" if is_player else "you",
-        "victim_poss": "their" if is_player else "your",
-    }
-
-
-def _report(template: PowerReport, *, is_player: bool = True, **kw: object) -> PowerReport:
-    """Fill both lines of a template. The log takes pronoun inserts (`_voice`); the toast ignores the
-    ones it does not use, so the same call fills both."""
-    fills = {**_voice(is_player), **kw}
-    return PowerReport(template.toast.format(**fills), template.log.format(**fills))
-
-
 # Not a power: the Early Bird logs its own line, so it stays a plain one-form message.
 EARLY_BIRD_MESSAGE = "You outran your opponent to the next Wu: {taken} is yours. You gave up your {given} for it."
 
-TAKEN, REFUSED = "took", "refused"
 SPENT_MESSAGE = "You have already acted this turn."
 
 
@@ -143,14 +40,20 @@ def has_acted(state: XiaolinState, actions_per_turn: int) -> bool:
     return state.actions_taken >= actions_per_turn
 
 
+def spent_gate(state: XiaolinState, actions: int) -> str | None:
+    """``SPENT_MESSAGE`` if the turn's one action is already used, else ``None`` — the shared head of
+    the ``*_blocked`` predicates, so the "one action a turn" policy lives in one place."""
+    return SPENT_MESSAGE if has_acted(state, actions) else None
+
+
 def deposit_blocked(state: XiaolinState, actions_per_turn: int) -> str | None:
     """Why a deposit is disallowed right now, or ``None`` when it is allowed.
 
     The ``can_*`` predicates are defined as "no reason", so a greyed action and the explanation for
     it can never disagree.
     """
-    if has_acted(state, actions_per_turn):
-        return SPENT_MESSAGE
+    if spent := spent_gate(state, actions_per_turn):
+        return spent
     if len(state.player.hand) <= 1:
         return "Only one Wu left in hand."
     return None
@@ -183,8 +86,8 @@ def draw_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | None:
     A full hand no longer blocks it: instead of growing the hand, Draw *swaps* — you shelve a Wu and
     take one back (see :func:`swap_from_hand`), so a stuck hand can still cycle.
     """
-    if has_acted(state, player_actions(state, settings)):
-        return SPENT_MESSAGE
+    if spent := spent_gate(state, player_actions(state, settings)):
+        return spent
     if not state.player.deck:
         return "Your personal deck is empty."
     return None
@@ -236,8 +139,8 @@ def train_blocked(state: XiaolinState, actions_per_turn: int) -> str | None:
         return "Your training is now complete!"
     if not can_train(state.player):
         return "Nothing left to train."
-    if has_acted(state, actions_per_turn):
-        return SPENT_MESSAGE
+    if spent := spent_gate(state, actions_per_turn):
+        return spent
     return None
 
 
@@ -311,8 +214,8 @@ def early_bird_options(state: XiaolinState, *, is_player: bool = True) -> list[C
 
 def early_bird_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | None:
     """Why the Early Bird cannot be flown right now, or ``None`` when it can."""
-    if has_acted(state, player_actions(state, settings)):
-        return SPENT_MESSAGE
+    if spent := spent_gate(state, player_actions(state, settings)):
+        return spent
     if not state.card_deck:
         return "No Wu left on the pile."
     lead = initiative_lead(state, is_player=True)
@@ -428,205 +331,3 @@ def use_power(
         return message
     spend.me.remove_card(card)  # discarded, no points
     return message
-
-
-@dataclass(frozen=True)
-class _Spend:
-    """One firing of a ``use`` power: the board, the Wu, and the answers its power asked for.
-
-    ``is_player`` is which side of the table fired it. Every rule below is written from the caster's
-    seat — *my* deck, *their* hand — so the bot spends a Wu by exactly the rules the player does.
-    """
-
-    state: XiaolinState
-    card: Card
-    is_player: bool = True
-    priority: bool | None = None
-    target: Card | None = None
-    to_deck: bool = False  # Repulsion: shove into their deck (no points), not into their temple
-    rng: Rng | None = None
-
-    @property
-    def me(self) -> Player:
-        return self.state.player if self.is_player else self.state.bot
-
-    @property
-    def them(self) -> Player:
-        return self.state.bot if self.is_player else self.state.player
-
-    def wu(self) -> Card:
-        """The Wu this power was aimed at. Fired at nothing, it would silently do nothing."""
-        if self.target is None:
-            raise ValueError(f"{self.card.name!r} was spent without naming a Wu — it does nothing")
-        return self.target
-
-
-# A handler does the game work and returns the values that fill its `REPORTS` row — or ``None`` when it
-# found nothing to act on, which fizzles. It carries no text: the wording all lives in `REPORTS`.
-_Fill = dict[str, object]
-
-
-def _draw(spend: _Spend) -> _Fill | None:
-    """Chronokinesis: the top of the pile, into your hand. An empty pile ends the run."""
-    state = spend.state
-    if not state.card_deck:
-        return None
-    drawn = state.card_deck.pop(0)
-    spend.me.hand.append(drawn)
-    if not state.card_deck:
-        state.has_ended = True
-    return {"name": drawn.name}
-
-
-def _read_deck(spend: _Spend) -> _Fill | None:
-    """Diaskopia: everything the opponent has shelved."""
-    deck = spend.them.deck
-    return {"cards": _names(deck)} if deck else None
-
-
-def _scan_pile(spend: _Spend) -> _Fill | None:
-    """Teleskopia: as far down the pile as the Wu can see."""
-    coming = coming_wu(spend.state, SCOPE_DEPTH)
-    return {"cards": _names(coming)} if coming else None
-
-
-def _listen(spend: _Spend) -> _Fill | None:
-    """Oxyderkia: the next showdown's initiative, bought with an answer.
-
-    ``priority`` is the *caster's* answer — do I want it? ``forced_priority`` is the duel's, and the
-    duel asks a different question: does the **player** hold it? For the bot, the two are opposites.
-    """
-    if spend.priority is None:
-        raise ValueError("Oxyderkia was spent without an answer — ask before you fire it")
-    spend.state.forced_priority = spend.priority if spend.is_player else not spend.priority
-    return {"answer": TAKEN if spend.priority else REFUSED}
-
-
-def _foresee(spend: _Spend) -> _Fill | None:
-    """Prognosis (the new Mind Reader Conch): let the opponent lead, but read their every move.
-
-    The opponent takes priority next showdown — they name the challenge — but the caster keeps the
-    challenger's ground (wins the level battles). When the opponent is the bot, its challenge is
-    PINNED now (from its current stats and hand) and revealed to the caster; a human opponent still
-    names theirs live, so nothing is pinned there and only the ground changes hands.
-    """
-    from . import bot  # local: bot imports this module
-
-    spend.state.forced_priority = not spend.is_player  # the opponent leads
-    spend.state.conch_tiebreak = spend.is_player  # the caster keeps the ground despite not leading
-    if spend.is_player:  # the opponent is the bot — its call is deterministic, so pin and reveal it
-        stats = list(spend.them.character.stats)
-        spend.state.locked_challenge = bot.choose_challenge(
-            spend.them.character.stats, stats, spend.them.whole_hand,
-            spend.me.character.stats, spend.rng or Rng(0),  # a tie-break stream; the caster supplies it
-        )
-        return {"answer": spend.state.locked_challenge.upper()}
-    return {"answer": "their lead"}
-
-
-def _pull(spend: _Spend) -> _Fill | None:
-    """Attraction: a Wu of your choosing, out of your own deck.
-
-    The hand does not grow: the Glove leaves it as the Wu it drew arrives.
-    """
-    deck = spend.me.deck
-    if not deck:
-        return None
-    pulled = spend.wu()
-    deck.pop(index_of(deck, pulled))
-    spend.me.hand.append(pulled)
-    return {"name": pulled.name}
-
-
-def _recover(spend: _Spend) -> _Fill | None:
-    """Luck: the oldest Wu in the lost pile, back into the hand of whoever spent the Rooster.
-
-    The **oldest**, and that is the whole of the rule. Letting its caster read the pile and pick would
-    make it a tutor for the best Wu anyone ever failed to win; letting it roll would make it the second
-    Wu in the game that gambles, and `GAMBLE_SPREAD` says there is exactly one. First lost, first back.
-    """
-    lost = spend.state.lost
-    if not lost:
-        return None
-    revived = lost.pop(0)
-    # A change of hands like any other (see wear.hand_over) — moot today, since only unclaimed
-    # prizes reach the lost pile and nobody has worn those.
-    spend.me.hand.append(hand_over(revived))
-    return {"name": revived.name}
-
-
-def _swap_souls(spend: _Spend) -> _Fill | None:
-    """Transfer: the two duelists' hands change owners entirely.
-
-    The plain hands only — an inalienable wudai is soul-bound and stays. The Lantern itself sits
-    out the swap: it is mid-spend, and must be in its caster's hand when the spend removes it.
-    Every crossing Wu goes through ``hand_over``, so wear resumes per wearer like any other change
-    of hands.
-    """
-    if not spend.them.hand:
-        return None  # nothing to swap into — a one-way gift is not a swap
-    mine = [card for card in spend.me.hand if card is not spend.card]
-    theirs = list(spend.them.hand)
-    spend.me.hand[:] = [spend.card] + [hand_over(card) for card in theirs]
-    spend.them.hand[:] = [hand_over(card) for card in mine]
-    return {"count": len(theirs)}
-
-
-def _shove(spend: _Spend) -> _Fill | None:
-    """Repulsion: a Wu out of the opponent's hand — the caster picks where it lands.
-
-    Two destinations, each with a cost. **Vault** (``to_deck=False``): they *bank the points*, the Wu
-    is gone for good — you pay them to remove it. **Deck** (``to_deck=True``): no points to them, but
-    it is shuffled into their deck and they will draw it back — a delay, not a removal. The clamp on the
-    deposit is the one every deposit lives under: a bad roll costs banked points, never the run.
-    """
-    them = spend.them
-    if not them.hand:
-        return None
-    if spend.rng is None:
-        raise ValueError("Repulsion moves a Wu that may need a roll or a shuffle — pass the rng")
-    shoved = spend.wu()
-    them.hand.pop(index_of(them.hand, shoved))
-    if spend.to_deck:
-        shelve(them, shoved, rng=spend.rng)
-        return {"name": shoved.name}
-    paid = bank_value(shoved, spend.rng)
-    them.points = max(0, them.points + paid)
-    return {"name": shoved.name, "paid": paid}
-
-
-# What each `use` power does. A mechanic that is absent, or whose handler finds nothing to act on,
-# fizzles — the gag Wu by design, and the rest when the pile or a hand has run dry.
-_FIRE: dict[Mechanic, Callable[[_Spend], _Fill | None]] = {
-    Mechanic.DRAW: _draw,
-    Mechanic.READ_DECK: _read_deck,
-    Mechanic.SCRY: _scan_pile,
-    Mechanic.ENHANCED_VISION: _listen,
-    Mechanic.FETCH: _pull,
-    Mechanic.BOUNCE: _shove,
-    Mechanic.LUCK: _recover,
-    Mechanic.PROGNOSIS: _foresee,
-    Mechanic.TRANSFER: _swap_souls,
-}
-
-
-def _fire(spend: _Spend) -> PowerReport:
-    """What a ``use`` power does, before the Wu is spent on it.
-
-    Every handler checks what it acts on, rather than trusting :func:`usable_powers` to have gated
-    it: a power that reveals an empty pile would read as a bug rather than as the fizzle it is.
-    """
-    mechanic = mechanic_of(spend.card.power)
-    handler = _FIRE.get(mechanic)
-    if handler is None:
-        return FIZZLE_MESSAGE
-    fills = handler(spend)
-    if fills is None:
-        return FIZZLE_MESSAGE
-    # Repulsion is the one power with two outcomes — the deck version has its own wording.
-    template = REPULSION_TO_DECK if mechanic is Mechanic.BOUNCE and spend.to_deck else REPORTS[mechanic]
-    return _report(template, is_player=spend.is_player, **fills)
-
-
-def _names(cards: list[Card]) -> str:
-    return ", ".join(card.name for card in cards)

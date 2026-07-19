@@ -15,7 +15,8 @@ from xiaolin_showdown.logic.duel import DuelState
 from xiaolin_showdown.logic.mechanics.powers import is_gamble, trigger_of
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute
 from xiaolin_showdown.logic.turn import VAULT
-from xiaolin_showdown.screens.duel import DuelScreen, _showdown_story, _wager_label
+from xiaolin_showdown.screens.duel import DuelScreen
+from xiaolin_showdown.screens.duel_board import _showdown_story, _wager_label
 from xiaolin_showdown.screens.format import (
     OPPONENT_LOG,
     SHOWDOWN_LOG,

@@ -23,7 +23,7 @@ from ..logic.models import Card
 from ..logic.settings import player_actions
 from ..logic.turn import EARLY_BIRD, POWER
 from .base import XiaolinMenu
-from .format import card_headline, card_label, power_headline, your_move
+from .format import card_headline, card_options, power_headline, prompt, your_move
 
 NOTHING_COMING = "The pile is empty — nothing is coming."
 
@@ -47,7 +47,7 @@ class UsePowerScreen(XiaolinMenu):
                 seen.add(card.name)
                 self._usable.append(card)
         items = [
-            MenuItem(id=f"pow-{index}", label=power_headline(card))
+            MenuItem.indexed("pow", index, power_headline(card))
             for index, card in enumerate(self._usable)
         ]
         if can_early_bird(self.state, self.rules):
@@ -58,18 +58,14 @@ class UsePowerScreen(XiaolinMenu):
         if item_id == "early-bird":
             self._fly()
             return
-        self._spend(self._usable[int(item_id.removeprefix("pow-"))])
+        self._spend(self._usable[self.index_of(item_id, "pow")])
 
     @work
     async def _fly(self) -> None:
         """The Early Bird: take the next Wu with no duel, paying one of your fastest for it."""
-        asked = Text("Take the next Wu with no duel.")
-        asked.append("\n\n")  # statement, blank line, question — the shape every dialog uses
-        asked.append("Which Initiative Wu do you give up?")
-
         surrendered = await self.choose(
-            asked,
-            [(card_label(card), card) for card in early_bird_options(self.state)],
+            prompt("Take the next Wu with no duel.", "Which Initiative Wu do you give up?"),
+            card_options(early_bird_options(self.state)),
             title="THE EARLY BIRD",
         )
         if surrendered is None:
@@ -107,13 +103,13 @@ class UsePowerScreen(XiaolinMenu):
         if mechanic is Mechanic.FETCH:
             return await self.choose(
                 "Pull which Wu from your deck?",
-                [(card_label(wu), wu) for wu in self.state.player.deck],
+                card_options(self.state.player.deck),
                 title="GLOVE OF JISAKU",
             )
         if mechanic is Mechanic.BOUNCE:
             return await self.choose(
                 "Shove which Wu out of their hand?",
-                [(card_label(wu), wu) for wu in self.state.bot.hand],
+                card_options(self.state.bot.hand),
                 title="RUBY OF RAMSES",
             )
         return None
@@ -121,14 +117,12 @@ class UsePowerScreen(XiaolinMenu):
     async def _ask_destination(self, target: Card | None) -> bool:
         """Where the shoved Wu lands — the two costs of Repulsion. Deposit pays them points but is
         forever; the deck gives no points but they draw it back. Returns True for the deck."""
-        asked = Text()
         if target is not None:
-            asked.append_text(card_headline(target))
-            asked.append(" — where does it go?")
+            top = card_headline(target)
+            top.append(" — where does it go?")
         else:
-            asked.append("Where does the shoved Wu go?")
-        asked.append("\n\n")
-        asked.append("Their temple pays them points but is final; their deck pays nothing but returns.")
+            top = Text("Where does the shoved Wu go?")
+        asked = prompt(top, "Their temple pays them points but is final; their deck pays nothing but returns.")
 
         return await self.confirm(
             asked,
@@ -141,13 +135,11 @@ class UsePowerScreen(XiaolinMenu):
         """Reveal and question on one screen: the next Wu is the whole reason to want initiative, so
         choosing before seeing it would be no choice at all."""
         coming = coming_wu(self.state)
-        heard = Text()
         if coming:
-            heard.append_text(card_headline(coming[0]))
-            heard.append(" comes next.")
+            top = card_headline(coming[0])
+            top.append(" comes next.")
         else:
-            heard.append(NOTHING_COMING)
-        heard.append("\n\n")
-        heard.append("Take Initiative in the next Showdown?")
+            top = Text(NOTHING_COMING)
+        heard = prompt(top, "Take Initiative in the next Showdown?")
 
         return await self.confirm(heard, title="MIND READER CONCH", yes="Take it", no="Refuse it")

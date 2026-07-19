@@ -21,9 +21,9 @@ stopped resonating, nobody was in tune with anything.
 
 Fail all four and the Wu is **lost** — not destroyed. It goes out of play, and it can surface again.
 
-Measured, over 200 runs a tier: this moves the prize in ~37% of showdowns on Easy and ~49% on Hard,
-against ~15–20% for the single decisive blow it replaced — while the *win rate* moves under two
-points. Circulation and balance are separate axes, and this only touches the first.
+Measured over 200 runs a tier: this moves the prize in ~37% of showdowns on Easy and ~49% on Hard
+(against ~15–20% for the single decisive blow it replaced), while the win rate moves under two points
+— it changes circulation, not balance.
 """
 
 from __future__ import annotations
@@ -85,9 +85,7 @@ def _elemental_surplus(rounds: list[Round], winner_is_player: bool, background: 
     what it did once it got there, and there are two ways to get a Wu wrong here:
 
     * A Wu that moves no stat is still standing in the arena. A negation prints 0/0/0, and it is still
-      a lump of metal in a water canal. (This read `contributors()`, which drops anything whose stats
-      move nothing — so a player who fielded metal, metal and one water dragon was told they were in
-      tune with the water.)
+      a lump of metal in a water canal — so it counts toward being in tune, stats or no stats.
     * **A curse you cast is a Wu you played**, even though it prints on the *opponent's* Defensive
       line — that is where it lands, not who brought it. Your own copy is spent to zero, so the Wu is
       absent from your Offensive line entirely, and reading only your own side loses it.

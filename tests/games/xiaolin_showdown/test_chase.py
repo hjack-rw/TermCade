@@ -110,7 +110,7 @@ async def test_a_plain_opponent_never_takes_beast_form():
 def test_beast_form_boosts_only_the_battle_that_contests_its_stat():
     # A tournament leg that contests a DIFFERENT stat sees the plain 7/7/7 — the +2 is once a fight.
     from xiaolin_showdown.logic.battle import Round
-    from xiaolin_showdown.screens.duel import _beast_for
+    from xiaolin_showdown.screens.duel_board import _beast_for
     from xiaolin_showdown.logic.duel import DuelState
 
     duel = DuelState()
@@ -120,7 +120,7 @@ def test_beast_form_boosts_only_the_battle_that_contests_its_stat():
 
 
 def test_the_beast_boost_rides_the_offensive_line_joined_to_its_wu():
-    from xiaolin_showdown.screens.duel import _beast_offensive
+    from xiaolin_showdown.screens.duel_board import _beast_offensive
 
     line = _beast_offensive("agility", [wu(2, 2, 1, name="Dead", element="metal")], "agility")
     plain = line.renderables[0].plain

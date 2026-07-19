@@ -13,6 +13,7 @@ from ..logic.models import Card, Character
 from ..logic.mechanics.powers import is_gamble
 from .format import (
     char_stats,
+    display_name,
     effect_line,
     element_text,
     points_label,
@@ -34,7 +35,7 @@ class DetailScreen(EngineScreen):
         target = self._target
         power = target.power
         yield Header()
-        with BoxedPanel(title=target.name.upper().replace("_", " ")):
+        with BoxedPanel(title=display_name(target.name, upper=True)):
             if isinstance(target, Card):
                 line = Text("Element: ")
                 line.append_text(element_text(target.element))

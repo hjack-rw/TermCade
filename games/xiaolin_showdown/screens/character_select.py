@@ -7,14 +7,15 @@ easy and hard tiers deal a random opponent, the boss tier never does.
 
 from __future__ import annotations
 
-from termcade.ui.screens.menu import MenuItem, MenuScreen
+from termcade.ui.screens.menu import MenuItem
 
 from ..logic.catalog import Catalog, load_catalog
 from ..logic.mechanics.powers import Mechanic, mechanic_of
 from ..logic.models import Character
-from ..logic.settings import XiaolinSettings, roster_of
+from ..logic.settings import roster_of
 from ..logic.setup import new_game
 from ..logic.turn import bot_turn
+from .base import XiaolinMenu
 from .format import affiliation_icon, char_stats, display_name, opponent_move
 from .temple import TempleScreen
 
@@ -29,10 +30,10 @@ _BOSS_ARCHETYPE: dict[Mechanic, str] = {
 
 def _character_row(character: Character) -> str:
     """The one label shape both select screens use: icon, NAME, stats in brackets."""
-    return f"{affiliation_icon(character)} {display_name(character.name).upper()}  ({char_stats(character)})"
+    return f"{affiliation_icon(character)} {display_name(character.name, upper=True)}  ({char_stats(character)})"
 
 
-def _begin_run(screen: MenuScreen, catalog: Catalog, character: Character, opponent: Character | None) -> None:
+def _begin_run(screen: XiaolinMenu, catalog: Catalog, character: Character, opponent: Character | None) -> None:
     """Deal the run and open the temple — shared by both select screens.
 
     The temple turn is one turn and both of you take it. Every later one of theirs runs as a
@@ -41,7 +42,7 @@ def _begin_run(screen: MenuScreen, catalog: Catalog, character: Character, oppon
     got to shape.
     """
     current = screen.ctx.settings.current
-    settings = XiaolinSettings.from_settings(current)
+    settings = screen.rules
     state = new_game(
         catalog,
         screen.ctx.rng,
@@ -61,7 +62,7 @@ def _begin_run(screen: MenuScreen, catalog: Catalog, character: Character, oppon
     )
 
 
-class CharacterSelectScreen(MenuScreen):
+class CharacterSelectScreen(XiaolinMenu):
     menu_title = "CHOOSE YOUR CHARACTER"
 
     def __init__(self) -> None:
@@ -75,11 +76,13 @@ class CharacterSelectScreen(MenuScreen):
             element = parts[-1].lower() if parts else ""
             # A plain-string label (not Rich Text) takes the button's CSS colour, so the
             # `elem-*` class tints it and the hover/focus highlight can still override it.
-            items.append(MenuItem(f"char-{character.id}", _character_row(character), classes=f"elem-{element}"))
+            items.append(
+                MenuItem.indexed("char", character.id, _character_row(character), classes=f"elem-{element}")
+            )
         return items
 
     def on_select(self, item_id: str) -> None:
-        character = self._catalog.character(int(item_id.removeprefix("char-")))
+        character = self._catalog.character(self.index_of(item_id, "char"))
         if roster_of(self.ctx.settings.current.difficulty) == "boss":
             # A boss is picked, never dealt — every boss is its own mechanic, and "which one" is
             # the whole decision. Pushed, so escape returns here to re-pick the character.
@@ -88,7 +91,7 @@ class CharacterSelectScreen(MenuScreen):
         _begin_run(self, self._catalog, character, None)
 
 
-class BossSelectScreen(MenuScreen):
+class BossSelectScreen(XiaolinMenu):
     """The boss roster, one button each — hovering a boss reads out what its power does."""
 
     menu_title = "CHOOSE YOUR OPPONENT"
@@ -100,8 +103,9 @@ class BossSelectScreen(MenuScreen):
 
     def menu_items(self) -> list[MenuItem]:
         return [
-            MenuItem(
-                f"boss-{boss.id}",
+            MenuItem.indexed(
+                "boss",
+                boss.id,
                 _character_row(boss),
                 tooltip=_BOSS_ARCHETYPE.get(mechanic_of(boss.power)),
             )
@@ -109,5 +113,5 @@ class BossSelectScreen(MenuScreen):
         ]
 
     def on_select(self, item_id: str) -> None:
-        boss = self._catalog.character(int(item_id.removeprefix("boss-")))
+        boss = self._catalog.character(self.index_of(item_id, "boss"))
         _begin_run(self, self._catalog, self._character, boss)

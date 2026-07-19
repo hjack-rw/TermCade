@@ -47,12 +47,9 @@ class Rule:
 
 # What a GAMBLE Wu pays when it is banked, inclusive. Nobody is told this: the card shows `?`.
 #
-# Its DB `points` is never shown to a player either — it is the card's *expected* value, and only two
-# things read it. `settings.point_limit_for` sizes the run from the deck's total points, and the bot
-# ranks what to bank by them. Both would be lied to by a number the card cannot pay. Here the true
-# average is 1.5 against a stored 1, so the bot slightly undervalues the card. That is the whole of
-# the discrepancy, and it is deliberate: it is one Wu, in the player's favour, and rounding it away
-# beats a DB migration. Widen the spread and the stored value must move with it.
+# Its DB `points` is the card's *expected* value (read only by `point_limit_for` and the bot's ranking),
+# not a payout the card can pay: the true average is 1.5 against a stored 1, so the bot undervalues it by
+# a hair — deliberate, one Wu, in the player's favour. Widen the spread and the stored value must move.
 #
 # ⚠ THIS IS THE ONLY RANDOMNESS A DUELIST CANNOT SEE COMING, AND IT BELONGS TO EXACTLY ONE WU.
 # Everything else in this game is open hands and hard choices — that is the whole pitch, and it only

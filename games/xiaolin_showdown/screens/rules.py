@@ -28,12 +28,12 @@ from textual.binding import Binding
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 
-from termcade.ui.screens.base import EngineScreen
 from termcade.ui.typography import spaced_dashes
 from ..logic.mechanics.prize import PrizeRoute
 from ..logic.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings
 from ..logic.training import BOSS_LOSS_FILL, STAT_CAP, TRAIN_LENGTH
 from ..logic.wear import WEAR_LIMIT
+from .base import XiaolinScreen
 
 PRIMER = "How to Play"  # the first entry in the rail, and where a player with no question yet lands
 
@@ -146,8 +146,7 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "there are four ways to take it, evaluated in that order:",
             # The route NAMES are quoted from `PrizeRoute` itself, never retyped. The board announces
             # the winning route in the enum's own words — "[Claimed: a decisive blow]" — so a book that
-            # called it something else would teach a player a name the game never says. Renaming a route
-            # in the code used to leave the book quietly lying; now it cannot.
+            # called it something else would teach a player a name the game never says.
             f"{_route(PrizeRoute.DECISIVE_BLOW)}: beat {settings.prize_threshold} on the contested "
             "stat in any one battle.",
             f"{_route(PrizeRoute.BROAD_WIN)}: beat {settings.prize_threshold - 1} on any two stats.",
@@ -187,7 +186,7 @@ def matching(rules: dict[str, list[str]], query: str) -> dict[str, list[str]]:
     return found
 
 
-class RulesScreen(EngineScreen):
+class RulesScreen(XiaolinScreen):
     """The book: a rail of sections on the left, the one you picked on the right."""
 
     # `Tab` is the engine's focus key everywhere and stays that way here — it moves between the rail
@@ -199,8 +198,7 @@ class RulesScreen(EngineScreen):
     ]
 
     def compose(self) -> ComposeResult:
-        settings = XiaolinSettings.from_settings(self.ctx.settings.current)
-        self._rules = rules_for(settings)
+        self._rules = rules_for(self.rules)
         self._searching = False
         self._visible: dict[str, list[str]] = {PRIMER: HOW_TO_PLAY}
         self._by_slug = {_slug(name): name for name in self._entries()}
@@ -219,11 +217,8 @@ class RulesScreen(EngineScreen):
     def on_mount(self) -> None:
         """The book opens out of focus mode, like every other screen in the engine.
 
-        It used to open with the rail focused, on the argument that the rail *is* this screen. That was
-        wrong, and it broke the one thing the focus key is for: `Tab` is offered in the footer as the way
-        **into** keyboard mode, and on a screen that starts in it, pressing the advertised key throws you
-        out of a mode you never asked to enter. One screen behaving backwards is worse than the second of
-        friction it saves.
+        `Tab` is advertised in the footer as the way **into** keyboard mode, so a screen that started in
+        it would make the advertised key throw you *out* of a mode you never asked to enter.
 
         The rail keeps its highlight regardless — the highlight says which section is on the page, and
         that is true whether or not the rail holds the keyboard.

@@ -113,7 +113,7 @@ def _power(row: tuple) -> Power:
     refuses to open rather than a Wu that quietly does nothing for a whole run. That failure mode is
     the entire reason the DB names its mechanic instead of encoding it as a pair of integers.
 
-    ``initiative_bonus`` is a column now — it used to be smuggled into the description after a ``~``.
+    ``initiative_bonus`` is its own column.
     """
     pid, name, mechanic, description, initiative_bonus = row
     return Power(pid, name, Mechanic(mechanic), description, initiative_bonus or 0)

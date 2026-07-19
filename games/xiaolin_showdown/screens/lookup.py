@@ -34,9 +34,10 @@ class LookUpScreen(XiaolinMenu):
         self._cards = self.state.player.whole_hand + self.state.bot.whole_hand
         mine = len(self.state.player.whole_hand)  # the first this many are yours
         return [
-            MenuItem(
-                id=f"look-{index}",
-                label=card_label(
+            MenuItem.indexed(
+                "look",
+                index,
+                card_label(
                     card,
                     f"  ({stats_line(card.stats)})",
                     prefix=f"{'You' if index < mine else 'Opp'}: ",
@@ -48,7 +49,7 @@ class LookUpScreen(XiaolinMenu):
     def on_select(self, item_id: str) -> None:
         if self._kind == "cards":
             self.app.push_screen(
-                DetailScreen(self._cards[int(item_id.removeprefix("look-"))], is_card=True)
+                DetailScreen(self._cards[self.index_of(item_id, "look")], is_card=True)
             )
             return
         player = item_id == "look-player"

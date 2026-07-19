@@ -23,12 +23,12 @@ class DepositScreen(XiaolinMenu):
     def menu_items(self) -> list[MenuItem]:
         # `points_label`, never `card.points`: the gamble Wu is worth `?` and must read as one here.
         return [
-            MenuItem(id=f"dep-{index}", label=card_label(card, f"   +{points_label(card)} pts"))
+            MenuItem.indexed("dep", index, card_label(card, f"   +{points_label(card)} pts"))
             for index, card in enumerate(self.state.player.hand)
         ]
 
     def on_select(self, item_id: str) -> None:
-        self._choose(self.state.player.hand[int(item_id.removeprefix("dep-"))])
+        self._choose(self.state.player.hand[self.index_of(item_id, "dep")])
 
     @work
     async def _choose(self, card: Card) -> None:

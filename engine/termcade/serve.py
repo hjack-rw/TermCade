@@ -35,7 +35,7 @@ _STOCK_STACK = '"Roboto Mono", menlo, monospace'  # textual-serve's terminal fon
 # An xterm cell measures about this much per px of font size. Both slightly over-estimate the real
 # cell, so a fit always clears rather than overflowing by a row.
 _CELL_W, _CELL_H = 0.60, 1.25
-_MIN_FONT, _MAX_FONT = 8, 28  # 28, not 18: the cap, not the layout, used to be what limited zoom
+_MIN_FONT, _MAX_FONT = 8, 28  # max font 28
 
 # Fallbacks when no game descriptor is on hand (``serve.main`` under Docker); override via env.
 DEFAULT_FIT_SIZE = (110, 38)

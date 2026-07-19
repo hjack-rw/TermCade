@@ -74,8 +74,9 @@ class SaveSlotScreen(MenuScreen):
             else:
                 label = f"{slot + 1}.  — empty —"
             items.append(
-                MenuItem(
-                    f"slot-{slot}",
+                MenuItem.indexed(
+                    "slot",
+                    slot,
                     label,
                     # An empty slot is a valid save target, but there's nothing there to load.
                     disabled=not occupied and self._mode == "load",
@@ -90,9 +91,9 @@ class SaveSlotScreen(MenuScreen):
 
     def on_select(self, item_id: str) -> None:
         if item_id.startswith("del-"):
-            self._delete(int(item_id.removeprefix("del-")))
+            self._delete(self.index_of(item_id, "del"))
             return
-        slot = int(item_id.removeprefix("slot-"))
+        slot = self.index_of(item_id, "slot")
         if self._mode == "save":
             self._save(slot)
         else:

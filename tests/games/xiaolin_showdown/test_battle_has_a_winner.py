@@ -14,10 +14,7 @@ import pytest
 
 from xiaolin_showdown.logic.battle import Ground, Round, Side, score_battle
 from xiaolin_showdown.logic.models import Card, Mechanic
-from factories import wu
-
-STATS = ("force", "agility", "intellect")
-FLAT = {"force": 0, "agility": 0, "intellect": 0}  # characters lend nothing, so the Wu decide
+from factories import ground, wu
 
 
 def _wu(force: int, agility: int, intellect: int) -> Card:
@@ -25,14 +22,7 @@ def _wu(force: int, agility: int, intellect: int) -> Card:
 
 
 def _ground(*, challenger_is_player: bool = True) -> Ground:
-    # Metal on a metal arena: nothing resonates, so nothing but the printed stats moves the score.
-    return Ground(
-        stats=STATS,
-        background="metal",
-        player_stats=FLAT,
-        bot_stats=FLAT,
-        challenger_is_player=challenger_is_player,
-    )
+    return ground(challenger_is_player=challenger_is_player)
 
 
 def _battle(mine: Card, theirs: Card) -> Round:

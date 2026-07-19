@@ -105,18 +105,15 @@ def char_stats(character: Character) -> str:
     return stats_line(character.stats)
 
 
-def display_name(name: str) -> str:
-    """A stored name shown for humans: underscores become spaces (``Salvador_Cumo`` -> ``Salvador Cumo``)."""
-    return name.replace("_", " ")
+def display_name(name: str, *, upper: bool = False) -> str:
+    """A stored name shown for humans: underscores become spaces (``Salvador_Cumo`` -> ``Salvador Cumo``).
+    ``upper`` shouts it for a heading, keeping the underscore rule in one place."""
+    shown = name.replace("_", " ")
+    return shown.upper() if upper else shown
 
 
 def affiliation_icon(character: Character) -> str:
     return ICONS.get(character.affiliation, "")
-
-
-def power_label(item: Card | Character) -> str:
-    """The power's name, or an em-dash for the blank/no-op power (power id 0)."""
-    return item.power.name if item.power.id else "—"
 
 
 def card_name_text(card: Card, *, bold: bool = False) -> Text:
@@ -189,6 +186,26 @@ def card_label(card: Card, suffix: str = "", *, prefix: str = "") -> Text:
     label.append_text(card_name_text(card))
     label.append(suffix)
     return label
+
+
+def card_options(cards: Sequence[Card], *, suffix_stats: bool = False) -> list[tuple[Text, Card]]:
+    """``(label, card)`` options for a chooser — a Wu reads the same on a button as on the board.
+    With ``suffix_stats`` the printed stats trail the name (the in-duel card picker wants them)."""
+    return [
+        (card_label(card, f"  ({stats_line(card.stats)})") if suffix_stats else card_label(card), card)
+        for card in cards
+    ]
+
+
+def prompt(top: str | Text, question: str | Text) -> Text:
+    """A dialog body: a statement, a blank line, then the question under it — the shape every dialog
+    uses. ``top`` may be plain text or an already-styled ``Text`` (a card headline); this owns the
+    single blank line between the two."""
+    body = Text()
+    body.append_text(top if isinstance(top, Text) else Text(top))
+    body.append("\n\n")
+    body.append_text(question if isinstance(question, Text) else Text(question))
+    return body
 
 
 def bonus_tooltip(bonuses: Sequence[int]) -> str:
