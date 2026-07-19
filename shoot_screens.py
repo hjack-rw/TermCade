@@ -22,7 +22,7 @@ import asyncio
 import re
 from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image
 from playwright.sync_api import sync_playwright
 
 from termcade.ui.app import EngineApp

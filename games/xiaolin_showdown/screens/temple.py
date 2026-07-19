@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from rich.cells import cell_len
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
@@ -312,14 +313,15 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
     # why a card in your bracket may be sitting in their hand.
     player_sources, bot_sources = initiative_sources(player, bot)
 
-    # Columns size to their content, so a short name leaves no trailing gap. One flex column eats the
-    # slack, pushing Deck and Initiative to the right; everything left of it packs tight.
+    # Columns size to their content, so a short name leaves no trailing gap. TWO flex columns bracket
+    # the training bar and split the slack evenly, which centres the bar between the name and Deck; a
+    # single flex on one side dumps every spare cell into one hole beside it.
     grid = Table.grid(expand=True, padding=(0, 1))
     grid.add_column(no_wrap=True)  # Player n
     grid.add_column(no_wrap=True)  # affiliation icon + name (stats)
-    grid.add_column(width=3)  # gap between
+    grid.add_column(ratio=1, min_width=3)  # flex — half the slack, left of the bar
     grid.add_column(no_wrap=True)  # training bar
-    grid.add_column(ratio=1)  # flex — absorbs the slack, pushing Deck/Initiative right
+    grid.add_column(ratio=1, min_width=3)  # flex — the other half, right of the bar
     grid.add_column(justify="right", no_wrap=True)  # deck
     grid.add_column(width=4)  # gap between
     grid.add_column(justify="right", no_wrap=True)  # initiative
@@ -342,7 +344,7 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
         grid.add_row(
             Text(f"{label}:", style="dim"),
             name,
-            Text(""),  # gap column
+            Text(""),  # flex spacer
             _training_cell(duelist),
             Text(""),  # flex spacer
             labelled("Deck", str(len(duelist.deck))),
@@ -361,7 +363,9 @@ def _training_cell(duelist: Player) -> Text:
     up under each other; a spacer column holds them clear of the name."""
     cell = Text("Training: ", style="dim")
     if duelist.character.tier == "boss":
-        width = 2 * TRAIN_LENGTH - 1  # the bar's own footprint: segments with a space between
+        # Measured off the real bar, percent included — that whole span is what the eye centres
+        # against, and a hand-derived segment count leaves MASTER sitting left of it.
+        width = cell_len(render_bar(0.0, TRAIN_LENGTH))
         word = " MASTER "
         dashes = (width - len(word)) // 2  # the same run both sides: symmetry beats exact width
         cell.append("-" * dashes + word + "-" * dashes)
