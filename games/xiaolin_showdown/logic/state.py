@@ -70,8 +70,15 @@ class XiaolinState:
     # Shared and in the order they were used — a Refresh Wu calls the most recent back, whoever spent
     # it, into the caster's hand.
     used: list[Card] = field(default_factory=list)
+    # A per-game win target, when this run deals a weighted subset of the pool (its size varies, so its
+    # target must too). ``None`` uses ``settings.point_limit`` — the ordinary whole-pool game.
+    point_limit: int | None = None
 
     schema_version: int = 1
+
+    def win_target(self, settings: "XiaolinSettings") -> int:
+        """The points that end the run: this game's own if it dealt a subset, else the settings'."""
+        return self.point_limit if self.point_limit is not None else settings.point_limit
 
     # --- whose side is this ---------------------------------------------------------
     # Mirrors `DuelState.duelist` (the in-duel half), so one question has one spelling.
@@ -116,6 +123,7 @@ class XiaolinState:
             "initiative_contested": self.initiative_contested,
             "lost": [card.id for card in self.lost],
             "used": [card.id for card in self.used],
+            "point_limit": self.point_limit,
         }
 
     @classmethod
@@ -142,6 +150,7 @@ class XiaolinState:
             initiative_contested=data.get("initiative_contested", False),
             lost=[_fresh_card(catalog, cid) for cid in data.get("lost", [])],
             used=[_fresh_card(catalog, cid) for cid in data.get("used", [])],
+            point_limit=data.get("point_limit"),
         )
 
 

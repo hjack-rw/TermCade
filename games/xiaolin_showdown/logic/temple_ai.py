@@ -157,7 +157,7 @@ def _shove_to_deck(state: XiaolinState, settings: XiaolinSettings, is_player: bo
     own Wu could hand them the run. There, the deck denies the weapon for a while and pays them nothing.
     """
     them = state.opponent(is_player)
-    return them.points + expected_points(_their_best(state, is_player)) >= settings.point_limit
+    return them.points + expected_points(_their_best(state, is_player)) >= state.win_target(settings)
 
 
 # --- the Mind Reader Conch: buy the initiative, when it is pointing the wrong way ---

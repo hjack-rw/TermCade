@@ -94,7 +94,8 @@ def test_new_game_hand_sizes():
     assert len(state.player.hand) == 4  # 5 minus the inalienable card
     assert len(state.player.inalienable_hand) == 1
     assert len(state.bot.hand) == 5
-    assert len(state.card_deck) == XiaolinSettings().max_deck_size - (4 + 5)
+    # The shipped game deals a weighted roster subset, not the whole pool.
+    assert 0 < len(state.card_deck) < deck_size_for(cat.cards)
 
 
 def test_snapshot_round_trips_through_savemanager(tmp_path):

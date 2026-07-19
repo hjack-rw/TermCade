@@ -52,7 +52,8 @@ def refill_hands(state: XiaolinState, settings: XiaolinSettings, *, rng: Rng) ->
     This is where a turn turns over, so this is where the action counters are cleared — and then
     immediately spent again for anyone the mercy rule has to deal back in (:func:`_charge_the_turn`).
     """
-    if state.player.points >= settings.point_limit or state.bot.points >= settings.point_limit:
+    target = state.win_target(settings)
+    if state.player.points >= target or state.bot.points >= target:
         state.has_ended = True
 
     state.actions_taken = 0
