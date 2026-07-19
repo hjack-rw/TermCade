@@ -16,11 +16,12 @@ from __future__ import annotations
 
 from termcade.core.rng import Rng
 
+from .constants import WEAR_LIMIT
 from .mechanics.cards import is_one_of
 from .models import Card, Player
 from .turn import bank_value
 
-WEAR_LIMIT = 3  # the showdown that brings a Wu here vaults it
+__all__ = ["WEAR_LIMIT", "hand_over", "record_showdown"]
 
 
 def hand_over(card: Card) -> Card:

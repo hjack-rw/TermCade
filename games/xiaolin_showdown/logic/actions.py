@@ -77,6 +77,10 @@ REPORTS: dict[Mechanic, PowerReport] = {
         "Euthymia called {name} back from the lost — it is yours.",
         "{name} came back from the lost into {caster_poss} possession.",
     ),
+    Mechanic.METEMPSYCHOSIS: PowerReport(
+        "The Lantern shone on you both — every Wu in your hand is theirs, and theirs are yours.",
+        "{caster} swapped the two hands entirely: {count} Wu crossed to {caster_poss} side.",
+    ),
 }
 
 # Repulsion's OTHER destination: shoved into their deck (no points), not banked. Picked by `_fire` when
@@ -266,6 +270,8 @@ def _has_target(state: XiaolinState, card: Card, is_player: bool = True) -> bool
         return len(them.hand) > 1
     if mechanic is Mechanic.EUTHYMIA:
         return bool(state.lost)  # nothing has been lost yet — there is nobody to call back
+    if mechanic is Mechanic.METEMPSYCHOSIS:
+        return bool(them.hand)  # a one-way gift is not a swap
     return True
 
 
@@ -501,6 +507,23 @@ def _recover(spend: _Spend) -> _Fill | None:
     return {"name": revived.name}
 
 
+def _swap_souls(spend: _Spend) -> _Fill | None:
+    """Metempsychosis: the two duelists' hands change owners entirely.
+
+    The plain hands only — an inalienable wudai is soul-bound and stays. The Lantern itself sits
+    out the swap: it is mid-spend, and must be in its caster's hand when the spend removes it.
+    Every crossing Wu goes through ``hand_over``, so wear resumes per wearer like any other change
+    of hands.
+    """
+    if not spend.them.hand:
+        return None  # nothing to swap into — a one-way gift is not a swap
+    mine = [card for card in spend.me.hand if card is not spend.card]
+    theirs = list(spend.them.hand)
+    spend.me.hand[:] = [spend.card] + [hand_over(card) for card in theirs]
+    spend.them.hand[:] = [hand_over(card) for card in mine]
+    return {"count": len(theirs)}
+
+
 def _shove(spend: _Spend) -> _Fill | None:
     """Repulsion: a Wu out of the opponent's hand — the caster picks where it lands.
 
@@ -534,6 +557,7 @@ _FIRE: dict[Mechanic, Callable[[_Spend], _Fill | None]] = {
     Mechanic.ATTRACTION: _pull,
     Mechanic.REPULSION: _shove,
     Mechanic.EUTHYMIA: _recover,
+    Mechanic.METEMPSYCHOSIS: _swap_souls,
 }
 
 

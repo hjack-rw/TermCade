@@ -163,6 +163,13 @@ RULES: dict[Mechanic, Rule] = {
         Timing.AT_TEMPLE,
         "Spend it at the temple to bring the oldest lost Wu back — into your hand, not the pile.",
     ),
+    Mechanic.METEMPSYCHOSIS: Rule(
+        Mechanic.METEMPSYCHOSIS,
+        "use",
+        Timing.AT_TEMPLE,
+        "Spend it to swap your entire hand with your opponent's — a wudai weapon stays with its "
+        "soul's owner.",
+    ),
     Mechanic.DRAGON: Rule(
         Mechanic.DRAGON,
         "boost",
@@ -259,6 +266,13 @@ RULES: dict[Mechanic, Rule] = {
         "play",
         Timing.IN_DUEL,
         "You choose the arena's element for the rest of the showdown.",
+    ),
+    Mechanic.WARD: Rule(
+        Mechanic.WARD,
+        "play",
+        Timing.IN_DUEL,
+        "Wards its own element for this battle: your Wu of that element ignore every negative "
+        "background bonus — the lift still lands.",
     ),
 }
 

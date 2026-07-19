@@ -87,6 +87,11 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (43, 'Metallaxis', 'transmutation', 'Transforms an object''s alchemical properties by changing its atoms - turning a rival Wu to inert metal.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (44, 'Chromakinesis', 'chromasis', 'Shoots any element from the centre gem, so the user''s own Wu take the colour they choose.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (45, 'Anemokinesis', 'stormfront', 'Controls the weather, changing the arena''s element to the one the user calls.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (46, 'Pyrophylaxia', 'ward', 'Covers the user in a shell of black bug that protects the user from extreme heat. It can also be used as a raft.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (47, 'Hydrophylaxia', 'ward', 'Allows the user to breathe underwater, transforming them into a fish-like being in the process (still can''t talk with fish).', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (48, 'Anemophylaxia', 'ward', 'Grants the user the physical characteristics, as well as the acrobatic agility and balance of a monkey. If it stays active for too long it slowly transforms the user into a monkey.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (49, 'Geophylaxia', 'ward', 'Transforms the user hands into one large drill, allowing him to travel underground and break even diamonds.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (50, 'Metempsychosis', 'metempsychosis', 'Allows the user to control chi: for example astral project or swap two person''s souls entirly. If used on multiple people all have to be illuminated by its light.', 0);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE card (id INTEGER, name TEXT, force INTEGER, agility INTEGER, intellect INTEGER, power_id INTEGER NOT NULL REFERENCES power (id), element TEXT, type TEXT, points INTEGER, PRIMARY KEY (id AUTOINCREMENT));
@@ -141,6 +146,11 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (47, 'Kuzusu Atom', 2, 1, 1, 43, 'metal', 'item', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (48, 'Eye of Dashi', 2, 2, 2, 44, 'metal', 'amulet', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (49, 'Monsoon Sandals', 1, 1, 1, 45, 'metal', 'boots', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (50, 'Black Beetle', 0, 1, 2, 46, 'fire', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (51, 'Gills of Hamachi', 0, 2, 1, 47, 'water', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (52, 'Monkey Staff', 1, 2, 0, 48, 'wind', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (53, 'Tunnel Armadillo', 2, 1, 0, 49, 'earth', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (54, 'Sun Chi Lantern', 0, 0, 0, 50, 'metal', 'item', 5);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (

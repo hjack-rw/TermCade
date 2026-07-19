@@ -144,6 +144,9 @@ def _apply_mechanic(
     if mechanic is Mechanic.CHROMASIS:  # Eye of Dashi — the caster's Wu count as their chosen element
         caster.element_as = element
         return False
+    if mechanic is Mechanic.WARD:  # Monkey Staff and kin — the caster's Wu of ITS element ignore drags
+        caster.ward = card.element
+        return False
     if mechanic is Mechanic.BOOST:
         played.stats = {name: 0 for name in card.stats}
         return False

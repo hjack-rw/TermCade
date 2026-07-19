@@ -75,6 +75,7 @@ def count_end_stats(
     earns_bonus: Sequence[Card] | None = None,
     suffers_bonus: Sequence[Card] = (),
     element_as: str | None = None,
+    ward: str | None = None,
 ) -> int:
     """A duelist's end value for one stat: base + queued card stats + elemental bonus.
 
@@ -103,7 +104,12 @@ def count_end_stats(
     element_total = 0
     if elemental_bonus:
         # ``element_as`` (a Kuzusu Atom / Eye of Dashi) overrides what this side's own Wu count as; the
-        # curses landed on it keep the element they were cast in.
-        element_total = sum(element_score(element_as or card.element, background) for card in bonus_cards)
+        # curses landed on it keep the element they were cast in. A ``ward`` (Monkey Staff and kin)
+        # clamps a warded-element Wu's NEGATIVE score to zero — drag ignored, lift kept.
+        for card in bonus_cards:
+            score = element_score(element_as or card.element, background)
+            if ward and (element_as or card.element) == ward and score < 0:
+                score = 0
+            element_total += score
         element_total -= sum(element_score(card.element, background) for card in suffers_bonus)
     return character_stats[stat] + sum(stat_values) + elemental_bonus * element_total

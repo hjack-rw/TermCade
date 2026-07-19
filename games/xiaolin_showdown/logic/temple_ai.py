@@ -31,6 +31,11 @@ REVIVAL_MARGIN = 5
 # temple. It is a Wu for a Wu, and it *pays them* — so the thing it removes had better be a weapon.
 REPULSION_THRESHOLD = 4
 
+# How much the OTHER hand must be worth, over this one, before the Lantern is spent on the swap.
+# The Lantern banks for real points, so a marginal upgrade is a worse deal than banking it — the
+# swap has to steal a lead, not tidy one.
+SWAP_MARGIN = 5
+
 
 @dataclass(frozen=True)
 class TemplePlay:
@@ -77,7 +82,28 @@ def choose_temple_power(
         if mechanic is Mechanic.EUTHYMIA and _worth_reviving(state):
             return TemplePlay(card)
 
+        if mechanic is Mechanic.METEMPSYCHOSIS and _worth_swapping(state, is_player):
+            return TemplePlay(card)
+
     return None
+
+
+def _worth_swapping(state: XiaolinState, is_player: bool = False) -> bool:
+    """Spend the Lantern when the other hand is the better arsenal by a real margin.
+
+    Summed ``duel_value``, this hand's Lanterns excluded — the spent one leaves with the swap, so
+    it was never part of what is being traded away.
+    """
+    me, them = state.duelist(is_player), state.opponent(is_player)
+    if not them.hand:
+        return False
+    mine = sum(
+        duel_value(card)
+        for card in me.hand
+        if mechanic_of(card.power) is not Mechanic.METEMPSYCHOSIS
+    )
+    theirs = sum(duel_value(card) for card in them.hand)
+    return theirs - mine >= SWAP_MARGIN
 
 
 def expected_points(card: Card) -> float:

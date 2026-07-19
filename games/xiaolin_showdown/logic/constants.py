@@ -17,6 +17,11 @@ ELEMENTS = ("water", "fire", "wind", "earth", "metal")
 TOURNAMENT = "tournament"
 TOURNAMENT_BATTLES = 3
 
+# "Three Times in a Row": the showdown that brings a Wu's wear here vaults it, free (see wear.py).
+# Lives HERE rather than in wear.py so the bot's deposit policy (turn.py, which wear imports) can
+# read it without a cycle.
+WEAR_LIMIT = 3
+
 # water⇄fire and wind⇄earth oppose each other; ``metal`` is neutral and has no opposite. In a duel a
 # card scores +1 with a matching background, −1 against its opposite (or when the background is
 # metal), 0 otherwise — see ``mechanics.scoring._element_score``.

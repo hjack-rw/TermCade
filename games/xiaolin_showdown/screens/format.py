@@ -218,6 +218,8 @@ EFFECTS = {
     Mechanic.TRANSMUTATION: "Their Wu count as Metal this battle.",
     Mechanic.CHROMASIS: "You choose what element your Wu count as this battle.",
     Mechanic.STORMFRONT: "You choose the arena's element for the Showdown.",
+    Mechanic.WARD: "Your Wu of its element cannot be dragged down this battle.",
+    Mechanic.METEMPSYCHOSIS: "Swap your entire hand with your opponent's.",
     Mechanic.DIASKOPIA: "Read your opponent's personal Deck.",
     Mechanic.TELESKOPIA: f"Look at the next {SCOPE_DEPTH} Wu in the incoming Wu pile.",
     Mechanic.TELEPATHEIA: "Take or refuse the next Showdown's Initiative.",

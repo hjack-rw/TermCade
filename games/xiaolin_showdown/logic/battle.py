@@ -44,6 +44,9 @@ class Side:
     # A Kuzusu Atom / Eye of Dashi has set what element this side's Wu count as, for the background
     # bonus only (their stats are untouched). ``None`` leaves each Wu its own printed element.
     element_as: str | None = None
+    # A ward Wu (Monkey Staff and kin) protects this side's Wu OF ITS ELEMENT from every negative
+    # elemental bonus this showdown — the opposite arena's drag and metal's alike. Lift still lands.
+    ward: str | None = None
 
     def mine(self) -> list[Card]:
         """Every Wu *this* duelist put on the table — what the board owes them a line for.
@@ -190,4 +193,5 @@ def end_stat(
         earns_bonus=side.contributors(),
         suffers_bonus=side.curses(),
         element_as=side.element_as,
+        ward=side.ward,
     )

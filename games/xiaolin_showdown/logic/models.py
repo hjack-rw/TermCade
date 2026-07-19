@@ -48,6 +48,8 @@ class Mechanic(StrEnum):
     TRANSMUTATION = "transmutation"  # Kuzusu Atom — force a side's Wu to count as metal
     CHROMASIS = "chromasis"  # Eye of Dashi — set a side's Wu to a chosen element
     STORMFRONT = "stormfront"  # Monsoon Sandals — change the arena's element
+    WARD = "ward"  # the -phylaxia four — the caster's Wu of this card's element ignore drags
+    METEMPSYCHOSIS = "metempsychosis"  # Sun Chi Lantern — the two duelists swap hands
 
 
 @dataclass

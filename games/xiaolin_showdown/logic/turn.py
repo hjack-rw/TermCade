@@ -23,6 +23,7 @@ from .mechanics.powers import (
     mechanic_of,
     roll_gamble,
 )
+from .constants import WEAR_LIMIT
 from .models import Card, Player
 from .settings import XiaolinSettings, player_actions, plays_keen
 from .state import XiaolinState
@@ -137,6 +138,10 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     Mechanic.CONTAINMENT: 5,
     Mechanic.SUBJUGATION: 5,
     Mechanic.REVERSAL: 4,
+    # A whole-hand swap swings at least as hard as a negation. The bot does not SPEND it yet
+    # (temple_ai has no policy for it) — this price only keeps it from banking the strongest
+    # tempo card in the pool as junk.
+    Mechanic.METEMPSYCHOSIS: 5,
 }
 
 # Mechanics whose printed stats are the whole value, declared rather than assumed. The two sets must
@@ -186,6 +191,7 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         Mechanic.DAMPENING,
         Mechanic.TRANSMUTATION,
         Mechanic.CHROMASIS,
+        Mechanic.WARD,
         Mechanic.STORMFRONT,
     }
 )
@@ -218,6 +224,11 @@ def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
     candidates = [card for card in hand if card.points > 0]
     if not candidates:
         return None
+    # A Wu one showdown from wearing out banks ITSELF, free (see wear.py) — spending the turn's
+    # action on it wastes the action. Prefer any other candidate; near-worn only when that is all
+    # there is.
+    fresh = [card for card in candidates if card.uses < WEAR_LIMIT - 1]
+    candidates = fresh or candidates
     if plays_keen(difficulty):
         return max(candidates, key=lambda c: c.points)
     return min(candidates, key=lambda c: (duel_value(c), -c.points))
