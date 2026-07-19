@@ -25,6 +25,20 @@ StartScreen {
 #start-root .subtitle {
     width: auto;  /* fit the ASCII wordmark; the Center wrapper handles the horizontal centring */
 }
+/* The subtitle is one row of fullwidth glyphs, not a figlet block — bold gives it the weight the
+   three-row wordmark used to carry, so it still reads as a wordmark and not as a line of prose. */
+#start-root .subtitle {
+    text-style: bold;
+    margin-top: 1;
+}
+/* The CABINET's wordmark, dimmed — overriding the engine's `#banner` here rather than in the engine
+   theme, because it is this cartridge's call: TermCade sits above the game's own title, and at full
+   accent-bold it out-shouts the thing the screen is actually for. Dimmed it reads as the machine the
+   cartridge runs on, supporting the title instead of competing with it. */
+#start-root #banner {
+    text-opacity: 55%;
+    text-style: none;
+}
 #start-root BoxedPanel {
     margin-top: 2;
 }
