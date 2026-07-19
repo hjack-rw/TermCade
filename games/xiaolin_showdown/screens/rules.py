@@ -42,11 +42,11 @@ HOW_TO_PLAY: list[str] = [
     "Collect Shen Gong Wu, bank them for points, and reach the target before your opponent does.",
     "A turn at the temple allows for ONE action: bank a Wu for its points, spend a Wu for its power, or "
     "draw one into your hand. Banking a Wu forfeits its power; keeping the power forfeits the points. ",
-    "Then call `Gong Yi Tanpai!` —  a Showdown for the next Wu on the pile.",
+    "Then call `Gong Yi Tanpai!`, a Showdown for the next Wu on the pile.",
     "Whoever is faster (Initiative) says what is contested.",
     "You both field your Wu at the same moment, neither seeing the other's. "
     "Your character, the Wu you played and the arena you stand in are all added up.",
-    "The loser forfeits every Wu they wagered. The winner takes the prize Wu — but only by winning "
+    "The loser forfeits every Wu they wagered. The winner takes the prize Wu, but only by winning "
     "decisively. Win small and nobody takes it: it will be temporarily lost.",
     "When the pile runs dry the run ends. Whatever is still in your hand is cashed for points. "
     "Whatever you shelved in your Deck is wasted.",
@@ -69,7 +69,7 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "Drawing with a full hand SWAPS: shelve one Wu to your Deck and take another. "
             "Your Deck is shuffled, so a shelved Wu comes back in its own time.",
             f"Your hand holds {settings.max_hand_size} Wu. Over that, you shelve one back to your Deck.",
-            f"Left with nothing you can field, you are dealt back in — up to {settings.empty_draw_limit} "
+            f"Left with nothing you can field, you are dealt back in – up to {settings.empty_draw_limit} "
             "Wu, from your own Deck first and the pile only after it. It costs you the turn's action, "
             "and it never hands you more than you could have staked. "
             "You are being put back in the fight, not paid for having lost it.",
@@ -78,7 +78,7 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
         ],
         "Initiative": [
             "Initiative is how fast you are, and the faster duelist names the Challenge.",
-            "Matching Initiative bonuses do NOT stack. Different ones do — a +1 beside a +2 is +3.",
+            "Matching Initiative bonuses do NOT stack. Different ones do: a +1 beside a +2 is +3.",
             "A Wu with a NEGATIVE bonus slows your opponent, not you. "
             "Holding one makes you the faster of the two, exactly as a positive one does.",
             f"Lead them by {settings.early_bird_gap} and the Early Bird advantage is yours: "
@@ -99,7 +99,7 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "Each stat is ONE battle. Every Wu goes down together and they are summed up.",
             "A Tournament is three battles of three different Wus: Force, then Agility, then Intellect.",
             "Any Wu you field may carry a Boost, but each Boost Wu is spent once a Showdown. A field "
-            "of three needs three different Boosts — one dragon cannot lift them all.",
+            "of three needs three different Boosts: one dragon cannot lift them all.",
             "A Wu with a negative stat curses your opponent: it lands on their side, not yours.",
             "The Background lifts a Wu of its element and drags down its opposite."
             "To a curse it does the reverse.",
@@ -123,13 +123,13 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             # the winning route in the enum's own words — "[Claimed: a decisive blow]" — so a book that
             # called it something else would teach a player a name the game never says. Renaming a route
             # in the code used to leave the book quietly lying; now it cannot.
-            f"{_route(PrizeRoute.DECISIVE_BLOW)} — beat {settings.prize_threshold} on the contested "
+            f"{_route(PrizeRoute.DECISIVE_BLOW)}: beat {settings.prize_threshold} on the contested "
             "stat in any one battle.",
-            f"{_route(PrizeRoute.BROAD_WIN)} — beat {settings.prize_threshold - 1} on any two stats.",
-            f"{_route(PrizeRoute.TOTAL_COMMAND)} — beat {settings.prize_threshold - 2} on all three.",
-            f"{_route(PrizeRoute.IN_TUNE)} — end the Showdown with more of the arena's element on your "
+            f"{_route(PrizeRoute.BROAD_WIN)}: beat {settings.prize_threshold - 1} on any two stats.",
+            f"{_route(PrizeRoute.TOTAL_COMMAND)}: beat {settings.prize_threshold - 2} on all three.",
+            f"{_route(PrizeRoute.IN_TUNE)}: end the Showdown with more of the arena's element on your "
             "side than against it. Nullifying the elemental bonus voids this way to win it.",
-            "Meet none of them and the Wu is LOST: nobody takes it. It is not destroyed, though — "
+            "Meet none of them and the Wu is LOST: nobody takes it. It is not destroyed, though – "
             "a way exists that calls the oldest lost Wu back into your hand.",
         ],
         "When the Pile Runs Dry": [
