@@ -334,13 +334,17 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
 
 def _training_cell(duelist: Player) -> Text:
     """A duelist's training bar (see ``logic.training``). A boss is at the stat cap and *cannot*
-    train — it reads MASTER, and its tooltip is ``-/-``, not a full bar.
+    train — it reads MASTER, centred in a dashed ruler as wide as the bar, and its tooltip is
+    ``-/-``, not a full bar.
 
-    Both rows start with the same ``TRAINING:`` prefix in a left-justified column, so their labels line
+    Both rows start with the same ``Training:`` prefix in a left-justified column, so their labels line
     up under each other; a spacer column holds them clear of the name."""
-    cell = Text("TRAINING: ", style="dim")
+    cell = Text("Training: ", style="dim")
     if duelist.character.tier == "boss":
-        cell.append("MASTER")
+        width = 2 * TRAIN_LENGTH - 1  # the bar's own footprint: segments with a space between
+        word = " MASTER "
+        dashes = (width - len(word)) // 2  # the same run both sides: symmetry beats exact width
+        cell.append("-" * dashes + word + "-" * dashes)
         cell.stylize(Style(meta={"tooltip": "-/-"}))
         return cell
     cell.append(render_bar(duelist.training / TRAIN_LENGTH, TRAIN_LENGTH))
@@ -379,5 +383,6 @@ def _action_cell(entry: str, blocked: dict[str, str | None]) -> Text:
 
 def _hand_panel(character_name: str, rows: list[Text]) -> BoxedPanel:
     title = f"{display_name(character_name).split(' ')[0].upper()}'S HAND"
-    # All rows in one Static so the panel centres them as a block (rows stay left-aligned within it).
-    return BoxedPanel(Static(Text("\n").join(rows), classes="hand-block"), title=title)
+    # All rows in one widget so the panel centres them as a block (rows stay left-aligned within
+    # it) — a TooltipStatic, so each row's own wear tooltip answers on hover (see format._rows).
+    return BoxedPanel(TooltipStatic(Text("\n").join(rows), classes="hand-block"), title=title)

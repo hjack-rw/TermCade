@@ -33,6 +33,7 @@ from termcade.ui.typography import spaced_dashes
 from ..logic.mechanics.prize import PrizeRoute
 from ..logic.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings
 from ..logic.training import BOSS_LOSS_FILL, STAT_CAP, TRAIN_LENGTH
+from ..logic.wear import WEAR_LIMIT
 
 PRIMER = "How to Play"  # the first entry in the rail, and where a player with no question yet lands
 
@@ -122,6 +123,15 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "Wu is dragged down on metal.",
             "During the evaluation: the contested stat counts x2. The other two still count, so don't "
             "put it all in one place.",
+        ],
+        "Three Times in a Row": [
+            f"Commit the same Wu to {WEAR_LIMIT} Showdowns (staked, or spent as a Boost) and it "
+            "wears out: it is deposited for you, for its full points, the moment that Showdown ends. "
+            "It costs no action.",
+            "Only Showdowns count towards the wear limit, never turns spent sitting in your hand.",
+            "The count is the wearer's own: a Wu that changes hands arrives fresh for its new owner.",
+            "But wear is REMEMBERED: win your Wu back and your own count resumes where it left off.",
+            "A Wudai weapon never wears out: it cannot be deposited at all.",
         ],
         "Who Takes It": [
             "A battle goes to whoever scored higher. Level? Initiative takes it. Every battle has a "

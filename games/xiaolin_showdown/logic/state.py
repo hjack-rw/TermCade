@@ -134,6 +134,12 @@ def _player_dict(p: Player) -> dict[str, Any]:
         "hand": [c.id for c in p.hand],
         "inalienable_hand": [c.id for c in p.inalienable_hand],
         "deck": [c.id for c in p.deck],
+        # Wear rides beside the ids (same order): a rebuilt card must remember its showdowns —
+        # the live count AND the other duelist's pocketed one (see wear.hand_over).
+        "hand_uses": [c.uses for c in p.hand],
+        "deck_uses": [c.uses for c in p.deck],
+        "hand_uses_memory": [c.uses_memory for c in p.hand],
+        "deck_uses_memory": [c.uses_memory for c in p.deck],
         "training": p.training,
         "just_trained": p.just_trained,
         # The catalog knows only printed stats — training raises them, so the current values are
@@ -154,4 +160,12 @@ def _player_from_dict(data: dict[str, Any], catalog: Catalog) -> Player:
     )
     # The catalog knows only printed stats — training raised these past them.
     player.character.stats.update(data.get("stats", {}))
+    for card, uses in zip(player.hand, data.get("hand_uses", ())):
+        card.uses = uses
+    for card, uses in zip(player.deck, data.get("deck_uses", ())):
+        card.uses = uses
+    for card, memory in zip(player.hand, data.get("hand_uses_memory", ())):
+        card.uses_memory = memory
+    for card, memory in zip(player.deck, data.get("deck_uses_memory", ())):
+        card.uses_memory = memory
     return player

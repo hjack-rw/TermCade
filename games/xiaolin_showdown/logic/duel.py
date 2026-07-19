@@ -47,6 +47,8 @@ from .models import Card, Player
 from .settings import XiaolinSettings
 from .state import XiaolinState
 from .training import record_showdown
+from . import wear
+from .wear import hand_over
 
 END, COMMITMENT, SETUP, BOOST, CARD, RESOLVEMENT = range(6)
 LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD repeats per Wu wagered
@@ -79,6 +81,9 @@ class DuelState:
     # The stat the BOT's training raised when this loss filled its bar, for the screen to report.
     # The player's payout is never taken here — the temple offers them the choice instead.
     bot_trained: str | None = None
+    # The Wu the wear rule vaulted as this showdown ended — (name, was the player's, points paid) —
+    # for the screen to report (see logic/wear.py).
+    worn_out: list[tuple[str, bool, int]] = field(default_factory=list)
     # Which of the four routes claimed it (`mechanics.prize`), or None when nobody did and the Wu was
     # lost. Kept so the board can say *how* it was won: a card that simply appears teaches nothing.
     prize_route: PrizeRoute | None = None
@@ -415,15 +420,25 @@ class Duel:
         if not self.state.card_deck:
             self.state.has_ended = True
 
-        # the loser gives up every card they staked this showdown; the winner takes them
+        # the loser gives up every card they staked this showdown; the winner takes them — fresh,
+        # since a Wu's wear belongs to the duelist who used it (see logic/wear.py)
         winner, loser = self._winner_and_loser()
         for card in self.duel.duelist(not self.duel.winner).stakes:
             loser.remove_card(card)
-            winner.hand.append(card)
+            winner.hand.append(hand_over(card))
 
         # losing teaches: the loser's training bar gains one (see logic/training.py). The bot
         # cashes a full bar on the spot; the raised stat is kept for the screen to report.
         self.duel.bot_trained = record_showdown(self.state, player_won=bool(self.duel.winner))
+
+        # wear: every Wu committed this showdown and still held wears by one, and the worn-out are
+        # vaulted for their points on the spot (see logic/wear.py). Kept for the screen to report.
+        for is_player in (True, False):
+            side = self.duel.duelist(is_player)
+            vaulted = wear.record_showdown(
+                self.state.duelist(is_player), side.stakes + side.boosts_spent, rng=self.rng
+            )
+            self.duel.worn_out += [(card.name, is_player, paid) for card, paid in vaulted]
 
     _STAGES: dict[int, Callable[["Duel"], Awaitable[None]]] = {
         END: _end,

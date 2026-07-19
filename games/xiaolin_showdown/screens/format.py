@@ -10,6 +10,7 @@ import re
 from collections.abc import Mapping, Sequence
 from functools import cache
 
+from rich.style import Style
 from rich.text import Text
 
 from ..logic.catalog import load_catalog
@@ -384,6 +385,9 @@ def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list
         row.append(f"{index}. ", style="dim")
         row.append(name, style=f"bold {colour}")
         row.append(f"  {stats}  {icon}")
+        # The wear count rides on the row's own span (the panels share one Static — see the state
+        # grid's tooltip note in temple.py), so hovering any Wu answers "how worn is it".
+        row.stylize(Style(meta={"tooltip": f"Used: {card.uses}"}))
         rows.append(row)
     return rows
 

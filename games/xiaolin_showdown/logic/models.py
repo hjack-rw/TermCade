@@ -79,6 +79,11 @@ class Card:
     element: str  # water | fire | wind | earth | metal
     type: str  # wudai | head | torso | amulet | arms | boots | item | empty
     points: int
+    # The wear count (see logic/wear.py): showdowns THIS copy was committed to by its CURRENT owner.
+    # Wear is per wearer and remembered: `uses_memory` holds the other duelist's count, and changing
+    # hands swaps the two — win your Wu back and you resume where you left off.
+    uses: int = 0
+    uses_memory: int = 0
 
 
 @dataclass

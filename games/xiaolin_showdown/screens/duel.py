@@ -33,6 +33,7 @@ from ..logic.models import Card, Player
 from ..logic.settings import XiaolinSettings
 from ..logic.state import XiaolinState
 from ..logic.turn import bot_turn, max_hand_size, refill_hands, shelve
+from ..logic.wear import WEAR_LIMIT
 from ..logic.mechanics.powers import is_boost_slot
 from ..logic.mechanics.scoring import contributing, element_score
 from .base import XiaolinScreen
@@ -561,6 +562,14 @@ def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
             Text(
                 f"{display_name(state.bot.character.name)} completed their training: "
                 f"their {duel.bot_trained} rose."
+            ),
+        )
+    for name, was_player, paid in duel.worn_out:
+        _line(
+            story,
+            Text(
+                f"{'Your' if was_player else 'Their'} {name} wore out after {WEAR_LIMIT} showdowns: "
+                f"vaulted for {paid} pt{'s' if paid != 1 else ''}."
             ),
         )
     return story

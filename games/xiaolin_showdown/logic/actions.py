@@ -19,6 +19,7 @@ from .settings import XiaolinSettings, player_actions
 from .state import XiaolinState
 from .training import add_progress, can_train, payout_ready
 from .turn import bank_value, max_hand_size, shelve
+from .wear import hand_over
 
 # A fired power says its piece TWICE. The toast names the power and sets the scene; the log line drops
 # the name and states only the outcome, because the Game Log entry above it already read "You played
@@ -494,7 +495,9 @@ def _recover(spend: _Spend) -> _Fill | None:
     if not lost:
         return None
     revived = lost.pop(0)
-    spend.me.hand.append(revived)
+    # A change of hands like any other (see wear.hand_over) — moot today, since only unclaimed
+    # prizes reach the lost pile and nobody has worn those.
+    spend.me.hand.append(hand_over(revived))
     return {"name": revived.name}
 
 
