@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .catalog import Catalog, load_catalog
+from .mechanics.cards import held_as_wudai
 from .models import Card, Player
 
 
@@ -132,7 +133,7 @@ def _player_from_dict(data: dict[str, Any], catalog: Catalog) -> Player:
     return Player(
         character=deepcopy(catalog.character(data["character"])),
         hand=[_fresh_card(catalog, cid) for cid in data["hand"]],
-        inalienable_hand=[_fresh_card(catalog, cid) for cid in data["inalienable_hand"]],
+        inalienable_hand=[held_as_wudai(_fresh_card(catalog, cid)) for cid in data["inalienable_hand"]],
         deck=[_fresh_card(catalog, cid) for cid in data["deck"]],
         points=data["points"],
     )

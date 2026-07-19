@@ -84,9 +84,9 @@ class Character:
     power: Power
     affiliation: str # xiaolin | heylin | construct | empty
     is_playable: bool
-    # Which opponent roster this belongs to: the easy tier (False) or the hard one (True).
-    # ``None`` on a playable character, which is on no opponent roster at all.
-    is_hard: bool | None = None
+    # Which opponent roster this belongs to: 'easy', 'hard' or 'boss'. ``None`` on a playable
+    # character, which is on no opponent roster at all.
+    tier: str | None = None
 
 
 @dataclass

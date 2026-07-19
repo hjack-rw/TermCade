@@ -55,9 +55,9 @@ class Catalog:
         """Every non-playable character, across both opponent rosters."""
         return [c for c in self.characters if not c.is_playable]
 
-    def opponents(self, *, hard: bool) -> list[Character]:
-        """One opponent roster: the easy tier, or the tougher stat blocks (``is_hard``)."""
-        return [c for c in self.opponent_characters if bool(c.is_hard) is hard]
+    def opponents(self, tier: str) -> list[Character]:
+        """One opponent roster: ``'easy'``, ``'hard'`` or ``'boss'``."""
+        return [c for c in self.opponent_characters if c.tier == tier]
 
     # Built on first lookup and kept — `cached_property` writes straight to __dict__, so it works
     # on a frozen dataclass. Without the cache, `card()` would rebuild the whole index per call.
@@ -126,7 +126,7 @@ def _card(row: tuple, resolve_power: ResolvePower) -> Card:
 
 
 def _character(row: tuple, resolve_power: ResolvePower) -> Character:
-    cid, name, force, agility, intellect, power_id, affiliation, is_playable, is_hard = row
+    cid, name, force, agility, intellect, power_id, affiliation, is_playable, tier = row
     stats = {"force": force, "agility": agility, "intellect": intellect}
     return Character(
         cid,
@@ -135,5 +135,5 @@ def _character(row: tuple, resolve_power: ResolvePower) -> Character:
         resolve_power(power_id),
         affiliation,
         bool(is_playable),
-        None if is_hard is None else bool(is_hard),
+        tier,
     )

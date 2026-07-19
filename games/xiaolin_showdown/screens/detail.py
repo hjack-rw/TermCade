@@ -53,7 +53,10 @@ class DetailScreen(EngineScreen):
                 # The joke Wu's name, timing and text are the same three question marks. Printing all
                 # three says nothing, at length.
                 if not is_gamble(power):
-                    power_line.append(f"  ({trigger_label(power)})")
+                    card_type = target.type if isinstance(target, Card) else None
+                    power_line.append(
+                        f"  ({trigger_label(power, is_card=self._is_card, card_type=card_type)})"
+                    )
                 yield Static(power_line, classes="power")
                 if power.description and not is_gamble(power):
                     yield Static(power.description, classes="description")
@@ -62,6 +65,6 @@ class DetailScreen(EngineScreen):
             # name stays its own business, but the rule it plays by is not a secret.
             if power.initiative_bonus:
                 yield Static(f"Initiative bonus: {power.initiative_bonus:+d}", classes="power")
-            elif effect := effect_line(power):
+            elif effect := effect_line(power, is_card=self._is_card):
                 yield Static(effect, classes="power")
         yield Footer()

@@ -22,7 +22,7 @@ from termcade.core.rng import Rng
 from .battle import Ground, Round, score_battle
 from .constants import OPPOSITES, TOURNAMENT
 from .mechanics.powers import names_a_stat
-from .mechanics.resolve import resolve_played_power
+from .mechanics.resolve import as_boost, resolve_played_power
 from .models import Card
 from .turn import duel_value
 
@@ -232,7 +232,9 @@ def _reachable(
     mine, _theirs = trial.sides(is_player)
     remaining = list(playable)
     if boost is not None:
-        mine.queue.append(deepcopy(boost))  # the resolver reads a live boost off the tail
+        # Resolve the boost the way the duel will (a Morpher becomes 1/1/1 of the ground's element),
+        # or the bot prices a wudai Morpher at its unresolved 0/0/0 and never plays it.
+        mine.queue.append(as_boost(boost, ground.background))
         remaining = [card for card in remaining if card is not boost]
 
     if not remaining:

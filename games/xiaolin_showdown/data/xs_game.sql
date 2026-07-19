@@ -15,7 +15,10 @@
 -- Card ids are contiguous and load-bearing, in two ways:
 --   * `setup.new_game` deals the draw pile from ids FIRST_DECK_CARD..N, indexing the card list
 --     by id — a gap deals the wrong card.
---   * A beginning Wu (ids 1-5) is tied to its character by `id == abs(power_id)`.
+--   * A character is granted its signature Wu by `card.id == abs(character.power_id)`. Cards 1-4
+--     *share* that power (Omi is the Dragon of Water). Moby Morpher (card 5) does not: Hannibal's
+--     own power is "Free Allomorphia" (-5), the Wu's is "Allomorphia" (30) — the character holds the
+--     Wu, it is not the Wu.
 -- So a new Wu appends at the end. It never fills a hole and never renumbers a neighbour.
 --
 -- A power NAMES its mechanic, and `mechanics.powers.RULES` says what that mechanic does, when it
@@ -33,7 +36,7 @@ CREATE TABLE "power" (
 	PRIMARY KEY("id")
 );
 
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-5, 'Allomorphia', 'morph', 'Allows the user to change their appearance into anything they choose - including the appearance of other beings', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-5, 'Free Allomorphia', 'morph', 'Given his condition of being a literal Heylin Bean, Hannibal took a hold of Moby Morpher and never let it go - so he wields it as a free Wu.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-4, 'Dragon of Earth', 'dragon', 'User has access to basic Earth-based attacks, and moves', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-3, 'Dragon of Fire', 'dragon', 'User has access to basic Fire-based attacks, and moves', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-2, 'Dragon of Wind', 'dragon', 'User has access to basic Wind-based attacks, and moves', 0);
@@ -78,6 +81,7 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (37, 'Efiáltiskinesis', 'initiative', 'Walks into a sleeping mind and gives its worst fear a body. It has no hold on anyone awake', -2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (38, 'Euthymia', 'euthymia', 'Your good spirits turn fortune your way and a lost Wu finds its way back to you', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (39, 'Polymorphia', 'dragon', 'Transforms into any weapon the user requires', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (40, 'Allomorphia', 'morph', 'Allows the user to change their appearance into anything they choose - including the appearance of other beings', 0);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE card (id INTEGER, name TEXT, force INTEGER, agility INTEGER, intellect INTEGER, power_id INTEGER NOT NULL REFERENCES power (id), element TEXT, type TEXT, points INTEGER, PRIMARY KEY (id AUTOINCREMENT));
@@ -87,7 +91,7 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (2, 'Crest of a Sparrow', 1, 1, 1, -2, 'wind', 'wudai', 0);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (3, 'Longi Sash', 1, 1, 1, -3, 'fire', 'wudai', 0);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (4, 'Iron Bear Charm', 1, 1, 1, -4, 'earth', 'wudai', 0);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (5, 'Moby Morpher', NULL, NULL, NULL, -5, 'metal', 'arms', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (5, 'Moby Morpher', NULL, NULL, NULL, 40, 'metal', 'arms', 4);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (6, 'Fist of Tebigong', 5, 0, 0, 1, 'metal', 'arms', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (7, 'Helmet of Jong', 0, 5, 0, 2, 'metal', 'head', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (8, 'Bubble Brains', 0, 0, 5, 3, 'metal', 'item', 3);
@@ -138,21 +142,22 @@ CREATE TABLE "character" (
 	"power_id"	INTEGER NOT NULL,
 	"affiliation"	TEXT,
 	"is_playable"	INTEGER,
-	"is_hard"	INTEGER,
+	"tier"	TEXT,
 	PRIMARY KEY("id" AUTOINCREMENT),
 	FOREIGN KEY("power_id") REFERENCES "power"("id")
 );
 
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (1, 'Omi', 5, 5, 2, -1, 'xiaolin', 1, NULL);
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (2, 'Raimundo', 4, 4, 4, -2, 'xiaolin', 1, NULL);
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (3, 'Kimiko', 3, 4, 5, -3, 'xiaolin', 1, NULL);
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (4, 'Clay', 5, 3, 4, -4, 'xiaolin', 1, NULL);
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (5, 'Tubbimura', 5, 3, 3, 0, 'heylin', 0, 0);
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (6, 'Katnappé', 3, 5, 3, 0, 'heylin', 0, 0);
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (7, 'Salvador_Cumo', 3, 3, 5, 0, 'heylin', 0, 0);
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (8, 'Vlad', 6, 4, 4, 0, 'heylin', 0, 1);
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (9, 'Le_Mime', 4, 6, 4, 0, 'heylin', 0, 1);
-INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "is_hard") VALUES (10, 'PandaBubba', 4, 4, 6, 0, 'heylin', 0, 1);
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (1, 'Omi', 5, 5, 2, -1, 'xiaolin', 1, NULL);
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (2, 'Raimundo', 4, 4, 4, -2, 'xiaolin', 1, NULL);
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (3, 'Kimiko', 3, 4, 5, -3, 'xiaolin', 1, NULL);
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (4, 'Clay', 5, 3, 4, -4, 'xiaolin', 1, NULL);
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (5, 'Tubbimura', 5, 3, 3, 0, 'heylin', 0, 'easy');
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (6, 'Katnappé', 3, 5, 3, 0, 'heylin', 0, 'easy');
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (7, 'Salvador_Cumo', 3, 3, 5, 0, 'heylin', 0, 'easy');
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (8, 'Vlad', 6, 4, 4, 0, 'heylin', 0, 'hard');
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (9, 'Le_Mime', 4, 6, 4, 0, 'heylin', 0, 'hard');
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (10, 'PandaBubba', 4, 4, 6, 0, 'heylin', 0, 'hard');
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (11, 'Hannibal_Roy_Bean', 5, 5, 5, -5, 'heylin', 0, 'boss');
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "background" (

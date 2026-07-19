@@ -23,6 +23,7 @@ class Difficulty(StrEnum):
     EASY = "easy"
     NORMAL = "normal"
     HARD = "hard"
+    BOSS = "boss"
 
 
 @dataclass

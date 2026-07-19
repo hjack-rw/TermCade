@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 
 from ..models import Card, Mechanic, Power
 from .cards import index_of
-from .powers import MORPH_ASIDE, MORPH_CONTESTED, NAMED_STAT_VALUE, mechanic_of
+from .powers import MORPH_ASIDE, MORPH_BOOST, MORPH_CONTESTED, NAMED_STAT_VALUE, mechanic_of
 
 if TYPE_CHECKING:
     from ..battle import Round, Side
@@ -68,6 +68,22 @@ def resolve_played_power(
 
     mine.queue.append(played)
     return mechanic is Mechanic.INTANGIBLE
+
+
+def as_boost(card: Card, element: str) -> Card:
+    """A boost card's queue form — what actually rides ahead of the Wu it lifts.
+
+    Every boost enters as a copy of itself, save the Morpher: spent as a boost it lends a flat
+    ``MORPH_BOOST`` in each stat, in the ``element`` its caster names (the background, for the bot).
+    That is the wudai mode — a dragon that chooses its colour — distinct from the 2/2/1 it takes when
+    fielded from hand. Used by both the duel (on commit) and the bot (weighing a boost), so the two can
+    never price it differently.
+    """
+    queued = deepcopy(card)
+    if mechanic_of(card.power) is Mechanic.MORPH:
+        queued.stats = {name: MORPH_BOOST for name in queued.stats}
+        queued.element = element
+    return queued
 
 
 def _curse(victim: "Side", mirror: Card) -> None:

@@ -48,7 +48,7 @@ def _player_with_initiative(*bonuses: int) -> Player:
 def test_catalog_loads_all_tables():
     cat = load_catalog()
     assert cat.powers and cat.cards
-    assert len(cat.characters) == 10  # 4 playable + two opponent rosters of 3
+    assert len(cat.characters) == 11  # 4 playable + easy 3 + hard 3 + boss 1
     assert cat.character(1).name == "Omi"
     assert cat.opponent_characters  # the bot must have someone to be
 
@@ -415,18 +415,19 @@ def test_usable_powers_respect_the_turns_one_action():
     assert all(card is not bras for card in usable_powers(state, actions_per_turn=1))
 
 
-def test_the_two_opponent_rosters_are_disjoint():
+def test_the_opponent_rosters_are_disjoint():
     catalog = load_catalog()
-    easy = {c.id for c in catalog.opponents(hard=False)}
-    hard = {c.id for c in catalog.opponents(hard=True)}
+    easy = {c.id for c in catalog.opponents("easy")}
+    hard = {c.id for c in catalog.opponents("hard")}
+    boss = {c.id for c in catalog.opponents("boss")}
 
-    assert easy and hard  # both tiers are populated
-    assert easy.isdisjoint(hard)
+    assert easy and hard and boss  # every tier is populated
+    assert easy.isdisjoint(hard) and easy.isdisjoint(boss) and hard.isdisjoint(boss)
 
 
 def test_no_playable_character_sits_on_an_opponent_roster():
     catalog = load_catalog()
-    rosters = catalog.opponents(hard=False) + catalog.opponents(hard=True)
+    rosters = catalog.opponents("easy") + catalog.opponents("hard") + catalog.opponents("boss")
 
     assert all(not c.is_playable for c in rosters)
 
@@ -437,7 +438,7 @@ def test_a_normal_game_never_deals_a_hard_opponent():
 
     bots = {new_game(catalog, Rng(seed), omi).bot.character.id for seed in range(30)}
 
-    assert bots <= {c.id for c in catalog.opponents(hard=False)}
+    assert bots <= {c.id for c in catalog.opponents("easy")}
 
 
 def test_a_hard_game_only_deals_hard_opponents():
@@ -445,11 +446,28 @@ def test_a_hard_game_only_deals_hard_opponents():
     omi = catalog.character(1)
 
     bots = {
-        new_game(catalog, Rng(seed), omi, hard_opponents=True).bot.character.id
+        new_game(catalog, Rng(seed), omi, roster="hard").bot.character.id
         for seed in range(30)
     }
 
-    assert bots <= {c.id for c in catalog.opponents(hard=True)}
+    assert bots <= {c.id for c in catalog.opponents("hard")}
+
+
+def test_a_boss_game_deals_the_boss_and_grants_its_wudai():
+    """The boss run deals Hannibal, and he holds Moby Morpher (card 5) inalienably — off the pile."""
+    catalog = load_catalog()
+    omi = catalog.character(1)
+
+    state = new_game(catalog, Rng(7), omi, roster="boss")
+
+    assert state.bot.character.name == "Hannibal_Roy_Bean"
+    assert [c.id for c in state.bot.inalienable_hand] == [5]  # Moby Morpher, granted not drawn
+    assert all(c.id != 5 for c in state.card_deck)  # reserved out of the pool
+
+    held = state.bot.inalienable_hand[0]
+    assert held.type == "wudai"  # a held signature is a wudai...
+    assert catalog.card(5).type == "arms"  # ...but the pool copy keeps its printed 'arms'
+    assert XiaolinState.restore(state.snapshot(), None).bot.inalienable_hand[0].type == "wudai"
 
 
 # --- the elemental bonus reads two sets of cards, in opposite directions ------------

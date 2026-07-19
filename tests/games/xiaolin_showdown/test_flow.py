@@ -397,21 +397,29 @@ async def test_settings_defaults_to_easy(tmp_path):
         assert app.ctx.settings.current.difficulty is Difficulty.EASY
 
 
-async def test_the_difficulty_toggle_switches_between_easy_and_hard(tmp_path):
+async def test_the_difficulty_toggle_cycles_easy_hard_boss(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:
         await _boot(app, pilot)
         await pilot.click("#settings")
         await pilot.pause()
+
+        def label() -> str:
+            return str(app.screen.query_one("#difficulty", Button).label)
+
         # Textual holds a button "-active" for ~0.3s after a press and drops a click landing inside
-        # that window, so a back-to-back re-click needs to wait it out.
+        # that window, so a back-to-back re-click needs to wait it out. Easy -> Hard -> Boss -> Easy.
         await pilot.click("#difficulty")
         await pilot.pause(0.4)
-        assert "HARD" in str(app.screen.query_one("#difficulty", Button).label)
+        assert "HARD" in label()
 
-        await pilot.click("#difficulty")  # toggles back
+        await pilot.click("#difficulty")
         await pilot.pause(0.4)
-        assert "EASY" in str(app.screen.query_one("#difficulty", Button).label)
+        assert "BOSS" in label()
+
+        await pilot.click("#difficulty")  # wraps back to the start
+        await pilot.pause(0.4)
+        assert "EASY" in label()
 
 
 async def test_an_abandoned_settings_screen_does_not_change_difficulty(tmp_path):
@@ -441,7 +449,7 @@ async def test_saving_hard_difficulty_deals_a_hard_opponent(tmp_path):
         await pilot.pause()
         await pilot.click("#char-1")  # Omi
         await pilot.pause()
-        assert app.ctx.state.bot.character.is_hard is True
+        assert app.ctx.state.bot.character.tier == "hard"
 
 
 async def test_a_wide_vault_lays_the_hands_side_by_side(tmp_path):

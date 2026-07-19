@@ -84,6 +84,12 @@ SCOPE_DEPTH = 3
 MORPH_ASIDE = 2
 MORPH_CONTESTED = 1
 
+# What a Morpher lends when it is spent as a *boost* instead of fielded — a flat 1/1/1, in the element
+# its caster names. A dragon that chooses its colour: weaker than the fielded 2/2/1 shape, but always
+# in tune with the arena. This is the mode a wudai Moby Morpher (Hannibal's, or any found in the pool
+# and laid as a boost) takes, since the inalienable slot can only ever boost.
+MORPH_BOOST = 1
+
 
 # Keyed by the mechanic itself — which is what the card DB stores. Nothing here is an integer, so
 # nothing here can be a Wu that quietly does nothing because somebody picked a number twice.
@@ -278,7 +284,8 @@ def names_a_stat(power: Power) -> bool:
 def is_boost_slot(power: Power) -> bool:
     """Can this Wu be played *in addition* to the card, at the power stage?
 
-    Both boost Wu can: the dragon lends a flat 1/1/1, the amplifier lends 1 per stat the card moves.
-    What they lend differs; the slot they occupy does not.
+    The dragon lends a flat 1/1/1 and the amplifier lends 1 per stat the card moves; both trigger on
+    "boost". The Morpher is dual-mode — fielded it takes its 2/2/1 shape, but it may also be spent as a
+    boost (a 1/1/1 of its chosen element), which is the only mode open to it in the wudai slot.
     """
-    return trigger_of(power) == "boost"
+    return trigger_of(power) == "boost" or mechanic_of(power) is Mechanic.MORPH

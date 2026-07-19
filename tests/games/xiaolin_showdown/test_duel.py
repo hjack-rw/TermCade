@@ -380,7 +380,7 @@ async def test_a_boost_wu_cannot_be_played_twice_in_one_showdown():
     duel.duel.rounds.append(Round())
 
     offered_first = duel._boost_options(state.player, is_player=True)
-    duel._commit_boost(bracelet, is_player=True)
+    duel._commit_boost(bracelet, is_player=True, element="metal")
     offered_again = duel._boost_options(state.player, is_player=True)
 
     assert any(c is bracelet for c in offered_first)
@@ -395,7 +395,7 @@ async def test_a_dragon_is_spent_once_too():
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.rounds.append(Round())
 
-    duel._commit_boost(dragon, is_player=True)
+    duel._commit_boost(dragon, is_player=True, element="metal")
 
     assert not any(c is dragon for c in duel._boost_options(state.player, is_player=True))
 
@@ -408,7 +408,7 @@ async def test_the_dragon_you_were_born_holding_is_never_at_stake():
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.rounds.append(Round())
 
-    duel._commit_boost(dragon, is_player=True)
+    duel._commit_boost(dragon, is_player=True, element="metal")
 
     assert not duel.duel.player.stakes
 
@@ -426,7 +426,7 @@ async def test_a_wudai_weapon_you_found_is_at_stake_like_anything_else():
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.rounds.append(Round())
 
-    duel._commit_boost(staff, is_player=True)
+    duel._commit_boost(staff, is_player=True, element="metal")
 
     assert any(c is staff for c in duel.duel.player.stakes)
 
@@ -440,7 +440,7 @@ async def test_holding_two_boosts_lets_you_amplify_two_rounds():
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.rounds.append(Round())
 
-    duel._commit_boost(first, is_player=True)
+    duel._commit_boost(first, is_player=True, element="metal")
 
     assert any(c is second for c in duel._boost_options(state.player, is_player=True))
 
@@ -453,7 +453,7 @@ async def test_a_spent_boost_stays_spent_across_rounds():
     state.player.hand.append(bracelet)
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.rounds.append(Round())
-    duel._commit_boost(bracelet, is_player=True)
+    duel._commit_boost(bracelet, is_player=True, element="metal")
 
     duel.duel.rounds.append(Round())  # round two opens
 

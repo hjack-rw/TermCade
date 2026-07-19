@@ -133,14 +133,25 @@ def card_name_text(card: Card, *, bold: bool = False) -> Text:
 def points_label(card: Card) -> str:
     """A card's deposit value — ``X`` when it has none to give.
 
-    A dragon Wu (``boost``/0) can never be staked, lost or banked, so ``0`` reads as "worth nothing"
-    when it means "not for sale".
+    A *born* wudai weapon can never be staked, lost or banked, so ``X`` reads "not for sale" where a
+    ``0`` would read "worth nothing": a dragon held from the start, or Hannibal's Morpher. A wudai
+    *found* in the pile — the Shimo Staff — is the exception: it is banked like any Wu and shows its
+    real points, as does a Morpher drawn from the pool (type ``arms``).
     """
-    if mechanic_of(card.power) is Mechanic.DRAGON:
+    if _is_born_wudai(card):
         return "X"
     if is_gamble(card.power):  # nobody knows, and the card is not going to tell you
         return "?"
     return str(card.points)
+
+
+def _is_born_wudai(card: Card) -> bool:
+    """A signature wudai a duelist holds from the start, never banked — as opposed to one won off the
+    pile. A dragon born in the hand carries a negative power id; Hannibal's Morpher is a wudai-typed
+    Morph. The Shimo Staff is a dragon *found* in the pile (positive id), so it is not born."""
+    if card.type != "wudai":
+        return False
+    return card.power.id < 0 or mechanic_of(card.power) is Mechanic.MORPH
 
 
 def power_name_text(power: Power) -> Text:
@@ -215,9 +226,25 @@ EFFECTS = {
 }
 
 
-def effect_line(power: Power) -> str | None:
-    """The one-liner under a Wu's flavour, or ``None`` for the Wu that do not earn one."""
-    return EFFECTS.get(mechanic_of(power))
+# A wudai weapon is boost-only and unlosable — but a *character* whose power is one does not print the
+# weapon's own rules; they possess it. So the same mechanic reads one way on the Wu, another on its owner.
+_WUDAI_MECHANICS = frozenset({Mechanic.DRAGON, Mechanic.MORPH})
+
+
+def effect_line(power: Power, *, is_card: bool = True) -> str | None:
+    """The one-liner under a Wu's flavour, or ``None`` for the ones that do not earn one.
+
+    ``is_card`` distinguishes the Wu from the character who holds it: a dragon (or Hannibal's Morpher)
+    reads "boost only, can't be lost" as a *weapon*, but "possesses a custom wudai weapon" as a *power*.
+    """
+    mechanic = mechanic_of(power)
+    if not is_card:
+        # Hannibal's Morpher is his one wudai, held unlosably; a dragon is a generic born weapon.
+        if mechanic is Mechanic.MORPH:
+            return "Immutable Moby Morpher."
+        if mechanic is Mechanic.DRAGON:
+            return "Possesses a personal Wudai weapon."
+    return EFFECTS.get(mechanic)
 
 
 _TRIGGERS = {
@@ -228,10 +255,18 @@ _TRIGGERS = {
 }
 
 
-def trigger_label(power: Power) -> str:
-    """When a power fires, e.g. ``On Play`` — or ``? ? ?`` for the gamble Wu, which says nothing."""
+def trigger_label(power: Power, *, is_card: bool = True, card_type: str | None = None) -> str:
+    """When a power fires, e.g. ``On Play`` — or ``? ? ?`` for the gamble Wu, which says nothing.
+
+    A wudai fires as a *boost*, whatever the weapon's own trigger — so it reads ``On Boost`` whether
+    shown on the character who possesses it (a dragon, or Hannibal) or on a wudai-typed Wu itself
+    (Hannibal's Morpher). The same Morpher drawn from the pool (type ``arms``) is fielded: ``On Play``.
+    """
     if is_gamble(power):
         return "? ? ?"
+    possessed = not is_card and mechanic_of(power) in _WUDAI_MECHANICS
+    if possessed or card_type == "wudai":
+        return _TRIGGERS["boost"]
     trigger = trigger_of(power)
     return _TRIGGERS.get(trigger, f"On {trigger.capitalize()}")
 

@@ -17,6 +17,18 @@ from collections.abc import Iterable, Sequence
 from ..models import Card
 
 
+def held_as_wudai(card: Card) -> Card:
+    """A signature Wu held in the inalienable slot is a *wudai*, whatever its printed type.
+
+    The dragons already print ``wudai``; Moby Morpher prints ``arms`` in the pool and becomes a wudai
+    only in the one hand it can never leave — Hannibal's. Mutates and returns the given copy, so it is
+    applied to the granted card, never the catalog. Both the deal and a save's restore go through it,
+    so a loaded boss run does not quietly turn the Morpher back into an arm.
+    """
+    card.type = "wudai"
+    return card
+
+
 def is_one_of(card: Card, cards: Iterable[Card]) -> bool:
     """Is ``card`` one of ``cards`` — that object, not one that merely looks like it?"""
     return any(card is other for other in cards)

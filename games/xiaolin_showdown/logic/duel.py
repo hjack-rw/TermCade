@@ -41,7 +41,7 @@ from .battle import Duelist, Ground, Round, score_battle
 from .mechanics.cards import excluding, is_one_of
 from .mechanics.powers import Mechanic, is_boost_slot, mechanic_of, names_a_stat
 from .mechanics.prize import PrizeRoute, claim_route
-from .mechanics.resolve import resolve_played_power
+from .mechanics.resolve import as_boost, resolve_played_power
 from .mechanics.scoring import initiative
 from .models import Card, Player
 from .settings import XiaolinSettings
@@ -282,14 +282,15 @@ class Duel:
 
         player_card = await self.choices.boost(self._boost_options(self.state.player, is_player=True))
         if player_card is not None:
-            self._commit_boost(player_card, is_player=True)
+            # A Morpher spent as a boost still chooses its element; any other boost ignores the ask.
+            self._commit_boost(player_card, is_player=True, element=await self._element_for(player_card))
 
         bot_boosts = self._boost_options(self.state.bot, is_player=False)
         chosen = bot.choose_boost(
             blind, self._ground(), bot_boosts, self._playable(self.state.bot, is_player=False)
         )
         if chosen is not None:
-            self._commit_boost(chosen, is_player=False)
+            self._commit_boost(chosen, is_player=False, element=self.duel.background or "")
 
     async def _card(self) -> None:
         """Both duelists field one Wu, at the same moment and blind to each other.
@@ -454,7 +455,7 @@ class Duel:
         """Wu that may still be fielded as a card. The hand only — the inalienable Wu is boost-only."""
         return excluding(player.hand, self.duel.duelist(is_player).stakes)
 
-    def _commit_boost(self, card: Card, *, is_player: bool) -> None:
+    def _commit_boost(self, card: Card, *, is_player: bool, element: str) -> None:
         duelist = self.duel.duelist(is_player)
         mine, _theirs = self.duel.round.sides(is_player)
         player = self.state.player if is_player else self.state.bot
@@ -464,10 +465,9 @@ class Duel:
         if not is_one_of(card, player.inalienable_hand):
             duelist.stakes.append(card)
         duelist.boosts_spent.append(card)  # one showdown, one use — even a dragon
-        # It keeps its unresolved "?/?/?" in the slot: what it lends is not knowable until it sees
-        # the Wu it lifts. Fielded as an ordinary Wu instead, the resolver zeroes it — and 0/0/0 is
-        # the honest reading of a Wu that was never meant to be played alone.
-        mine.queue.append(deepcopy(card))
+        # A dragon/amplifier keeps its unresolved slot — what it lends is not known until it sees the
+        # Wu it lifts. A Morpher resolves here instead, to a flat 1/1/1 of its chosen element.
+        mine.queue.append(as_boost(card, element))
 
     def _winner_and_loser(self) -> tuple[Player, Player]:
         if self.duel.winner:

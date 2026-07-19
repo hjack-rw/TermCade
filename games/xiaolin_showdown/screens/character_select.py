@@ -8,7 +8,7 @@ from __future__ import annotations
 from termcade.ui.screens.menu import MenuItem, MenuScreen
 
 from ..logic.catalog import Catalog, load_catalog
-from ..logic.settings import XiaolinSettings, is_hard
+from ..logic.settings import XiaolinSettings, roster_of
 from ..logic.setup import new_game
 from ..logic.turn import bot_turn
 from .format import affiliation_icon, char_stats, display_name, opponent_move
@@ -42,7 +42,7 @@ class CharacterSelectScreen(MenuScreen):
             self.ctx.rng,
             character,
             settings=settings,
-            hard_opponents=is_hard(current.difficulty),
+            roster=roster_of(current.difficulty),
         )
         self.ctx.state = state
 

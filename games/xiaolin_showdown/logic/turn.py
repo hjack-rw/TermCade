@@ -24,7 +24,7 @@ from .mechanics.powers import (
     roll_gamble,
 )
 from .models import Card, Player
-from .settings import XiaolinSettings, is_hard
+from .settings import XiaolinSettings, plays_keen
 from .state import XiaolinState
 
 # What a booster is worth in a showdown. It carries no stats of its own, so without this premium a
@@ -205,7 +205,7 @@ def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
     candidates = [card for card in hand if card.points > 0]
     if not candidates:
         return None
-    if is_hard(difficulty):
+    if plays_keen(difficulty):
         return max(candidates, key=lambda c: c.points)
     return min(candidates, key=lambda c: (duel_value(c), -c.points))
 

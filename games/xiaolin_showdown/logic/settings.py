@@ -125,14 +125,25 @@ class XiaolinSettings:
         return coerced, adjusted
 
 
-def is_hard(difficulty: Difficulty) -> bool:
-    """The game runs two tiers, not three: only HARD is the hard tier.
+def roster_of(difficulty: Difficulty) -> str:
+    """Which opponent roster a difficulty draws from — the string ``Catalog.opponents`` keys on.
 
-    Picks the opponent roster (``Catalog.opponents``) and the bot's deposit skill alike, so the two
-    can never disagree. Folds a stale ``NORMAL`` (an older settings file, or the engine default)
-    into Easy.
+    Folds a stale ``NORMAL`` (an older settings file, or the engine default) into Easy.
     """
-    return difficulty is Difficulty.HARD
+    if difficulty is Difficulty.HARD:
+        return "hard"
+    if difficulty is Difficulty.BOSS:
+        return "boss"
+    return "easy"
+
+
+def plays_keen(difficulty: Difficulty) -> bool:
+    """Whether the bot banks by the keen rule (deposit its *most* valuable Wu).
+
+    Hard and boss opponents both play keen; easy banks its least useful. Kept beside ``roster_of`` so
+    the roster and the skill can never disagree about who is a tough opponent.
+    """
+    return difficulty in (Difficulty.HARD, Difficulty.BOSS)
 
 
 def point_limit_for(cards: Iterable[Card], *, dealt: int | None = None) -> int:

@@ -22,7 +22,7 @@ from xiaolin_showdown.logic.mechanics.powers import (
     rule_of,
     trigger_of,
 )
-from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
+from xiaolin_showdown.logic.mechanics.resolve import as_boost, resolve_played_power
 from xiaolin_showdown.logic.models import Power
 
 
@@ -167,11 +167,31 @@ def test_a_showdown_without_intangibility_keeps_the_bonus(card):
 # --- the boost slot: who may be played in addition to a card ----------------------
 
 
-def test_only_a_boost_trigger_wu_may_take_the_boost_slot(catalog):
-    """It is the *slot*, not the mechanic: both the dragon and the amplifier qualify, nothing else."""
+def test_only_boost_slot_wu_may_take_the_boost_slot(catalog):
+    """The dragon and the amplifier trigger on "boost"; the Morpher is dual-mode and may also boost."""
     eligible = {mechanic_of(power) for power in catalog.powers if is_boost_slot(power)}
 
-    assert eligible == {Mechanic.DRAGON, Mechanic.BOOST}
+    assert eligible == {Mechanic.DRAGON, Mechanic.BOOST, Mechanic.MORPH}
+
+
+def test_a_morpher_spent_as_a_boost_is_one_one_one_of_its_chosen_element(catalog):
+    """The wudai mode: a flat 1/1/1 in the colour the caster names — a dragon that picks its element."""
+    moby = catalog.card(5)  # Moby Morpher, the Morpher — prints ?/?/? until it is played
+
+    boosted = as_boost(moby, "fire")
+
+    assert boosted.stats == {"force": 1, "agility": 1, "intellect": 1}
+    assert boosted.element == "fire"
+
+
+def test_a_dragon_boost_enters_the_queue_as_itself(catalog):
+    """Only the Morpher has a boost mode; every other boost rides in unchanged, its own element kept."""
+    dragon = catalog.card(1)  # Silver Manta Ray — a dragon, 1/1/1 of water
+
+    boosted = as_boost(dragon, "fire")
+
+    assert boosted.stats == dragon.stats
+    assert boosted.element == dragon.element  # the ask is ignored — not a Morpher
 
 
 def test_a_hand_or_play_wu_is_never_offered_the_boost_slot(catalog):
@@ -261,3 +281,43 @@ def test_a_wudai_weapon_can_be_found_rather_than_inherited(catalog):
     for card in found:
         assert card.power.id > 0, "a found dragon is not a birthright"
         assert effect_line(card.power)
+
+
+def test_a_wudai_reads_as_possession_on_its_owner_and_as_the_weapons_rule_on_the_wu(catalog):
+    """Same mechanic, two readings: a character *possesses* the weapon; the Wu *is* it.
+
+    True of a dragon (a born-holding character) and of Hannibal, whose Morpher is his wudai.
+    """
+    from copy import deepcopy
+
+    from xiaolin_showdown.logic.mechanics.cards import held_as_wudai
+    from xiaolin_showdown.screens.format import effect_line, points_label, trigger_label
+
+    omi = catalog.character(1)  # a dragon character
+    hannibal = catalog.character(11)  # holds Moby Morpher as his wudai
+    found_dragon = next(
+        c for c in catalog.cards
+        if mechanic_of(c.power) is Mechanic.DRAGON and c.id >= FIRST_DECK_CARD
+    )
+
+    # The character possesses a weapon; Hannibal's is his one immutable Morpher.
+    assert "Wudai weapon" in (effect_line(omi.power, is_card=False) or "")
+    assert effect_line(hannibal.power, is_card=False) == "Immutable Moby Morpher."
+    # And a possessed wudai reads "On Boost" on its owner, whatever the Wu's own trigger.
+    assert trigger_label(hannibal.power, is_card=False) == "On Boost"
+    # On the Wu itself, the weapon states its own rule.
+    assert "Boost" in (effect_line(found_dragon.power, is_card=True) or "")
+
+    # The Morpher: fielded from the pool it is On Play and bankable; as a wudai it is On Boost, worth X.
+    pool = catalog.card(5)
+    wudai = held_as_wudai(deepcopy(pool))
+    assert trigger_label(pool.power, is_card=True, card_type=pool.type) == "On Play"
+    assert trigger_label(wudai.power, is_card=True, card_type=wudai.type) == "On Boost"
+    assert points_label(wudai) == "X"
+    assert points_label(pool) == str(pool.points)
+
+    # The Shimo Staff (card 44) is a wudai found in the pile — boost-only, but banked like any Wu.
+    shimo = catalog.card(44)
+    assert trigger_label(shimo.power, is_card=True, card_type=shimo.type) == "On Boost"
+    assert points_label(shimo) == str(shimo.points)  # the exception: it shows its real points
+    assert points_label(catalog.card(1)) == "X"  # a born dragon never counts

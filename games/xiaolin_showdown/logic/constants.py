@@ -27,10 +27,11 @@ OPPOSITES = {
     "earth": "wind",
 }
 
-# "Beginning Wu" cards (power_id < 0) are tied to a character by id == abs(power_id):
+# A character is granted its signature Wu by `card.id == abs(character.power_id)`:
 #   0     blank — the template/dummy card and deck filler/padding
-#   1..4  the four playable characters' signature Wu — never in the draw pool; granted on pick
-#   5     Moby Morpher, Hannibal's Wu (non-playable carrier) — IN the pool by default,
-#         removed only when Hannibal is in play
+#   1..4  the four playable characters' signature Wu — never in the draw pool; granted on pick.
+#         Each *shares* its character's power (the dragon), so power_id is -1..-4 too.
+#   5     Moby Morpher, Hannibal's wudai — IN the pool by default, removed only when Hannibal is in
+#         play. Its power is its own ("Allomorphia", 30); Hannibal's is "Free Allomorphia" (-5).
 # So the shuffled draw pile starts at card 5 (Moby Morpher included).
 FIRST_DECK_CARD = 5

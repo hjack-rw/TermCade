@@ -1,6 +1,6 @@
 """Settings screen — edit the ruleset before starting a game.
 
-Each ``XiaolinSettings`` field is an integer input, plus the Easy/Hard difficulty toggle (which
+Each ``XiaolinSettings`` field is an integer input, plus the Easy/Hard/Boss difficulty toggle (which
 picks both the opponent roster and the bot's deposit skill). Saving writes the values back through
 the engine's ``SettingsStore`` (global defaults for new games); a new game then reads them via
 ``XiaolinSettings.from_settings`` and the engine freezes them into that save.
@@ -21,7 +21,10 @@ from termcade.ui.app import EngineApp
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel, Button
 
-from ..logic.settings import XiaolinSettings, is_hard
+from ..logic.settings import XiaolinSettings
+
+# The difficulty button cycles these in order. NORMAL (an old file or the engine default) folds to EASY.
+_DIFFICULTY_CYCLE = (Difficulty.EASY, Difficulty.HARD, Difficulty.BOSS)
 
 
 def _out_of_range_message(adjusted: dict[str, tuple[int, int]]) -> str:
@@ -47,15 +50,17 @@ def _sfx_label(on: bool) -> str:
 class SettingsScreen(EngineScreen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
-    # The pending choices, toggled by their buttons and only written on Save. 
-    # Two states: never NORMAL.
+    # The pending choices, toggled by their buttons and only written on Save.
+    # Three states — Easy, Hard, Boss; never NORMAL.
     _difficulty: Difficulty = Difficulty.EASY
     _music: bool = True
     _sfx: bool = True
 
     def compose(self) -> ComposeResult:
         current = self.ctx.settings.current
-        self._difficulty = Difficulty.HARD if is_hard(current.difficulty) else Difficulty.EASY
+        self._difficulty = (
+            current.difficulty if current.difficulty in _DIFFICULTY_CYCLE else Difficulty.EASY
+        )
         self._music = bool(current.options.get(MUSIC_OPTION, True))
         self._sfx = bool(current.options.get(SFX_OPTION, True))
         rules = XiaolinSettings.from_settings(current)
@@ -114,7 +119,8 @@ class SettingsScreen(EngineScreen):
         self.app.pop_screen()
 
     def _toggle_difficulty(self) -> None:
-        self._difficulty = Difficulty.EASY if self._difficulty is Difficulty.HARD else Difficulty.HARD
+        nxt = (_DIFFICULTY_CYCLE.index(self._difficulty) + 1) % len(_DIFFICULTY_CYCLE)
+        self._difficulty = _DIFFICULTY_CYCLE[nxt]
         self.query_one("#difficulty", Button).label = _difficulty_label(self._difficulty)
 
     def _toggle_music(self) -> None:
