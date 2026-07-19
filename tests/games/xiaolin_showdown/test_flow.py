@@ -347,11 +347,14 @@ async def test_game_over_shows_the_outcome_and_can_play_again(tmp_path):
 
 
 async def test_start_screen_shows_the_cartridge_version(tmp_path):
-    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    game = build_game()
+    app = EngineApp(game, data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:
         await _boot(app, pilot)
         await pilot.pause()
-        assert str(app.screen.query_one("#version", Static).render()) == "v1.2"
+        # Read the version off the cartridge, never a literal — the rule is "the screen shows what the
+        # game declares", and a hardcoded number turns every version bump into a failing test.
+        assert str(app.screen.query_one("#version", Static).render()) == f"v{game.version}"
 
 
 async def test_settings_flags_an_out_of_range_value_instead_of_saving(tmp_path):

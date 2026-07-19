@@ -24,7 +24,7 @@ def build_game() -> Game:
     return Game(
         game_id="xiaolin_showdown",
         title="Xiaolin Showdown",
-        version="1.2",
+        version="1.3",
         state_cls=XiaolinState,
         default_settings=default_settings(),
         # The deck size and the win target are read off the CARD POOL, not chosen by a player, so a
