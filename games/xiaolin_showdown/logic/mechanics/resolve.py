@@ -39,11 +39,13 @@ _NEUTRAL_POWER = Power(id=0, name="", mechanic=Mechanic.FILLER, description="")
 
 def resolve_played_power(
     round_: "Round", card: Card, *, is_player: bool, element: str, stat: str | None = None
-) -> bool:
-    """Resolve ``card`` into this round's scoring queues; return whether it voided the elemental bonus.
+) -> str | None:
+    """Resolve ``card`` into this round's scoring queues; return the elemental flag it raised, if any.
 
-    The bonus is a condition of the whole *showdown*, not of one round, so the caller owns that flag
-    — a Serpent's Tail played in round one leaves the ground intangible for the rest of the match.
+    ``"cancel"`` (a Serpent's Tail — nothing resonates) or ``"reverse"`` (a Celestial Dial — resonance
+    and opposition swap), or ``None``. The flag is a condition of the whole *showdown*, not of one
+    round, so the caller owns it: a Serpent's Tail played in round one leaves the ground intangible for
+    the rest of the match.
 
     ``element`` and ``stat`` are the two things a Wu can ask of whoever plays it: the Morpher's
     element, and the stat the Orb or the Curse pours itself into. Both are resolved by the caller —
@@ -67,7 +69,13 @@ def resolve_played_power(
         mine.spent.append(played)
 
     mine.queue.append(played)
-    return mechanic is Mechanic.INTANGIBLE
+    if mechanic is Mechanic.INTANGIBLE:
+        return "cancel"
+    if mechanic is Mechanic.DISSONANCE:
+        return "reverse"
+    if mechanic is Mechanic.STORMFRONT:  # Monsoon Sandals — the arena becomes the chosen element
+        return f"background:{element}"
+    return None
 
 
 def as_boost(card: Card, element: str) -> Card:
@@ -130,6 +138,12 @@ def _apply_mechanic(
     if mechanic in _NEGATIONS:
         _negate(mechanic, caster, opponent)
         return False
+    if mechanic is Mechanic.TRANSMUTATION:  # Kuzusu Atom — the opponent's Wu count as metal
+        opponent.element_as = "metal"
+        return False
+    if mechanic is Mechanic.CHROMASIS:  # Eye of Dashi — the caster's Wu count as their chosen element
+        caster.element_as = element
+        return False
     if mechanic is Mechanic.BOOST:
         played.stats = {name: 0 for name in card.stats}
         return False
@@ -159,6 +173,7 @@ _NEGATIONS: dict[Mechanic, tuple[bool, str]] = {
     Mechanic.CONTAINMENT: (True, "base_negated"),  # Sphere of Jianyu — the duelist themselves
     Mechanic.SUBJUGATION: (True, "offence_negated"),  # Emperor Scorpion — every Wu they played
     Mechanic.REVERSAL: (False, "defence_negated"),  # Reversing Mirror — every curse laid on you
+    Mechanic.DAMPENING: (True, "boost_negated"),  # Star Hanabi — the opponent's boost's stats
 }
 
 

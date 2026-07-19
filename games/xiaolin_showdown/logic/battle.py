@@ -10,6 +10,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from .mechanics.cards import excluding, is_one_of
+from .mechanics.powers import is_boost_slot
 from .mechanics.scoring import contributing, count_end_stats
 from .models import Card
 
@@ -39,6 +40,10 @@ class Side:
     base_negated: bool = False
     offence_negated: bool = False
     defence_negated: bool = False
+    boost_negated: bool = False  # a Star Hanabi — this side's boost lends no stats
+    # A Kuzusu Atom / Eye of Dashi has set what element this side's Wu count as, for the background
+    # bonus only (their stats are untouched). ``None`` leaves each Wu its own printed element.
+    element_as: str | None = None
 
     def mine(self) -> list[Card]:
         """Every Wu *this* duelist put on the table — what the board owes them a line for.
@@ -59,7 +64,10 @@ class Side:
         """
         if self.offence_negated:
             return []
-        return contributing(excluding(self.queue, self.suffered))
+        played = contributing(excluding(self.queue, self.suffered))
+        if self.boost_negated:  # a fielded boost keeps its real power; a played Wu wears a neutral one
+            played = [card for card in played if not is_boost_slot(card.power)]
+        return played
 
     def curses(self) -> list[Card]:
         """The curses still biting this duelist — none, once a Reversing Mirror has turned them."""
@@ -78,6 +86,8 @@ class Side:
             cards = [card for card in cards if is_one_of(card, self.suffered)]
         if self.defence_negated:
             cards = excluding(cards, self.suffered)
+        if self.boost_negated:  # a Star Hanabi: the boost's stats no longer reach the score
+            cards = [card for card in cards if not is_boost_slot(card.power)]
         return cards
 
 
@@ -120,6 +130,7 @@ class Ground:
     player_stats: Mapping[str, int]
     bot_stats: Mapping[str, int]
     bonus_cancelled: bool = False  # a Serpent's Tail is on the table — nothing resonates
+    bonus_reversed: bool = False  # a Celestial Dial is on the table — resonance and opposition swap
     # Who holds priority. The last word on a battle nothing else can separate — the same rule the
     # showdown itself ends on, so a duelist who sets the terms holds the ground at every level.
     challenger_is_player: bool = True
@@ -143,6 +154,8 @@ def score_battle(battle: Round, ground: Ground) -> None:
         elemental_bonus, point = (1, 2) if stat == battle.stat else (0, 1)
         if ground.bonus_cancelled:
             elemental_bonus = 0
+        elif ground.bonus_reversed:
+            elemental_bonus = -elemental_bonus  # resonance now costs, opposition now pays
         player_end = end_stat(
             stat, elemental_bonus, battle.player, ground.player_stats, ground.background
         )
@@ -176,4 +189,5 @@ def end_stat(
         background,
         earns_bonus=side.contributors(),
         suffers_bonus=side.curses(),
+        element_as=side.element_as,
     )

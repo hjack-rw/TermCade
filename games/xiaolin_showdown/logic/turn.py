@@ -174,6 +174,16 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         # is *meant* to be: the veto is the card, and the author has priced it as such (4 points, the
         # top of the pool). It is not underpriced here by oversight. Do not "fix" it.
         Mechanic.INTANGIBLE,
+        # The Celestial Dial reverses the elemental bonus all showdown — worth more than its printed
+        # 1/1/1, but priced by them here: the reversal is contextual (great against an in-tune opponent,
+        # nothing against a metal one) and the bot reads that from its play-it-out eval, not from here.
+        Mechanic.DISSONANCE,
+        # The four boss counters print real stats; their showdown effect (negate a boost, recolour a
+        # side or the arena) is contextual and read by the bot's play-it-out eval, not priced here.
+        Mechanic.DAMPENING,
+        Mechanic.TRANSMUTATION,
+        Mechanic.CHROMASIS,
+        Mechanic.STORMFRONT,
     }
 )
 

@@ -228,6 +228,38 @@ RULES: dict[Mechanic, Rule] = {
         "Voids the elemental bonus for the rest of the showdown — for both duelists, whoever "
         "played it.",
     ),
+    Mechanic.DISSONANCE: Rule(
+        Mechanic.DISSONANCE,
+        "play",
+        Timing.IN_DUEL,
+        "Reverses the elemental bonus for the rest of the showdown, for both duelists: a resonant Wu "
+        "now costs, an opposed one now pays.",
+    ),
+    Mechanic.DAMPENING: Rule(
+        Mechanic.DAMPENING,
+        "play",
+        Timing.IN_DUEL,
+        "Smothers your opponent's boost for this battle: its stats count for nothing.",
+    ),
+    Mechanic.TRANSMUTATION: Rule(
+        Mechanic.TRANSMUTATION,
+        "play",
+        Timing.IN_DUEL,
+        "Turns your opponent's Wu to metal for this battle — they read as metal for the background "
+        "bonus, favoured nowhere but a metal arena.",
+    ),
+    Mechanic.CHROMASIS: Rule(
+        Mechanic.CHROMASIS,
+        "play",
+        Timing.IN_DUEL,
+        "You choose the element your own Wu count as for this battle's background bonus.",
+    ),
+    Mechanic.STORMFRONT: Rule(
+        Mechanic.STORMFRONT,
+        "play",
+        Timing.IN_DUEL,
+        "You choose the arena's element for the rest of the showdown.",
+    ),
 }
 
 

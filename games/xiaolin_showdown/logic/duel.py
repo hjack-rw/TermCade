@@ -50,6 +50,10 @@ from .state import XiaolinState
 END, COMMITMENT, SETUP, BOOST, CARD, RESOLVEMENT = range(6)
 LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD repeats per Wu wagered
 
+# The Wu that ask their caster for an element: the Morpher (its shape), the Eye (its own colour), the
+# Monsoon (the whole arena's).
+_CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.CHROMASIS, Mechanic.STORMFRONT})
+
 
 @dataclass
 class DuelState:
@@ -78,6 +82,7 @@ class DuelState:
     # showdown — a condition of the duel, not of the queue it was played into. It carries across
     # every round: the ground stays intangible once someone makes it so.
     elemental_bonus_cancelled: bool = False
+    elemental_bonus_reversed: bool = False  # a Celestial Dial: resonance and opposition swap all match
 
     def duelist(self, is_player: bool) -> Duelist:
         return self.player if is_player else self.bot
@@ -318,10 +323,9 @@ class Duel:
         if player_card is not None:
             element = await self._element_for(player_card)
             stat = await self._stat_for(player_card)
-            if resolve_played_power(
-                current, player_card, is_player=True, element=element, stat=stat
-            ):
-                self.duel.elemental_bonus_cancelled = True
+            self._apply_elemental(
+                resolve_played_power(current, player_card, is_player=True, element=element, stat=stat)
+            )
         if bot_card is not None:
             self._resolve_bot(current, bot_card)
 
@@ -330,12 +334,20 @@ class Duel:
         if current.fielded >= self._wu_per_battle():
             self._score_round(current)
 
+    def _apply_elemental(self, effect: str | None) -> None:
+        """A played Wu's showdown-wide elemental effect: void, reverse, or re-colour the arena."""
+        if effect and effect.startswith("background:"):
+            self.duel.background = effect.split(":", 1)[1]
+        elif effect == "cancel":
+            self.duel.elemental_bonus_cancelled = True
+        elif effect == "reverse":
+            self.duel.elemental_bonus_reversed = True
+
     def _resolve_bot(self, current: Round, card: Card) -> None:
         stat = bot.choose_stat(current, self._ground(), card) if names_a_stat(card.power) else None
-        if resolve_played_power(
-            current, card, is_player=False, element=self.duel.background or "", stat=stat
-        ):
-            self.duel.elemental_bonus_cancelled = True
+        self._apply_elemental(
+            resolve_played_power(current, card, is_player=False, element=self.duel.background or "", stat=stat)
+        )
 
     def _ground(self) -> Ground:
         """The terms this battle is fought under — what the scorer and the bot both read."""
@@ -345,6 +357,7 @@ class Duel:
             player_stats=self.state.player.character.stats,
             bot_stats=self.state.bot.character.stats,
             bonus_cancelled=self.duel.elemental_bonus_cancelled,
+            bonus_reversed=self.duel.elemental_bonus_reversed,
             # Priority is the last word on a battle nothing else can separate — and priority is held by
             # whoever called the challenge, settled by initiative (or by the coin, on a tie).
             challenger_is_player=bool(self.duel.player_priority),
@@ -354,8 +367,9 @@ class Duel:
         score_battle(current, self._ground())
 
     async def _element_for(self, card: Card) -> str:
-        """A Morpher (play/+1) lets the player choose its element; any other card ignores it."""
-        if mechanic_of(card.power) is Mechanic.MORPH:
+        """Some Wu let the player name an element: the Morpher its shape, the Eye its own colour, the
+        Monsoon the whole arena's. Any other card ignores the ask and takes the background."""
+        if mechanic_of(card.power) in _CHOOSES_ELEMENT:
             return await self.choices.element(self.duel.background or "")
         return self.duel.background or ""
 

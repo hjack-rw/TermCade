@@ -81,6 +81,7 @@ FIST_OF_TEBIGONG = 6  # a plain Wu — its stats ARE its power
 WUSHU_BRACELET = 14  # boost/+1
 TWO_TON_TUNIC = 17  # a plain Wu with negative force: a curse
 SERPENTS_TAIL = 24  # play/-1, Intangibility
+CELESTIAL_DIAL = 45  # play, Dissonance
 
 
 def test_a_plain_wu_contributes_its_printed_stats(card):
@@ -149,14 +150,18 @@ def test_a_dragon_wu_is_not_a_booster(card):
 
 
 def test_intangibility_voids_the_elemental_bonus(card):
-    voided = resolve_played_power(Round(), card(SERPENTS_TAIL), is_player=True, element="metal")
-    assert voided
+    assert resolve_played_power(Round(), card(SERPENTS_TAIL), is_player=True, element="metal") == "cancel"
 
 
 def test_intangibility_voids_it_for_both_duelists(card):
     """Whoever plays it, nobody earns the bonus — it is a condition of the showdown."""
-    voided = resolve_played_power(Round(), card(SERPENTS_TAIL), is_player=False, element="metal")
-    assert voided
+    assert resolve_played_power(Round(), card(SERPENTS_TAIL), is_player=False, element="metal") == "cancel"
+
+
+def test_a_celestial_dial_reverses_the_elemental_bonus(card):
+    """The Dial signals the reverse for the showdown, whoever plays it."""
+    assert resolve_played_power(Round(), card(CELESTIAL_DIAL), is_player=True, element="metal") == "reverse"
+    assert resolve_played_power(Round(), card(CELESTIAL_DIAL), is_player=False, element="metal") == "reverse"
 
 
 def test_a_showdown_without_intangibility_keeps_the_bonus(card):

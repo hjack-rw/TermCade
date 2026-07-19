@@ -386,7 +386,9 @@ async def test_settings_change_flows_into_a_new_game(tmp_path):
         await pilot.pause()
         await pilot.click("#char-1")  # Omi (has one inalienable card)
         await pilot.pause()
-        assert len(app.ctx.state.player.hand) == 2  # 3 dealt minus the inalienable card
+        # 3 dealt minus the inalienable card = 2 — at most, since the opponent's opening turn may bank
+        # one of yours (a Repulsion). The point is the setting flowed: the default 5 would leave 4.
+        assert len(app.ctx.state.player.hand) <= 2
 
 
 async def test_settings_defaults_to_easy(tmp_path):

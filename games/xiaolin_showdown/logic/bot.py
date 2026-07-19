@@ -202,10 +202,14 @@ def _after(
         )
 
     trial = deepcopy(battle)
-    voided = resolve_played_power(
+    effect = resolve_played_power(
         trial, card, is_player=is_player, element=ground.background, stat=stat
     )
-    terms = replace(ground, bonus_cancelled=ground.bonus_cancelled or voided)
+    terms = replace(
+        ground,
+        bonus_cancelled=ground.bonus_cancelled or effect == "cancel",
+        bonus_reversed=ground.bonus_reversed or effect == "reverse",
+    )
     score_battle(trial, terms)
     sign = -1 if is_player else 1
     return sign * trial.score, -_blow(trial, terms, is_player=is_player)

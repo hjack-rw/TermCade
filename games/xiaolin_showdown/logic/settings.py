@@ -45,8 +45,8 @@ class XiaolinSettings:
     # here too because a bare `XiaolinSettings()` deals a real game: a stale `max_deck_size` would
     # shuffle the pool and then truncate it, quietly leaving the newest Wu out of the run.
     # `test_settings_defaults_match_the_card_pool` fails when a printed Wu leaves them behind.
-    max_deck_size: int = 40
-    point_limit: int = 21
+    max_deck_size: int = 45
+    point_limit: int = 24
     starting_points_player: int = 0
     starting_points_bot: int = 0
     # One temple turn, one action: deposit, spend a power, or draw. One budget, so a hand is a resource

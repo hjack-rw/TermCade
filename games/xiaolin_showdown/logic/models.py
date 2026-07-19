@@ -43,6 +43,11 @@ class Mechanic(StrEnum):
     CONTAINMENT = "containment"
     REVERSAL = "reversal"
     SUBJUGATION = "subjugation"
+    DISSONANCE = "dissonance"
+    DAMPENING = "dampening"  # Star Hanabi — negate the opponent's boost's stats
+    TRANSMUTATION = "transmutation"  # Kuzusu Atom — force a side's Wu to count as metal
+    CHROMASIS = "chromasis"  # Eye of Dashi — set a side's Wu to a chosen element
+    STORMFRONT = "stormfront"  # Monsoon Sandals — change the arena's element
 
 
 @dataclass

@@ -74,6 +74,7 @@ def count_end_stats(
     absolute: bool = True,
     earns_bonus: Sequence[Card] | None = None,
     suffers_bonus: Sequence[Card] = (),
+    element_as: str | None = None,
 ) -> int:
     """A duelist's end value for one stat: base + queued card stats + elemental bonus.
 
@@ -101,6 +102,8 @@ def count_end_stats(
 
     element_total = 0
     if elemental_bonus:
-        element_total = sum(element_score(card.element, background) for card in bonus_cards)
+        # ``element_as`` (a Kuzusu Atom / Eye of Dashi) overrides what this side's own Wu count as; the
+        # curses landed on it keep the element they were cast in.
+        element_total = sum(element_score(element_as or card.element, background) for card in bonus_cards)
         element_total -= sum(element_score(card.element, background) for card in suffers_bonus)
     return character_stats[stat] + sum(stat_values) + elemental_bonus * element_total

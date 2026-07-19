@@ -82,6 +82,11 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (38, 'Euthymia', 'euthymia', 'Your good spirits turn fortune your way and a lost Wu finds its way back to you', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (39, 'Polymorphia', 'dragon', 'Transforms into any weapon the user requires', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (40, 'Allomorphia', 'morph', 'Allows the user to change their appearance into anything they choose - including the appearance of other beings', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (41, 'Lunarkinesis', 'dissonance', 'Allows the user to control the sun, the stars and the moon, including their different phases - turning the arena''s favour against itself.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (42, 'Thermokinesis', 'dampening', 'Shoots out sparks that generate heat and can light fires, the sudden bloom of warmth smothering an opponent''s boost.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (43, 'Metallaxis', 'transmutation', 'Transforms an object''s alchemical properties by changing its atoms - turning a rival Wu to inert metal.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (44, 'Chromakinesis', 'chromasis', 'Shoots any element from the centre gem, so the user''s own Wu take the colour they choose.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (45, 'Anemokinesis', 'stormfront', 'Controls the weather, changing the arena''s element to the one the user calls.', 0);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE card (id INTEGER, name TEXT, force INTEGER, agility INTEGER, intellect INTEGER, power_id INTEGER NOT NULL REFERENCES power (id), element TEXT, type TEXT, points INTEGER, PRIMARY KEY (id AUTOINCREMENT));
@@ -131,6 +136,11 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (42, 'Shadow of Fear', -2, 0, -2, 37, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (43, 'Rooster Booster', 1, 1, 1, 38, 'metal', 'item', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (44, 'Shimo Staff', 1, 1, 1, 39, 'metal', 'wudai', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (45, 'Celestial Dial Locket', 1, 1, 1, 41, 'metal', 'amulet', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (46, 'Star Hanabi', 2, 2, 0, 42, 'fire', 'amulet', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (47, 'Kuzusu Atom', 2, 1, 1, 43, 'metal', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (48, 'Eye of Dashi', 2, 2, 2, 44, 'metal', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (49, 'Monsoon Sandals', 1, 1, 1, 45, 'metal', 'boots', 2);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (
