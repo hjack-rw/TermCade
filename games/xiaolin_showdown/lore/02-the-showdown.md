@@ -1,4 +1,4 @@
-# Xiaolin Showdown
+# The Xiaolin Showdown
 
 A Wu is not found. It **reveals itself**, and when it does, everyone who wants it starts running.
 When two hands close on a Wu at the same moment, and neither lets go, that is where a Xiaolin Showdown begins.

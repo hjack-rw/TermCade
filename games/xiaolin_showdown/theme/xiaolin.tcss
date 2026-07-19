@@ -26,8 +26,14 @@ StartScreen {
     width: auto;  /* fit the ASCII wordmark; the Center wrapper handles the horizontal centring */
 }
 /* The subtitle is one row of fullwidth glyphs, not a figlet block — bold gives it the weight the
-   three-row wordmark used to carry, so it still reads as a wordmark and not as a line of prose. */
+   three-row wordmark used to carry, so it still reads as a wordmark and not as a line of prose.
+
+   Centred by spanning the row rather than by `width: auto` in the Center wrapper: auto-width measures
+   the string, and a measure that disagrees with what the glyphs actually draw leaves the row sitting
+   off-centre. Spanning and centring the text inside measures nothing and cannot drift. */
 #start-root .subtitle {
+    width: 100%;
+    text-align: center;
     text-style: bold;
     margin-top: 1;
 }

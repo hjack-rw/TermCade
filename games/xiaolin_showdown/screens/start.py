@@ -33,9 +33,9 @@ class StartScreen(EngineScreen):
                 with BoxedPanel(title="MENU"):
                     yield Button("Play", id="play", variant="primary")
                     yield Button("Continue", id="continue")
-                    yield Button("Lore", id="lore")
                     yield Button("Rules", id="rules")
                     yield Button("Settings", id="settings")
+                    yield Button("Lore", id="lore")
                     yield Button("Quit", id="quit")
         yield Static(f"v{self.game.version}", id="version")
         yield Footer()
@@ -45,11 +45,11 @@ class StartScreen(EngineScreen):
             self.app.push_screen(CharacterSelectScreen())
         elif event.button.id == "continue":
             self.app.push_screen(SaveSlotScreen("load", next_screen=TempleScreen))
-        elif event.button.id == "lore":
-            self.app.push_screen(LoreScreen())
         elif event.button.id == "rules":
             self.app.push_screen(RulesScreen())
         elif event.button.id == "settings":
             self.app.push_screen(SettingsScreen())
+        elif event.button.id == "lore":
+            self.app.push_screen(LoreScreen())
         elif event.button.id == "quit":
             self.app.exit()

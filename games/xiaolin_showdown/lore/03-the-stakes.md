@@ -1,4 +1,4 @@
-# Real Stakes
+# Huge Stakes
 
 Every Wu that surfaces goes one of two ways.
 
