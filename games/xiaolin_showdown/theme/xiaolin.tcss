@@ -219,6 +219,33 @@ RulesScreen Static {
     padding: 1 1 0 1;
 }
 
+/* --- Lore ---------------------------------------------------------------- */
+/* A Rich `Markdown` has no intrinsic width, so `width: auto` measures it as ZERO and the book draws
+   as an empty box. The page therefore gets its width from here, not from its content — and the width
+   is the one `logic/lore.PAGE_COLS` promises, so what the overflow test measures is what is drawn.
+   Height is fixed for the same reason a book's pages are: a box that resized to each page would jump
+   every time one was turned. */
+LoreScreen {
+    align: center middle;
+}
+LoreScreen > BoxedPanel {
+    width: 108;      /* PAGE_COLS plus the box's own chrome */
+    max-width: 100%; /* ...but never wider than the window it is drawn in */
+    height: 38;      /* PAGE_ROWS plus chrome */
+    max-height: 100%;
+}
+LoreScreen #lore-page {
+    width: 100%;
+    height: 100%;
+    padding: 1;
+}
+LoreScreen #lore-footer {
+    width: 108;
+    max-width: 100%;
+    padding: 0 2;
+    color: $text-disabled;
+}
+
 /* --- Duel ---------------------------------------------------------------- */
 DuelScreen > BoxedPanel {
     width: 84%;

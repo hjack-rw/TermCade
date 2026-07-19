@@ -13,6 +13,7 @@ from termcade.ui.widgets import BoxedPanel, Button
 
 from ._logo import SUBTITLE_ART, TITLE_ART
 from .character_select import CharacterSelectScreen
+from .lore import LoreScreen
 from .rules import RulesScreen
 from .settings import SettingsScreen
 from .temple import TempleScreen
@@ -32,6 +33,7 @@ class StartScreen(EngineScreen):
                 with BoxedPanel(title="MENU"):
                     yield Button("Play", id="play", variant="primary")
                     yield Button("Continue", id="continue")
+                    yield Button("Lore", id="lore")
                     yield Button("Rules", id="rules")
                     yield Button("Settings", id="settings")
                     yield Button("Quit", id="quit")
@@ -43,6 +45,8 @@ class StartScreen(EngineScreen):
             self.app.push_screen(CharacterSelectScreen())
         elif event.button.id == "continue":
             self.app.push_screen(SaveSlotScreen("load", next_screen=TempleScreen))
+        elif event.button.id == "lore":
+            self.app.push_screen(LoreScreen())
         elif event.button.id == "rules":
             self.app.push_screen(RulesScreen())
         elif event.button.id == "settings":
