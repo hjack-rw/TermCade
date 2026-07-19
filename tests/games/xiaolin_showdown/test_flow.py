@@ -462,6 +462,36 @@ async def test_saving_hard_difficulty_deals_a_hard_opponent(tmp_path):
         assert app.ctx.state.bot.character.tier == "hard"
 
 
+async def test_a_boss_run_asks_which_boss(tmp_path):
+    """A boss is PICKED, never dealt: the boss tier routes through its own select screen."""
+    from xiaolin_showdown.screens.character_select import BossSelectScreen
+
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        await _boot(app, pilot)
+        await pilot.click("#settings")
+        await pilot.pause()
+        await pilot.click("#difficulty")
+        await pilot.pause(0.4)  # the -active window (see the cycle test above)
+        await pilot.click("#difficulty")  # EASY -> HARD -> BOSS
+        await pilot.click("#save")
+        await pilot.pause()
+
+        await pilot.click("#play")
+        await pilot.pause()
+        await pilot.click("#char-1")  # Omi
+        await pilot.pause()
+        assert isinstance(app.screen, BossSelectScreen)
+
+        wuya_button = app.screen.query_one("#boss-12", Button)
+        assert wuya_button.tooltip == "Shen Gong Wu Boss"
+
+        await pilot.click("#boss-12")  # Wuya, by choice
+        await pilot.pause()
+        assert isinstance(app.screen, TempleScreen)
+        assert app.ctx.state.bot.character.name == "Wuya"
+
+
 async def test_a_wide_vault_lays_the_hands_side_by_side(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(120, 40)) as pilot:
