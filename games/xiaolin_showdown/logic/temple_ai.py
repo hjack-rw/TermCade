@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from .mechanics.powers import GAMBLE_SPREAD, Mechanic, is_gamble, mechanic_of
 from .mechanics.scoring import initiative
 from .models import Card
-from .settings import XiaolinSettings
+from .settings import XiaolinSettings, player_actions
 from .state import XiaolinState
 from .turn import duel_value
 
@@ -188,7 +188,9 @@ def choose_early_bird(
 
     me, them = state.duelist(is_player), state.opponent(is_player)
     spent = state.actions_spent(is_player)
-    if spent >= settings.actions_per_turn or not state.card_deck:
+    # Each side flies against its own budget — in a boss run the player's is the larger one.
+    budget = player_actions(state, settings) if is_player else settings.actions_per_turn
+    if spent >= budget or not state.card_deck:
         return None
     if initiative_lead(state, is_player=is_player) < settings.early_bird_gap:
         return None

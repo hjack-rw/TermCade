@@ -136,11 +136,11 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (42, 'Shadow of Fear', -2, 0, -2, 37, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (43, 'Rooster Booster', 1, 1, 1, 38, 'metal', 'item', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (44, 'Shimo Staff', 1, 1, 1, 39, 'metal', 'wudai', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (45, 'Celestial Dial Locket', 1, 1, 1, 41, 'metal', 'amulet', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (46, 'Star Hanabi', 2, 2, 0, 42, 'fire', 'amulet', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (47, 'Kuzusu Atom', 2, 1, 1, 43, 'metal', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (45, 'Celestial Dial Locket', 1, 1, 1, 41, 'metal', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (46, 'Star Hanabi', 2, 2, 0, 42, 'fire', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (47, 'Kuzusu Atom', 2, 1, 1, 43, 'metal', 'item', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (48, 'Eye of Dashi', 2, 2, 2, 44, 'metal', 'amulet', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (49, 'Monsoon Sandals', 1, 1, 1, 45, 'metal', 'boots', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (49, 'Monsoon Sandals', 1, 1, 1, 45, 'metal', 'boots', 3);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (

@@ -15,7 +15,7 @@ from .mechanics.cards import index_of
 from .mechanics.scoring import initiative
 from .mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of, trigger_of
 from .models import Card, Player
-from .settings import XiaolinSettings
+from .settings import XiaolinSettings, player_actions
 from .state import XiaolinState
 from .training import add_progress, can_train, payout_ready
 from .turn import bank_value, max_hand_size, shelve
@@ -167,7 +167,7 @@ def draw_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | None:
     A full hand no longer blocks it: instead of growing the hand, Draw *swaps* — you shelve a Wu and
     take one back (see :func:`swap_from_hand`), so a stuck hand can still cycle.
     """
-    if has_acted(state, settings.actions_per_turn):
+    if has_acted(state, player_actions(state, settings)):
         return SPENT_MESSAGE
     if not state.player.deck:
         return "Your personal deck is empty."
@@ -288,7 +288,7 @@ def early_bird_options(state: XiaolinState, *, is_player: bool = True) -> list[C
 
 def early_bird_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | None:
     """Why the Early Bird cannot be flown right now, or ``None`` when it can."""
-    if has_acted(state, settings.actions_per_turn):
+    if has_acted(state, player_actions(state, settings)):
         return SPENT_MESSAGE
     if not state.card_deck:
         return "No Wu left on the pile."

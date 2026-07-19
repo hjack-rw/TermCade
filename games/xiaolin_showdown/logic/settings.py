@@ -46,7 +46,7 @@ class XiaolinSettings:
     # shuffle the pool and then truncate it, quietly leaving the newest Wu out of the run.
     # `test_settings_defaults_match_the_card_pool` fails when a printed Wu leaves them behind.
     max_deck_size: int = 45
-    point_limit: int = 24
+    point_limit: int = 25
     starting_points_player: int = 0
     starting_points_bot: int = 0
     # One temple turn, one action: deposit, spend a power, or draw. One budget, so a hand is a resource
@@ -260,3 +260,18 @@ def default_settings() -> Settings:
     # had one, and a settings file written for a pool of 20 Wu reads as current. It only ever gets
     # stamped by `refreshed_for_pool`, on a file that has actually been brought up to date.
     return defaults.to_settings(Settings(difficulty=Difficulty.EASY))
+
+
+# Boss-run rule: the player takes THREE temple actions to the boss's one. A boss's powers are offset
+# by asymmetries in the player's favour, never by raw duel stats (the magnitude-5 law). Measured at
+# 200 runs: with the boss loss drip it takes the boss tier 0.5% -> 5.0%, and leaks nothing to the
+# boss itself. Global, it wrecks the normal game (easy 81%) — hence boss runs only.
+BOSS_PLAYER_ACTIONS = 3
+
+
+def player_actions(state, settings: XiaolinSettings) -> int:
+    """The PLAYER's temple-action budget this run; the opponent always plays to the settings' own.
+
+    ``state`` is the live ``XiaolinState`` (untyped here — settings must stay importable by it).
+    """
+    return BOSS_PLAYER_ACTIONS if state.boss_run else settings.actions_per_turn

@@ -17,6 +17,12 @@ from .state import XiaolinState
 
 TRAIN_LENGTH = 10  # what a full bar takes; the temple tooltip reads progress/TRAIN_LENGTH
 STAT_CAP = 5  # no base stat may pass this — outstat the plain Wu and the pricing collapses
+LOSS_FILL = 1  # what a lost showdown teaches
+# Boss-run rule: a beating from a boss teaches DOUBLE. One of the two asymmetries that offset a
+# boss's powers without touching duel stats (measured: 0.5% -> 3.0% alone, 5.0% with the extra
+# actions — docs/design/BOSSES.md). Written as the same law for both sides; the boss sits at the
+# cap, so only the player can collect.
+BOSS_LOSS_FILL = 2
 
 
 def can_train(player: Player) -> bool:
@@ -68,13 +74,15 @@ def pick_stat(player: Player) -> str:
 
 
 def record_showdown(state: XiaolinState, *, player_won: bool) -> str | None:
-    """A finished showdown teaches its LOSER: their bar gains one. The winner was paid in Wu.
+    """A finished showdown teaches its LOSER: their bar gains one — two, when a boss is doing the
+    teaching. The winner was paid in Wu.
 
     The bot cashes a full bar on the spot (see :func:`pick_stat`) and the raised stat's name is
     returned, for the log. The player's payout waits instead — the temple offers them the choice.
     """
     loser = state.bot if player_won else state.player
-    if add_progress(loser) and loser is state.bot:
+    fill = BOSS_LOSS_FILL if state.boss_run else LOSS_FILL
+    if add_progress(loser, fill) and loser is state.bot:
         stat = pick_stat(loser)
         raise_stat(loser, stat)
         return stat

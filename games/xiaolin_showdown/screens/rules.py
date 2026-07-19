@@ -31,7 +31,8 @@ from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.typography import spaced_dashes
 from ..logic.mechanics.prize import PrizeRoute
-from ..logic.settings import XiaolinSettings
+from ..logic.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings
+from ..logic.training import BOSS_LOSS_FILL, STAT_CAP, TRAIN_LENGTH
 
 PRIMER = "How to Play"  # the first entry in the rail, and where a player with no question yet lands
 
@@ -40,7 +41,7 @@ PRIMER = "How to Play"  # the first entry in the rail, and where a player with n
 # reference below is an answer to a question this raises — and none of them has to be read first.
 HOW_TO_PLAY: list[str] = [
     "Collect Shen Gong Wu, bank them for points, and reach the target before your opponent does.",
-    "A turn at the temple allows for ONE action: bank a Wu for its points, spend a Wu for its power, or "
+    "A turn at the Temple allows for ONE action: bank a Wu for its points, spend a Wu for its power, or "
     "draw one into your hand. Banking a Wu forfeits its power; keeping the power forfeits the points. ",
     "Then call `Gong Yi Tanpai!`, a Showdown for the next Wu on the pile.",
     "Whoever is faster (Initiative) says what is contested.",
@@ -63,7 +64,7 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
     return {
         "At the Temple": [
             f"A turn buys you {settings.actions_per_turn} action: deposit a Wu for its "
-            "points, use its power, or draw one from your Deck.",
+            "points, use its power, draw one from your Deck, or train.",
             "Depositing a Wu forfeits its power. You are vaulting it, not spending it.",
             "Your hand never refills itself. Drawing it back up costs you the turn's action too.",
             "Drawing with a full hand SWAPS: shelve one Wu to your Deck and take another. "
@@ -75,6 +76,20 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "You are being put back in the fight, not paid for having lost it.",
             "Your opponent takes the same turn when you do.",
             f"Bank {settings.point_limit} points and the run is yours!",
+        ],
+        "Training": [
+            "Losing a Showdown fills your training bar by 1. You learn more from a beating than from a win.",
+            "Spending a Temple turn training fills it by 1 too, for the turn's one action.",
+            f"A full bar ({TRAIN_LENGTH}) raises a base stat of your CHOICE by 1.",
+            f"No stat is ever raised past {STAT_CAP}. A balanced duelist with every stat there, has nothing more to gain.",
+            "A cashed in progress bar shows full for the rest of the turn, then resets and climbs again.",
+            "Your opponent trains by the same rule.",
+        ],
+        "Facing a Boss": [
+            "A boss already sits at the top level on every stat. Their bar reads MASTER "
+            "they have nothing left to train, and you can't climb toward their level.",
+            f"A beating from a boss teaches DOUBLE: losing a Showdown fills your bar by {BOSS_LOSS_FILL}.",
+            f"Against a boss, a Temple turn buys you {BOSS_PLAYER_ACTIONS} actions to their one. You better prepare yourself!",
         ],
         "Initiative": [
             "Initiative is how fast you are, and the faster duelist names the Challenge.",

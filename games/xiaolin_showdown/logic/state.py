@@ -66,6 +66,14 @@ class XiaolinState:
     def opponent(self, is_player: bool) -> Player:
         return self.bot if is_player else self.player
 
+    @property
+    def boss_run(self) -> bool:
+        """Whether this run's opponent is a boss — the boss-run rules key off this.
+
+        Derived from the opponent, never stored: the roster the run was dealt from IS the fact.
+        """
+        return self.bot.character.tier == "boss"
+
     def actions_spent(self, is_player: bool) -> int:
         return self.actions_taken if is_player else self.bot_actions_taken
 

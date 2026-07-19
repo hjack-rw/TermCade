@@ -20,6 +20,7 @@ from ..logic.actions import (
 )
 from ..logic.mechanics.powers import Mechanic, mechanic_of
 from ..logic.models import Card
+from ..logic.settings import player_actions
 from ..logic.turn import EARLY_BIRD, POWER
 from .base import XiaolinMenu
 from .format import card_headline, card_label, power_headline, your_move
@@ -41,7 +42,7 @@ class UsePowerScreen(XiaolinMenu):
         # the same, so a second row is only noise — collapse by name, and `_spend` fires one copy.
         seen: set[str] = set()
         self._usable: list[Card] = []
-        for card in usable_powers(self.state, self.rules.actions_per_turn):
+        for card in usable_powers(self.state, player_actions(self.state, self.rules)):
             if card.name not in seen:
                 seen.add(card.name)
                 self._usable.append(card)

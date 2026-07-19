@@ -53,9 +53,11 @@ def wu(
     return Card(id, name, stats, Power(0, "", mechanic, "", bonus), element, type, points)
 
 
-def character(stats: dict[str, int] | None = None, *, name: str = "C") -> Character:
+def character(
+    stats: dict[str, int] | None = None, *, name: str = "C", tier: str | None = None
+) -> Character:
     """A blank duelist's character — no stats of its own, so the Wu decide."""
-    return Character(0, name, dict(stats or NO_STATS), wu().power, "xiaolin", True)
+    return Character(0, name, dict(stats or NO_STATS), wu().power, "xiaolin", True, tier=tier)
 
 
 def duelist(*, hand: list[Card] | None = None, deck: list[Card] | None = None, **char) -> Player:

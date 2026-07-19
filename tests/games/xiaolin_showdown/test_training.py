@@ -184,6 +184,34 @@ def test_the_turnover_resets_a_cashed_bar():
     assert state.player.training == 0 and not state.player.just_trained
 
 
+def test_a_loss_to_a_boss_teaches_double():
+    from xiaolin_showdown.logic.training import BOSS_LOSS_FILL
+
+    state = _state(duelist(stats={"force": 2}), duelist(tier="boss"))
+    record_showdown(state, player_won=False)
+    assert state.player.training == BOSS_LOSS_FILL
+
+
+def test_a_boss_run_gives_the_player_three_actions():
+    from xiaolin_showdown.logic.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings, player_actions
+
+    boss_run = _state(duelist(), duelist(tier="boss"))
+    plain_run = _state(duelist(), duelist())
+    assert player_actions(boss_run, XiaolinSettings()) == BOSS_PLAYER_ACTIONS
+    assert player_actions(plain_run, XiaolinSettings()) == XiaolinSettings().actions_per_turn
+
+
+def test_the_boss_itself_gets_no_extra_actions():
+    # The budget is the PLAYER's; the opponent loop reads the settings' own count.
+    from termcade.core.rng import Rng
+    from xiaolin_showdown.logic.settings import XiaolinSettings
+    from xiaolin_showdown.logic.turn import bot_turn
+
+    state = _state(duelist(), duelist(tier="boss", stats={"force": 5}, hand=[wu(1)], deck=[wu(1)]))
+    bot_turn(state, XiaolinSettings(actions_per_turn=1), rng=Rng(0))
+    assert state.bot_actions_taken <= 1
+
+
 def test_the_console_fill_command_readies_the_payout():
     from types import SimpleNamespace
 

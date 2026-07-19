@@ -24,7 +24,7 @@ from .mechanics.powers import (
     roll_gamble,
 )
 from .models import Card, Player
-from .settings import XiaolinSettings, plays_keen
+from .settings import XiaolinSettings, player_actions, plays_keen
 from .state import XiaolinState
 from .training import TRAIN_LENGTH, add_progress, can_train, pick_stat, raise_stat, turn_over
 
@@ -106,7 +106,7 @@ def _charge_the_turn(state: XiaolinState, settings: XiaolinSettings, *, is_playe
     income a Draw buys, so it costs the same thing: the turn it lands on opens already spent.
     """
     if is_player:
-        state.actions_taken = settings.actions_per_turn
+        state.actions_taken = player_actions(state, settings)  # the whole budget, boss run or not
     else:
         state.bot_actions_taken = settings.actions_per_turn
 

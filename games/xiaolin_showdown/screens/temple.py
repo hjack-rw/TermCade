@@ -37,6 +37,7 @@ from ..logic.actions import (
 )
 from ..logic.mechanics.scoring import initiative, initiative_sources
 from ..logic.models import Player
+from ..logic.settings import player_actions
 from ..logic.state import XiaolinState
 from ..logic.training import TRAIN_LENGTH, payout_ready, raise_stat, trainable_stats
 from ..logic.turn import DRAW, TRAIN
@@ -95,16 +96,17 @@ class TempleScreen(XiaolinScreen):
         # Keyed by the shown number, so the greying and the hover reason come from one source.
         # "4" opens on the Early Bird alone: it is a power, and a fast duelist has one to spend even
         # holding no Wu that acts.
+        budget = player_actions(state, rules)  # 3 to the boss's one in a boss run
         blocked: dict[str, str | None] = {
             "1": "The run is over." if state.has_ended else None,
             "2": draw_blocked(state, rules),
-            "3": deposit_blocked(state, rules.actions_per_turn),
+            "3": deposit_blocked(state, budget),
             "4": (
                 None
                 if can_early_bird(state, rules)
-                else use_power_blocked(state, rules.actions_per_turn)
+                else use_power_blocked(state, budget)
             ),
-            "5": train_blocked(state, rules.actions_per_turn),
+            "5": train_blocked(state, budget),
         }
         with BoxedPanel(title="ACTIONS"):
             yield TooltipStatic(_actions_grid(blocked), id="actions")
@@ -175,15 +177,15 @@ class TempleScreen(XiaolinScreen):
 
     def action_use_power(self) -> None:
         state, rules = self.state, self.rules
-        if usable_powers(state, rules.actions_per_turn) or can_early_bird(state, rules):
+        if usable_powers(state, player_actions(state, rules)) or can_early_bird(state, rules):
             self.app.push_screen(UsePowerScreen())
 
     def action_deposit(self) -> None:
-        if can_deposit(self.state, self.rules.actions_per_turn):
+        if can_deposit(self.state, player_actions(self.state, self.rules)):
             self.app.push_screen(DepositScreen())
 
     def action_train(self) -> None:
-        if train_blocked(self.state, self.rules.actions_per_turn) is not None:
+        if train_blocked(self.state, player_actions(self.state, self.rules)) is not None:
             return
         if payout_ready(self.state.player):
             self._pick_training_stat()  # the bar is already full: picking the stat is free
