@@ -47,6 +47,9 @@ class Side:
     # A ward Wu (Monkey Staff and kin) protects this side's Wu OF ITS ELEMENT from every negative
     # elemental bonus this showdown — the opposite arena's drag and metal's alike. Lift still lands.
     ward: str | None = None
+    # A stat-shield Wu (Mikado Arms and kin) fielded here: its caster takes no curse on these stats —
+    # a debuff landed on a shielded stat counts nothing. One entry per shield Wu fielded.
+    shielded: set[str] = field(default_factory=set)
 
     def mine(self) -> list[Card]:
         """Every Wu *this* duelist put on the table — what the board owes them a line for.
@@ -193,4 +196,5 @@ def end_stat(
         suffers_bonus=side.curses(),
         element_as=side.element_as,
         ward=side.ward,
+        shielded=stat in side.shielded,
     )

@@ -12,7 +12,7 @@ boss already sits at the cap on every stat — MASTER — while the player can s
 
 from __future__ import annotations
 
-from .models import Player
+from .models import Mechanic, Player
 from .state import XiaolinState
 
 TRAIN_LENGTH = 10  # what a full bar takes; the temple tooltip reads progress/TRAIN_LENGTH
@@ -23,6 +23,11 @@ LOSS_FILL = 1  # what a lost showdown teaches
 # actions — docs/design/BOSSES.md). Written as the same law for both sides; the boss sits at the
 # cap, so only the player can collect.
 BOSS_LOSS_FILL = 2
+
+
+def doubles_training(player: Player) -> bool:
+    """The Ring of Nine Xing, held: every point of training its holder gains counts double."""
+    return any(card.power.mechanic is Mechanic.DOUBLE_TRAINING for card in player.whole_hand)
 
 
 def can_train(player: Player) -> bool:
@@ -82,6 +87,8 @@ def record_showdown(state: XiaolinState, *, player_won: bool) -> str | None:
     """
     loser = state.bot if player_won else state.player
     fill = BOSS_LOSS_FILL if state.boss_run else LOSS_FILL
+    if doubles_training(loser):  # a Ring of Nine Xing still in hand after the showdown doubles the lesson
+        fill *= 2
     if add_progress(loser, fill) and loser is state.bot:
         stat = pick_stat(loser)
         raise_stat(loser, stat)

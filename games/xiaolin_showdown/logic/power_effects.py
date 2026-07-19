@@ -76,6 +76,10 @@ REPORTS: dict[Mechanic, PowerReport] = {
         "Euthymia called {name} back from the lost — it is yours.",
         "{name} came back from the lost into {caster_poss} possession.",
     ),
+    Mechanic.REFRESH: PowerReport(
+        "{name} is refreshed — back in your hand, ready to spend again.",
+        "{caster} called {name} back from the used pile into {caster_poss} hand.",
+    ),
     Mechanic.PROGNOSIS: PowerReport(
         "The Conch read them — next Showdown they lead with {answer}, but the ground is yours.",
         "{caster} let {victim} lead the next Showdown, but kept the challenger's ground.",
@@ -247,6 +251,22 @@ def _recover(spend: _Spend) -> _Fill | None:
     return {"name": revived.name}
 
 
+def _refresh(spend: _Spend) -> _Fill | None:
+    """Refresh: the Wu most recently used by *either* duelist, back into the caster's hand.
+
+    The used pile is shared and in order, so the newest spend comes back — yours or theirs, and if it
+    was theirs you take it. It returns *healed*: its wear resets to zero, a fresh Wu in the caster's
+    hand. Fizzles when nobody has used anything yet.
+    """
+    used = spend.state.used
+    if not used:
+        return None
+    revived = used.pop()
+    revived.uses = revived.uses_memory = 0  # healed — three showdowns' wear undone
+    spend.me.hand.append(revived)
+    return {"name": revived.name}
+
+
 def _swap_souls(spend: _Spend) -> _Fill | None:
     """Transfer: the two duelists' hands change owners entirely.
 
@@ -297,6 +317,7 @@ _FIRE: dict[Mechanic, Callable[[_Spend], _Fill | None]] = {
     Mechanic.FETCH: _pull,
     Mechanic.BOUNCE: _shove,
     Mechanic.LUCK: _recover,
+    Mechanic.REFRESH: _refresh,
     Mechanic.PROGNOSIS: _foresee,
     Mechanic.TRANSFER: _swap_souls,
 }

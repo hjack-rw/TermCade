@@ -251,6 +251,11 @@ EFFECTS = {
     Mechanic.NULLIFY_STATS: "In battle: their own stats count nothing.",
     Mechanic.NULLIFY_CURSE: "In battle: the curses laid on you count nothing.",
     Mechanic.NULLIFY_WU: "In battle: every Wu they played counts nothing.",
+    Mechanic.TREASURE: "Worth a bunch of points on deposit.",
+    Mechanic.REFRESH: "Bring the Wu you last used back into your hand.",
+    Mechanic.DOUBLE_TRAINING: "While held: the training you gain counts double.",
+    Mechanic.STAT_SHIELD: "In battle: no curse can debuff the stat it boosts.",
+    Mechanic.DOUBLE_ELEMENT: "Its own elemental advantage and disadvantage count double.",
 }
 
 
@@ -284,6 +289,7 @@ _TRIGGERS = {
     "hand": "While Held",
     "play": "On Play",
     "boost": "On Boost",
+    "deposit": "On Deposit",
 }
 
 

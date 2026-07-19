@@ -95,6 +95,15 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (49, 'Geophylaxia', 'ward', 'Transforms the user hands into one large drill, allowing him to travel underground and break even diamonds.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (50, 'Metempsychosis', 'transfer', 'Allows the user to control chi: for example astral project or swap two person''s souls entirly. If used on multiple people all have to be illuminated by its light.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (51, 'Telepatheia', 'prognosis', 'Allows the user to hear the thoughts of other people whom the shell is aimed at.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (52, 'Chronomorphosis', 'treasure', 'Caused people to change age acording to the user (older/younger) rapidly. Can be used also to reverts a target back to its original form, such as turning oil into dinosaurs.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (53, 'Spirit Sealing', 'treasure', 'Traps spiritual bodies, such as Sibini or Wuya. There were multiple occurrences of this Wu.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (54, 'Fool''s Gold', 'treasure', 'Could produce laser beams of different colors, that could change everyone and everything color. Making people very enamoured by the object.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (55, 'Palingenesis', 'refresh', 'Heals any injury. Also regenerates aging over time.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (56, 'Klonogenesis', 'double_training', 'Multiplies the user into as many as nine people, but it also divides up the user''s skills (and mental prower is a skill) among all the clones.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (57, 'Hypersthenia', 'stat_shield', 'Grants the user super strength.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (58, 'Proaisthesis', 'stat_shield', 'It warned its user of impending danger.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (59, 'Gnoseokinesis', 'stat_shield', 'In form of a crown, grants the user infinite, but random knowledge. It can also grant perspective and sentience to an unintelligent beast. To gain specific knowledge use it with the Wushu Brcelet.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (60, 'Thyellokinesis', 'double_element', 'Allows the user to generate or manipulate strong winds and tornados (leting its user to become a walking hurricane), but the sword itself cannot be used for physical attacks as it phases through enemies.', 0);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE card (id INTEGER, name TEXT, force INTEGER, agility INTEGER, intellect INTEGER, power_id INTEGER NOT NULL REFERENCES power (id), element TEXT, type TEXT, points INTEGER, PRIMARY KEY (id AUTOINCREMENT));
@@ -154,7 +163,16 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (52, 'Monkey Staff', 1, 2, 0, 48, 'wind', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (53, 'Tunnel Armadillo', 2, 1, 0, 49, 'earth', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (54, 'Sun Chi Lantern', 0, 0, 0, 50, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (55, 'Caleido-scope Glasses', 0, 2, 2, 22, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (55, 'Caleido-scope Glasses', 0, 2, 2, 22, 'metal', 'head', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (56, 'Sweet Baby Among Us', 1, 0, 0, 52, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (57, 'Mosaic Scale Puzzlebox', 0, 1, 0, 53, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (58, 'Prism of Genesis', 0, 0, 1, 54, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (59, 'Tong ku Reverso', 0, 0, 0, 55, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (60, 'Ring of Nine Xing', 2, 2, 1, 56, 'metal', 'amulet', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (61, 'Mikado Arms', 3, 0, 0, 57, 'metal', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (62, 'Ninja Tabi', 0, 3, 0, 58, 'metal', 'torso', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (63, 'Fountain of Hui', 0, 0, 3, 59, 'metal', 'head', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (64, 'Blade of the Nebula', 0, 2, 2, 60, 'wind', 'item', 3);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (

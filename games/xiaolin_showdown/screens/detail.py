@@ -23,6 +23,11 @@ from .format import (
 )
 
 
+# The rare Wu that ported in under a second name — shown as `aka "..."` in the detail. One entry does
+# not earn a DB column; keyed by card id.
+_ALIASES = {64: "Sword of the Storm"}  # Blade of the Nebula
+
+
 class DetailScreen(EngineScreen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
@@ -37,6 +42,8 @@ class DetailScreen(EngineScreen):
         yield Header()
         with BoxedPanel(title=display_name(target.name, upper=True)):
             if isinstance(target, Card):
+                if alias := _ALIASES.get(target.id):
+                    yield Static(Text(f'aka "{alias}"', style="dim italic"))
                 line = Text("Element: ")
                 line.append_text(element_text(target.element))
                 line.append(f"    Type: {target.type.capitalize()}    Points: {points_label(target)}")

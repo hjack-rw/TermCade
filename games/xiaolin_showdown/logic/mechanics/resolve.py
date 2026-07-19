@@ -149,6 +149,9 @@ def _apply_mechanic(
     if mechanic is Mechanic.WARD:  # Monkey Staff and kin — the caster's Wu of ITS element ignore drags
         caster.ward = card.element
         return False
+    if mechanic is Mechanic.STAT_SHIELD:  # Mikado Arms and kin — immune to curses on the stat it boosts
+        caster.shielded.add(max(card.stats, key=lambda s: card.stats[s] or 0))
+        return False
     if mechanic is Mechanic.BOOST:
         played.stats = {name: 0 for name in card.stats}
         return False

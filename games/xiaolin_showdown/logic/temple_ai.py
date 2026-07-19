@@ -90,6 +90,12 @@ def choose_temple_power(
         if mechanic is Mechanic.TRANSFER and _worth_swapping(state, is_player):
             return TemplePlay(card)
 
+        if mechanic is Mechanic.PROGNOSIS and _worth_foreseeing(state, is_player):
+            return TemplePlay(card)
+
+        if mechanic is Mechanic.REFRESH and _worth_refreshing(state):
+            return TemplePlay(card)
+
     return None
 
 
@@ -186,6 +192,26 @@ def _initiative_is_wrong(state: XiaolinState, is_player: bool = False) -> bool:
     if mine == theirs:
         return True  # a tie is a coin toss, and a coin toss is always worth buying out of
     return (mine > theirs) is not _wants_initiative(state, is_player)
+
+
+def _worth_foreseeing(state: XiaolinState, is_player: bool = False) -> bool:
+    """Prognosis: let the opponent lead the showdown, but keep the challenger's ground (win the level
+    battles). Worth spending only when this duelist would NOT hold that ground on its own — its
+    initiative does not already lead. Holding the lead, the Conch would trade it for a ground it has."""
+    player_bonus, bot_bonus = initiative(state.player, state.bot)
+    mine, theirs = (player_bonus, bot_bonus) if is_player else (bot_bonus, player_bonus)
+    return mine <= theirs
+
+
+# What the most-recently-used Wu must be worth before Refresh reclaims it. The Reverso is a Wu (worth
+# its points banked) and the turn's action, so what it calls back had better be a real weapon.
+REFRESH_MARGIN = 5
+
+
+def _worth_refreshing(state: XiaolinState) -> bool:
+    """Refresh: the Wu most recently used by either duelist, back to hand. Only when that Wu is worth
+    reclaiming — a scrap is a Wu and an action spent for nothing."""
+    return bool(state.used) and duel_value(state.used[-1]) >= REFRESH_MARGIN
 
 
 # --- the Glove of Jisaku: the best Wu on the shelf, not the top one ----------------

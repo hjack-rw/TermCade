@@ -292,6 +292,39 @@ RULES: dict[Mechanic, Rule] = {
         "Wards its own element for this battle: your Wu of that element ignore every negative "
         "background bonus — the lift still lands.",
     ),
+    Mechanic.TREASURE: Rule(
+        Mechanic.TREASURE,
+        "deposit",
+        Timing.AT_TEMPLE,
+        "Worth a bunch of points — deposit it for the windfall. It has no power to spend, and its "
+        "printed stats are all it brings to a showdown.",
+    ),
+    Mechanic.REFRESH: Rule(
+        Mechanic.REFRESH,
+        "use",
+        Timing.AT_TEMPLE,
+        "Spend it to bring the Wu you most recently used back into your hand, ready to spend again.",
+    ),
+    Mechanic.DOUBLE_TRAINING: Rule(
+        Mechanic.DOUBLE_TRAINING,
+        "hand",
+        Timing.IN_HAND,
+        "While it is in your hand, every point of training you gain counts double — a lost showdown "
+        "teaches twice, if it is still in your hand once the showdown ends.",
+    ),
+    Mechanic.STAT_SHIELD: Rule(
+        Mechanic.STAT_SHIELD,
+        "play",
+        Timing.IN_DUEL,
+        "Field it for its printed stats, and take no curse on the stat it boosts this battle — a "
+        "debuff landed on that stat counts nothing.",
+    ),
+    Mechanic.DOUBLE_ELEMENT: Rule(
+        Mechanic.DOUBLE_ELEMENT,
+        "play",
+        Timing.IN_DUEL,
+        "Its own elemental bonus counts double — twice the lift in tune, twice the drag against it.",
+    ),
 }
 
 

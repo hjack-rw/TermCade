@@ -15,7 +15,7 @@ from .mechanics.powers import Mechanic, mechanic_of, trigger_of
 from .models import Card
 from .settings import XiaolinSettings, player_actions
 from .state import XiaolinState
-from .training import add_progress, can_train, payout_ready
+from .training import add_progress, can_train, doubles_training, payout_ready
 from .turn import bank_value, duel_value, max_hand_size, shelve
 from .power_effects import FIZZLE_MESSAGE, PowerReport, _Spend, _fire
 
@@ -145,9 +145,11 @@ def train_blocked(state: XiaolinState, actions_per_turn: int) -> str | None:
 
 
 def train(state: XiaolinState) -> bool:
-    """Spend the turn's action on the bar. Returns whether the payout is now waiting."""
+    """Spend the turn's action on the bar. Returns whether the payout is now waiting.
+
+    A Ring of Nine Xing in hand doubles the point earned, as it doubles a lost showdown's."""
     state.actions_taken += 1
-    return add_progress(state.player)
+    return add_progress(state.player, 2 if doubles_training(state.player) else 1)
 
 
 def usable_powers(state: XiaolinState, actions_per_turn: int, *, is_player: bool = True) -> list[Card]:
@@ -184,6 +186,8 @@ def _has_target(state: XiaolinState, card: Card, is_player: bool = True) -> bool
         return len(them.hand) > 1
     if mechanic is Mechanic.LUCK:
         return bool(state.lost)  # nothing has been lost yet — there is nobody to call back
+    if mechanic is Mechanic.REFRESH:
+        return bool(state.used)  # nobody has used anything yet — there is nothing to call back
     if mechanic is Mechanic.TRANSFER:
         return bool(them.hand)  # a one-way gift is not a swap
     return True
@@ -329,5 +333,6 @@ def use_power(
         paid = bank_value(card, rng) if rng is not None else card.points
         spend.me.points = max(0, spend.me.points + paid)
         return message
-    spend.me.remove_card(card)  # discarded, no points
+    spend.me.remove_card(card)  # spent, no points
+    state.used.append(card)  # into the shared used pile for a Refresh Wu to call back
     return message

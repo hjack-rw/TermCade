@@ -3,7 +3,8 @@
 from collections.abc import Callable, Iterable, Mapping, Sequence
 
 from ..constants import OPPOSITES
-from ..models import Card, Player
+from ..models import Card, Mechanic, Player
+from .cards import is_one_of
 
 
 def initiative(player: Player, bot: Player) -> tuple[int, int]:
@@ -76,6 +77,7 @@ def count_end_stats(
     suffers_bonus: Sequence[Card] = (),
     element_as: str | None = None,
     ward: str | None = None,
+    shielded: bool = False,
 ) -> int:
     """A duelist's end value for one stat: base + queued card stats + elemental bonus.
 
@@ -96,6 +98,9 @@ def count_end_stats(
     stat_values: list[int] = []
     for card in target_queue:
         value = card.stats[stat]
+        # A stat shield (Mikado Arms and kin): a curse's debuff on the shielded stat counts nothing.
+        if shielded and value and value < 0 and is_one_of(card, suffers_bonus):
+            value = 0
         if absolute:
             stat_values.append(value or 0)
         else:
@@ -110,6 +115,8 @@ def count_end_stats(
             score = element_score(element_as or card.element, background)
             if ward and (element_as or card.element) == ward and score < 0:
                 score = 0
+            if card.power.mechanic is Mechanic.DOUBLE_ELEMENT:  # Blade of the Nebula — its bonus counts double
+                score *= 2
             element_total += score
         element_total -= sum(element_score(card.element, background) for card in suffers_bonus)
     return character_stats[stat] + sum(stat_values) + elemental_bonus * element_total

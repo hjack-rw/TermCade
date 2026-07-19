@@ -62,6 +62,10 @@ class XiaolinState:
     # not destroyed: out of play, and one day recoverable (the Rooster Booster reaches for the oldest).
     # Shared — a Wu dies to a showdown, not to a duelist.
     lost: list[Card] = field(default_factory=list)
+    # Wu spent on their own power and discarded (deposited Wu are banked and gone, and never reach it).
+    # Shared and in the order they were used — a Refresh Wu calls the most recent back, whoever spent
+    # it, into the caster's hand.
+    used: list[Card] = field(default_factory=list)
 
     schema_version: int = 1
 
@@ -106,6 +110,7 @@ class XiaolinState:
             "locked_challenge": self.locked_challenge,
             "conch_tiebreak": self.conch_tiebreak,
             "lost": [card.id for card in self.lost],
+            "used": [card.id for card in self.used],
         }
 
     @classmethod
@@ -130,6 +135,7 @@ class XiaolinState:
             locked_challenge=data.get("locked_challenge"),
             conch_tiebreak=data.get("conch_tiebreak"),
             lost=[_fresh_card(catalog, cid) for cid in data.get("lost", [])],
+            used=[_fresh_card(catalog, cid) for cid in data.get("used", [])],
         )
 
 

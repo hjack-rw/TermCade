@@ -53,6 +53,11 @@ class Mechanic(StrEnum):
     WITCHCRAFT = "witchcraft"  # Wuya's character power — spent Wu return worn; the lost answer her
     BEAST_FORM = "beast_form"  # Chase Young's — +3 on the contested stat, but his Wu score nothing
     PROGNOSIS = "prognosis"  # new Mind Reader Conch — let them lead, but read and pin their challenge
+    TREASURE = "treasure"  # a Wu with no power to spend — its worth is a fat deposit value
+    REFRESH = "refresh"  # spend it to call one already-used Wu back to your hand
+    DOUBLE_TRAINING = "double_training"  # held: every point of training its holder gains counts double
+    STAT_SHIELD = "stat_shield"  # fielded: its caster is immune to curses on the stat it boosts
+    DOUBLE_ELEMENT = "double_element"  # this Wu's own elemental bonus, resonance and drag alike, counts double
 
 
 @dataclass

@@ -143,6 +143,9 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     # (temple_ai has no policy for it) — this price only keeps it from banking the strongest
     # tempo card in the pool as junk.
     Mechanic.TRANSFER: 5,
+    # Refresh prints 0/0/0 — its worth is the second use it buys back, not stats. Priced as a modest
+    # utility so the bot holds it rather than banking it as junk; the bot has no policy to spend it yet.
+    Mechanic.REFRESH: 3,
 }
 
 # (Witchcraft is a CHARACTER power — no card carries it, so its table price is moot; it sits in
@@ -169,6 +172,7 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         Mechanic.INNATE,  # the stats *are* the Wu
         Mechanic.INITIATIVE,  # its bonus is a hand power; in a battle it is only its stats
         Mechanic.HAND_SIZE,  # likewise — it buys a hand slot, not a blow
+        Mechanic.DOUBLE_TRAINING,  # a hand power (doubles training); in a battle it is only its stats
         Mechanic.HAND_FIZZLE,  # unprinted (see `powers.UNPRINTED`)
         Mechanic.DRAW,  # a temple power; on the table it is just its printed stats
         Mechanic.READ_DECK,  # likewise
@@ -200,6 +204,15 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         Mechanic.SET_ELEMENT,
         Mechanic.WARD,
         Mechanic.SET_ARENA,
+        # Prints real stats; its shield (no curse on the stat it boosts) is contextual, read by the
+        # bot's play-it-out eval, not priced here.
+        Mechanic.STAT_SHIELD,
+        # Prints real stats; its doubled elemental bonus is contextual (great in tune, awful against),
+        # read by the bot's play-it-out eval, not priced here.
+        Mechanic.DOUBLE_ELEMENT,
+        # Its printed stats are its whole table value — the fat deposit is the points column, which the
+        # bot reads straight off when it decides what to bank.
+        Mechanic.TREASURE,
     }
 )
 
