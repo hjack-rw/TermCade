@@ -54,37 +54,41 @@ class PowerReport:
 # flip by who cast it (see `_voice`): {caster} You/They, {caster_poss} your/their, {victim}/{victim_poss}
 # the other duelist. The rest (`{name}`, `{cards}`, `{answer}`, `{paid}`) come from the handler.
 REPORTS: dict[Mechanic, PowerReport] = {
-    Mechanic.CHRONOKINESIS: PowerReport(
+    Mechanic.DRAW: PowerReport(
         "Chronokinesis stopped time — you drew {name}!",
         "{caster} drew {name}.",
     ),
     # Diaskopia and Teleskopia reveal to the CASTER, and the opponent never spends them (they are always
     # banked — see temple_ai), so their log only ever reads player-cast. Left first-person.
-    Mechanic.DIASKOPIA: PowerReport(
+    Mechanic.READ_DECK: PowerReport(
         "Diaskopia saw through the wall — their Deck holds: {cards}",
         "Their Deck holds: {cards}",
     ),
-    Mechanic.TELESKOPIA: PowerReport(
+    Mechanic.SCRY: PowerReport(
         "Teleskopia saw down the line — next will come: {cards}",
         "Next will come: {cards}",
     ),
-    Mechanic.TELEPATHEIA: PowerReport(
-        "Telepatheia listened in — you {answer} Initiative in the next Showdown.",
+    Mechanic.ENHANCED_VISION: PowerReport(
+        "Oxyderkia saw them coming — you {answer} Initiative in the next Showdown.",
         "{caster} {answer} Initiative in the next Showdown.",
     ),
-    Mechanic.ATTRACTION: PowerReport(
+    Mechanic.FETCH: PowerReport(
         "Attraction pulled {name} out of your Deck and into your Hand.",
         "{name} came out of {caster_poss} Deck and into {caster_poss} Hand.",
     ),
-    Mechanic.REPULSION: PowerReport(
+    Mechanic.BOUNCE: PowerReport(
         "Repulsion shoved {name} out of their Hand — they deposited it for {paid} points.",
         "{name} was deposited out of {victim_poss} Hand for {paid} points.",
     ),
-    Mechanic.EUTHYMIA: PowerReport(
+    Mechanic.LUCK: PowerReport(
         "Euthymia called {name} back from the lost — it is yours.",
         "{name} came back from the lost into {caster_poss} possession.",
     ),
-    Mechanic.METEMPSYCHOSIS: PowerReport(
+    Mechanic.PROGNOSIS: PowerReport(
+        "The Conch read them — next Showdown they lead with {answer}, but the ground is yours.",
+        "{caster} let {victim} lead the next Showdown, but kept the challenger's ground.",
+    ),
+    Mechanic.TRANSFER: PowerReport(
         "The Lantern shone on you both — every Wu in your hand is theirs, and theirs are yours.",
         "{caster} swapped the two hands entirely: {count} Wu crossed to {caster_poss} side.",
     ),
@@ -266,18 +270,18 @@ def _has_target(state: XiaolinState, card: Card, is_player: bool = True) -> bool
     """
     me, them = state.duelist(is_player), state.opponent(is_player)
     mechanic = mechanic_of(card.power)
-    if mechanic is Mechanic.DIASKOPIA:
+    if mechanic is Mechanic.READ_DECK:
         return bool(them.deck)
-    if mechanic is Mechanic.TELESKOPIA:
+    if mechanic is Mechanic.SCRY:
         return bool(state.card_deck)
-    if mechanic is Mechanic.ATTRACTION:
+    if mechanic is Mechanic.FETCH:
         return bool(me.deck)
-    if mechanic is Mechanic.REPULSION:
+    if mechanic is Mechanic.BOUNCE:
         # The opponent is held to the rule that binds you: a deposit may never empty a hand.
         return len(them.hand) > 1
-    if mechanic is Mechanic.EUTHYMIA:
+    if mechanic is Mechanic.LUCK:
         return bool(state.lost)  # nothing has been lost yet — there is nobody to call back
-    if mechanic is Mechanic.METEMPSYCHOSIS:
+    if mechanic is Mechanic.TRANSFER:
         return bool(them.hand)  # a one-way gift is not a swap
     return True
 
@@ -395,12 +399,12 @@ def use_power(
     (a toast line and a shorter log line).
 
     Distinct from :func:`deposit`, which banks the Wu for its points. Seven powers do something —
-    Chronokinesis draws, Diaskopia and Teleskopia reveal, Telepatheia buys the next showdown's
+    Chronokinesis draws, Diaskopia and Teleskopia reveal, Oxyderkia buys the next showdown's
     initiative, Attraction pulls a Wu to you, Repulsion shoves one out of your opponent's hand, and
     Euthymia calls one back from the lost; the gag Wu fizzles.
 
     ``is_player`` is which duelist fired it — the bot spends a Wu by exactly these rules. The rest
-    are the answers a power needs and the logic layer cannot ask for: ``priority`` is Telepatheia's
+    are the answers a power needs and the logic layer cannot ask for: ``priority`` is Oxyderkia's
     (take the next showdown's initiative, or refuse it), ``target`` is the Wu Attraction pulls or the
     one Repulsion shoves, ``to_deck`` is Repulsion's destination (shelve it into their deck for no
     points, instead of banking it for points), and ``rng`` is Repulsion's, because a Wu shoved into the
@@ -487,15 +491,37 @@ def _scan_pile(spend: _Spend) -> _Fill | None:
 
 
 def _listen(spend: _Spend) -> _Fill | None:
-    """Telepatheia: the next showdown's initiative, bought with an answer.
+    """Oxyderkia: the next showdown's initiative, bought with an answer.
 
     ``priority`` is the *caster's* answer — do I want it? ``forced_priority`` is the duel's, and the
     duel asks a different question: does the **player** hold it? For the bot, the two are opposites.
     """
     if spend.priority is None:
-        raise ValueError("Telepatheia was spent without an answer — ask before you fire it")
+        raise ValueError("Oxyderkia was spent without an answer — ask before you fire it")
     spend.state.forced_priority = spend.priority if spend.is_player else not spend.priority
     return {"answer": TAKEN if spend.priority else REFUSED}
+
+
+def _foresee(spend: _Spend) -> _Fill | None:
+    """Prognosis (the new Mind Reader Conch): let the opponent lead, but read their every move.
+
+    The opponent takes priority next showdown — they name the challenge — but the caster keeps the
+    challenger's ground (wins the level battles). When the opponent is the bot, its challenge is
+    PINNED now (from its current stats and hand) and revealed to the caster; a human opponent still
+    names theirs live, so nothing is pinned there and only the ground changes hands.
+    """
+    from . import bot  # local: bot imports this module
+
+    spend.state.forced_priority = not spend.is_player  # the opponent leads
+    spend.state.conch_tiebreak = spend.is_player  # the caster keeps the ground despite not leading
+    if spend.is_player:  # the opponent is the bot — its call is deterministic, so pin and reveal it
+        stats = list(spend.them.character.stats)
+        spend.state.locked_challenge = bot.choose_challenge(
+            spend.them.character.stats, stats, spend.them.whole_hand,
+            spend.me.character.stats, spend.rng or Rng(0),  # a tie-break stream; the caster supplies it
+        )
+        return {"answer": spend.state.locked_challenge.upper()}
+    return {"answer": "their lead"}
 
 
 def _pull(spend: _Spend) -> _Fill | None:
@@ -513,7 +539,7 @@ def _pull(spend: _Spend) -> _Fill | None:
 
 
 def _recover(spend: _Spend) -> _Fill | None:
-    """Euthymia: the oldest Wu in the lost pile, back into the hand of whoever spent the Rooster.
+    """Luck: the oldest Wu in the lost pile, back into the hand of whoever spent the Rooster.
 
     The **oldest**, and that is the whole of the rule. Letting its caster read the pile and pick would
     make it a tutor for the best Wu anyone ever failed to win; letting it roll would make it the second
@@ -530,7 +556,7 @@ def _recover(spend: _Spend) -> _Fill | None:
 
 
 def _swap_souls(spend: _Spend) -> _Fill | None:
-    """Metempsychosis: the two duelists' hands change owners entirely.
+    """Transfer: the two duelists' hands change owners entirely.
 
     The plain hands only — an inalienable wudai is soul-bound and stays. The Lantern itself sits
     out the swap: it is mid-spend, and must be in its caster's hand when the spend removes it.
@@ -572,14 +598,15 @@ def _shove(spend: _Spend) -> _Fill | None:
 # What each `use` power does. A mechanic that is absent, or whose handler finds nothing to act on,
 # fizzles — the gag Wu by design, and the rest when the pile or a hand has run dry.
 _FIRE: dict[Mechanic, Callable[[_Spend], _Fill | None]] = {
-    Mechanic.CHRONOKINESIS: _draw,
-    Mechanic.DIASKOPIA: _read_deck,
-    Mechanic.TELESKOPIA: _scan_pile,
-    Mechanic.TELEPATHEIA: _listen,
-    Mechanic.ATTRACTION: _pull,
-    Mechanic.REPULSION: _shove,
-    Mechanic.EUTHYMIA: _recover,
-    Mechanic.METEMPSYCHOSIS: _swap_souls,
+    Mechanic.DRAW: _draw,
+    Mechanic.READ_DECK: _read_deck,
+    Mechanic.SCRY: _scan_pile,
+    Mechanic.ENHANCED_VISION: _listen,
+    Mechanic.FETCH: _pull,
+    Mechanic.BOUNCE: _shove,
+    Mechanic.LUCK: _recover,
+    Mechanic.PROGNOSIS: _foresee,
+    Mechanic.TRANSFER: _swap_souls,
 }
 
 
@@ -597,7 +624,7 @@ def _fire(spend: _Spend) -> PowerReport:
     if fills is None:
         return FIZZLE_MESSAGE
     # Repulsion is the one power with two outcomes — the deck version has its own wording.
-    template = REPULSION_TO_DECK if mechanic is Mechanic.REPULSION and spend.to_deck else REPORTS[mechanic]
+    template = REPULSION_TO_DECK if mechanic is Mechanic.BOUNCE and spend.to_deck else REPORTS[mechanic]
     return _report(template, is_player=spend.is_player, **fills)
 
 

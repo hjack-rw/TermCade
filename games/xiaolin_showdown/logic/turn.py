@@ -134,15 +134,15 @@ def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettin
 _MECHANIC_VALUE: dict[Mechanic, int] = {
     # Priced off the Morph rule itself, so retuning the rule re-prices the bot.
     Mechanic.MORPH: MORPH_ASIDE * 2 + MORPH_CONTESTED,
-    Mechanic.HYDROKINESIS: NAMED_STAT_VALUE,
+    Mechanic.BUFF: NAMED_STAT_VALUE,
     Mechanic.MISFORTUNE: NAMED_STAT_VALUE,
-    Mechanic.CONTAINMENT: 5,
-    Mechanic.SUBJUGATION: 5,
-    Mechanic.REVERSAL: 4,
+    Mechanic.NULLIFY_STATS: 5,
+    Mechanic.NULLIFY_WU: 5,
+    Mechanic.NULLIFY_CURSE: 4,
     # A whole-hand swap swings at least as hard as a negation. The bot does not SPEND it yet
     # (temple_ai has no policy for it) — this price only keeps it from banking the strongest
     # tempo card in the pool as junk.
-    Mechanic.METEMPSYCHOSIS: 5,
+    Mechanic.TRANSFER: 5,
 }
 
 # (Witchcraft is a CHARACTER power — no card carries it, so its table price is moot; it sits in
@@ -170,13 +170,14 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         Mechanic.INITIATIVE,  # its bonus is a hand power; in a battle it is only its stats
         Mechanic.HAND_SIZE,  # likewise — it buys a hand slot, not a blow
         Mechanic.HAND_FIZZLE,  # unprinted (see `powers.UNPRINTED`)
-        Mechanic.CHRONOKINESIS,  # a temple power; on the table it is just its printed stats
-        Mechanic.DIASKOPIA,  # likewise
-        Mechanic.TELESKOPIA,  # likewise
-        Mechanic.TELEPATHEIA,  # likewise
-        Mechanic.ATTRACTION,  # likewise
-        Mechanic.REPULSION,  # likewise
-        Mechanic.EUTHYMIA,  # likewise — it acts on the lost pile, never in a battle
+        Mechanic.DRAW,  # a temple power; on the table it is just its printed stats
+        Mechanic.READ_DECK,  # likewise
+        Mechanic.SCRY,  # likewise
+        Mechanic.ENHANCED_VISION,  # likewise
+        Mechanic.FETCH,  # likewise
+        Mechanic.BOUNCE,  # likewise
+        Mechanic.LUCK,  # likewise — it acts on the lost pile, never in a battle
+        Mechanic.PROGNOSIS,  # likewise — a temple power, on the table just its printed stats
         Mechanic.WITCHCRAFT,  # a character power (Wuya's) — no card ever prints it
         Mechanic.BEAST_FORM,  # a character power (Chase's) — likewise
         # The dragon and the booster carry no stats but decide duels — they are priced by
@@ -187,18 +188,18 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         # prize's elemental route with it. That is plainly worth more than the stats it prints — and it
         # is *meant* to be: the veto is the card, and the author has priced it as such (4 points, the
         # top of the pool). It is not underpriced here by oversight. Do not "fix" it.
-        Mechanic.INTANGIBLE,
+        Mechanic.NULLIFY_ELEMENT,
         # The Celestial Dial reverses the elemental bonus all showdown — worth more than its printed
         # 1/1/1, but priced by them here: the reversal is contextual (great against an in-tune opponent,
         # nothing against a metal one) and the bot reads that from its play-it-out eval, not from here.
-        Mechanic.DISSONANCE,
+        Mechanic.REVERSE_ELEMENT,
         # The four boss counters print real stats; their showdown effect (negate a boost, recolour a
         # side or the arena) is contextual and read by the bot's play-it-out eval, not priced here.
-        Mechanic.DAMPENING,
-        Mechanic.TRANSMUTATION,
-        Mechanic.CHROMASIS,
+        Mechanic.NULLIFY_BOOST,
+        Mechanic.CLEANSE,
+        Mechanic.SET_ELEMENT,
         Mechanic.WARD,
-        Mechanic.STORMFRONT,
+        Mechanic.SET_ARENA,
     }
 )
 

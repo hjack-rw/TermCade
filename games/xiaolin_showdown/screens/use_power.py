@@ -86,9 +86,9 @@ class UsePowerScreen(XiaolinMenu):
     @work
     async def _spend(self, card: Card) -> None:
         mechanic = mechanic_of(card.power)
-        priority = await self._ask_priority() if mechanic is Mechanic.TELEPATHEIA else None
+        priority = await self._ask_priority() if mechanic is Mechanic.ENHANCED_VISION else None
         target = await self._ask_target(mechanic)
-        to_deck = await self._ask_destination(target) if mechanic is Mechanic.REPULSION else False
+        to_deck = await self._ask_destination(target) if mechanic is Mechanic.BOUNCE else False
 
         report = use_power(
             self.state, card, priority=priority, target=target, to_deck=to_deck, rng=self.ctx.rng
@@ -104,13 +104,13 @@ class UsePowerScreen(XiaolinMenu):
     async def _ask_target(self, mechanic: Mechanic) -> Card | None:
         """The Wu a power is aimed at. Both lists are ones the player may read: their own deck, and
         the opponent's hand (already face up on the temple board)."""
-        if mechanic is Mechanic.ATTRACTION:
+        if mechanic is Mechanic.FETCH:
             return await self.choose(
                 "Pull which Wu from your deck?",
                 [(card_label(wu), wu) for wu in self.state.player.deck],
                 title="GLOVE OF JISAKU",
             )
-        if mechanic is Mechanic.REPULSION:
+        if mechanic is Mechanic.BOUNCE:
             return await self.choose(
                 "Shove which Wu out of their hand?",
                 [(card_label(wu), wu) for wu in self.state.bot.hand],

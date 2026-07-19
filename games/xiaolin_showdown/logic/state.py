@@ -51,6 +51,13 @@ class XiaolinState:
     # showdown and retreats has not had their answer yet, and the Conch is already gone from their
     # hand. Burning it there would sell them a Wu for nothing.
     forced_priority: bool | None = None
+    # The new Mind Reader Conch (Prognosis): you let the opponent lead, but you read their every move.
+    # ``locked_challenge`` is the stat they are pinned to next showdown (chosen the moment the Conch is
+    # spent, revealed to you, unchanged even as their hand shifts); ``conch_tiebreak`` is who holds the
+    # challenger's ground despite NOT leading — the caster. Both spent by the duel end phase, like
+    # ``forced_priority``. ``None`` is the ordinary game.
+    locked_challenge: str | None = None
+    conch_tiebreak: bool | None = None
     # Wu that surfaced, were fought over, and that nobody won hard enough to keep. They are **lost**,
     # not destroyed: out of play, and one day recoverable (the Rooster Booster reaches for the oldest).
     # Shared — a Wu dies to a showdown, not to a duelist.
@@ -96,6 +103,8 @@ class XiaolinState:
             "bot_actions_taken": self.bot_actions_taken,
             "bot_turn_done": self.bot_turn_done,
             "forced_priority": self.forced_priority,
+            "locked_challenge": self.locked_challenge,
+            "conch_tiebreak": self.conch_tiebreak,
             "lost": [card.id for card in self.lost],
         }
 
@@ -118,6 +127,8 @@ class XiaolinState:
             bot_actions_taken=data.get("bot_actions_taken", 0),
             bot_turn_done=data.get("bot_turn_done", False),
             forced_priority=data.get("forced_priority"),  # absent in a save from before the Conch
+            locked_challenge=data.get("locked_challenge"),
+            conch_tiebreak=data.get("conch_tiebreak"),
             lost=[_fresh_card(catalog, cid) for cid in data.get("lost", [])],
         )
 

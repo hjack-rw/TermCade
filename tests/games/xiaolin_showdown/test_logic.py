@@ -215,7 +215,7 @@ def test_count_end_stats_does_not_inspect_powers():
     played card enters as a stand-in wearing a neutral power. The scan was dead, and the test that
     covered it built a queue by hand.
     """
-    tail = _card(0, 0, 0, "water", mechanic=Mechanic.INTANGIBLE)
+    tail = _card(0, 0, 0, "water", mechanic=Mechanic.NULLIFY_ELEMENT)
     assert count_end_stats("force", 2, [tail], _NO_STATS, "water") == 2
 
 

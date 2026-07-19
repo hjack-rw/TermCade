@@ -213,7 +213,7 @@ def test_a_bot_passes_when_nothing_in_hand_is_worth_points():
 
 def test_bot_turn_swaps_a_deposit_power_wu_for_a_fresh_draw():
     bot = _player(2)
-    power_wu = _card(mechanic=Mechanic.CHRONOKINESIS, points=9)
+    power_wu = _card(mechanic=Mechanic.DRAW, points=9)
     bot.hand.append(power_wu)
     state = _state(_player(3), bot, main=5)
 

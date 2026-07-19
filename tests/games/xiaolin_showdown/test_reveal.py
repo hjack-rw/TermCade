@@ -19,7 +19,7 @@ from xiaolin_showdown.logic.settings import XiaolinSettings
 
 FALCONS_EYE = 25
 EAGLE_SCOPE = 26
-MIND_READER_CONCH = 27
+CALEIDO_GLASSES = 55  # Caleido-scope Glasses now carries Oxyderkia (enhanced vision)
 GLOVE_OF_JISAKU = 30
 RUBY_OF_RAMSES = 31
 
@@ -111,54 +111,54 @@ def _priority_of(state) -> bool | None:
 
 def test_the_conch_shows_the_one_wu_that_comes_next(state, held):
     """It hears one thought, not three — the Scope is the Wu that reaches further."""
-    conch = held(MIND_READER_CONCH)
+    glasses = held(CALEIDO_GLASSES)
     next_up = state.card_deck[0]
 
     assert [wu.id for wu in coming_wu(state)] == [next_up.id]
 
-    use_power(state, conch, priority=True)
+    use_power(state, glasses, priority=True)
 
 
 def test_taking_initiative_beats_a_losing_sum(state, held):
     """The point of the Wu: the hands say you lose the read, and you take it anyway."""
-    conch = held(MIND_READER_CONCH)
+    glasses = held(CALEIDO_GLASSES)
     # Both hands set outright: initiative is read off them, so a Wu the seed happened to deal could
     # otherwise tie the sums and hand priority to a coin toss instead of to the bot.
-    state.player.hand = [conch]
+    state.player.hand = [glasses]
     state.bot.hand = [state.catalog.card(9)]  # Longhorn Taurus, +1 — the bot out-reads the player
 
     assert _priority_of(state) is False  # without the Conch, theirs
 
-    use_power(state, conch, priority=True)
+    use_power(state, glasses, priority=True)
 
     assert _priority_of(state) is True
 
 
 def test_refusing_initiative_gives_it_away(state, held):
     """It cuts both ways, and that is the choice: sometimes you want them to commit first."""
-    conch = held(MIND_READER_CONCH)
+    glasses = held(CALEIDO_GLASSES)
 
-    use_power(state, conch, priority=False)
+    use_power(state, glasses, priority=False)
 
     assert _priority_of(state) is False
 
 
 def test_the_conch_overrules_a_tie_without_a_coin(state, held):
     """A tie is settled by a coin toss. An answered Conch means there is nothing left to toss for."""
-    conch = held(MIND_READER_CONCH)
+    glasses = held(CALEIDO_GLASSES)
     state.player.hand, state.bot.hand = [], []  # nobody holds an initiative Wu: 0 against 0
 
-    use_power(state, conch, priority=True)
+    use_power(state, glasses, priority=True)
 
     assert _priority_of(state) is True
 
 
 def test_the_conch_cannot_be_spent_without_an_answer(state, held):
     """A Wu that quietly does nothing is the bug this game keeps a whole test file about."""
-    conch = held(MIND_READER_CONCH)
+    glasses = held(CALEIDO_GLASSES)
 
     with pytest.raises(ValueError, match="without an answer"):
-        use_power(state, conch)
+        use_power(state, glasses)
 
 
 def test_a_look_is_paid_for_with_the_wu(state, held):

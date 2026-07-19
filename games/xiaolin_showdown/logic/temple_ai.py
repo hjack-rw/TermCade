@@ -68,26 +68,26 @@ def choose_temple_power(
     for card in state.duelist(is_player).whole_hand:
         mechanic = mechanic_of(card.power)
 
-        if mechanic is Mechanic.REPULSION and _worth_shoving(state, is_player):
+        if mechanic is Mechanic.BOUNCE and _worth_shoving(state, is_player):
             return TemplePlay(
                 card,
                 target=_their_best(state, is_player),
                 to_deck=_shove_to_deck(state, settings, is_player),
             )
 
-        if mechanic is Mechanic.TELEPATHEIA and _initiative_is_wrong(state, is_player):
+        if mechanic is Mechanic.ENHANCED_VISION and _initiative_is_wrong(state, is_player):
             return TemplePlay(card, priority=_wants_initiative(state, is_player))
 
-        if mechanic is Mechanic.ATTRACTION and _worth_reaching_for(state, is_player):
+        if mechanic is Mechanic.FETCH and _worth_reaching_for(state, is_player):
             return TemplePlay(card, target=_best_on_the_shelf(state, is_player))
 
-        if mechanic is Mechanic.CHRONOKINESIS and _worth_drawing(state, settings, is_player):
+        if mechanic is Mechanic.DRAW and _worth_drawing(state, settings, is_player):
             return TemplePlay(card)
 
-        if mechanic is Mechanic.EUTHYMIA and _worth_reviving(state):
+        if mechanic is Mechanic.LUCK and _worth_reviving(state):
             return TemplePlay(card)
 
-        if mechanic is Mechanic.METEMPSYCHOSIS and _worth_swapping(state, is_player):
+        if mechanic is Mechanic.TRANSFER and _worth_swapping(state, is_player):
             return TemplePlay(card)
 
     return None
@@ -110,7 +110,7 @@ def _worth_swapping(state: XiaolinState, is_player: bool = False) -> bool:
     mine = sum(
         duel_value(card)
         for card in me.hand
-        if mechanic_of(card.power) is not Mechanic.METEMPSYCHOSIS
+        if mechanic_of(card.power) is not Mechanic.TRANSFER
     )
     theirs = sum(duel_value(card) for card in them.hand)
     return theirs - mine >= SWAP_MARGIN
@@ -284,7 +284,7 @@ def _worth_drawing(state: XiaolinState, settings: XiaolinSettings, is_player: bo
     if not state.card_deck:
         return False
     hand = state.duelist(is_player).whole_hand
-    chrono = next((c for c in hand if mechanic_of(c.power) is Mechanic.CHRONOKINESIS), None)
+    chrono = next((c for c in hand if mechanic_of(c.power) is Mechanic.DRAW), None)
     if chrono is None:
         return False
     average_held = sum(duel_value(card) for card in hand) / len(hand)

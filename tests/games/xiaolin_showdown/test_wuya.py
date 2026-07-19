@@ -32,7 +32,7 @@ def _state(player, bot, *, pile=(), lost=()) -> XiaolinState:
 
 
 def test_a_spent_wu_returns_to_her_worn_one_further():
-    chrono = wu(1, mechanic=Mechanic.CHRONOKINESIS, name="Falcon's Eye", points=2)
+    chrono = wu(1, mechanic=Mechanic.DRAW, name="Falcon's Eye", points=2)
     state = _state(_wuya(hand=[chrono]), duelist(), pile=[wu(1, name="Drawn")])
     use_power(state, chrono, rng=Rng(0))
     assert chrono in state.player.hand  # restored, not discarded
@@ -40,7 +40,7 @@ def test_a_spent_wu_returns_to_her_worn_one_further():
 
 
 def test_the_third_witchery_vaults_the_wu():
-    chrono = wu(1, mechanic=Mechanic.CHRONOKINESIS, name="Falcon's Eye", points=2)
+    chrono = wu(1, mechanic=Mechanic.DRAW, name="Falcon's Eye", points=2)
     chrono.uses = WEAR_LIMIT - 1
     state = _state(_wuya(hand=[chrono]), duelist(), pile=[wu(1, name="Drawn")])
     use_power(state, chrono, rng=Rng(0))
@@ -77,7 +77,7 @@ def test_a_chosen_opponent_overrides_the_roster_pick(catalog):
 
 def test_witchcraft_is_hers_alone() -> None:
     # A plain duelist's spent Wu still leaves the hand.
-    chrono = wu(1, mechanic=Mechanic.CHRONOKINESIS, name="Falcon's Eye", points=2)
+    chrono = wu(1, mechanic=Mechanic.DRAW, name="Falcon's Eye", points=2)
     state = _state(duelist(hand=[chrono]), duelist(), pile=[wu(1, name="Drawn")])
     use_power(state, chrono, rng=Rng(0))
     assert chrono not in state.player.hand and state.player.points == 0

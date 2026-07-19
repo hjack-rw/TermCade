@@ -118,53 +118,60 @@ RULES: dict[Mechanic, Rule] = {
         f"Nobody knows what it is worth. Deposit it and find out: anywhere from "
         f"{GAMBLE_SPREAD[0]:+d} to {GAMBLE_SPREAD[1]:+d} points.",
     ),
-    Mechanic.CHRONOKINESIS: Rule(
-        Mechanic.CHRONOKINESIS,
+    Mechanic.DRAW: Rule(
+        Mechanic.DRAW,
         "use",
         Timing.AT_TEMPLE,
         "Spend it to draw a Wu from the pile. Depositing it forfeits that.",
     ),
-    Mechanic.DIASKOPIA: Rule(
-        Mechanic.DIASKOPIA,
+    Mechanic.READ_DECK: Rule(
+        Mechanic.READ_DECK,
         "use",
         Timing.AT_TEMPLE,
         "Spend it to read your opponent's personal deck. Only offered while they hold one.",
     ),
-    Mechanic.TELESKOPIA: Rule(
-        Mechanic.TELESKOPIA,
+    Mechanic.SCRY: Rule(
+        Mechanic.SCRY,
         "use",
         Timing.AT_TEMPLE,
         f"Spend it to look at the next {SCOPE_DEPTH} Wu in the draw pile, in the order they will "
         f"come.",
     ),
-    Mechanic.TELEPATHEIA: Rule(
-        Mechanic.TELEPATHEIA,
+    Mechanic.ENHANCED_VISION: Rule(
+        Mechanic.ENHANCED_VISION,
         "use",
         Timing.AT_TEMPLE,
         "Spend it to see the next Wu in the pile, then take or refuse initiative in the next "
         "showdown — whatever the two hands add up to.",
     ),
-    Mechanic.ATTRACTION: Rule(
-        Mechanic.ATTRACTION,
+    Mechanic.FETCH: Rule(
+        Mechanic.FETCH,
         "use",
         Timing.AT_TEMPLE,
         "Spend it to pull any one Wu out of your own deck and into your hand.",
     ),
-    Mechanic.REPULSION: Rule(
-        Mechanic.REPULSION,
+    Mechanic.BOUNCE: Rule(
+        Mechanic.BOUNCE,
         "use",
         Timing.AT_TEMPLE,
         "Spend it to shove one Wu out of your opponent's hand — deposit it (they keep the points) or "
         "bury it in their Deck (no points, but they draw it back).",
     ),
-    Mechanic.EUTHYMIA: Rule(
-        Mechanic.EUTHYMIA,
+    Mechanic.LUCK: Rule(
+        Mechanic.LUCK,
         "use",
         Timing.AT_TEMPLE,
         "Spend it at the temple to bring the oldest lost Wu back — into your hand, not the pile.",
     ),
-    Mechanic.METEMPSYCHOSIS: Rule(
-        Mechanic.METEMPSYCHOSIS,
+    Mechanic.PROGNOSIS: Rule(
+        Mechanic.PROGNOSIS,
+        "use",
+        Timing.AT_TEMPLE,
+        "Spend it to let your opponent lead the next Showdown — but you read the challenge before they play "
+        ", and keep the challenger's ground after the battle.",
+    ),
+    Mechanic.TRANSFER: Rule(
+        Mechanic.TRANSFER,
         "use",
         Timing.AT_TEMPLE,
         "Spend it to swap your entire hand with your opponent's — a Wudai weapon stays with its "
@@ -207,8 +214,8 @@ RULES: dict[Mechanic, Rule] = {
         f"Becomes {MORPH_ASIDE} in the two stats the battle is not fought over and "
         f"{MORPH_CONTESTED} in the one it is — and you choose the element it counts as.",
     ),
-    Mechanic.HYDROKINESIS: Rule(
-        Mechanic.HYDROKINESIS,
+    Mechanic.BUFF: Rule(
+        Mechanic.BUFF,
         "play",
         Timing.IN_DUEL,
         f"Prints no stats. Name one when you play it, and it pours +{NAMED_STAT_VALUE} into that stat "
@@ -221,62 +228,62 @@ RULES: dict[Mechanic, Rule] = {
         f"Prints no stats. Name one when you play it, and your opponent suffers −{NAMED_STAT_VALUE} in "
         f"that stat.",
     ),
-    Mechanic.CONTAINMENT: Rule(
-        Mechanic.CONTAINMENT,
+    Mechanic.NULLIFY_STATS: Rule(
+        Mechanic.NULLIFY_STATS,
         "play",
         Timing.IN_DUEL,
         "Traps your opponent for this battle: their own stats count for nothing, and only the Wu "
         "they played answer for them.",
     ),
-    Mechanic.REVERSAL: Rule(
-        Mechanic.REVERSAL,
+    Mechanic.NULLIFY_CURSE: Rule(
+        Mechanic.NULLIFY_CURSE,
         "play",
         Timing.IN_DUEL,
         "Turns every curse laid on you aside for this battle. Your Defensive line counts for "
         "nothing.",
     ),
-    Mechanic.SUBJUGATION: Rule(
-        Mechanic.SUBJUGATION,
+    Mechanic.NULLIFY_WU: Rule(
+        Mechanic.NULLIFY_WU,
         "play",
         Timing.IN_DUEL,
         "Disarms your opponent for this battle: every Wu they played counts for nothing, and only "
         "they themselves answer for it.",
     ),
-    Mechanic.INTANGIBLE: Rule(
-        Mechanic.INTANGIBLE,
+    Mechanic.NULLIFY_ELEMENT: Rule(
+        Mechanic.NULLIFY_ELEMENT,
         "play",
         Timing.IN_DUEL,
         "Voids the elemental bonus for the rest of the showdown — for both duelists, whoever "
         "played it.",
     ),
-    Mechanic.DISSONANCE: Rule(
-        Mechanic.DISSONANCE,
+    Mechanic.REVERSE_ELEMENT: Rule(
+        Mechanic.REVERSE_ELEMENT,
         "play",
         Timing.IN_DUEL,
         "Reverses the elemental bonus for the rest of the showdown, for both duelists: a resonant Wu "
         "now costs, an opposed one now pays.",
     ),
-    Mechanic.DAMPENING: Rule(
-        Mechanic.DAMPENING,
+    Mechanic.NULLIFY_BOOST: Rule(
+        Mechanic.NULLIFY_BOOST,
         "play",
         Timing.IN_DUEL,
         "Smothers your opponent's boost for this battle: its stats count for nothing.",
     ),
-    Mechanic.TRANSMUTATION: Rule(
-        Mechanic.TRANSMUTATION,
+    Mechanic.CLEANSE: Rule(
+        Mechanic.CLEANSE,
         "play",
         Timing.IN_DUEL,
         "Turns your opponent's Wu to metal for this battle — they read as metal for the background "
         "bonus, favoured nowhere but a metal arena.",
     ),
-    Mechanic.CHROMASIS: Rule(
-        Mechanic.CHROMASIS,
+    Mechanic.SET_ELEMENT: Rule(
+        Mechanic.SET_ELEMENT,
         "play",
         Timing.IN_DUEL,
         "You choose the element your own Wu count as for this battle's background bonus.",
     ),
-    Mechanic.STORMFRONT: Rule(
-        Mechanic.STORMFRONT,
+    Mechanic.SET_ARENA: Rule(
+        Mechanic.SET_ARENA,
         "play",
         Timing.IN_DUEL,
         "You choose the arena's element for the rest of the showdown.",
@@ -338,7 +345,7 @@ def names_a_stat(power: Power) -> bool:
     Both do — the Orb pours a gain, the Curse pours a wound. What they aim at is the same question,
     asked of whoever plays them, so the duel asks it in one place.
     """
-    return mechanic_of(power) in (Mechanic.HYDROKINESIS, Mechanic.MISFORTUNE)
+    return mechanic_of(power) in (Mechanic.BUFF, Mechanic.MISFORTUNE)
 
 
 def is_boost_slot(power: Power) -> bool:

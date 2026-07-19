@@ -7,9 +7,9 @@ applies is looked up once, by :func:`~.powers.mechanic_of`:
 - :attr:`~.powers.Mechanic.BOOST` — lends no stats; amplifies the card played after it.
 - :attr:`~.powers.Mechanic.MORPH` — takes a fixed shape, low on the contested stat; the caster picks
   its element.
-- :attr:`~.powers.Mechanic.HYDROKINESIS` / :attr:`~.powers.Mechanic.MISFORTUNE` — prints no stats; the caster
+- :attr:`~.powers.Mechanic.BUFF` / :attr:`~.powers.Mechanic.MISFORTUNE` — prints no stats; the caster
   names one, and it takes the whole value, for them or against their opponent.
-- :attr:`~.powers.Mechanic.INTANGIBLE` — voids the elemental bonus for both duelists. A condition of
+- :attr:`~.powers.Mechanic.NULLIFY_ELEMENT` — voids the elemental bonus for both duelists. A condition of
   the *showdown*, not of one round, so this reports it and the stage machine holds the flag.
 - anything else — the printed stats.
 
@@ -69,11 +69,11 @@ def resolve_played_power(
         mine.spent.append(played)
 
     mine.queue.append(played)
-    if mechanic is Mechanic.INTANGIBLE:
+    if mechanic is Mechanic.NULLIFY_ELEMENT:
         return "cancel"
-    if mechanic is Mechanic.DISSONANCE:
+    if mechanic is Mechanic.REVERSE_ELEMENT:
         return "reverse"
-    if mechanic is Mechanic.STORMFRONT:  # Monsoon Sandals — the arena becomes the chosen element
+    if mechanic is Mechanic.SET_ARENA:  # Monsoon Sandals — the arena becomes the chosen element
         return f"background:{element}"
     return None
 
@@ -140,10 +140,10 @@ def _apply_mechanic(
     if mechanic in _NEGATIONS:
         _negate(mechanic, caster, opponent)
         return False
-    if mechanic is Mechanic.TRANSMUTATION:  # Kuzusu Atom — the opponent's Wu count as metal
+    if mechanic is Mechanic.CLEANSE:  # Kuzusu Atom — the opponent's Wu count as metal
         opponent.element_as = "metal"
         return False
-    if mechanic is Mechanic.CHROMASIS:  # Eye of Dashi — the caster's Wu count as their chosen element
+    if mechanic is Mechanic.SET_ELEMENT:  # Eye of Dashi — the caster's Wu count as their chosen element
         caster.element_as = element
         return False
     if mechanic is Mechanic.WARD:  # Monkey Staff and kin — the caster's Wu of ITS element ignore drags
@@ -156,7 +156,7 @@ def _apply_mechanic(
         played.stats = _morphed(card, contested)
         played.element = element
         return False
-    if mechanic in (Mechanic.HYDROKINESIS, Mechanic.MISFORTUNE):
+    if mechanic in (Mechanic.BUFF, Mechanic.MISFORTUNE):
         played.stats = _poured(card, mechanic, _named(card, stat))
         # A Misfortune Wu prints no stats, so `_is_negative` cannot see what it is: the wound only
         # exists once its caster has named a stat. It curses from here instead.
@@ -175,10 +175,10 @@ def _apply_mechanic(
 # with the rest. The negators print 0/0/0: the rule is the whole of what they are.
 _NEGATIONS: dict[Mechanic, tuple[bool, str]] = {
     # mechanic: (does it land on the opponent?, which line it takes)
-    Mechanic.CONTAINMENT: (True, "base_negated"),  # Sphere of Jianyu — the duelist themselves
-    Mechanic.SUBJUGATION: (True, "offence_negated"),  # Emperor Scorpion — every Wu they played
-    Mechanic.REVERSAL: (False, "defence_negated"),  # Reversing Mirror — every curse laid on you
-    Mechanic.DAMPENING: (True, "boost_negated"),  # Star Hanabi — the opponent's boost's stats
+    Mechanic.NULLIFY_STATS: (True, "base_negated"),  # Sphere of Jianyu — the duelist themselves
+    Mechanic.NULLIFY_WU: (True, "offence_negated"),  # Emperor Scorpion — every Wu they played
+    Mechanic.NULLIFY_CURSE: (False, "defence_negated"),  # Reversing Mirror — every curse laid on you
+    Mechanic.NULLIFY_BOOST: (True, "boost_negated"),  # Star Hanabi — the opponent's boost's stats
 }
 
 
@@ -197,7 +197,7 @@ def _named(card: Card, stat: str | None) -> str:
 
 def _poured(card: Card, mechanic: Mechanic, stat: str) -> dict[str, int | None]:
     """Everything into the one named stat, nothing anywhere else."""
-    value = NAMED_STAT_VALUE if mechanic is Mechanic.HYDROKINESIS else -NAMED_STAT_VALUE
+    value = NAMED_STAT_VALUE if mechanic is Mechanic.BUFF else -NAMED_STAT_VALUE
     return {name: (value if name == stat else 0) for name in card.stats}
 
 

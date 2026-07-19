@@ -50,8 +50,8 @@ def test_a_mechanic_nobody_implemented_raises_rather_than_doing_nothing(monkeypa
     left is a mechanic somebody added to the enum and never wrote a rule for — so that is what this
     simulates, by taking one out of the table.
     """
-    orphan = Power(99, "Unwritten", Mechanic.SUBJUGATION, "")
-    monkeypatch.delitem(RULES, Mechanic.SUBJUGATION)
+    orphan = Power(99, "Unwritten", Mechanic.NULLIFY_WU, "")
+    monkeypatch.delitem(RULES, Mechanic.NULLIFY_WU)
 
     with pytest.raises(KeyError, match="nobody implemented it"):
         rule_of(orphan)

@@ -1,4 +1,4 @@
-"""Sun Chi Lantern — Metempsychosis swaps the two hands entirely; the wudai slot never moves."""
+"""Sun Chi Lantern — the Transfer mechanic swaps the two hands entirely; the wudai slot never moves."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from factories import duelist, wu
 
 
 def _state_with_lantern() -> tuple[XiaolinState, object]:
-    lantern = wu(0, 0, 0, mechanic=Mechanic.METEMPSYCHOSIS, name="Lantern", points=5)
+    lantern = wu(0, 0, 0, mechanic=Mechanic.TRANSFER, name="Lantern", points=5)
     player = duelist(hand=[lantern, wu(1, name="Mine")])
     bot = duelist(hand=[wu(2, name="Theirs A"), wu(3, name="Theirs B")])
     return XiaolinState(catalog=None, player=player, bot=bot, card_deck=[]), lantern  # type: ignore[arg-type]
@@ -50,7 +50,7 @@ def test_the_bot_spends_the_lantern_only_from_behind():
     from xiaolin_showdown.logic.settings import XiaolinSettings
     from xiaolin_showdown.logic.temple_ai import choose_temple_power
 
-    lantern = wu(0, 0, 0, mechanic=Mechanic.METEMPSYCHOSIS, name="Lantern", points=5)
+    lantern = wu(0, 0, 0, mechanic=Mechanic.TRANSFER, name="Lantern", points=5)
     behind = XiaolinState(  # type: ignore[arg-type]
         catalog=None, player=duelist(hand=[wu(5, 5, 5)]), bot=duelist(hand=[lantern]), card_deck=[]
     )
@@ -85,7 +85,7 @@ def test_a_background_is_still_picked_against_an_empty_hand():
 
 
 def test_an_empty_opposing_hand_fizzles_the_swap():
-    lantern = wu(0, 0, 0, mechanic=Mechanic.METEMPSYCHOSIS, name="Lantern")
+    lantern = wu(0, 0, 0, mechanic=Mechanic.TRANSFER, name="Lantern")
     state = XiaolinState(  # type: ignore[arg-type]
         catalog=None, player=duelist(hand=[lantern, wu(1, name="Mine")]), bot=duelist(), card_deck=[]
     )

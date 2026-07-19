@@ -55,7 +55,7 @@ LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD rep
 
 # The Wu that ask their caster for an element: the Morpher (its shape), the Eye (its own colour), the
 # Monsoon (the whole arena's).
-_CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.CHROMASIS, Mechanic.STORMFRONT})
+_CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET_ARENA})
 
 BEAST_BOOST = 2  # Chase Young's Beast Form: +2 on the contested stat, in exchange for his Wu
 
@@ -234,7 +234,9 @@ class Duel:
             self.duel.player_priority = self.rng.choice([True, False])
         # only when the bot leads does it name the challenge here; a leading player waits for stage 2
         if not self.duel.player_priority:
-            self.duel.challenge = bot.choose_challenge(
+            # A Prognosis Conch already pinned the bot's challenge when it was spent — read, and set
+            # in stone. Otherwise the bot names it fresh from its hand now.
+            self.duel.challenge = self.state.locked_challenge or bot.choose_challenge(
                 self.state.bot.character.stats,
                 self._challenge_options(),
                 self.state.bot.whole_hand,
@@ -394,9 +396,14 @@ class Duel:
             bot_stats=self._bot_base(),
             bonus_cancelled=self.duel.elemental_bonus_cancelled,
             bonus_reversed=self.duel.elemental_bonus_reversed,
-            # Priority is the last word on a battle nothing else can separate — and priority is held by
-            # whoever called the challenge, settled by initiative (or by the coin, on a tie).
-            challenger_is_player=bool(self.duel.player_priority),
+            # Priority is the last word on a battle nothing else can separate — held by whoever called
+            # the challenge (settled by initiative, or the coin on a tie). A Prognosis Conch splits
+            # the two: the opponent leads and names the stat, but its caster keeps the ground.
+            challenger_is_player=(
+                self.state.conch_tiebreak
+                if self.state.conch_tiebreak is not None
+                else bool(self.duel.player_priority)
+            ),
         )
 
     def _bot_base(self) -> dict[str, int]:
@@ -458,6 +465,8 @@ class Duel:
         # by dealing you back in. Reset here and that charge would be wiped before it ever bit.
         self.state.bot_turn_done = False  # a new temple turn, for both of you
         self.state.forced_priority = None  # the Conch's answer was for this showdown, and is spent
+        self.state.locked_challenge = None  # the Prognosis pin was for this showdown too
+        self.state.conch_tiebreak = None
         if not self.state.card_deck:
             self.state.has_ended = True
 
