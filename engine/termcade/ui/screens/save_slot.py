@@ -115,7 +115,12 @@ class SaveSlotScreen(MenuScreen):
         state = self.ctx.state
         assert state is not None, "nothing to save — no active game state"
         self.ctx.saves.save(
-            slot, state, self.ctx.rng, title=self._title, settings=self.ctx.settings.current
+            slot,
+            state,
+            self.ctx.rng,
+            title=self._title,
+            settings=self.ctx.settings.current,
+            journal=self.ctx.journal,
         )
         self.app.pop_screen()
 
@@ -127,8 +132,12 @@ class SaveSlotScreen(MenuScreen):
             # A corrupt or unreadable save must not crash the picker — flag it and stay put.
             self.app.notify(str(e), title="Load failed", severity="error")
             return
-        self.ctx.state = state
+        self.ctx.state = state  # empties the journal — a new state is a new run
         self.ctx.rng = rng
+        # ...then refill the log from the save, so the loaded run opens on what happened, not a blank.
+        saved_journal = self.ctx.saves.journal_of(slot)
+        if saved_journal is not None:
+            self.ctx.journal.restore(saved_journal)
         if self._next_screen is not None:
             self.app.switch_screen(self._next_screen())
         else:

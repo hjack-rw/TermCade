@@ -2,8 +2,9 @@
 
 Menu-only by design: saving happens between runs, never mid-duel. A game can
 disable saving entirely or cap the slot count. The on-disk envelope is
-``{meta, rng, settings, state}``: the run's settings are frozen into the save so it
-remembers the ruleset it was created with. The engine never inspects the ``state`` payload.
+``{meta, rng, settings, state}``, plus an optional ``journal`` (the run's log, so a load
+opens on what happened): the run's settings are frozen into the save so it remembers the
+ruleset it was created with. The engine never inspects the ``state`` payload.
 
 ``SaveManager`` depends on the ``SaveBackend`` protocol, not a concrete store, so
 the storage medium is swappable: ``JsonFileBackend`` (one file per slot) and
@@ -27,6 +28,7 @@ from .state import GameState, SaveMeta
 
 if TYPE_CHECKING:
     from termcade.app.game import GameContext
+    from termcade.core.journal import Journal
 
 
 class SaveError(Exception):
@@ -273,6 +275,7 @@ class SaveManager:
         *,
         title: str,
         settings: Settings | None = None,
+        journal: "Journal | None" = None,
     ) -> SaveMeta:
         self._guard(slot)
         meta = SaveMeta(
@@ -289,6 +292,10 @@ class SaveManager:
             "settings": settings.to_dict() if settings is not None else {},
             "state": state.snapshot(),
         }
+        # The run's log rides along so a loaded save opens on what happened, not a blank. Optional: a
+        # save with no journal (or an older one) simply loads with an empty log, as before.
+        if journal is not None:
+            envelope["journal"] = journal.snapshot()
         self._backend.write(slot, envelope)
         return meta
 
@@ -322,6 +329,18 @@ class SaveManager:
         if not frozen:
             return None
         return Settings.from_dict(frozen, Settings())
+
+    def journal_of(self, slot: int) -> dict[str, Any] | None:
+        """The run's log as it was saved — read without restoring the run itself.
+
+        Its own reader, mirroring :meth:`settings_of`, because the log is restored *after* the state
+        is: assigning ``ctx.state`` empties the journal (a new state is a new run), so the load screen
+        sets the state first and refills the log from this second. ``None`` when the slot is empty or
+        the save predates the log being kept.
+        """
+        if not self._enabled or not self._backend.exists(slot):
+            return None
+        return self._backend.read(slot).get("journal")
 
     def list(self) -> list[SaveMeta | None]:
         """One entry per slot; ``None`` for an empty slot. Length == ``max_slots``."""

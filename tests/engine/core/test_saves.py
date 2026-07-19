@@ -21,6 +21,7 @@ from termcade.core.saves import (
     SlotOutOfRange,
     SqliteBackend,
 )
+from termcade.core.journal import Journal
 from termcade.core.settings import Difficulty, Settings
 
 
@@ -134,6 +135,37 @@ def test_settings_are_frozen_into_the_save(backend, fake_state_cls):
     _state, _rng, _meta, loaded = mgr.load(0, fake_state_cls, ctx=None)
     assert loaded.difficulty is Difficulty.HARD
     assert loaded.options["point_limit"] == 20
+
+
+def test_the_run_log_rides_in_the_save(backend, fake_state_cls):
+    mgr = _manager(backend)
+    journal = Journal()
+    journal.add("You drew a Wu.", title="Your move")
+    journal.next_turn()
+    journal.add("They banked the Sphere.", title="Opponent's move")
+
+    mgr.save(0, fake_state_cls(), Rng(1), title="logged", journal=journal)
+
+    saved = mgr.journal_of(0)
+    assert saved is not None
+    restored = Journal()
+    restored.restore(saved)
+    assert [(e.turn, e.message) for e in restored.entries] == [
+        (1, "You drew a Wu."),
+        (2, "They banked the Sphere."),
+    ]
+
+
+def test_a_save_made_without_a_journal_reports_none(backend, fake_state_cls):
+    """The journal is optional — a save written without one loads with an empty log, not a crash."""
+    mgr = _manager(backend)
+    mgr.save(0, fake_state_cls(), Rng(1), title="no log")
+
+    assert mgr.journal_of(0) is None
+
+
+def test_journal_of_an_empty_slot_is_none(backend):
+    assert _manager(backend).journal_of(0) is None
 
 
 def test_load_fills_new_defaults_over_frozen_settings(backend, fake_state_cls):

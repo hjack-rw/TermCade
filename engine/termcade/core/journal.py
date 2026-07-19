@@ -9,14 +9,19 @@ So every notification is written down as it is raised (see ``EngineApp.notify``)
 what it does *without* a popup — a Wu banked, a showdown settled. The journal is the record; the
 Game Log screen is one way of reading it.
 
-Not persisted. A journal belongs to a **run**, and it is emptied when a new state is dealt (see
-``GameContext.state``) — a loaded save opens on an empty log rather than the tail of somebody else's
-game, which would be a lie told in order to have something to show.
+Emptied when a new state is dealt (see ``GameContext.state``), so a *new* run never opens on the tail
+of the game before it. A **loaded save** is the exception: it carries its own log (:meth:`snapshot` /
+:meth:`restore`), because that tail is a record of *this* run, not somebody else's. Only what cannot
+be rebuilt is stored — the words, not their colour. A Wu's element-colour is re-painted from the
+catalog every time the log is drawn (``Game.log_line``), so a saved line is plain text; the one colour
+no lookup recovers, an arena's summoned element, reloads grey.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from rich.text import Text
 
@@ -85,6 +90,33 @@ class Journal:
     def clear(self) -> None:
         self._entries.clear()
         self._turn = 1
+
+    def snapshot(self) -> dict[str, Any]:
+        """The record, flattened for a save: the turn in play and every line as plain text.
+
+        Rich messages (an arena's coloured element line) are stored as ``str(message)`` — their plain
+        text. The colour a save could rebuild is not stored, only the words it cannot. The turn is kept
+        so a loaded run stacks new lines under where it left off, not back at Turn 1.
+        """
+        return {
+            "turn": self._turn,
+            "entries": [
+                {"turn": e.turn, "title": e.title, "message": str(e.message)} for e in self._entries
+            ],
+        }
+
+    def restore(self, data: Mapping[str, Any]) -> None:
+        """Refill from a :meth:`snapshot`, replacing whatever is here.
+
+        A loaded run's log is that run's — not the menu's leftovers — so this overwrites rather than
+        appends. Messages come back as plain strings; the Game Log re-paints their Wu names on draw.
+        """
+        entries: Iterable[Mapping[str, Any]] = data.get("entries", ())
+        self._entries = [
+            Entry(turn=int(row["turn"]), title=row.get("title", ""), message=row["message"])
+            for row in entries
+        ]
+        self._turn = int(data.get("turn", 1))
 
     def __len__(self) -> int:
         return len(self._entries)

@@ -149,6 +149,28 @@ async def test_loading_a_slot_with_corrupt_payload_toasts_and_stays(make_app):
         assert any("unreadable" in n.message.lower() for n in app._notifications)
 
 
+async def test_loading_a_slot_refills_the_run_log(make_app):
+    """Assigning the loaded state empties the journal; the load must then refill it from the save.
+
+    Proves the ordering: a blank log here would mean the restore ran before the state cleared it."""
+    app = make_app(_Blank)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.ctx.state = app.ctx.game.state_cls()
+        app.ctx.journal.add("They banked the Sphere.", title="Opponent's move")
+        app.ctx.saves.save(
+            0, app.ctx.state, app.ctx.rng, title="logged", journal=app.ctx.journal
+        )
+        app.ctx.journal.clear()  # as if the run had moved on and the log emptied
+
+        app.push_screen(SaveSlotScreen("load", next_screen=_Blank))
+        await pilot.pause()
+        await pilot.click("#slot-0")
+        await pilot.pause()
+
+        assert [e.message for e in app.ctx.journal.entries] == ["They banked the Sphere."]
+
+
 async def test_the_load_picker_offers_a_delete_button_per_occupied_slot(make_app):
     app = make_app(_Blank)
     async with app.run_test() as pilot:
