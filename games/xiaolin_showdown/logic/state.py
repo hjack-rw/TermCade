@@ -15,11 +15,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .catalog import Catalog, load_catalog
 from .mechanics.cards import held_as_wudai
 from .models import Card, Player
+
+if TYPE_CHECKING:  # settings imports nothing from here, but importing it at runtime would still cycle
+    from .settings import XiaolinSettings
 
 
 @dataclass

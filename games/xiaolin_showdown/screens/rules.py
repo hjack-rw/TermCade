@@ -20,6 +20,8 @@ checks 8 is worse than no rulebook, and `test_rules_screen.py` fails the moment 
 
 from __future__ import annotations
 
+from typing import cast
+
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.table import Table
 from rich.text import Text
@@ -31,6 +33,7 @@ from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 from termcade.ui.typography import spaced_dashes
 from ..logic.mechanics.prize import PrizeRoute
 from ..logic.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings
+from ..logic.state import XiaolinState
 from ..logic.training import BOSS_LOSS_FILL, STAT_CAP, TRAIN_LENGTH
 from ..logic.wear import WEAR_LIMIT
 from .base import XiaolinScreen
@@ -60,8 +63,15 @@ def _route(route: PrizeRoute) -> str:
     return route.value[0].upper() + route.value[1:]
 
 
-def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
-    """The rulebook, with the game's own numbers in it."""
+def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[str, list[str]]:
+    """The rulebook, with the game's own numbers in it.
+
+    ``target`` is THIS run's win target, when a run is live. The shipped deal gives each game its own
+    target, derived from the subset it dealt — so the settings' figure is read off the whole pool and is
+    NOT the number the player is racing to. Omitted (no run yet, from the start screen), the settings'
+    figure is the honest answer: it is what a new game would be dealt.
+    """
+    target = target if target is not None else settings.point_limit
     return {
         "At the Temple": [
             f"A turn buys you {settings.actions_per_turn} action: deposit a Wu for its "
@@ -76,7 +86,7 @@ def rules_for(settings: XiaolinSettings) -> dict[str, list[str]]:
             "and it never hands you more than you could have staked. "
             "You are being put back in the fight, not paid for having lost it.",
             "Your opponent takes the same turn when you do.",
-            f"Bank {settings.point_limit} points and the run is yours!",
+            f"Bank {target} points and the run is yours!",
         ],
         "Training": [
             "Losing a Showdown fills your training bar by 1. You learn more from a beating than from a win.",
@@ -198,7 +208,12 @@ class RulesScreen(XiaolinScreen):
     ]
 
     def compose(self) -> ComposeResult:
-        self._rules = rules_for(self.rules)
+        # The book is reachable from the START screen, where there is no run and so no dealt target yet.
+        settings = self.rules
+        run = cast("XiaolinState | None", self.ctx.state)
+        self._rules = rules_for(
+            settings, target=run.win_target(settings) if run is not None else None
+        )
         self._searching = False
         self._visible: dict[str, list[str]] = {PRIMER: HOW_TO_PLAY}
         self._by_slug = {_slug(name): name for name in self._entries()}

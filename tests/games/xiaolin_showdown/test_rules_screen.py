@@ -94,6 +94,25 @@ def test_the_prize_routes_print_the_thresholds_the_code_actually_checks():
         assert printed in book, f"the book never says {printed!r} for {route}"
 
 
+def test_the_book_prints_this_runs_target_not_the_pools():
+    """A run deals a subset and derives its OWN target, so the settings' figure — read off the whole
+    pool — is not what the player is racing to. The book must print the run's number."""
+    settings = XiaolinSettings()
+    dealt_target = settings.point_limit // 2  # this run was dealt a smaller deck, so a nearer target
+
+    book = _all_text(rules_for(settings, target=dealt_target))
+
+    assert f"bank {dealt_target} points" in book  # `_all_text` lowercases
+    assert f"bank {settings.point_limit} points" not in book
+
+
+def test_the_book_falls_back_to_the_settings_target_before_a_run():
+    """From the start screen there is no dealt deck yet, so what a new game would be dealt is honest."""
+    settings = XiaolinSettings()
+
+    assert f"bank {settings.point_limit} points" in _all_text(rules_for(settings))
+
+
 def _bars_the_code_checks(threshold: int) -> dict[PrizeRoute, int]:
     """The lowest end value that claims the Wu by each route — asked of `claim_route` itself.
 
