@@ -48,7 +48,7 @@ def _player_with_initiative(*bonuses: int) -> Player:
 def test_catalog_loads_all_tables():
     cat = load_catalog()
     assert cat.powers and cat.cards
-    assert len(cat.characters) == 11  # 4 playable + easy 3 + hard 3 + boss 1
+    assert len(cat.characters) == 12  # 4 playable + easy 3 + hard 3 + boss 2
     assert cat.character(1).name == "Omi"
     assert cat.opponent_characters  # the bot must have someone to be
 
@@ -454,11 +454,12 @@ def test_a_hard_game_only_deals_hard_opponents():
 
 
 def test_a_boss_game_deals_the_boss_and_grants_its_wudai():
-    """The boss run deals Hannibal, and he holds Moby Morpher (card 5) inalienably — off the pile."""
+    """A CHOSEN Hannibal holds Moby Morpher (card 5) inalienably — off the pile."""
     catalog = load_catalog()
     omi = catalog.character(1)
 
-    state = new_game(catalog, Rng(7), omi, roster="boss")
+    # Pinned, not rolled: with two on the boss roster, the roster pick could hand back either.
+    state = new_game(catalog, Rng(7), omi, roster="boss", opponent=catalog.character(11))
 
     assert state.bot.character.name == "Hannibal_Roy_Bean"
     assert [c.id for c in state.bot.inalienable_hand] == [5]  # Moby Morpher, granted not drawn

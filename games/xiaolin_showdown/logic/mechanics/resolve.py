@@ -78,18 +78,20 @@ def resolve_played_power(
     return None
 
 
-def as_boost(card: Card, element: str) -> Card:
+def as_boost(card: Card, element: str, contested: str | None = None) -> Card:
     """A boost card's queue form — what actually rides ahead of the Wu it lifts.
 
-    Every boost enters as a copy of itself, save the Morpher: spent as a boost it lends a flat
-    ``MORPH_BOOST`` in each stat, in the ``element`` its caster names (the background, for the bot).
-    That is the wudai mode — a dragon that chooses its colour — distinct from the 2/2/1 it takes when
-    fielded from hand. Used by both the duel (on commit) and the bot (weighing a boost), so the two can
-    never price it differently.
+    Every boost enters as a copy of itself, save the Morpher: spent as a boost it lends
+    ``MORPH_BOOST`` in each stat EXCEPT the ``contested`` one, where it prints 0 — in tune (and it
+    chooses its tune) the elemental bonus stands that stat up, so the boost NETS 1/1/1: the same
+    law every Wu is priced by, never 1/1/1 *plus* the lift. It also puts the Morpher on the hook:
+    reverse or cancel the bonus and the contested column stays down. The ``element`` is the one its
+    caster names (the background, for the bot). Used by both the duel (on commit) and the bot
+    (weighing a boost), so the two can never price it differently.
     """
     queued = deepcopy(card)
     if mechanic_of(card.power) is Mechanic.MORPH:
-        queued.stats = {name: MORPH_BOOST for name in queued.stats}
+        queued.stats = {name: 0 if name == contested else MORPH_BOOST for name in queued.stats}
         queued.element = element
     return queued
 

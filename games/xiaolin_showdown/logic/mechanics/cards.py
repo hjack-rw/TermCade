@@ -17,6 +17,17 @@ from collections.abc import Iterable, Sequence
 from ..models import Card
 
 
+def hand_over(card: Card) -> Card:
+    """A Wu changing hands swaps whose wear count is live: fresh for the new owner (their own
+    count, in a two-duelist run), while the departing owner's waits in the pocket to be resumed.
+
+    Lives here rather than in ``wear.py`` so the turn logic can call it without a cycle — wear
+    imports turn for ``bank_value``.
+    """
+    card.uses, card.uses_memory = card.uses_memory, card.uses
+    return card
+
+
 def held_as_wudai(card: Card) -> Card:
     """A signature Wu held in the inalienable slot is a *wudai*, whatever its printed type.
 

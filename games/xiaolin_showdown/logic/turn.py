@@ -24,6 +24,7 @@ from .mechanics.powers import (
     roll_gamble,
 )
 from .constants import WEAR_LIMIT
+from .mechanics.cards import hand_over
 from .models import Card, Player
 from .settings import XiaolinSettings, player_actions, plays_keen
 from .state import XiaolinState
@@ -144,6 +145,9 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     Mechanic.METEMPSYCHOSIS: 5,
 }
 
+# (Witchcraft is a CHARACTER power — no card carries it, so its table price is moot; it sits in
+# `_STATS_ARE_THE_WHOLE_VALUE` below purely to satisfy the every-mechanic-is-accounted guard.)
+
 # Mechanics whose printed stats are the whole value, declared rather than assumed. The two sets must
 # cover every `Mechanic` — `test_every_mechanic_is_priced` enforces it. An unpriced `? ? ?` Wu reads as
 # zero: the bot banks the strongest card in the game for 2 points. That cost 16 points of win rate once.
@@ -173,6 +177,7 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         Mechanic.ATTRACTION,  # likewise
         Mechanic.REPULSION,  # likewise
         Mechanic.EUTHYMIA,  # likewise — it acts on the lost pile, never in a battle
+        Mechanic.WITCHCRAFT,  # a character power (Wuya's) — no card ever prints it
         # The dragon and the booster carry no stats but decide duels — they are priced by
         # BOOSTER_PREMIUM in `duel_value` rather than here, which is the older seam.
         Mechanic.DRAGON,
@@ -254,6 +259,7 @@ EARLY_BIRD = "Early Bird"
 PASSED = "Pass"
 POWER = "Power"
 TRAIN = "Train"
+RECALL = "Witchcraft"
 
 # How close to a full bar the bot must be before training beats drawing or banking. Losses carry a
 # bar most of the way for free; only the last stretch is worth whole temple turns.
@@ -314,7 +320,7 @@ def _bot_acts(
     # only what a player could — see `temple_ai`, which is also where two of the Wu are explained as
     # worthless *to it* and banked instead.
     from .actions import early_bird, use_power  # local: actions imports this module
-    from .temple_ai import choose_early_bird, choose_temple_power
+    from .temple_ai import choose_early_bird, choose_temple_power, worth_recalling
 
     play = choose_temple_power(state, settings)
     if play is not None:
@@ -343,6 +349,14 @@ def _bot_acts(
             f"{name} used Early Bird to take {taken.name} from under your nose, "
             f"giving up {bird.name}.",
         )
+
+    # Wuya's witchcraft: her temple action can call the OLDEST lost Wu back — Euthymia's rule, but
+    # she pays no Wu for it. Ahead of training and drawing: a known weapon beats a blind draw.
+    if mechanic_of(state.bot.character.power) is Mechanic.WITCHCRAFT and worth_recalling(state):
+        revived = state.lost.pop(0)
+        state.bot.hand.append(hand_over(revived))
+        state.bot_actions_taken += 1
+        return BotMove(RECALL, f"{name} called {revived.name} back from the lost.")
 
     # The last stretch of a nearly-full training bar outranks drawing or banking: a permanent +1
     # base stat pays in every showdown left in the run. The bot cashes a full bar on the spot,

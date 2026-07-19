@@ -36,6 +36,11 @@ REPULSION_THRESHOLD = 4
 # swap has to steal a lead, not tidy one.
 SWAP_MARGIN = 5
 
+# What the oldest lost Wu must be worth before Wuya's witchcraft spends her temple action on the
+# recall. She pays no Wu (unlike the Rooster), so the bar sits under REVIVAL_MARGIN — but an action
+# is still a deposit not made, and a scrap is not worth one.
+WITCH_RECALL_MARGIN = 3
+
 
 @dataclass(frozen=True)
 class TemplePlay:
@@ -86,6 +91,11 @@ def choose_temple_power(
             return TemplePlay(card)
 
     return None
+
+
+def worth_recalling(state: XiaolinState) -> bool:
+    """Wuya's recall: the lost pile's OLDEST (Euthymia's rule), against the action it costs."""
+    return bool(state.lost) and duel_value(state.lost[0]) >= WITCH_RECALL_MARGIN
 
 
 def _worth_swapping(state: XiaolinState, is_player: bool = False) -> bool:

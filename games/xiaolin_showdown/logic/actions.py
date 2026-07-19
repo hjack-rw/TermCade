@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from termcade.core.rng import Rng
 
+from .constants import WEAR_LIMIT
 from .mechanics.cards import index_of
 from .mechanics.scoring import initiative
 from .mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of, trigger_of
@@ -400,6 +401,16 @@ def use_power(
     spend = _Spend(state, card, is_player, priority, target, to_deck, rng)
     message = _fire(spend)
     state.spend_action(is_player)
+    # Witchcraft (Wuya): the spent Wu returns to her hand instead of the discard — worn one further
+    # by the sorcery. The wear rule is her leash: the return that brings it to the limit vaults it.
+    if mechanic_of(spend.me.character.power) is Mechanic.WITCHCRAFT:
+        card.uses += 1
+        if card.uses < WEAR_LIMIT:
+            return message  # restored: it never leaves her hand
+        spend.me.remove_card(card)
+        paid = bank_value(card, rng) if rng is not None else card.points
+        spend.me.points = max(0, spend.me.points + paid)
+        return message
     spend.me.remove_card(card)  # discarded, no points
     return message
 

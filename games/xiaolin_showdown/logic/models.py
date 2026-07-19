@@ -50,6 +50,7 @@ class Mechanic(StrEnum):
     STORMFRONT = "stormfront"  # Monsoon Sandals — change the arena's element
     WARD = "ward"  # the -phylaxia four — the caster's Wu of this card's element ignore drags
     METEMPSYCHOSIS = "metempsychosis"  # Sun Chi Lantern — the two duelists swap hands
+    WITCHCRAFT = "witchcraft"  # Wuya's character power — spent Wu return worn; the lost answer her
 
 
 @dataclass

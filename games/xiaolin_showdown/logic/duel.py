@@ -503,8 +503,9 @@ class Duel:
             duelist.stakes.append(card)
         duelist.boosts_spent.append(card)  # one showdown, one use — even a dragon
         # A dragon/amplifier keeps its unresolved slot — what it lends is not known until it sees the
-        # Wu it lifts. A Morpher resolves here instead, to a flat 1/1/1 of its chosen element.
-        mine.queue.append(as_boost(card, element))
+        # Wu it lifts. A Morpher resolves here instead: 0 on the contested stat, MORPH_BOOST on the
+        # rest, so in tune it NETS 1/1/1 (see `as_boost`).
+        mine.queue.append(as_boost(card, element, self._stat_of(self.duel.round_number - 1)))
 
     def _winner_and_loser(self) -> tuple[Player, Player]:
         if self.duel.winner:

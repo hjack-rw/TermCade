@@ -17,18 +17,11 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 
 from .constants import WEAR_LIMIT
-from .mechanics.cards import is_one_of
+from .mechanics.cards import hand_over, is_one_of
 from .models import Card, Player
 from .turn import bank_value
 
 __all__ = ["WEAR_LIMIT", "hand_over", "record_showdown"]
-
-
-def hand_over(card: Card) -> Card:
-    """A Wu changing hands swaps whose count is live: fresh for the new owner (their own count, in
-    a two-duelist run), while the departing owner's waits in the pocket to be resumed."""
-    card.uses, card.uses_memory = card.uses_memory, card.uses
-    return card
 
 
 def record_showdown(player: Player, committed: list[Card], *, rng: Rng) -> list[tuple[Card, int]]:

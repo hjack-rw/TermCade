@@ -36,6 +36,7 @@ CREATE TABLE "power" (
 	PRIMARY KEY("id")
 );
 
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-6, 'Witchcraft', 'witchcraft', 'Due to Wuya''s personal connection to the Shen Gong Wu, she can both find Wu''s that have been lost, while also using them in more efficient ways.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-5, 'Free Allomorphia', 'morph', 'Given his condition of being a literal Heylin Bean, Hannibal took a hold of Moby Morpher and never let it go - so he wields it as a free Wu.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-4, 'Dragon of Earth', 'dragon', 'User has access to basic Earth-based attacks, and moves', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-3, 'Dragon of Fire', 'dragon', 'User has access to basic Fire-based attacks, and moves', 0);
@@ -178,6 +179,7 @@ INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id"
 INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (9, 'Le_Mime', 4, 6, 4, 0, 'heylin', 0, 'hard');
 INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (10, 'PandaBubba', 4, 4, 6, 0, 'heylin', 0, 'hard');
 INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (11, 'Hannibal_Roy_Bean', 5, 5, 5, -5, 'heylin', 0, 'boss');
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (12, 'Wuya', 6, 6, 6, -6, 'heylin', 0, 'boss');
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "background" (

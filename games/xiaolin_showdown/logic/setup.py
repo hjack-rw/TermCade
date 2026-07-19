@@ -27,10 +27,12 @@ def new_game(
     *,
     settings: XiaolinSettings | None = None,
     roster: str = "easy",
+    opponent: Character | None = None,
 ) -> XiaolinState:
     """A fresh temple-menu state: shuffled draw pile, both hands dealt, starting points.
     ``settings`` are the (player-chosen) settings for this run; defaults are used when omitted.
-    ``roster`` picks the opponent tier — ``'easy'``, ``'hard'`` or ``'boss'``.
+    ``roster`` picks the opponent tier — ``'easy'``, ``'hard'`` or ``'boss'`` — and ``opponent``
+    overrides the roster's random pick with a CHOSEN one: a boss is picked, never dealt.
     """
     settings = settings or XiaolinSettings()
     cards = catalog.cards
@@ -44,9 +46,10 @@ def new_game(
 
     # Pick the opponent right after the shuffle (RNG call 2). Dealing consumes no RNG, so knowing both
     # duelists before any hand is dealt does not disturb the call order — and it must be known, so a
-    # boss's signature Wu is pulled from the pool before the player could draw it.
+    # boss's signature Wu is pulled from the pool before the player could draw it. A CHOSEN opponent
+    # (the boss picker) skips the pick and its RNG call: the choice was the player's, not the stream's.
     player = deepcopy(player_character)
-    bot = deepcopy(rng.choice(catalog.opponents(roster)))  # RNG call 2
+    bot = deepcopy(opponent) if opponent is not None else deepcopy(rng.choice(catalog.opponents(roster)))  # RNG call 2
 
     # Reserve each duelist's signature Wu out of the pile *before* either hand is dealt.
     player_sig = _reserve_signature(draw_pile, player)
@@ -69,7 +72,8 @@ def _reserve_signature(draw_pile: list[Card], character: Character) -> int | Non
 
     Pull that Wu out of the pool so it can never be drawn by anyone: ids 1-4 (the playable signatures)
     never ride in the pool, but id 5 (Moby Morpher, Hannibal's) does by default. Returns the Wu's id,
-    or ``None`` when the character carries no signature.
+    or ``None`` when the character carries no signature. Wuya's Witchcraft sits at −6 ON PURPOSE:
+    a character power that grants no Wu lives outside the signature range.
     """
     if not -6 < character.power.id < 0:
         return None

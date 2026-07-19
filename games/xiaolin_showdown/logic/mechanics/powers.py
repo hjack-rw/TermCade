@@ -170,6 +170,13 @@ RULES: dict[Mechanic, Rule] = {
         "Spend it to swap your entire hand with your opponent's — a wudai weapon stays with its "
         "soul's owner.",
     ),
+    Mechanic.WITCHCRAFT: Rule(
+        Mechanic.WITCHCRAFT,
+        "hand",
+        Timing.AT_TEMPLE,
+        "Witchcraft: a Wu she spends returns to her hand, worn one further by the sorcery — the "
+        "third use vaults it. Her temple turn can also call the oldest lost Wu back.",
+    ),
     Mechanic.DRAGON: Rule(
         Mechanic.DRAGON,
         "boost",

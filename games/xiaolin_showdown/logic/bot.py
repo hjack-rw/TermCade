@@ -91,7 +91,13 @@ def _counter_element(
     player_hand: Sequence[Card], backgrounds: Sequence[str], rng: Rng
 ) -> str:
     """No boost available — counter the player: against a wudai lead card prefer metal or its
-    opposite, otherwise counter the player's most common element."""
+    opposite, otherwise counter the player's most common element.
+
+    An EMPTY hand has no element to counter — a hand can run dry between refills now that wear
+    vaults Wu mid-showdown and the Lantern can take everything at once. Nothing to read, so roll.
+    """
+    if not player_hand:
+        return rng.choice(list(backgrounds))
     if player_hand[0].type == "wudai":
         counters = ["metal", OPPOSITES.get(player_hand[0].element, "metal")]
     else:
@@ -236,9 +242,9 @@ def _reachable(
     mine, _theirs = trial.sides(is_player)
     remaining = list(playable)
     if boost is not None:
-        # Resolve the boost the way the duel will (a Morpher becomes 1/1/1 of the ground's element),
+        # Resolve the boost the way the duel will (a Morpher nets 1/1/1 in tune — see `as_boost`),
         # or the bot prices a wudai Morpher at its unresolved 0/0/0 and never plays it.
-        mine.queue.append(as_boost(boost, ground.background))
+        mine.queue.append(as_boost(boost, ground.background, trial.stat))
         remaining = [card for card in remaining if card is not boost]
 
     if not remaining:

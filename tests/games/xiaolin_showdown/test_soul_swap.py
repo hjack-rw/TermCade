@@ -74,6 +74,16 @@ def test_the_bot_leaves_a_near_worn_wu_to_bank_itself():
     assert pick_deposit([worn, fresh], Difficulty.HARD) is fresh
 
 
+def test_a_background_is_still_picked_against_an_empty_hand():
+    # Wear vaults and the Lantern made empty hands reachable mid-run; the background pick must not
+    # read a lead card that is not there.
+    from termcade.core.rng import Rng
+    from xiaolin_showdown.logic.bot import choose_background
+
+    stats = {"force": 1, "agility": 1, "intellect": 1}
+    assert choose_background(stats, ["fire", "water"], ([], []), stats, Rng(0)) in ("fire", "water")
+
+
 def test_an_empty_opposing_hand_fizzles_the_swap():
     lantern = wu(0, 0, 0, mechanic=Mechanic.METEMPSYCHOSIS, name="Lantern")
     state = XiaolinState(  # type: ignore[arg-type]

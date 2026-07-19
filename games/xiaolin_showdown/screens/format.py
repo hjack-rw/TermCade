@@ -220,6 +220,7 @@ EFFECTS = {
     Mechanic.STORMFRONT: "You choose the arena's element for the Showdown.",
     Mechanic.WARD: "Your Wu of its element cannot be dragged down this battle.",
     Mechanic.METEMPSYCHOSIS: "Swap your entire hand with your opponent's.",
+    Mechanic.WITCHCRAFT: "Spent Wu return to her hand, worn; her turn can recall the lost.",
     Mechanic.DIASKOPIA: "Read your opponent's personal Deck.",
     Mechanic.TELESKOPIA: f"Look at the next {SCOPE_DEPTH} Wu in the incoming Wu pile.",
     Mechanic.TELEPATHEIA: "Take or refuse the next Showdown's Initiative.",
@@ -252,6 +253,8 @@ def effect_line(power: Power, *, is_card: bool = True) -> str | None:
             return "Immutable Moby Morpher."
         if mechanic is Mechanic.DRAGON:
             return "Possesses a personal Wudai weapon."
+        if mechanic is Mechanic.WITCHCRAFT:
+            return "Her spent Wu return to her; the lost answer her call."
     return EFFECTS.get(mechanic)
 
 

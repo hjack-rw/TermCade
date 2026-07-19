@@ -189,6 +189,17 @@ def test_a_morpher_spent_as_a_boost_is_one_one_one_of_its_chosen_element(catalog
     assert boosted.element == "fire"
 
 
+def test_a_morph_boost_prints_nothing_on_the_contested_stat(catalog):
+    """The nerf that ended 1/1/1-plus-the-lift: in tune, the elemental bonus stands the contested
+    column back up, so the boost NETS 1/1/1 — and a reversed bonus drags it below."""
+    moby = catalog.card(5)
+
+    boosted = as_boost(moby, "fire", "agility")
+
+    assert boosted.stats["agility"] == 0
+    assert all(boosted.stats[stat] == 1 for stat in ("force", "intellect"))
+
+
 def test_a_dragon_boost_enters_the_queue_as_itself(catalog):
     """Only the Morpher has a boost mode; every other boost rides in unchanged, its own element kept."""
     dragon = catalog.card(1)  # Silver Manta Ray — a dragon, 1/1/1 of water
