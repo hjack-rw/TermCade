@@ -162,7 +162,9 @@ class Duel:
         """
         duel = DuelState()
         duel.player.initiative, duel.bot.initiative = initiative(self.state.player, self.state.bot)
-        if self.state.forced_priority is not None:
+        if self.state.initiative_contested:
+            pass  # both reached for it — player_priority stays None, so `_commitment` throws the coin
+        elif self.state.forced_priority is not None:
             duel.player_priority = self.state.forced_priority
         elif duel.player.initiative != duel.bot.initiative:
             duel.player_priority = duel.player.initiative > duel.bot.initiative
@@ -467,6 +469,7 @@ class Duel:
         self.state.forced_priority = None  # the Conch's answer was for this showdown, and is spent
         self.state.locked_challenge = None  # the Prognosis pin was for this showdown too
         self.state.conch_tiebreak = None
+        self.state.initiative_contested = False  # the contest, if any, was settled by this showdown's coin
         if not self.state.card_deck:
             self.state.has_ended = True
 

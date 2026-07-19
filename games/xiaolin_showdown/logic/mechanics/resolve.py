@@ -126,6 +126,17 @@ def _inert(mirror: Card) -> Card:
     return mirror
 
 
+def _set_element_as(side: "Side", element: str) -> None:
+    """One Wu decrees what a side's Wu count as, for the background bonus. Two decrees that disagree
+    (a Set-Element and a Cleanse both landing here) cancel: the side keeps its Wu's own elements, and
+    the clash is flagged so the story can say why. Last-writer-wins would let play order decide it."""
+    if side.element_as is not None and side.element_as != element:
+        side.element_as = None
+        side.element_cancelled = True
+    else:
+        side.element_as = element
+
+
 def _apply_mechanic(
     mechanic: Mechanic,
     card: Card,
@@ -141,13 +152,13 @@ def _apply_mechanic(
         _negate(mechanic, caster, opponent)
         return False
     if mechanic is Mechanic.CLEANSE:  # Kuzusu Atom — the opponent's Wu count as metal
-        opponent.element_as = "metal"
+        _set_element_as(opponent, "metal")
         return False
     if mechanic is Mechanic.SET_ELEMENT:  # Eye of Dashi — the caster's Wu count as their chosen element
-        caster.element_as = element
+        _set_element_as(caster, element)
         return False
     if mechanic is Mechanic.WARD:  # Monkey Staff and kin — the caster's Wu of ITS element ignore drags
-        caster.ward = card.element
+        caster.ward.add(card.element)  # a set: two wards of different elements both hold
         return False
     if mechanic is Mechanic.STAT_SHIELD:  # Mikado Arms and kin — immune to curses on the stat it boosts
         caster.shielded.add(max(card.stats, key=lambda s: card.stats[s] or 0))

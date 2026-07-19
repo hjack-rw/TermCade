@@ -58,6 +58,10 @@ class XiaolinState:
     # ``forced_priority``. ``None`` is the ordinary game.
     locked_challenge: str | None = None
     conch_tiebreak: bool | None = None
+    # Both duelists reached for the initiative the same turn (a Conch and/or Glasses each): neither's
+    # answer stands and the coin decides, since we cannot play the two out simultaneously. Set when a
+    # second initiative power lands on an already-answered showdown; spent by the duel end phase.
+    initiative_contested: bool = False
     # Wu that surfaced, were fought over, and that nobody won hard enough to keep. They are **lost**,
     # not destroyed: out of play, and one day recoverable (the Rooster Booster reaches for the oldest).
     # Shared — a Wu dies to a showdown, not to a duelist.
@@ -109,6 +113,7 @@ class XiaolinState:
             "forced_priority": self.forced_priority,
             "locked_challenge": self.locked_challenge,
             "conch_tiebreak": self.conch_tiebreak,
+            "initiative_contested": self.initiative_contested,
             "lost": [card.id for card in self.lost],
             "used": [card.id for card in self.used],
         }
@@ -134,6 +139,7 @@ class XiaolinState:
             forced_priority=data.get("forced_priority"),  # absent in a save from before the Conch
             locked_challenge=data.get("locked_challenge"),
             conch_tiebreak=data.get("conch_tiebreak"),
+            initiative_contested=data.get("initiative_contested", False),
             lost=[_fresh_card(catalog, cid) for cid in data.get("lost", [])],
             used=[_fresh_card(catalog, cid) for cid in data.get("used", [])],
         )

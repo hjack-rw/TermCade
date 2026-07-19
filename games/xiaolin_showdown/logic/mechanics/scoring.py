@@ -1,6 +1,6 @@
 """Scoring math — initiative before a showdown, end values within one. Pure, no I/O."""
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 
 from ..constants import OPPOSITES
 from ..models import Card, Mechanic, Player
@@ -76,7 +76,7 @@ def count_end_stats(
     earns_bonus: Sequence[Card] | None = None,
     suffers_bonus: Sequence[Card] = (),
     element_as: str | None = None,
-    ward: str | None = None,
+    ward: Collection[str] = (),
     shielded: bool = False,
 ) -> int:
     """A duelist's end value for one stat: base + queued card stats + elemental bonus.
@@ -113,7 +113,7 @@ def count_end_stats(
         # clamps a warded-element Wu's NEGATIVE score to zero — drag ignored, lift kept.
         for card in bonus_cards:
             score = element_score(element_as or card.element, background)
-            if ward and (element_as or card.element) == ward and score < 0:
+            if (element_as or card.element) in ward and score < 0:
                 score = 0
             if card.power.mechanic is Mechanic.DOUBLE_ELEMENT:  # Blade of the Nebula — its bonus counts double
                 score *= 2

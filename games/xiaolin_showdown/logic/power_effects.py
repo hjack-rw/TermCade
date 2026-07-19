@@ -104,6 +104,13 @@ FIZZLE_MESSAGE = PowerReport(
     "Something should have happened...",
 )
 
+# Both duelists reached for the initiative the same turn (Conch and/or Glasses): neither answer stands.
+# Swapped in by `_fire` for the second such power played — the coin toss decides who leads instead.
+CONTESTED_INITIATIVE = PowerReport(
+    "You both reached for the initiative — a coin toss will decide who leads.",
+    "{caster} contested the initiative — the coin decides who leads the next Showdown.",
+)
+
 
 def _voice(is_player: bool) -> dict[str, str]:
     """The pronoun inserts for a log line, flipped by who cast the power — so one line reads right from
@@ -186,6 +193,20 @@ def _scan_pile(spend: _Spend) -> _Fill | None:
     return {"cards": _names(coming)} if coming else None
 
 
+def _already_answered(state: XiaolinState) -> bool:
+    """Has an initiative power (Conch or Glasses) already spoken for the coming showdown this turn?"""
+    return state.forced_priority is not None or state.initiative_contested
+
+
+def _contest_initiative(state: XiaolinState) -> None:
+    """A second initiative power lands on an already-answered showdown: neither answer stands. Wipe the
+    priority claims and flag the contest — the coin decides, since the two cannot be played at once."""
+    state.initiative_contested = True
+    state.forced_priority = None
+    state.conch_tiebreak = None
+    state.locked_challenge = None
+
+
 def _listen(spend: _Spend) -> _Fill | None:
     """Oxyderkia: the next showdown's initiative, bought with an answer.
 
@@ -194,7 +215,10 @@ def _listen(spend: _Spend) -> _Fill | None:
     """
     if spend.priority is None:
         raise ValueError("Oxyderkia was spent without an answer — ask before you fire it")
-    spend.state.forced_priority = spend.priority if spend.is_player else not spend.priority
+    if _already_answered(spend.state):
+        _contest_initiative(spend.state)
+    else:
+        spend.state.forced_priority = spend.priority if spend.is_player else not spend.priority
     return {"answer": TAKEN if spend.priority else REFUSED}
 
 
@@ -208,6 +232,9 @@ def _foresee(spend: _Spend) -> _Fill | None:
     """
     from . import bot  # local: bot imports this module
 
+    if _already_answered(spend.state):
+        _contest_initiative(spend.state)
+        return {"answer": "the coin"}  # ignored: `_fire` swaps in CONTESTED_INITIATIVE
     spend.state.forced_priority = not spend.is_player  # the opponent leads
     spend.state.conch_tiebreak = spend.is_player  # the caster keeps the ground despite not leading
     if spend.is_player:  # the opponent is the bot — its call is deterministic, so pin and reveal it
@@ -336,6 +363,10 @@ def _fire(spend: _Spend) -> PowerReport:
     fills = handler(spend)
     if fills is None:
         return FIZZLE_MESSAGE
+    # An initiative power that lands on an already-answered showdown contests it: neither stands, the
+    # coin decides, and the wording says so instead of promising an answer the handler did not keep.
+    if spend.state.initiative_contested and mechanic in (Mechanic.ENHANCED_VISION, Mechanic.PROGNOSIS):
+        return _report(CONTESTED_INITIATIVE, is_player=spend.is_player, **fills)
     # Repulsion is the one power with two outcomes — the deck version has its own wording.
     template = REPULSION_TO_DECK if mechanic is Mechanic.BOUNCE and spend.to_deck else REPORTS[mechanic]
     return _report(template, is_player=spend.is_player, **fills)

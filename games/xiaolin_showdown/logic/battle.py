@@ -44,9 +44,13 @@ class Side:
     # A Kuzusu Atom / Eye of Dashi has set what element this side's Wu count as, for the background
     # bonus only (their stats are untouched). ``None`` leaves each Wu its own printed element.
     element_as: str | None = None
-    # A ward Wu (Monkey Staff and kin) protects this side's Wu OF ITS ELEMENT from every negative
+    # Two element-setters disagreed over this side (a Set-Element and a Cleanse, say): they cancel,
+    # `element_as` reverts to None, and this flags it so the showdown story can say why.
+    element_cancelled: bool = False
+    # Ward Wu (Monkey Staff and kin) protect this side's Wu OF THEIR ELEMENT from every negative
     # elemental bonus this showdown — the opposite arena's drag and metal's alike. Lift still lands.
-    ward: str | None = None
+    # A set: field two wards of different elements and both protect, they do not overwrite each other.
+    ward: set[str] = field(default_factory=set)
     # A stat-shield Wu (Mikado Arms and kin) fielded here: its caster takes no curse on these stats —
     # a debuff landed on a shielded stat counts nothing. One entry per shield Wu fielded.
     shielded: set[str] = field(default_factory=set)

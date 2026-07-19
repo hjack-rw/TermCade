@@ -140,13 +140,22 @@ class DuelScreen(XiaolinScreen):
         while True:
             stage = await duel.advance()  # one phase; a choice phase raises its modal inline
             self._show_board(duel)
-            if stage == COMMITMENT and duel.duel.player.initiative == duel.duel.bot.initiative:
+            tied = duel.duel.player.initiative == duel.duel.bot.initiative
+            if stage == COMMITMENT and (tied or self.state.initiative_contested):
                 await self._reveal_coin_toss(duel.duel.player_priority is True)
             # They set the price only if you called a *stat*. A tournament prices itself — three
             # battles of one Wu — so there is nothing they named and nothing to announce.
             if stage == SETUP and duel.duel.player_priority and duel.duel.challenge != TOURNAMENT:
                 self._announce_wager(duel.duel, state)
             if stage == END:  # the end phase (the loser's stakes change hands) has run
+                if any(r.player.element_cancelled or r.bot.element_cancelled for r in duel.duel.rounds):
+                    # Toast only, not logged: two element-setters disagreed and cancelled — the player
+                    # would otherwise see a Wu keep its own colour with no reason given.
+                    self.engine_app.notify(
+                        "Two Wu clashed over the element — both cancelled; each side kept its own.",
+                        title="Elements cancelled",
+                        log=False,
+                    )
                 break
             await self._await_continue("Continue")
 
