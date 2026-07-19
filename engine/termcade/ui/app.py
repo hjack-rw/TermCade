@@ -17,6 +17,7 @@ from termcade.ui.screens.console import ConsoleScreen, debug_enabled
 from termcade.ui.screens.dialog import ChoiceModal
 from termcade.core import music
 from termcade.core.audio import MUSIC_OPTION, SFX_OPTION, make_player
+from termcade.core.music import Style
 
 from .screens.base import EngineScreen
 from .theme import TERMCADE_THEME
@@ -35,6 +36,10 @@ BANNER = """\
 
 # At or above this width a screen is "-wide" (room for side-by-side panels); below it, "-narrow".
 WIDE_COLS = 100
+
+# How long one tune takes to become another. Long enough that the two overlap as a change of mood
+# rather than a cut, short enough that the new tune is established before the moment has passed.
+MUSIC_CROSSFADE = 1.2
 
 
 class HelloScreen(EngineScreen):
@@ -138,7 +143,12 @@ class EngineApp(App[None]):
         # With no game there is no context to own the player, but the empty cabinet still hums.
         self._player = self.ctx.audio if self.ctx is not None else make_player()
         self._closing = False
-        self._theme: bytes | None = None  # rendered once, then kept — a toggle must be instant
+        # Tunes are rendered once and KEPT, keyed by name — a toggle must be instant, and so must
+        # switching back to a tune already heard (a boss run ending, say).
+        self._tunes: dict[str, bytes] = {}
+        self._tune = ""  # which tune is current; "" is the cartridge's own `music_style`
+        self._tune_style: Style | None = None  # set when a cartridge switched to one of its own
+        self._crossfade = 0.0  # seconds, carried to the render worker when a switch has to wait on it
         self._sfx: dict[str, array] = {}  # synthesized on first press, then kept
 
     def on_mount(self) -> None:
@@ -177,14 +187,32 @@ class EngineApp(App[None]):
         after the screen has handled it, so a cartridge gets this for free and cannot forget it."""
         self.play_sfx(music.CLICK)
 
-    def apply_music_setting(self) -> None:
+    def apply_music_setting(self, *, crossfade: float = 0.0) -> None:
         """Start or stop the soundtrack to match the setting. Safe to call as often as you like."""
         if not self.music_on:
             self._player.stop()
-        elif self._theme is not None:
-            self._player.play_loop(self._theme)
+        elif (tune := self._tunes.get(self._tune)) is not None:
+            self._player.play_loop(tune, crossfade=crossfade)
         else:
+            # The render happens on a worker, so the fade has to travel with it to the other side.
+            self._crossfade = crossfade
             self.run_worker(self._start_theme, thread=True, group="theme")
+
+    def play_tune(self, style: Style, *, name: str) -> None:
+        """Switch the soundtrack to another style of the cartridge's own — a boss theme, say.
+
+        The cabinet knows how to play a tune; only the cartridge knows *which* tune a moment calls for,
+        so the style is passed in rather than looked up. Calling with the tune already playing is a
+        no-op, so a screen may call it on every mount without restarting the music under the player.
+
+        A switch CROSSFADES, because one tune is replacing another under a player who is mid-run and
+        did not ask for a jolt. Starting from silence still cuts — there is nothing to fade from.
+        """
+        if name == self._tune:
+            return
+        playing = self._tunes.get(self._tune) is not None
+        self._tune, self._tune_style = name, style
+        self.apply_music_setting(crossfade=MUSIC_CROSSFADE if playing else 0.0)
 
     def _start_theme(self) -> None:
         """Synthesize and start the soundtrack off the UI thread — rendering it takes long enough
@@ -197,12 +225,18 @@ class EngineApp(App[None]):
         cartridge's ``music_style`` decides what kind of music it is a tune of.
         """
         seed = self.game.game_id if self.game is not None else "termcade"
-        style = self.game.music_style if self.game is not None else music.ARCADE
-        self._theme = music.theme(seed, style)
+        # The SEED stays the cartridge's either way, so a switched tune is the same melody under
+        # different rules — the faster cousin of what was playing, not an unrelated piece.
+        name = self._tune
+        style = self._tune_style or (self.game.music_style if self.game is not None else music.ARCADE)
+        rendered = music.theme(seed, style)
+        self._tunes[name] = rendered
         # The render outlives a fast quit, and a player who muted while it ran wants silence, not a
-        # late start — both would otherwise leave the OS looping a sound nobody asked for.
-        if not self._closing and self.music_on:
-            self._player.play_loop(self._theme)
+        # late start — both would otherwise leave the OS looping a sound nobody asked for. It also
+        # outlives a switch: by the time it lands the player may already be on another tune.
+        if not self._closing and self.music_on and self._tune == name:
+            self._player.play_loop(rendered, crossfade=self._crossfade)
+        self._crossfade = 0.0
 
     def notify(self, message: str, *, title: str = "", log: bool = True, **kwargs: Any) -> None:
         """Raise a toast, and journal it — the Game Log reads the journal back.

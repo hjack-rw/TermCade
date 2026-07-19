@@ -46,8 +46,13 @@ BLOCKSIZE = 512
 
 
 class AudioPlayer(Protocol):
-    def play_loop(self, wav: bytes) -> None:
-        """Start ``wav`` looping. Replaces whatever was looping before."""
+    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
+        """Start ``wav`` looping. Replaces whatever was looping before.
+
+        ``crossfade`` seconds fades the outgoing loop down while the new one comes up, instead of
+        cutting. A cut is right when the music was silent (starting, unmuting); a fade is right when
+        one tune is replacing another mid-run.
+        """
 
     def play_once(self, pcm: array) -> None:
         """Sound ``pcm`` once, over anything already playing."""
@@ -62,7 +67,7 @@ class AudioPlayer(Protocol):
 class NullPlayer:
     """Silence. The fallback whenever real audio is off, absent, or unwanted."""
 
-    def play_loop(self, wav: bytes) -> None:
+    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
         return None
 
     def play_once(self, pcm: array) -> None:
@@ -99,7 +104,15 @@ class StreamPlayer:
         """
         outdata[:] = self._mixer.fill(frames)
 
-    def play_loop(self, wav: bytes) -> None:
+    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
+        samples = int(crossfade * SAMPLE_RATE)
+        if self._music is not None and samples > 0:
+            # Both loops run together for the length of the fade. The outgoing one drops itself once
+            # it reaches silence — it loops, so it would otherwise play under the new tune forever.
+            self._mixer.fade(self._music, 0.0, samples=samples, drop=True)
+            self._music = self._mixer.play(pcm_of(wav), loop=True, gain=0.0)
+            self._mixer.fade(self._music, MUSIC_GAIN, samples=samples)
+            return
         if self._music is not None:
             self._mixer.stop(self._music)
         self._music = self._mixer.play(pcm_of(wav), loop=True, gain=MUSIC_GAIN)

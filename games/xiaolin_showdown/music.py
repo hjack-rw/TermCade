@@ -30,3 +30,14 @@ XIAOLIN = Style(
     # Well under the cabinet's floor of 120. The temple, not the arcade.
     bpm_range=(80, 100),
 )
+
+# The same music, driven. A boss is the one opponent the temple's pace is wrong for, so only the TEMPO
+# moves: same yu scale, same quartal progressions, same roots, and the tune is rendered off the same
+# seed — the faster cousin of what was already playing, not a different piece. Change anything else here
+# and the boss stops sounding like the same temple in trouble.
+XIAOLIN_BOSS = Style(
+    scale=XIAOLIN.scale,
+    progressions=XIAOLIN.progressions,
+    roots_hz=XIAOLIN.roots_hz,
+    bpm_range=(126, 146),
+)

@@ -30,6 +30,11 @@ class Voice:
     loop: bool = False
     gain: float = 1.0
     pos: int = 0
+    # A gain ramp, stepped per sample on the audio thread (see `Mixer.fade`). ``fade_step`` of 0.0
+    # means "not fading", and that is the common case — `fill` keeps a separate fast path for it.
+    fade_to: float = 0.0
+    fade_step: float = 0.0
+    drop_when_faded: bool = False
 
 
 def pcm_of(wav: bytes) -> array:
@@ -63,6 +68,22 @@ class Mixer:
             self._voices.append(voice)
         return voice
 
+    def fade(self, voice: Voice, to: float, *, samples: int, drop: bool = False) -> None:
+        """Ramp ``voice`` toward gain ``to`` over ``samples``, and optionally drop it when it lands.
+
+        The ramp is stepped on the AUDIO thread, per sample, because only that thread knows where the
+        playhead is. Driven from a UI timer instead it would move in ~23ms chunks and zipper audibly.
+        ``samples`` rather than seconds keeps the mixer ignorant of the sample rate, which is the
+        player's business.
+        """
+        if samples <= 0:
+            voice.gain, voice.fade_step = to, 0.0
+            return
+        with self._lock:
+            voice.fade_to = to
+            voice.fade_step = (to - voice.gain) / samples
+            voice.drop_when_faded = drop
+
     def stop(self, voice: Voice | None = None) -> None:
         """Drop one voice, or every voice when given none."""
         with self._lock:
@@ -92,16 +113,36 @@ class Mixer:
                     spent.append(voice)
                     continue
                 pos = voice.pos
-                for i in range(frames):
-                    if pos >= length:
-                        if not voice.loop:
-                            break
-                        pos = 0
-                    out[i] += int(voice.pcm[pos] * voice.gain)
-                    pos += 1
+                if voice.fade_step:  # the ramping path — see `fade`; gains move per sample
+                    gain, step, target = voice.gain, voice.fade_step, voice.fade_to
+                    for i in range(frames):
+                        if pos >= length:
+                            if not voice.loop:
+                                break
+                            pos = 0
+                        out[i] += int(voice.pcm[pos] * gain)
+                        pos += 1
+                        if step:
+                            gain += step
+                            if (step > 0 and gain >= target) or (step < 0 and gain <= target):
+                                gain, step = target, 0.0
+                    voice.gain, voice.fade_step = gain, step
+                    # Faded to nothing and asked to leave: a looping voice never runs out on its own,
+                    # so this is the only way the tune being crossfaded OUT of is ever collected.
+                    if not step and voice.drop_when_faded and gain <= 0.0:
+                        spent.append(voice)
+                else:
+                    for i in range(frames):
+                        if pos >= length:
+                            if not voice.loop:
+                                break
+                            pos = 0
+                        out[i] += int(voice.pcm[pos] * voice.gain)
+                        pos += 1
                 voice.pos = pos
                 if pos >= length and not voice.loop:
                     spent.append(voice)
             for voice in spent:
-                self._voices.remove(voice)
+                if voice in self._voices:  # a voice can be flagged twice: faded out AND run out
+                    self._voices.remove(voice)
         return array("h", (max(-PEAK, min(PEAK, sample)) for sample in out)).tobytes()

@@ -26,7 +26,7 @@ class SpyPlayer:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def play_loop(self, wav: bytes) -> None:
+    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
         self.calls.append("play")
 
     def play_once(self, pcm: array) -> None:
@@ -82,7 +82,8 @@ async def test_turning_music_back_on_replays_it_without_re_rendering(tmp_path):
     # cached, and that worker would land a second later and overwrite the stub — the reuse path
     # this test exists to check would never be the thing that ran.
     app._player = spy
-    app._theme = b"RIFF-already-rendered"
+    # Tunes are cached by name; "" is the cartridge's own theme (a boss run switches to another).
+    app._tunes[""] = b"RIFF-already-rendered"
     async with app.run_test(size=(150, 50)) as pilot:
         current = app.ctx.settings.current
         app.ctx.settings.save(
@@ -99,4 +100,4 @@ async def test_turning_music_back_on_replays_it_without_re_rendering(tmp_path):
         # longer the last thing the player heard. What must hold is that it played at all, and
         # that it played the bytes we already had rather than synthesizing them again.
         assert "play" in spy.calls
-        assert app._theme == b"RIFF-already-rendered"
+        assert app._tunes[""] == b"RIFF-already-rendered"

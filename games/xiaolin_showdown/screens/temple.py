@@ -15,7 +15,7 @@ from rich.text import Text
 from termcade.ui.work import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Header
 
 from termcade.ui.screens.log import GameLogScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
@@ -41,6 +41,7 @@ from ..logic.settings import player_actions
 from ..logic.state import XiaolinState
 from ..logic.training import TRAIN_LENGTH, payout_ready, raise_stat, trainable_stats
 from ..logic.turn import DRAW, TRAIN
+from ..music import XIAOLIN, XIAOLIN_BOSS
 from .base import XiaolinScreen
 from .deposit import DepositScreen
 from .format import (
@@ -86,7 +87,16 @@ class TempleScreen(XiaolinScreen):
         yield Header()
 
         with BoxedPanel(title="STATE OF THE GAME"):
-            yield Static(_summary_line(player, bot, state), id="summary")
+            # TooltipStatic, not Static: the Points figure carries the run's target on a hover, and a
+            # plain Static never reads the `meta` that answers it.
+            yield TooltipStatic(
+                _summary_line(
+                    player, bot, state,
+                    target=state.win_target(self.rules),
+                    actions_left=player_actions(state, self.rules) - state.actions_taken,
+                ),
+                id="summary",
+            )
             yield TooltipStatic(_state_grid(player, bot, init_player, init_bot), id="state")
 
         player_rows, bot_rows = hands_lines(player.whole_hand, bot.whole_hand)
@@ -125,6 +135,13 @@ class TempleScreen(XiaolinScreen):
         self._offer_payout()
 
     def on_mount(self) -> None:
+        # A boss run is fought to a faster tune. Set here rather than at character select because the
+        # temple is where a run actually begins — and re-set on every return to it, so loading a saved
+        # boss run into the temple sounds right too. `play_tune` no-ops when it is already playing.
+        boss = self.state.boss_run
+        self.engine_app.play_tune(
+            XIAOLIN_BOSS if boss else XIAOLIN, name="boss" if boss else ""
+        )
         self._offer_payout()
 
     def _offer_payout(self) -> None:
@@ -274,11 +291,19 @@ _ACTION_HELP = {
 }
 
 
-def _summary_line(player: Player, bot: Player, state: XiaolinState) -> Text:
+def _summary_line(
+    player: Player, bot: Player, state: XiaolinState, *, target: int, actions_left: int
+) -> Text:
     line = Text()  # centred by the #summary `text-align`, not Rich justify (which uses natural width)
-    line.append_text(labelled("Points", f"{player.points}/{bot.points}"))
+    # The score alone never says what it is a race TO — and the target is per-run now (derived from the
+    # deck this game dealt), so it cannot be learned once and remembered. Hovering the score answers it.
+    points = labelled("Points", f"{player.points}/{bot.points}")
+    points.stylize(Style(meta={"tooltip": f"Earn {target} to win!"}))
+    line.append_text(labelled("Actions Left", str(actions_left)))
     line.append("       ")
     line.append_text(labelled("Remaining Wu", str(len(state.card_deck))))
+    line.append("       ")
+    line.append_text(points)
     return line
 
 
