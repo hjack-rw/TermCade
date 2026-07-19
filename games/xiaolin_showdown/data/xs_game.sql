@@ -117,10 +117,10 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (6, 'Fist of Tebigong', 5, 0, 0, 1, 'metal', 'arms', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (7, 'Helmet of Jong', 0, 5, 0, 2, 'metal', 'head', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (8, 'Bubble Brains', 0, 0, 5, 3, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (9, 'Longhorn Taurus', 3, 0, 0, 4, 'wind', 'item', 1);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (10, 'Jetbootsu', 0, 3, 0, 5, 'fire', 'boots', 1);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (11, 'Mask of Rio', 0, 0, 3, 6, 'earth', 'head', 1);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (12, 'Changing Chopsticks', 0, 1, 1, 7, 'water', 'item', 1);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (9, 'Longhorn Taurus', 3, 0, 0, 4, 'wind', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (10, 'Jetbootsu', 0, 3, 0, 5, 'fire', 'boots', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (11, 'Mask of Rio', 0, 0, 3, 6, 'earth', 'head', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (12, 'Changing Chopsticks', 0, 1, 1, 7, 'water', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (13, 'Ohwah Tegu Saim', NULL, NULL, NULL, 8, 'metal', 'item', 1);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (14, 'Wushu Bracelet', NULL, NULL, NULL, 9, 'metal', 'amulet', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (15, 'Third-Arm Sash', 0, 3, 0, 10, 'metal', 'arms', 2);
@@ -128,10 +128,10 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (17, 'Two-Ton Tunic', -5, 0, 0, 12, 'metal', 'torso', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (18, 'Shadow Slicer', 0, -5, 0, 13, 'metal', 'item', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (19, 'Pearl of LiBai', 0, 0, -5, 14, 'metal', 'amulet', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (20, 'Lasso Boa-Boa', -3, 0, 0, 15, 'earth', 'arms', 1);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (21, 'Tangle Web Comb', 0, -3, 0, 16, 'fire', 'item', 1);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (22, 'Ju-Ju Flytrap', 0, 0, -3, 17, 'wind', 'item', 1);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (23, 'Silk Spitter', -1, -1, 0, 18, 'water', 'item', 1);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (20, 'Lasso Boa-Boa', -3, 0, 0, 15, 'earth', 'arms', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (21, 'Tangle Web Comb', 0, -3, 0, 16, 'fire', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (22, 'Ju-Ju Flytrap', 0, 0, -3, 17, 'wind', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (23, 'Silk Spitter', -1, -1, 0, 18, 'water', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (24, 'Serpent''s Tail', 1, 2, 1, 19, 'metal', 'item', 4);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (25, 'Falcon''s Eye', 0, 1, 2, 20, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (26, 'Eagle Scope', 0, 2, 1, 21, 'metal', 'item', 2);
@@ -156,7 +156,7 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (45, 'Celestial Dial Locket', 1, 1, 1, 41, 'metal', 'amulet', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (46, 'Star Hanabi', 2, 2, 0, 42, 'fire', 'amulet', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (47, 'Kuzusu Atom', 2, 1, 1, 43, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (48, 'Eye of Dashi', 2, 2, 2, 44, 'metal', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (48, 'Eye of Dashi', 2, 2, 2, 44, 'metal', 'amulet', 4);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (49, 'Monsoon Sandals', 1, 1, 1, 45, 'metal', 'boots', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (50, 'Black Beetle', 0, 1, 2, 46, 'fire', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (51, 'Gills of Hamachi', 0, 2, 1, 47, 'water', 'item', 2);

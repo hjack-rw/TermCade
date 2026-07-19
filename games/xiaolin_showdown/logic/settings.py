@@ -36,7 +36,7 @@ class XiaolinSettings:
     # Derived from the pool (see `pool_fingerprint`), but written out so a bare `XiaolinSettings()`
     # still deals a real game. `test_settings_defaults_match_the_card_pool` fails when they fall stale.
     max_deck_size: int = 60
-    point_limit: int = 40
+    point_limit: int = 42
     starting_points_player: int = 0
     starting_points_bot: int = 0
     # One temple turn, one action: deposit, spend a power, or draw. One budget, so a hand is a resource
