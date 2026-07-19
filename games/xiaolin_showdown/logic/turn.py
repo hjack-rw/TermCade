@@ -166,7 +166,7 @@ _WORTH_NOTHING_ON_THE_TABLE: frozenset[Mechanic] = frozenset(
 
 _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | frozenset(
     {
-        Mechanic.PRINTED_STATS,  # the stats *are* the Wu
+        Mechanic.INNATE,  # the stats *are* the Wu
         Mechanic.INITIATIVE,  # its bonus is a hand power; in a battle it is only its stats
         Mechanic.HAND_SIZE,  # likewise — it buys a hand slot, not a blow
         Mechanic.HAND_FIZZLE,  # unprinted (see `powers.UNPRINTED`)
@@ -178,6 +178,7 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         Mechanic.REPULSION,  # likewise
         Mechanic.EUTHYMIA,  # likewise — it acts on the lost pile, never in a battle
         Mechanic.WITCHCRAFT,  # a character power (Wuya's) — no card ever prints it
+        Mechanic.BEAST_FORM,  # a character power (Chase's) — likewise
         # The dragon and the booster carry no stats but decide duels — they are priced by
         # BOOSTER_PREMIUM in `duel_value` rather than here, which is the older seam.
         Mechanic.DRAGON,
@@ -306,6 +307,61 @@ def bot_turn(
     return log or [BotMove(PASSED, f"{name} did nothing this turn.")]
 
 
+def _boss_acts(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """A boss's one temple action, or ``None`` to let the generic policy (a power) handle it.
+
+    A boss wins showdowns on its stats, so the temple is a race to the point target: keep a hand big
+    enough to field a full wager, snatch cheap Wu off the pile, and BANK the surplus. A power is not
+    taken here — it falls through to the generic path, which fires one only once the surplus is gone.
+    That is the whole fix: banking outranks a power for a boss, so a reusable witchcraft power stops
+    being an every-turn substitute for reaching the target.
+    """
+    from .actions import early_bird  # local: actions imports this module
+    from .temple_ai import choose_early_bird, worth_recalling
+
+    bot = state.bot
+
+    # Thin hand first: a boss that banks down to one Wu can be wagered only one, and wins nothing.
+    if len(bot.hand) < settings.max_wager and bot.deck:
+        drawn = bot.deck.pop(0)
+        bot.hand.append(drawn)
+        state.bot_actions_taken += 1
+        return BotMove(DRAW, f"{name} drew {drawn.name} from their deck.")
+
+    # A Wu off the pile with no showdown — cheap for Wuya (she gives up a scrap), pure profit.
+    bird = choose_early_bird(state, settings)
+    if bird is not None:
+        taken = state.card_deck[0]
+        early_bird(state, bird, is_player=False)
+        return BotMove(
+            EARLY_BIRD,
+            f"{name} used Early Bird to take {taken.name} from under your nose, giving up {bird.name}.",
+        )
+
+    # Wuya's witchcraft: a known weapon called back from the lost beats a blind draw.
+    if mechanic_of(bot.character.power) is Mechanic.WITCHCRAFT and worth_recalling(state):
+        revived = state.lost.pop(0)
+        bot.hand.append(hand_over(revived))
+        state.bot_actions_taken += 1
+        return BotMove(RECALL, f"{name} called {revived.name} back from the lost.")
+
+    # Bank the surplus — the point race. Ahead of any power: reaching the target ends the run on the
+    # boss's terms, before the player claws back.
+    if len(bot.hand) > DUEL_FLOOR:
+        banked = pick_deposit(bot.hand, difficulty)
+        if banked is not None:
+            points = bank_value(banked, rng)
+            bot.points = max(0, bot.points + points)
+            bot.remove_card(banked)
+            state.bot_actions_taken += 1
+            return BotMove(
+                VAULT, f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}."
+            )
+    return None  # nothing to draw/bank — the generic path may still fire a power
+
+
 def _bot_acts(
     state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
 ) -> BotMove | None:
@@ -322,7 +378,20 @@ def _bot_acts(
     from .actions import early_bird, use_power  # local: actions imports this module
     from .temple_ai import choose_early_bird, choose_temple_power, worth_recalling
 
-    play = choose_temple_power(state, settings)
+    # Chase Young meddles in no mere mortal affairs: at the temple he only draws or banks — never
+    # spends a Wu's power, never flies the Early Bird. His Wu are points and wagers, nothing more.
+    chase = mechanic_of(state.bot.character.power) is Mechanic.BEAST_FORM
+
+    # A BOSS races the point target: it wins showdowns on its stats, so it converts surplus Wu to
+    # points and uses a power only when nothing better is on the table — never the greedy every-turn
+    # spam that a shared, weapon-poor opponent policy falls into (which made witchcraft's reusable
+    # powers a NET LOSS: she shoved every turn and never banked). Boss temple order below.
+    if state.bot.character.tier == "boss" and not chase:
+        boss = _boss_acts(state, settings, rng, difficulty, name)
+        if boss is not None:
+            return boss
+
+    play = None if chase else choose_temple_power(state, settings)
     if play is not None:
         report = use_power(
             state,
@@ -340,7 +409,7 @@ def _bot_acts(
 
     # The Early Bird, before drawing or banking: a Wu off the pile with no showdown beats either, and
     # it is the only action here that takes from the *shared* pile rather than the bot's own shelf.
-    bird = choose_early_bird(state, settings)
+    bird = None if chase else choose_early_bird(state, settings)
     if bird is not None:
         taken = state.card_deck[0]  # the Wu the bird snatches, off the top of the pile
         early_bird(state, bird, is_player=False)

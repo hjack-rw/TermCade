@@ -167,7 +167,7 @@ RULES: dict[Mechanic, Rule] = {
         Mechanic.METEMPSYCHOSIS,
         "use",
         Timing.AT_TEMPLE,
-        "Spend it to swap your entire hand with your opponent's — a wudai weapon stays with its "
+        "Spend it to swap your entire hand with your opponent's — a Wudai weapon stays with its "
         "soul's owner.",
     ),
     Mechanic.WITCHCRAFT: Rule(
@@ -176,6 +176,13 @@ RULES: dict[Mechanic, Rule] = {
         Timing.AT_TEMPLE,
         "Witchcraft: a Wu she spends returns to her hand, worn one further by the sorcery — the "
         "third use vaults it. Her temple turn can also call the oldest lost Wu back.",
+    ),
+    Mechanic.BEAST_FORM: Rule(
+        Mechanic.BEAST_FORM,
+        "boost",  # it reads "On Boost" on his sheet — it IS a boost, just his own, not a Wu's
+        Timing.IN_DUEL,
+        "Beast Form: once a showdown, +3 to the contested stat — element-free, beyond the reach of "
+        "any counter. His Wu score nothing while it holds; he wagers them, never wields them.",
     ),
     Mechanic.DRAGON: Rule(
         Mechanic.DRAGON,
@@ -192,7 +199,7 @@ RULES: dict[Mechanic, Rule] = {
         "Lends no stats of its own; amplifies the card you play after it by 1 per stat that card "
         "contributes.",
     ),
-    Mechanic.PRINTED_STATS: Rule(Mechanic.PRINTED_STATS, "play", Timing.IN_DUEL, "Contributes its printed stats."),
+    Mechanic.INNATE: Rule(Mechanic.INNATE, "play", Timing.IN_DUEL, "Contributes its printed stats."),
     Mechanic.MORPH: Rule(
         Mechanic.MORPH,
         "play",

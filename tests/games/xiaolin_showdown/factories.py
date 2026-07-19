@@ -40,7 +40,7 @@ def wu(
     agility: int | None = 0,
     intellect: int | None = 0,
     *,
-    mechanic: Mechanic = Mechanic.PRINTED_STATS,
+    mechanic: Mechanic = Mechanic.INNATE,
     element: str = "metal",
     points: int = 0,
     bonus: int = 0,

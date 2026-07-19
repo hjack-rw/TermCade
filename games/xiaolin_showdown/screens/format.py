@@ -221,6 +221,7 @@ EFFECTS = {
     Mechanic.WARD: "Your Wu of its element cannot be dragged down this battle.",
     Mechanic.METEMPSYCHOSIS: "Swap your entire hand with your opponent's.",
     Mechanic.WITCHCRAFT: "Spent Wu return to her hand, worn; her turn can recall the lost.",
+    Mechanic.BEAST_FORM: "+3 to the contested stat, element-free; his Wu score nothing.",
     Mechanic.DIASKOPIA: "Read your opponent's personal Deck.",
     Mechanic.TELESKOPIA: f"Look at the next {SCOPE_DEPTH} Wu in the incoming Wu pile.",
     Mechanic.TELEPATHEIA: "Take or refuse the next Showdown's Initiative.",
@@ -255,6 +256,8 @@ def effect_line(power: Power, *, is_card: bool = True) -> str | None:
             return "Possesses a personal Wudai weapon."
         if mechanic is Mechanic.WITCHCRAFT:
             return "Her spent Wu return to her; the lost answer her call."
+        if mechanic is Mechanic.BEAST_FORM:
+            return "Takes Beast Form for +3, but wields no Wu; gifts the prize he wins."
     return EFFECTS.get(mechanic)
 
 

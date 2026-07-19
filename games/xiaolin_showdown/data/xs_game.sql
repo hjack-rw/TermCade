@@ -36,16 +36,17 @@ CREATE TABLE "power" (
 	PRIMARY KEY("id")
 );
 
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-6, 'Witchcraft', 'witchcraft', 'Due to Wuya''s personal connection to the Shen Gong Wu, she can both find Wu''s that have been lost, while also using them in more efficient ways.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-7, 'Beast Form', 'beast_form', 'Going over to the dark side, Chase became infused with the power of a Heylin Demon. He refuses however to meddle in mere mortal affairs.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-6, 'Witchcraft', 'witchcraft', 'Due to Wuya''s personal connection to the Shen Gong Wu, she can both find Wu''s that have been lost, while also using them in more efficient ways.', 1);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-5, 'Free Allomorphia', 'morph', 'Given his condition of being a literal Heylin Bean, Hannibal took a hold of Moby Morpher and never let it go - so he wields it as a free Wu.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-4, 'Dragon of Earth', 'dragon', 'User has access to basic Earth-based attacks, and moves', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-3, 'Dragon of Fire', 'dragon', 'User has access to basic Fire-based attacks, and moves', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-2, 'Dragon of Wind', 'dragon', 'User has access to basic Wind-based attacks, and moves', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-1, 'Dragon of Water', 'dragon', 'User has access to basic Water-based attacks, and moves', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (0, 'blank', 'filler', 'blank', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (1, 'Superhuman Strength', 'printed_stats', 'Allows the user to punch with incredible force, capable of creating shock waves during the impact', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (2, 'Deflection', 'printed_stats', 'Protects the user''s head by deflecting attacks and projectiles towards it', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (3, 'Photographic Memory', 'printed_stats', 'Grants its user an instant memory recall. The memories are stored in bubbles inside the Wu and can be shared across users', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (1, 'Superhuman Strength', 'innate', 'Allows the user to punch with incredible force, capable of creating shock waves during the impact', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (2, 'Deflection', 'innate', 'Protects the user''s head by deflecting attacks and projectiles towards it', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (3, 'Photographic Memory', 'innate', 'Grants its user an instant memory recall. The memories are stored in bubbles inside the Wu and can be shared across users', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (4, 'Furious Charge', 'initiative', 'Bull horn that when blown blasts the user at rapid speeds forward at their target (aka a "DASH-i")', 1);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (5, 'Levitation', 'initiative', 'Allows the user to defy gravity, which enables them to walk vertically on walls and even float minimal above ground', 1);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (6, 'Camouflage', 'initiative', 'Helps its user blend into their surroundings like a chameleon', 1);
@@ -54,9 +55,9 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (9, 'Power Augmentation', 'boost', 'Could greatly enhance the powers of other Wu that the user is holding. It combines with it, making it count as one in a duel.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (10, 'Temporary Appendage', 'hand_size', 'Acts like an extendable, strong, and durable third arm. Its moves are somewhat independent from the wearer, but always obey their commands', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (11, 'Chronokinesis', 'chronokinesis', 'Freezes anything it is pointed at in time and place for a short while', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (12, 'Impenetrable Defence', 'printed_stats', 'Can temporarily transform into an armor capable of blocking all sorts of attacks, but its weight increases drastically while active', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (13, 'Umbrakinesis', 'printed_stats', 'Allows for shadow manipulation that can influence a physical target. It can absorb and dissipate shadows at will, allowing the user to create shadow copies when it''s charged up', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (14, 'Tongue Twister', 'printed_stats', 'Makes the user''s enemies babble nonsense non stop. The effect prevents them of taking coherent actions', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (12, 'Impenetrable Defence', 'innate', 'Can temporarily transform into an armor capable of blocking all sorts of attacks, but its weight increases drastically while active', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (13, 'Umbrakinesis', 'innate', 'Allows for shadow manipulation that can influence a physical target. It can absorb and dissipate shadows at will, allowing the user to create shadow copies when it''s charged up', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (14, 'Tongue Twister', 'innate', 'Makes the user''s enemies babble nonsense non stop. The effect prevents them of taking coherent actions', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (15, 'Self-conscious Rope', 'initiative', 'Rope that can fulfill simple orders, behaving like a snake while at it. Apart from that it possess all the abilities of an ordinary rope', -1);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (16, 'Extendable Tendrils', 'initiative', 'It shoots a stream of hair from the comb''s teeth at the intended target and binds it. However, it requires complete focus from the user as you need to control each hair separately', -1);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (17, 'Méllissakinesis', 'initiative', 'When opened, unleashes a swarm of insects (e.g. ants, flies, bees) at a desired target', -1);
@@ -180,6 +181,7 @@ INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id"
 INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (10, 'PandaBubba', 4, 4, 6, 0, 'heylin', 0, 'hard');
 INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (11, 'Hannibal_Roy_Bean', 5, 5, 5, -5, 'heylin', 0, 'boss');
 INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (12, 'Wuya', 6, 6, 6, -6, 'heylin', 0, 'boss');
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (13, 'Chase_Young', 7, 7, 7, -7, 'heylin', 0, 'boss');
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "background" (

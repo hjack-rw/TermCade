@@ -30,7 +30,7 @@ class Mechanic(StrEnum):
     EUTHYMIA = "euthymia"
     DRAGON = "dragon"
     BOOST = "boost"
-    PRINTED_STATS = "printed_stats"
+    INNATE = "innate"
     MORPH = "morph"
     INTANGIBLE = "intangible"
     DIASKOPIA = "diaskopia"
@@ -51,6 +51,7 @@ class Mechanic(StrEnum):
     WARD = "ward"  # the -phylaxia four — the caster's Wu of this card's element ignore drags
     METEMPSYCHOSIS = "metempsychosis"  # Sun Chi Lantern — the two duelists swap hands
     WITCHCRAFT = "witchcraft"  # Wuya's character power — spent Wu return worn; the lost answer her
+    BEAST_FORM = "beast_form"  # Chase Young's — +3 on the contested stat, but his Wu score nothing
 
 
 @dataclass
@@ -136,8 +137,10 @@ class Player:
 
     @property
     def initiative(self) -> list[int]:
-        """Derived, never stored: each hand card's passive initiative bonus."""
-        return [card.power.initiative_bonus for card in self.hand]
+        """Derived, never stored: each hand card's passive initiative bonus, plus the character's own
+        inherent bonus (Wuya's witchcraft carries +1). A 0 changes nothing — only Wuya's power is
+        non-zero — and equal bonuses do not stack (the sum takes distinct values)."""
+        return [self.character.power.initiative_bonus] + [card.power.initiative_bonus for card in self.hand]
 
     @property
     def whole_hand(self) -> list[Card]:

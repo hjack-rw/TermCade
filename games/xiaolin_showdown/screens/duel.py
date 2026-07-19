@@ -26,7 +26,7 @@ from textual.widgets import Footer, Header, Static
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
 from ..logic.battle import Round, Side
-from ..logic.duel import COMMITMENT, END, SETUP, Duel, DuelChoices, DuelState
+from ..logic.duel import BEAST_BOOST, COMMITMENT, END, SETUP, Duel, DuelChoices, DuelState
 from ..logic.constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from ..logic.mechanics.cards import is_one_of
 from ..logic.models import Card, Player
@@ -412,6 +412,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             "P2", state.bot, live.bot,
             leads=duel.player_priority is False,
             challenge=live.stat or None, background=_resonant_background(duel),
+            beast=_beast_for(duel, live),
         ),
     ]
     if duel.winner_character:
@@ -426,6 +427,36 @@ def _resonant_background(duel: DuelState) -> str | None:
     return None if duel.elemental_bonus_cancelled else duel.background
 
 
+def _beast_for(duel: DuelState, live: Round) -> str | None:
+    """The stat Chase's Beast Form boosts on the table right now — set only in the battle that
+    contests it (a tournament's other legs see the plain stats), so the board shows it once."""
+    return duel.beast_stat if duel.beast_stat and live.stat == duel.beast_stat else None
+
+
+def _beast_offensive(stat: str, cards: list[Card], challenge: str | None) -> _CardsLine:
+    """Chase's Beast Form as the boost it is: ``Offensive: Beast Form (0/2/0) + <Wu> (-/-/-)`` — an
+    element-free, uncoloured boost lifting his own Wu, which are nullified beside it (offence_negated,
+    struck like an Emperor Scorpion's victim). The +2 sits on the one stat he named."""
+    tag = Text()
+    tag.append("     Offensive: ", style="dim")
+
+    beast = Text()
+    beast.append("Beast Form ", style="dim")  # no element colour — the beast is not a Wu
+    stats = "/".join(str(BEAST_BOOST) if s == stat else "0" for s in STAT_ORDER)
+    beast.append(f"({stats})", style="dim")
+
+    entries, joiners = [beast], [Text()]
+    for card in cards:  # the Wu the beast lifts — staked, but struck to nothing
+        joiners.append(Text(" + ", style="dim"))
+        entry = Text()
+        entry.append_text(card_name_text(card))
+        entry.append(" (", style="dim")
+        entry.append_text(absent_stats_text(challenge))
+        entry.append(")", style="dim")
+        entries.append(entry)
+    return _CardsLine(tag, entries, joiners)
+
+
 def _side_line(
     label: str,
     player: Player,
@@ -434,6 +465,7 @@ def _side_line(
     leads: bool,
     challenge: str | None,
     background: str | None,
+    beast: str | None = None,
 ) -> Group:
     name = display_name(player.character.name)
 
@@ -461,14 +493,20 @@ def _side_line(
     # bug, and the two duelists' blocks stay the same height.
     # Both lines read the background, in opposite directions: what lifts a Wu you played drags down
     # a curse cast at you. Printed here exactly as scored, so the shifts sum to the total by `base`.
-    return Group(
-        header,
-        # The board prints every Wu played, but only the ones that still move a stat earn the
-        # background's bonus — so only those may show the shift. See `earns_bonus` in the scorer.
-        _cards_line(
+    # Chase's Beast Form rides the Offensive line like the boost it is — ``Beast Form (0/2/0) + <Wu>``
+    # — his own Wu struck to -/-/- beside it. Otherwise the ordinary line: only the Wu that still move
+    # a stat earn the background's bonus (see `earns_bonus` in the scorer).
+    offensive = (
+        _beast_offensive(beast, side.mine(), challenge)
+        if beast
+        else _cards_line(
             "Offensive", side.mine(), side.amplifiers, challenge, background,
             earning=side.contributors(), negated=side.offence_negated,
-        ),
+        )
+    )
+    return Group(
+        header,
+        offensive,
         _cards_line(
             "Defensive", contributing(side.suffered), side.amplifiers, challenge, background,
             earning=contributing(side.suffered), sign=-1, negated=side.defence_negated,

@@ -53,7 +53,7 @@ def resolve_played_power(
     """
     mine, theirs = round_.sides(is_player)
     mechanic = mechanic_of(card.power)
-    played = _stand_in(card)
+    played = stand_in(card)
     cursed = _apply_mechanic(
         mechanic, card, played, mine, theirs, element, stat, contested=round_.stat
     )
@@ -240,7 +240,7 @@ def _apply_booster(booster: Card, played: Card, opponent: "Side", *, cursed: boo
         booster.stats = {stat: 1 if played.stats[stat] else 0 for stat in played.stats}
 
 
-def _stand_in(card: Card) -> Card:
+def stand_in(card: Card) -> Card:
     """A scratch copy of ``card`` wearing a neutral power — safe for the duel to mutate."""
     return Card(
         id=card.id,

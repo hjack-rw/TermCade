@@ -41,7 +41,7 @@ from .battle import Duelist, Ground, Round, score_battle
 from .mechanics.cards import excluding, is_one_of
 from .mechanics.powers import Mechanic, is_boost_slot, mechanic_of, names_a_stat
 from .mechanics.prize import PrizeRoute, claim_route
-from .mechanics.resolve import as_boost, resolve_played_power
+from .mechanics.resolve import as_boost, resolve_played_power, stand_in
 from .mechanics.scoring import initiative
 from .models import Card, Player
 from .settings import XiaolinSettings
@@ -56,6 +56,8 @@ LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD rep
 # The Wu that ask their caster for an element: the Morpher (its shape), the Eye (its own colour), the
 # Monsoon (the whole arena's).
 _CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.CHROMASIS, Mechanic.STORMFRONT})
+
+BEAST_BOOST = 2  # Chase Young's Beast Form: +2 on the contested stat, in exchange for his Wu
 
 
 @dataclass
@@ -81,6 +83,9 @@ class DuelState:
     # The stat the BOT's training raised when this loss filled its bar, for the screen to report.
     # The player's payout is never taken here — the temple offers them the choice instead.
     bot_trained: str | None = None
+    # Chase Young's Beast Form (see logic/bot.choose_beast_form): the stat he boosts +3 this showdown.
+    # When set, his fielded Wu score NOTHING (offence_negated) — he wagers them, never wields them.
+    beast_stat: str | None = None
     # The Wu the wear rule vaulted as this showdown ended — (name, was the player's, points paid) —
     # for the screen to report (see logic/wear.py).
     worn_out: list[tuple[str, bool, int]] = field(default_factory=list)
@@ -256,6 +261,14 @@ class Duel:
             if not self._is_tournament():
                 self.duel.wager = await self.choices.wager(self._wager_options())
         self.duel.background_name = self._draw_place(self.duel.background)
+        # Chase Young decides now, the challenge known: go Beast Form (+2 on one stat, his Wu all
+        # dead) or field his Wu as an ordinary duelist and keep the prizes he wins. Chase ALONE.
+        # Beast Form is once a fight — in a tournament he still boosts only one of the three stats.
+        if self._is_chase(self.state.bot) and self.duel.challenge:
+            contested = self._stat_names() if self._is_tournament() else [self.duel.challenge]
+            self.duel.beast_stat = bot.choose_beast_form(
+                self.state.bot, self.state.player, contested
+            )
 
     def _can_field(self) -> int:
         """The most Wu both duelists could actually put down. Neither may be asked for more."""
@@ -288,6 +301,10 @@ class Duel:
         # lays all its Wu into a single battle, a tournament opens a fresh one for each.
         if not self.duel.rounds or self.duel.round.fielded >= self._wu_per_battle():
             self.duel.rounds.append(Round(stat=self._stat_of(len(self.duel.rounds))))
+            # Beast Form: Chase's fielded Wu score nothing — he wagers them, never wields them. The
+            # existing offence-negated path zeroes his played Wu and strikes them on the board.
+            if self.duel.beast_stat is not None:
+                self.duel.round.bot.offence_negated = True
 
         # Gong Yi Tanpai: both duelists choose against the ground as it stands *now*, and neither
         # sees what the other laid this stage. The opponent reads the frozen copy, so the order the
@@ -299,12 +316,15 @@ class Duel:
             # A Morpher spent as a boost still chooses its element; any other boost ignores the ask.
             self._commit_boost(player_card, is_player=True, element=await self._element_for(player_card))
 
-        bot_boosts = self._boost_options(self.state.bot, is_player=False)
-        chosen = bot.choose_boost(
-            blind, self._ground(), bot_boosts, self._playable(self.state.bot, is_player=False)
-        )
-        if chosen is not None:
-            self._commit_boost(chosen, is_player=False, element=self.duel.background or "")
+        # In Beast Form Chase lays no boost — his Wu never lift, never curse, never score. Outside it
+        # he boosts like anyone. `beast_stat` is set only for Chase, and only when he took the beast.
+        if self.duel.beast_stat is None:
+            bot_boosts = self._boost_options(self.state.bot, is_player=False)
+            chosen = bot.choose_boost(
+                blind, self._ground(), bot_boosts, self._playable(self.state.bot, is_player=False)
+            )
+            if chosen is not None:
+                self._commit_boost(chosen, is_player=False, element=self.duel.background or "")
 
     async def _card(self) -> None:
         """Both duelists field one Wu, at the same moment and blind to each other.
@@ -336,7 +356,14 @@ class Duel:
                 resolve_played_power(current, player_card, is_player=True, element=element, stat=stat)
             )
         if bot_card is not None:
-            self._resolve_bot(current, bot_card)
+            if self.duel.beast_stat is None:
+                self._resolve_bot(current, bot_card)
+            else:
+                # In Beast Form his Wu are NULLIFIED, not skipped: a neutral stand-in enters the
+                # queue so the board strikes it to -/-/- (offence_negated, set in `_boost`) — like an
+                # Emperor Scorpion's victim. It is staked (the opponent can still win it), lends
+                # nothing, and casts no curse: he meets the wager but wields none of it.
+                current.bot.queue.append(stand_in(bot_card))
 
         current.fielded += 1
         # Score only once the battle is full — a wagered field is weighed as a whole, not per Wu.
@@ -364,13 +391,27 @@ class Duel:
             stats=list(self.duel.stakes.stats.keys()) if self.duel.stakes else [],
             background=self.duel.background or "",
             player_stats=self.state.player.character.stats,
-            bot_stats=self.state.bot.character.stats,
+            bot_stats=self._bot_base(),
             bonus_cancelled=self.duel.elemental_bonus_cancelled,
             bonus_reversed=self.duel.elemental_bonus_reversed,
             # Priority is the last word on a battle nothing else can separate — and priority is held by
             # whoever called the challenge, settled by initiative (or by the coin, on a tie).
             challenger_is_player=bool(self.duel.player_priority),
         )
+
+    def _bot_base(self) -> dict[str, int]:
+        """The bot's base stats — Chase's Beast Form adds +2 to the stat it named, in the ONE battle
+        that contests it. Like a boost: once a showdown, one stat, one battle (a tournament's other
+        two legs see the plain 7/7/7).
+
+        On the BASE, so it is element-free by nature: it earns no arena bonus and no elemental counter
+        can touch it (they act on the elemental bonus, which a base stat never carries).
+        """
+        base = dict(self.state.bot.character.stats)
+        contested = self.duel.round.stat if self.duel.rounds else self.duel.challenge
+        if self.duel.beast_stat is not None and self.duel.beast_stat == contested:
+            base[self.duel.beast_stat] += BEAST_BOOST
+        return base
 
     def _score_round(self, current: Round) -> None:
         score_battle(current, self._ground())
@@ -507,6 +548,11 @@ class Duel:
         # rest, so in tune it NETS 1/1/1 (see `as_boost`).
         mine.queue.append(as_boost(card, element, self._stat_of(self.duel.round_number - 1)))
 
+    @staticmethod
+    def _is_chase(player: Player) -> bool:
+        """Whether this duelist gifts a won prize — Chase Young, the boss who refuses the Wu."""
+        return mechanic_of(player.character.power) is Mechanic.BEAST_FORM
+
     def _winner_and_loser(self) -> tuple[Player, Player]:
         if self.duel.winner:
             return self.state.player, self.state.bot
@@ -518,7 +564,7 @@ class Duel:
         Four routes, in :mod:`.mechanics.prize` — a decisive blow, a broad win, total command, or
         having fought in tune with the arena. Fail all four and the Wu is **lost**, not destroyed.
         """
-        winner, _loser = self._winner_and_loser()
+        winner, loser = self._winner_and_loser()
         self.duel.winner_character = winner.character.name
         if not self.duel.stakes:
             self.duel.card_won = False
@@ -533,7 +579,14 @@ class Duel:
         )
         self.duel.card_won = self.duel.prize_route is not None
         if self.duel.card_won:
-            winner.hand.append(self.duel.stakes)
+            # "The Good Guys Finish Last": a Beast-Form win gives the prize to the duelist Chase beat
+            # — he still takes their STAKED Wu (`_end`), but the revealed trophy he hands back. This
+            # is the price of the beast, and the reason to field his Wu instead: a Wu-play win keeps
+            # the prize like anyone's. `card_won` stays true — a route was earned — so the log still
+            # reads a win; only the taker changes.
+            gifts = self._is_chase(winner) and self.duel.beast_stat is not None
+            takes_prize = loser if gifts else winner
+            takes_prize.hand.append(self.duel.stakes)
         else:
             # Lost, not destroyed. It leaves play, and one day it can surface again — which is what
             # the Rooster Booster reaches for. Until that card exists, nothing reads this pile.

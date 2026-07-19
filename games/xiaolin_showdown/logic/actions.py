@@ -19,8 +19,14 @@ from .models import Card, Player
 from .settings import XiaolinSettings, player_actions
 from .state import XiaolinState
 from .training import add_progress, can_train, payout_ready
-from .turn import bank_value, max_hand_size, shelve
+from .turn import bank_value, duel_value, max_hand_size, shelve
 from .wear import hand_over
+
+# Whether Wuya's witchcraft-restored Wu wear out (vault on the third use) or reuse forever, and
+# whether it returns them at all. Balance knobs for how hard the witch is — the harness flips them
+# (XS_WITCH_NOWEAR / XS_WITCH_OFF) to measure the tireless and the no-return forms.
+WITCHCRAFT_WEARS = True
+WITCHCRAFT_RETURNS = True
 
 # A fired power says its piece TWICE. The toast names the power and sets the scene; the log line drops
 # the name and states only the outcome, because the Game Log entry above it already read "You played
@@ -287,6 +293,11 @@ def early_bird_options(state: XiaolinState, *, is_player: bool = True) -> list[C
     thing you outran them with, so the Early Bird cannot be flown twice on the same wings.
     """
     me = state.duelist(is_player)
+    # Wuya's witchcraft cheats the toll: she gives up her WEAKEST Wu, not her fastest — the bird
+    # costs her a scrap, so she snatches the pile almost for free. Anyone else pays in speed.
+    if mechanic_of(me.character.power) is Mechanic.WITCHCRAFT and me.hand:
+        cheapest = min(duel_value(card) for card in me.hand)
+        return [card for card in me.hand if duel_value(card) == cheapest]
     speed = [card for card in me.hand if card.power.initiative_bonus]
     if not speed:
         return []
@@ -403,9 +414,9 @@ def use_power(
     state.spend_action(is_player)
     # Witchcraft (Wuya): the spent Wu returns to her hand instead of the discard — worn one further
     # by the sorcery. The wear rule is her leash: the return that brings it to the limit vaults it.
-    if mechanic_of(spend.me.character.power) is Mechanic.WITCHCRAFT:
+    if WITCHCRAFT_RETURNS and mechanic_of(spend.me.character.power) is Mechanic.WITCHCRAFT:
         card.uses += 1
-        if card.uses < WEAR_LIMIT:
+        if not WITCHCRAFT_WEARS or card.uses < WEAR_LIMIT:
             return message  # restored: it never leaves her hand
         spend.me.remove_card(card)
         paid = bank_value(card, rng) if rng is not None else card.points

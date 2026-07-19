@@ -137,11 +137,13 @@ LookUpScreen Button {
     content-align-horizontal: left;  /* labels start at the left; the buttons themselves stay centred */
 }
 
-/* --- Character select ---------------------------------------------------- */
-CharacterSelectScreen BoxedPanel {
-    align-horizontal: center;  /* centre the uniform-width character buttons */
+/* --- Character & boss select --------------------------------------------- */
+CharacterSelectScreen BoxedPanel,
+BossSelectScreen BoxedPanel {
+    align-horizontal: center;  /* centre the uniform-width buttons */
 }
-CharacterSelectScreen Button {
+CharacterSelectScreen Button,
+BossSelectScreen Button {
     width: 44;
     content-align-horizontal: left;
 }

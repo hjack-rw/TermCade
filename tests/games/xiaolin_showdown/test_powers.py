@@ -84,7 +84,7 @@ SERPENTS_TAIL = 24  # play/-1, Intangibility
 CELESTIAL_DIAL = 45  # play, Dissonance
 
 
-def test_a_plain_wu_contributes_its_printed_stats(card):
+def test_a_plain_wu_contributes_its_innate(card):
     """Whatever it prints — the rule is *printed*, so the card is asked, never assumed."""
     duel = Round()
     fist = card(FIST_OF_TEBIGONG)
@@ -173,8 +173,12 @@ def test_a_showdown_without_intangibility_keeps_the_bonus(card):
 
 
 def test_only_boost_slot_wu_may_take_the_boost_slot(catalog):
-    """The dragon and the amplifier trigger on "boost"; the Morpher is dual-mode and may also boost."""
-    eligible = {mechanic_of(power) for power in catalog.powers if is_boost_slot(power)}
+    """The dragon and the amplifier trigger on "boost"; the Morpher is dual-mode and may also boost.
+
+    The question is about CARDS — which Wu may be fielded into the boost slot — so it reads the
+    powers a card carries, not the character-only powers (Chase's Beast Form reads "On Boost" on
+    his sheet but is never a Wu played from a hand)."""
+    eligible = {mechanic_of(card.power) for card in catalog.cards if is_boost_slot(card.power)}
 
     assert eligible == {Mechanic.DRAGON, Mechanic.BOOST, Mechanic.MORPH}
 
@@ -215,7 +219,7 @@ def test_a_hand_or_play_wu_is_never_offered_the_boost_slot(catalog):
 
     assert Mechanic.DRAGON not in rejected
     assert Mechanic.BOOST not in rejected
-    assert Mechanic.PRINTED_STATS in rejected
+    assert Mechanic.INNATE in rejected
 
 
 # --- the player's word for a trigger, not the DB's ---------------------------------
@@ -244,7 +248,7 @@ def test_a_hand_trigger_says_it_is_passive(catalog):
 # --- what a Wu tells you it does ---------------------------------------------------
 
 
-SILENT = {Mechanic.FILLER, Mechanic.PRINTED_STATS, Mechanic.INITIATIVE, Mechanic.GAMBLE}
+SILENT = {Mechanic.FILLER, Mechanic.INNATE, Mechanic.INITIATIVE, Mechanic.GAMBLE}
 
 
 def test_every_mechanic_either_explains_itself_or_is_deliberately_silent(catalog):

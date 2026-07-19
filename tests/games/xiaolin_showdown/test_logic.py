@@ -48,7 +48,7 @@ def _player_with_initiative(*bonuses: int) -> Player:
 def test_catalog_loads_all_tables():
     cat = load_catalog()
     assert cat.powers and cat.cards
-    assert len(cat.characters) == 12  # 4 playable + easy 3 + hard 3 + boss 2
+    assert len(cat.characters) == 13  # 4 playable + easy 3 + hard 3 + boss 3
     assert cat.character(1).name == "Omi"
     assert cat.opponent_characters  # the bot must have someone to be
 
@@ -119,7 +119,7 @@ def test_snapshot_round_trips_through_savemanager(tmp_path):
     assert meta.schema_version == state.schema_version
 
 
-def _card(force, agility, intellect, element="metal", *, mechanic=Mechanic.PRINTED_STATS):
+def _card(force, agility, intellect, element="metal", *, mechanic=Mechanic.INNATE):
     return wu(force, agility, intellect, element=element, mechanic=mechanic, name="", type="wudai")
 
 

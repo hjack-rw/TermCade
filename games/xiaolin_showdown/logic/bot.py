@@ -23,8 +23,34 @@ from .battle import Ground, Round, score_battle
 from .constants import OPPOSITES, TOURNAMENT
 from .mechanics.powers import names_a_stat
 from .mechanics.resolve import as_boost, resolve_played_power
-from .models import Card
+from .models import Card, Player
 from .turn import duel_value
+
+# Chase Young activates Beast Form's +2 only when a contested stat is close — his lead on it is
+# under the boost, so the +2 could decide the battle. Ahead by more, he keeps his raw stats and the
+# prize he would otherwise gift. Swept from the harness (XS_BEAST_MARGIN).
+BEAST_MARGIN = 2
+
+
+def choose_beast_form(chase: Player, opponent: Player, stats: Sequence[str]) -> str | None:
+    """Chase's per-showdown call: which contested stat to spend Beast Form's +2 on, or ``None``.
+
+    His Wu are dead weight regardless — Beast Form is only the +2, once a fight, on one stat, and
+    activating it FORFEITS the prize (see the duel's `_award_prize`). So he spends it only where a
+    battle is close: the tightest contested stat, where his base lead over the opponent's reach is
+    under the boost. Ahead by more on all of them, he keeps his raw stats and the prize.
+
+    ``stats`` is the contested set — one stat for a challenge, all three for a tournament (he may
+    still boost only one).
+    """
+    def lead(stat: str) -> int:
+        reach = opponent.character.stats[stat] + max(
+            (card.stats[stat] or 0 for card in opponent.hand), default=0
+        )
+        return chase.character.stats[stat] - reach
+
+    tightest = min(stats, key=lead)
+    return tightest if lead(tightest) < BEAST_MARGIN else None
 
 
 def choose_challenge(
