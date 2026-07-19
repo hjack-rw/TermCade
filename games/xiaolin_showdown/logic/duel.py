@@ -46,6 +46,7 @@ from .mechanics.scoring import initiative
 from .models import Card, Player
 from .settings import XiaolinSettings
 from .state import XiaolinState
+from .training import record_showdown
 
 END, COMMITMENT, SETUP, BOOST, CARD, RESOLVEMENT = range(6)
 LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD repeats per Wu wagered
@@ -75,6 +76,9 @@ class DuelState:
     winner: bool | None = None  # True = player won, False = bot won
     winner_character: str | None = None
     card_won: bool = False
+    # The stat the BOT's training raised when this loss filled its bar, for the screen to report.
+    # The player's payout is never taken here — the temple offers them the choice instead.
+    bot_trained: str | None = None
     # Which of the four routes claimed it (`mechanics.prize`), or None when nobody did and the Wu was
     # lost. Kept so the board can say *how* it was won: a card that simply appears teaches nothing.
     prize_route: PrizeRoute | None = None
@@ -416,6 +420,10 @@ class Duel:
         for card in self.duel.duelist(not self.duel.winner).stakes:
             loser.remove_card(card)
             winner.hand.append(card)
+
+        # losing teaches: the loser's training bar gains one (see logic/training.py). The bot
+        # cashes a full bar on the spot; the raised stat is kept for the screen to report.
+        self.duel.bot_trained = record_showdown(self.state, player_won=bool(self.duel.winner))
 
     _STAGES: dict[int, Callable[["Duel"], Awaitable[None]]] = {
         END: _end,

@@ -7,6 +7,8 @@ are emphasised, and the whole screen rebuilds on return so deposits and draws sh
 
 from __future__ import annotations
 
+from typing import Literal
+
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
@@ -17,7 +19,7 @@ from textual.widgets import Footer, Header, Static
 
 from termcade.ui.screens.log import GameLogScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
-from termcade.ui.widgets import BoxedPanel, TooltipStatic
+from termcade.ui.widgets import BoxedPanel, TooltipStatic, render_bar
 
 from ..logic.actions import (
     can_deposit,
@@ -28,13 +30,16 @@ from ..logic.actions import (
     draw_blocked,
     draw_swaps,
     swap_from_hand,
+    train,
+    train_blocked,
     usable_powers,
     use_power_blocked,
 )
 from ..logic.mechanics.scoring import initiative, initiative_sources
 from ..logic.models import Player
 from ..logic.state import XiaolinState
-from ..logic.turn import DRAW
+from ..logic.training import TRAIN_LENGTH, payout_ready, raise_stat, trainable_stats
+from ..logic.turn import DRAW, TRAIN
 from .base import XiaolinScreen
 from .deposit import DepositScreen
 from .format import (
@@ -58,8 +63,8 @@ class TempleScreen(XiaolinScreen):
         ("2", "draw", "Draw"),
         ("3", "deposit", "Deposit"),
         ("4", "use_power", "Power"),
-        ("5", "lookup_cards", "Cards"),
-        ("6", "lookup_characters", "Characters"),
+        ("5", "train", "Train"),
+        ("6", "lookup", "Lookup"),
         ("7", "game_log", "Log"),
         ("8", "rules", "Rules"),
         ("9", "save_game", "Save"),
@@ -69,6 +74,7 @@ class TempleScreen(XiaolinScreen):
     def __init__(self) -> None:
         super().__init__()
         self._suspended = False
+        self._payout_offered = False  # offer a waiting training payout once, not on every return
 
     def compose(self) -> ComposeResult:
         state, rules = self.state, self.rules
@@ -98,6 +104,7 @@ class TempleScreen(XiaolinScreen):
                 if can_early_bird(state, rules)
                 else use_power_blocked(state, rules.actions_per_turn)
             ),
+            "5": train_blocked(state, rules.actions_per_turn),
         }
         with BoxedPanel(title="ACTIONS"):
             yield TooltipStatic(_actions_grid(blocked), id="actions")
@@ -112,6 +119,21 @@ class TempleScreen(XiaolinScreen):
         if self._suspended:
             self._suspended = False
             self.rebuild()
+        self._offer_payout()
+
+    def on_mount(self) -> None:
+        self._offer_payout()
+
+    def _offer_payout(self) -> None:
+        """A bar filled by a lost showdown waits for its stat pick — offer it the moment the player
+        is back at the temple. Once per fill: a dismissed offer stays claimable through Train, and
+        the flag re-arms when the payout is gone so the NEXT full bar is offered again."""
+        if not payout_ready(self.state.player):
+            self._payout_offered = False
+            return
+        if not self._payout_offered:
+            self._payout_offered = True
+            self._pick_training_stat()
 
     def action_gong_yi_tanpai(self) -> None:
         state = self.state
@@ -160,11 +182,58 @@ class TempleScreen(XiaolinScreen):
         if can_deposit(self.state, self.rules.actions_per_turn):
             self.app.push_screen(DepositScreen())
 
-    def action_lookup_cards(self) -> None:
-        self.app.push_screen(LookUpScreen("cards"))
+    def action_train(self) -> None:
+        if train_blocked(self.state, self.rules.actions_per_turn) is not None:
+            return
+        if payout_ready(self.state.player):
+            self._pick_training_stat()  # the bar is already full: picking the stat is free
+            return
+        if train(self.state):
+            self._pick_training_stat()  # this very turn filled it
+            return
+        self.app.notify(
+            "You trained for +1 progress.\n"
+            f"Progress towards the next Stat upgrade: {self.state.player.training}/{TRAIN_LENGTH}!",
+            title=your_move(TRAIN),
+        )
+        self.rebuild()
 
-    def action_lookup_characters(self) -> None:
-        self.app.push_screen(LookUpScreen("characters"))
+    @work
+    async def _pick_training_stat(self) -> None:
+        """A full bar pays out: the player picks which base stat rises (the bot shores up its lowest
+        on its own — see `logic.training`). Free, even on a spent turn: the ten fills paid for it."""
+        player = self.state.player
+        asked = Text("Your training paid off!")
+        asked.append("\n\n")
+        asked.append("Which stat do you raise?")
+        stat = await self.choose(
+            asked,
+            [(stat.capitalize(), stat) for stat in trainable_stats(player)],
+            title="TRAINING",
+        )
+        if stat is None:
+            return  # decide later — Train reopens the choice
+        raise_stat(player, stat)
+        self.app.notify(
+            f"Your {stat} rose to {player.character.stats[stat]}.", title=your_move(TRAIN)
+        )
+        self.ctx.journal.add(
+            f"You completed your training: your {stat} rose.", title=your_move(TRAIN)
+        )
+
+    def action_lookup(self) -> None:
+        self._lookup()
+
+    @work
+    async def _lookup(self) -> None:
+        """One Lookup for both inspect screens: ask what to look at, then open it."""
+        options: list[tuple[str, Literal["cards", "characters"]]] = [
+            ("Hand", "cards"),
+            ("Character", "characters"),
+        ]
+        what = await self.choose(Text("What would you like to look up?"), options, title="LOOKUP")
+        if what is not None:
+            self.app.push_screen(LookUpScreen(what))
 
     def action_game_log(self) -> None:
         self.app.push_screen(GameLogScreen())
@@ -184,10 +253,10 @@ _ACTIONS = [
     "2. Draw a Card",
     "3. Deposit a Card",
     "4. Use a Power",
-    "5. Look up Cards",
-    "6. Look up Characters",
+    "5. Train a Stat",
+    "6. Look Things Up",
     "7. Game Log",
-    "8. Rules",
+    "8. Game Rules",
     "9. Save game",
     # Escape is NOT listed. It is on the footer, where every screen's escape is, and a panel of things
     # to *do* in the temple is not where "leave the temple" belongs. Nine actions fill the three columns
@@ -200,8 +269,8 @@ _ACTION_HELP = {
     "2": "Take a Wu from your personal deck.",
     "3": "Cash a Wu from your hand for points.",
     "4": "Spend a Wu for its power.",
-    "5": "Inspect any Wu in either hand.",
-    "6": "Inspect either duelist.",
+    "5": "Fill your training bar.",
+    "6": "Inspect either hand or duelist.",
     "7": "Everything that has happened so far.",
     "8": "Rulebook for the game.",
     "9": "Save this run to a slot.",
@@ -221,11 +290,17 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
     # why a card in your bracket may be sitting in their hand.
     player_sources, bot_sources = initiative_sources(player, bot)
 
+    # Columns size to their content, so a short name leaves no trailing gap. One flex column eats the
+    # slack, pushing Deck and Initiative to the right; everything left of it packs tight.
     grid = Table.grid(expand=True, padding=(0, 1))
-    grid.add_column(ratio=3, justify="left")  # Player n
-    grid.add_column(ratio=6, justify="left")  # affiliation icon + name (stats)
-    grid.add_column(ratio=3, justify="left")  # deck
-    grid.add_column(ratio=4, justify="right")  # initiative
+    grid.add_column(no_wrap=True)  # Player n
+    grid.add_column(no_wrap=True)  # affiliation icon + name (stats)
+    grid.add_column(width=3)  # gap between
+    grid.add_column(no_wrap=True)  # training bar
+    grid.add_column(ratio=1)  # flex — absorbs the slack, pushing Deck/Initiative right
+    grid.add_column(justify="right", no_wrap=True)  # deck
+    grid.add_column(width=4)  # gap between
+    grid.add_column(justify="right", no_wrap=True)  # initiative
     rows = (
         ("Player 1", player, init_player, player_sources),
         ("Player 2", bot, init_bot, bot_sources),
@@ -245,10 +320,30 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
         grid.add_row(
             Text(f"{label}:", style="dim"),
             name,
+            Text(""),  # gap column
+            _training_cell(duelist),
+            Text(""),  # flex spacer
             labelled("Deck", str(len(duelist.deck))),
+            Text(""),  # gap before Initiative
             initiative_cell,
         )
     return grid
+
+
+def _training_cell(duelist: Player) -> Text:
+    """A duelist's training bar (see ``logic.training``). A boss is at the stat cap and *cannot*
+    train — it reads MASTER, and its tooltip is ``-/-``, not a full bar.
+
+    Both rows start with the same ``TRAINING:`` prefix in a left-justified column, so their labels line
+    up under each other; a spacer column holds them clear of the name."""
+    cell = Text("TRAINING: ", style="dim")
+    if duelist.character.tier == "boss":
+        cell.append("MASTER")
+        cell.stylize(Style(meta={"tooltip": "-/-"}))
+        return cell
+    cell.append(render_bar(duelist.training / TRAIN_LENGTH, TRAIN_LENGTH))
+    cell.stylize(Style(meta={"tooltip": f"{duelist.training}/{TRAIN_LENGTH}"}))
+    return cell
 
 
 def _actions_grid(blocked: dict[str, str | None]) -> Table:

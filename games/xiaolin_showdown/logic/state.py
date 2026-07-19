@@ -126,14 +126,24 @@ def _player_dict(p: Player) -> dict[str, Any]:
         "hand": [c.id for c in p.hand],
         "inalienable_hand": [c.id for c in p.inalienable_hand],
         "deck": [c.id for c in p.deck],
+        "training": p.training,
+        "just_trained": p.just_trained,
+        # The catalog knows only printed stats — training raises them, so the current values are
+        # the save's to keep.
+        "stats": p.character.stats,
     }
 
 
 def _player_from_dict(data: dict[str, Any], catalog: Catalog) -> Player:
-    return Player(
+    player = Player(
         character=deepcopy(catalog.character(data["character"])),
         hand=[_fresh_card(catalog, cid) for cid in data["hand"]],
         inalienable_hand=[held_as_wudai(_fresh_card(catalog, cid)) for cid in data["inalienable_hand"]],
         deck=[_fresh_card(catalog, cid) for cid in data["deck"]],
         points=data["points"],
+        training=data.get("training", 0),
+        just_trained=data.get("just_trained", False),
     )
+    # The catalog knows only printed stats — training raised these past them.
+    player.character.stats.update(data.get("stats", {}))
+    return player

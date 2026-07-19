@@ -555,6 +555,14 @@ def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
 
     _line(story, *_showdown_result(duel))
     _spoils(story, duel)
+    if duel.bot_trained:
+        _line(
+            story,
+            Text(
+                f"{display_name(state.bot.character.name)} completed their training: "
+                f"their {duel.bot_trained} rose."
+            ),
+        )
     return story
 
 

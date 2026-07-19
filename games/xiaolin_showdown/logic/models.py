@@ -121,6 +121,10 @@ class Player:
     inalienable_hand: list[Card] = field(default_factory=list)
     deck: list[Card] = field(default_factory=list)
     points: int = 0
+    # The training bar (see logic/training.py): progress toward the next payout, and whether a
+    # payout was just taken — the bar shows full until the turn turns over, then resets to climb.
+    training: int = 0
+    just_trained: bool = False
 
     @property
     def initiative(self) -> list[int]:

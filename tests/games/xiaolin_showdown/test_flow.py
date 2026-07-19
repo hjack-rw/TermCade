@@ -118,7 +118,11 @@ async def test_lookup_picks_a_card_and_shows_its_detail(tmp_path):
     async with app.run_test(size=(150, 60)) as pilot:
         await _boot(app, pilot)
         await _new_game_at_vault(app, pilot)
-        await pilot.press("5")  # Look up cards -> pick list
+        await pilot.press("6")  # Look up -> Hand or Character?
+        await pilot.pause()
+        assert isinstance(app.screen, ChoiceModal)
+
+        await pilot.click("#opt-0")  # "Hand" -> pick list
         await pilot.pause()
         assert isinstance(app.screen, LookUpScreen)
 
@@ -310,7 +314,11 @@ async def test_look_up_can_inspect_the_opponents_cards(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:  # both hands listed — keep every button on-screen
         await _new_game_at_vault(app, pilot)
-        await pilot.press("5")  # look up cards
+        await pilot.press("6")  # Look up -> Hand or Character?
+        await pilot.pause()
+        assert isinstance(app.screen, ChoiceModal)
+
+        await pilot.click("#opt-0")  # "Hand" -> pick list
         await pilot.pause()
         assert isinstance(app.screen, LookUpScreen)
 

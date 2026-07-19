@@ -17,6 +17,7 @@ from .mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of, trigger_of
 from .models import Card, Player
 from .settings import XiaolinSettings
 from .state import XiaolinState
+from .training import add_progress, can_train, payout_ready
 from .turn import bank_value, max_hand_size, shelve
 
 # A fired power says its piece TWICE. The toast names the power and sets the scene; the log line drops
@@ -205,6 +206,29 @@ def swap_from_hand(state: XiaolinState, shelved: Card, *, rng: Rng) -> Card:
     shelve(state.player, shelved, rng=rng)
     state.actions_taken += 1
     return drawn
+
+
+def train_blocked(state: XiaolinState, actions_per_turn: int) -> str | None:
+    """Why training is disallowed right now, or ``None`` when it is allowed.
+
+    A waiting payout is never blocked: the 10 fills already paid for it, so picking the stat is
+    free even on a spent turn.
+    """
+    if payout_ready(state.player):
+        return None
+    if state.player.just_trained:
+        return "Your training is now complete!"
+    if not can_train(state.player):
+        return "Nothing left to train."
+    if has_acted(state, actions_per_turn):
+        return SPENT_MESSAGE
+    return None
+
+
+def train(state: XiaolinState) -> bool:
+    """Spend the turn's action on the bar. Returns whether the payout is now waiting."""
+    state.actions_taken += 1
+    return add_progress(state.player)
 
 
 def usable_powers(state: XiaolinState, actions_per_turn: int, *, is_player: bool = True) -> list[Card]:

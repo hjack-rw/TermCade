@@ -26,7 +26,9 @@ def hover_tooltip():
     untagged span and an empty tooltip are different bugs.
     """
 
-    async def _hover_tooltip(app, pilot, selector: str, row: int = 0) -> str | None:
+    async def _hover_tooltip(
+        app, pilot, selector: str, row: int = 0, *, from_right: bool = False
+    ) -> str | None:
         widget = app.screen.query_one(selector)
         region = widget.region
         tagged = [
@@ -35,7 +37,9 @@ def hover_tooltip():
             if app.screen.get_style_at(x, region.y + row).meta.get("tooltip")
         ]
         assert tagged, f"{selector} row {row} carries no tooltip meta"
-        await pilot.hover(selector, offset=(tagged[0] - region.x, row))
+        # A row may carry several tagged spans; ``from_right`` reads the rightmost one instead.
+        target = tagged[-1] if from_right else tagged[0]
+        await pilot.hover(selector, offset=(target - region.x, row))
         await pilot.pause()
         return widget.tooltip
 

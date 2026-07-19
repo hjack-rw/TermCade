@@ -125,6 +125,27 @@ def points(ctx: GameContext, args: Sequence[str]) -> str:
     return f"points: you {state.player.points}, them {state.bot.points}"
 
 
+def fill(ctx: GameContext, args: Sequence[str]) -> str:
+    """Fill a training bar outright, to test the payout without grinding ten losses.
+
+    Yours waits for the stat pick (the temple offers it, or Train opens it); the opponent's is
+    cashed by their own turn, exactly as a real full bar would be.
+    """
+    from .logic.training import TRAIN_LENGTH, add_progress, can_train
+
+    state = _state(ctx)
+    who = args[0] if args else "me"
+    if who not in (*_ME, *_THEM):
+        raise ValueError("fill me | fill them")
+    player = state.bot if who in _THEM else state.player
+    if player.just_trained:
+        return "the payout was just taken — that bar resets next turn"
+    if not can_train(player):
+        return "nothing left to train — every stat is at the cap"
+    add_progress(player, TRAIN_LENGTH)
+    return "their bar is full" if who in _THEM else "your bar is full — Train (5) picks the stat"
+
+
 def clear(ctx: GameContext, args: Sequence[str]) -> str:
     """Empty a hand, so what you deal into it next is the only thing in it."""
     state = _state(ctx)
@@ -174,6 +195,7 @@ COMMANDS: dict[str, Command] = {
     "deck": Command(deck, "deck [me|them] <id>... — shelve Wu onto a personal deck"),
     "lose": Command(lose, "lose <id>... — put a Wu on the lost pile"),
     "points": Command(points, "points <yours> [theirs] — set the banked score"),
+    "fill": Command(fill, "fill [me|them] — fill a training bar, to test the payout"),
     "clear": Command(clear, "clear me | clear them — empty a hand"),
     "refresh": Command(
         refresh, "refresh [me|them|both] — give the turn's action back, to spend another power"

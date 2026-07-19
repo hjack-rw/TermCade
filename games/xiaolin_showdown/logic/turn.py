@@ -26,6 +26,7 @@ from .mechanics.powers import (
 from .models import Card, Player
 from .settings import XiaolinSettings, plays_keen
 from .state import XiaolinState
+from .training import TRAIN_LENGTH, add_progress, can_train, pick_stat, raise_stat, turn_over
 
 # What a booster is worth in a showdown. It carries no stats of its own, so without this premium a
 # skilled bot would happily bank one for points.
@@ -54,6 +55,8 @@ def refill_hands(state: XiaolinState, settings: XiaolinSettings, *, rng: Rng) ->
 
     state.actions_taken = 0
     state.bot_actions_taken = 0
+    turn_over(state.player)  # a taken payout's bar showed full through the turn; reset it now
+    turn_over(state.bot)
 
     while not (
         oversee_hand_size(state, is_player=True, settings=settings, rng=rng)
@@ -239,6 +242,11 @@ DRAW = "Draw"
 EARLY_BIRD = "Early Bird"
 PASSED = "Pass"
 POWER = "Power"
+TRAIN = "Train"
+
+# How close to a full bar the bot must be before training beats drawing or banking. Losses carry a
+# bar most of the way for free; only the last stretch is worth whole temple turns.
+_TRAIN_WITHIN = 4
 
 
 @dataclass(frozen=True)
@@ -324,6 +332,22 @@ def _bot_acts(
             f"{name} used Early Bird to take {taken.name} from under your nose, "
             f"giving up {bird.name}.",
         )
+
+    # The last stretch of a nearly-full training bar outranks drawing or banking: a permanent +1
+    # base stat pays in every showdown left in the run. The bot cashes a full bar on the spot,
+    # shoring up its lowest stat (see `training.pick_stat`). A just-taken payout waits for the
+    # turnover instead — the bar cannot climb until it resets.
+    if (
+        can_train(state.bot)
+        and not state.bot.just_trained
+        and TRAIN_LENGTH - state.bot.training <= _TRAIN_WITHIN
+    ):
+        state.bot_actions_taken += 1
+        if add_progress(state.bot):
+            stat = pick_stat(state.bot)
+            raise_stat(state.bot, stat)
+            return BotMove(TRAIN, f"{name} completed their training: their {stat} rose.")
+        return BotMove(TRAIN, f"{name} spent the turn training.")
 
     if len(state.bot.hand) < settings.max_wager and state.bot.deck:
         drawn = state.bot.deck.pop(0)

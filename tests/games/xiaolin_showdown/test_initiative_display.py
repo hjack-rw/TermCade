@@ -77,8 +77,9 @@ async def test_each_duelist_row_gets_its_own_initiative_tooltip(
     state.bot.hand = [card(TANGLE_WEB_COMB), card(LONGHORN_TAURUS)]
 
     async with open_vault(state) as (app, pilot):
-        player_row = await hover_tooltip(app, pilot, "#state", row=0)
-        bot_row = await hover_tooltip(app, pilot, "#state", row=1)
+        # From the right: the row's FIRST tooltip span is the training bar, initiative is rightmost.
+        player_row = await hover_tooltip(app, pilot, "#state", row=0, from_right=True)
+        bot_row = await hover_tooltip(app, pilot, "#state", row=1, from_right=True)
 
     assert (player_row, bot_row) == ("(+1, -1)", "(+1)")
 
@@ -88,4 +89,4 @@ async def test_a_duelist_with_no_bonuses_still_tooltips(state, card, open_vault,
     state.bot.hand = [card(7)]
 
     async with open_vault(state) as (app, pilot):
-        assert await hover_tooltip(app, pilot, "#state", row=0) == "(/)"
+        assert await hover_tooltip(app, pilot, "#state", row=0, from_right=True) == "(/)"
