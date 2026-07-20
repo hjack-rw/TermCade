@@ -20,6 +20,9 @@ build/
 # Runtime data (TERMCADE_DATA_DIR — saves & settings)
 /data/
 
+# Beta passcodes — the real list is per-host, never committed
+/codes.txt
+
 # OS cruft
 .DS_Store
 

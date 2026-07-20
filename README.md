@@ -55,6 +55,31 @@ xiaolin                                    # play Xiaolin Showdown (needs a real
 xiaolin-play                               # play in the browser — serve + auto-open (needs the [serve] extra)
 ```
 
+## Closed beta
+
+Serving the game to other people needs two things the open server has no answer for: a way to keep
+strangers out, and a way to stop testers overwriting each other's saves. One passcode does both — it
+is checked at the door, then hashed into that player's own save directory.
+
+```bash
+printf 'beta-alpha-1\nbeta-bravo-2\n' > codes.txt    # one per line; # comments ignored
+docker compose -f docker-compose.yml -f docker-compose.beta.yml --profile beta up
+```
+
+The tunnel container prints a `https://*.trycloudflare.com` URL. Put it in `PUBLIC_URL` and bring
+the stack up again — the browser's websocket connects back to that name, so a wrong one loads the
+page to a dead terminal. Then hand each tester `<url>/?code=<their code>`; the code moves into a
+cookie on first load and leaves the address bar.
+
+Revoking a tester is deleting their line from `codes.txt` — the file is re-read on every request, so
+their next session is refused. Their saves stay on disk under `players/`, keyed by a hash of the
+code, and come back if the code does.
+
+Set `TERMCADE_CODES` to switch the gate on outside Docker. Unset, the server is open as before.
+
+**Sound is off in this mode.** A container has no audio device, so the served game falls back to
+silence — see `termcade.core.audio`.
+
 ## Fonts
 
 Games draw their board with plain Unicode symbols picked for *text* (monochrome) presentation. The icons render as monochrome glyphs anywhere a font covers them; the only catch is that a bare terminal font can lack a glyph and show tofu (☐). A monospace font with good symbol coverage is bundled under `fonts/`:

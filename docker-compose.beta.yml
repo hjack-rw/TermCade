@@ -1,0 +1,28 @@
+# The closed beta: the served game behind a passcode, reachable through a Cloudflare tunnel.
+#
+#   printf 'beta-alpha-1\nbeta-bravo-2\n' > ./codes.txt
+#   docker compose -f docker-compose.yml -f docker-compose.beta.yml --profile beta up
+#
+# The tunnel prints a https://*.trycloudflare.com URL on startup. Put it in PUBLIC_URL and bring
+# the stack up again, or the browser's websocket has nothing connectable to call back to and the
+# page loads to a dead terminal. Hand testers <that URL>/?code=<their code>.
+services:
+  serve:
+    profiles: ["beta"]
+    environment:
+      # The gate: present means every request needs a passcode. Remove it and the server is open.
+      TERMCADE_CODES: /data/codes.txt
+      # Must be the tunnel's hostname, never 0.0.0.0 — see docker/entrypoint.sh.
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8000}
+    volumes:
+      # Read-only: the server only ever reads codes. Editing this file on the host and restarting
+      # is how a tester is revoked — there is no admin screen and no second source of truth.
+      - ./codes.txt:/data/codes.txt:ro
+
+  tunnel:
+    profiles: ["beta"]
+    image: cloudflare/cloudflared:latest
+    # A quick tunnel: no account, no DNS, a throwaway hostname printed to this container's log.
+    # For a URL that survives a restart, swap this for `tunnel run` with a named tunnel token.
+    command: tunnel --no-autoupdate --url http://serve:8000
+    depends_on: [serve]

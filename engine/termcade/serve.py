@@ -9,7 +9,8 @@ host-side install. The xterm.js protocol and static assets are used exactly as s
 Configured by environment: ``GAME`` (the console command to run), ``PORT``, ``PUBLIC_URL``
 (the browser-reachable URL — it must not be ``0.0.0.0`` or the websocket cannot connect back), and
 ``GAME_FACTORY`` (``pkg.module:callable`` returning the game's ``Game``), so the page's auto-fit
-reads the cartridge's own sizes instead of a copy of them.
+reads the cartridge's own sizes instead of a copy of them. ``TERMCADE_CODES`` additionally puts the
+closed-beta gate in front of everything — see :mod:`termcade.beta`.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ from pathlib import Path
 
 import textual_serve
 from textual_serve.server import Server
+
+from termcade import beta
 
 # The embedded font gives xterm.js a clean mono text face *and* monochrome glyphs for the card /
 # affiliation icons (all text-presentation Unicode symbols). It leads the terminal font stack; any
@@ -126,14 +129,29 @@ def make_server(
 
     ``fit_size`` / ``min_size`` come from the game's ``Game`` descriptor. ``min_size=None`` (a game
     whose screens scroll) means no too-small overlay: zooming past the fit is the player's choice.
+
+    With ``TERMCADE_CODES`` set this is a :class:`~termcade.beta.BetaServer` instead: a passcode at
+    the door and a save directory per code. Without it, the open server as before — a player serving
+    the game to their own machine should not have to hold a passcode.
     """
     templates = _templates_dir(fit_size, min_size)
+    kwargs: dict[str, object] = {
+        "host": host, "port": port, "title": "TermCade", "public_url": public_url
+    }
     if templates is not None:
-        return Server(
-            game, host=host, port=port, title="TermCade",
-            public_url=public_url, templates_path=templates,
-        )
-    return Server(game, host=host, port=port, title="TermCade", public_url=public_url)
+        kwargs["templates_path"] = templates
+
+    codes = beta.codes_path()
+    if codes is None:
+        return Server(game, **kwargs)  # type: ignore[arg-type]
+    return beta.BetaServer(game, codes_path=codes, data_dir=_data_dir(), **kwargs)
+
+
+def _data_dir() -> Path:
+    """The base the beta's per-player directories are made under — the same ``TERMCADE_DATA_DIR``
+    the game itself reads (``/data`` in the image), so codes.txt and players/ sit side by side."""
+    configured = os.environ.get(beta.DATA_DIR_ENV)
+    return Path(configured) if configured else Path.cwd()
 
 
 def _descriptor_sizes() -> tuple[tuple[int, int], tuple[int, int] | None]:
