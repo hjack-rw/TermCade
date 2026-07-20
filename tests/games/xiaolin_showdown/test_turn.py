@@ -334,16 +334,21 @@ def test_a_hand_with_nothing_fieldable_is_refilled():
     assert player.hand, "left holding only a Wu that cannot be fielded"
 
 
-def test_the_refill_counts_what_cannot_be_fielded_toward_the_mercy():
-    """``empty_draw_limit`` is the hand you are brought up to, not a count of cards dealt."""
+def test_the_mercy_pays_its_count_whatever_cannot_be_fielded():
+    """``empty_draw_limit`` is a count of Wu dealt, not the hand you are brought up to.
+
+    A Wu that cannot be fielded still takes a slot against the hand LIMIT (the test below), but it is
+    no answer to a showdown — so it cannot be counted as part of the answer the mercy just paid. Filled
+    to a size, it was: its holder came out a Wu behind a duelist holding none.
+    """
     player = _player(0)
     player.inalienable_hand.append(_card())
     state = _state(player, _player(3), main=9)
 
     oversee_hand_size(state, is_player=True, settings=_SETTINGS, rng=Rng(1))
 
-    assert len(player.whole_hand) == _SETTINGS.empty_draw_limit
-    assert len(player.hand) == _SETTINGS.empty_draw_limit - 1  # the boost-only Wu filled a slot
+    assert len(player.hand) == _SETTINGS.empty_draw_limit  # paid in full, the wudai notwithstanding
+    assert len(player.whole_hand) == _SETTINGS.empty_draw_limit + 1  # which still sits on top of it
 
 
 def test_a_wu_that_cannot_be_fielded_still_takes_a_slot_against_the_limit():

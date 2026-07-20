@@ -43,6 +43,12 @@ class XiaolinState:
     # spent for them. The cards are the action, not a gift on top of it.
     actions_taken: int = 0
     bot_actions_taken: int = 0
+    # How many of those actions went to the vault. At most HALF a turn's budget may be cashed (see
+    # `settings.deposit_limit`), so a bigger action budget buys tempo — a draw, a power, a stat — and
+    # not simply a faster way to bank. Counted separately because `actions_taken` cannot say which
+    # actions were deposits.
+    deposits_taken: int = 0
+    bot_deposits_taken: int = 0
     # The opponent takes the same temple turn you do, and takes it once. Retreating from a
     # showdown returns you to a turn you have already spent, so this keeps them from banking
     # twice on the way back in. Reset, like the counters, by the duel end phase.
@@ -65,6 +71,10 @@ class XiaolinState:
     # answer stands and the coin decides, since we cannot play the two out simultaneously. Set when a
     # second initiative power lands on an already-answered showdown; spent by the duel end phase.
     initiative_contested: bool = False
+    # How many Wu Wuya's witchcraft has called back this run (see `temple_ai.WITCH_RECALL_LIMIT`).
+    # Per-run, never reset by the turn: the allowance is the whole run, which is what makes the recall
+    # a resource to spend rather than an answer she always has.
+    witch_recalls: int = 0
     # Wu that surfaced, were fought over, and that nobody won hard enough to keep. They are **lost**,
     # not destroyed: out of play, and one day recoverable (the Rooster Booster reaches for the oldest).
     # Shared — a Wu dies to a showdown, not to a duelist.
@@ -119,6 +129,9 @@ class XiaolinState:
             "has_ended": self.has_ended,
             "actions_taken": self.actions_taken,
             "bot_actions_taken": self.bot_actions_taken,
+            "deposits_taken": self.deposits_taken,
+            "bot_deposits_taken": self.bot_deposits_taken,
+            "witch_recalls": self.witch_recalls,
             "bot_turn_done": self.bot_turn_done,
             "forced_priority": self.forced_priority,
             "locked_challenge": self.locked_challenge,
@@ -146,6 +159,13 @@ class XiaolinState:
                 "actions_taken", data.get("deposit_counter", 0) + data.get("draw_counter", 0)
             ),
             bot_actions_taken=data.get("bot_actions_taken", 0),
+            # Absent in a save from before the deposit cap. Zero is the honest read: that run never
+            # counted deposits, so it starts the loaded turn owing none.
+            deposits_taken=data.get("deposits_taken", 0),
+            bot_deposits_taken=data.get("bot_deposits_taken", 0),
+            # Absent in a save from before the recall cap — that run spent them uncounted, so it
+            # loads with its whole allowance. Generous, and it errs toward the boss, not the player.
+            witch_recalls=data.get("witch_recalls", 0),
             bot_turn_done=data.get("bot_turn_done", False),
             forced_priority=data.get("forced_priority"),  # absent in a save from before the Conch
             locked_challenge=data.get("locked_challenge"),

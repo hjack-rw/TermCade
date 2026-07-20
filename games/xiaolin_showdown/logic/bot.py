@@ -29,7 +29,15 @@ from .turn import duel_value
 # Chase Young activates Beast Form's +2 only when a contested stat is close — his lead on it is
 # under the boost, so the +2 could decide the battle. Ahead by more, he keeps his raw stats and the
 # prize he would otherwise gift. Swept from the harness (XS_BEAST_MARGIN).
-BEAST_MARGIN = 2
+#
+# Since the beast KEEPS its prize (see the duel's `_award_prize`), beasting more makes him STRONGER,
+# monotonically: 0 (never) 5.5% player win, 2 -> 3.2%, 4 -> 2.5%, always -> 2.0% (n=600). Sweeps
+# taken before the prize flip read this slope the other way round.
+#
+# Three, paired with a BEAST_BOOST of 1: the pair reads 7.1% player win and the beast fires on 61%
+# of his showdowns, so the mode is a real choice rather than a rule. At boost 2 the curve was crushed
+# flat and every route to this win rate meant a Chase who barely beasts at all.
+BEAST_MARGIN = 3
 
 
 def choose_beast_form(chase: Player, opponent: Player, stats: Sequence[str]) -> str | None:

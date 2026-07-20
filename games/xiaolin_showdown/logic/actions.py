@@ -13,7 +13,7 @@ from .constants import WEAR_LIMIT
 from .mechanics.scoring import initiative
 from .mechanics.powers import Mechanic, mechanic_of, trigger_of
 from .models import Card
-from .settings import XiaolinSettings, player_actions
+from .settings import XiaolinSettings, deposit_limit, player_actions
 from .state import XiaolinState
 from .training import add_progress, can_train, doubles_training, payout_ready
 from .turn import bank_value, duel_value, max_hand_size, shelve
@@ -54,6 +54,8 @@ def deposit_blocked(state: XiaolinState, actions_per_turn: int) -> str | None:
     """
     if spent := spent_gate(state, actions_per_turn):
         return spent
+    if state.deposits_taken >= deposit_limit(actions_per_turn):
+        return "No more deposits this turn."
     if len(state.player.hand) <= 1:
         return "Only one Wu left in hand."
     return None
@@ -77,6 +79,7 @@ def deposit(state: XiaolinState, card: Card, *, rng: Rng) -> int:
     paid = bank_value(card, rng)
     state.player.points = max(0, state.player.points + paid)
     state.actions_taken += 1
+    state.deposits_taken += 1
     return paid
 
 
@@ -330,6 +333,7 @@ def use_power(
         if not WITCHCRAFT_WEARS or card.uses < WEAR_LIMIT:
             return message  # restored: it never leaves her hand
         spend.me.remove_card(card)
+        # A wear-vault, not a deposit: the sorcery used the Wu up, she did not choose to cash it.
         paid = bank_value(card, rng) if rng is not None else card.points
         spend.me.points = max(0, spend.me.points + paid)
         return message

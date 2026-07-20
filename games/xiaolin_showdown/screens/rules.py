@@ -32,7 +32,7 @@ from textual.widgets import Footer, Header, Input, ListItem, ListView, Static
 
 from termcade.ui.typography import spaced_dashes
 from ..logic.mechanics.prize import PrizeRoute
-from ..logic.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings
+from ..logic.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings, deposit_limit
 from ..logic.state import XiaolinState
 from ..logic.training import BOSS_LOSS_FILL, STAT_CAP, TRAIN_LENGTH
 from ..logic.wear import WEAR_LIMIT
@@ -81,9 +81,9 @@ def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[s
             "Drawing with a full hand SWAPS: shelve one Wu to your Deck and take another. "
             "Your Deck is shuffled, so a shelved Wu comes back in its own time.",
             f"Your hand holds {settings.max_hand_size} Wu. Over that, you shelve one back to your Deck.",
-            f"Left with nothing you can field, you are dealt back in – up to {settings.empty_draw_limit} "
+            f"Left with nothing you can field, you are dealt back in – {settings.empty_draw_limit} "
             "Wu, from your own Deck first and the pile only after it. It costs you the turn's action, "
-            "and it never hands you more than you could have staked. "
+            "the same as a Draw, and it pays the same as a Draw. "
             "You are being put back in the fight, not paid for having lost it.",
             "Your opponent takes the same turn when you do.",
             f"Bank {target} points and the run is yours!",
@@ -101,6 +101,10 @@ def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[s
             "they have nothing left to train, and you can't climb toward their level.",
             f"A beating from a boss teaches DOUBLE: losing a Showdown fills your bar by {BOSS_LOSS_FILL}.",
             f"Against a boss, a Temple turn buys you {BOSS_PLAYER_ACTIONS} actions to their one. You better prepare yourself!",
+            f"At most {deposit_limit(BOSS_PLAYER_ACTIONS)} of them may be Deposits - half a turn, "
+            "rounded up. The extra actions are there to arm you, not to fill your vault faster.",
+            "Dealt back in with nothing you could field? That costs the whole turn, all "
+            f"{BOSS_PLAYER_ACTIONS} actions of it - not one.",
         ],
         "Initiative": [
             "Initiative is how fast you are, and the faster duelist names the Challenge.",

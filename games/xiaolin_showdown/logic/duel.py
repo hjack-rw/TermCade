@@ -57,7 +57,11 @@ LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD rep
 # Monsoon (the whole arena's).
 _CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET_ARENA})
 
-BEAST_BOOST = 2  # Chase Young's Beast Form: +2 on the contested stat, in exchange for his Wu
+# Chase Young's Beast Form: +1 on the contested stat, in exchange for his Wu. One, not two: the beast
+# KEEPS its prize now (see `_award_prize`), and at +2 that was worth so much it crushed the whole
+# `bot.BEAST_MARGIN` curve flat (margin 5 read 2.0% player win). At +1 the margin spans 5.5-10.9% and
+# is a real dial again — the boost had to come down for when-to-beast to mean anything.
+BEAST_BOOST = 1
 
 
 @dataclass
@@ -86,6 +90,10 @@ class DuelState:
     # Chase Young's Beast Form (see logic/bot.choose_beast_form): the stat he boosts +3 this showdown.
     # When set, his fielded Wu score NOTHING (offence_negated) — he wagers them, never wields them.
     beast_stat: str | None = None
+    # Chase won the Wu and handed it to the duelist he beat ("The Good Guys Finish Last", see
+    # `_award_prize`). Recorded rather than re-derived: the screen must not have to know which of his
+    # two modes gives the prize back, and the player cannot see it happen — the Wu simply arrives.
+    prize_gifted: bool = False
     # The Wu the wear rule vaulted as this showdown ended — (name, was the player's, points paid) —
     # for the screen to report (see logic/wear.py).
     worn_out: list[tuple[str, bool, int]] = field(default_factory=list)
@@ -591,12 +599,18 @@ class Duel:
         )
         self.duel.card_won = self.duel.prize_route is not None
         if self.duel.card_won:
-            # "The Good Guys Finish Last": a Beast-Form win gives the prize to the duelist Chase beat
-            # — he still takes their STAKED Wu (`_end`), but the revealed trophy he hands back. This
-            # is the price of the beast, and the reason to field his Wu instead: a Wu-play win keeps
-            # the prize like anyone's. `card_won` stays true — a route was earned — so the log still
-            # reads a win; only the taker changes.
-            gifts = self._is_chase(winner) and self.duel.beast_stat is not None
+            # "The Good Guys Finish Last": a WU-PLAY win gives the prize to the duelist Chase beat —
+            # he fought them as a duelist and hands the trophy back. A Beast-Form win keeps it: in
+            # the beast his Wu are dead weight, so a Wu he takes is one he cannot wield, banked and
+            # denied rather than wielded. He could spend them at the temple; he simply never wants to.
+            # `card_won` stays true — a route was earned — so the log still reads a win; only the
+            # taker changes.
+            #
+            # This way round because the beast was paying twice: it deadens his Wu AND forfeited the
+            # prize, so it was never the right call and beasting more only made him weaker (margin 0
+            # 1.5% player win, always-beast 8.5%). A mode that is always wrong is not a choice.
+            gifts = self._is_chase(winner) and self.duel.beast_stat is None
+            self.duel.prize_gifted = gifts
             takes_prize = loser if gifts else winner
             takes_prize.hand.append(self.duel.stakes)
         else:

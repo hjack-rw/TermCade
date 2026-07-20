@@ -41,6 +41,13 @@ SWAP_MARGIN = 5
 # is still a deposit not made, and a scrap is not worth one.
 WITCH_RECALL_MARGIN = 3
 
+# How many Wu the witchcraft may call back in a whole run. The recall is a RESOURCE, not a tap: with
+# no ceiling she never runs out of ammunition and the counterplay collapses to outrunning her to the
+# point target. A cap lets her spend it greedily — the margin stays low, so she takes what is worth
+# taking — and then it is gone. Raising the margin instead reached the same win rate by tuning the
+# signature mechanic into almost never firing, which is a footnote, not a boss.
+WITCH_RECALL_LIMIT = 3
+
 
 @dataclass(frozen=True)
 class TemplePlay:
@@ -100,7 +107,12 @@ def choose_temple_power(
 
 
 def worth_recalling(state: XiaolinState) -> bool:
-    """Wuya's recall: the lost pile's OLDEST (Euthymia's rule), against the action it costs."""
+    """Wuya's recall: the lost pile's OLDEST (Euthymia's rule), against the action it costs.
+
+    Spent, not owned — ``WITCH_RECALL_LIMIT`` of them in a run, and the run is the whole allowance.
+    """
+    if state.witch_recalls >= WITCH_RECALL_LIMIT:
+        return False
     return bool(state.lost) and duel_value(state.lost[0]) >= WITCH_RECALL_MARGIN
 
 

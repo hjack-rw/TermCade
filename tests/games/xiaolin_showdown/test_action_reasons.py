@@ -19,6 +19,7 @@ from xiaolin_showdown.logic.actions import (
     usable_powers,
     use_power_blocked,
 )
+from xiaolin_showdown.logic.settings import deposit_limit
 
 BRAS_FINGER = 16  # a `deposit`-trigger Wu: usable only while a deposit is still allowed
 PLAIN_WU = 6
@@ -86,6 +87,24 @@ def test_a_spent_action_blocks_a_deposit(state, settings):
 def test_a_last_wu_cannot_be_deposited(state, settings, card):
     state.player.hand = [card(PLAIN_WU)]
     assert deposit_blocked(state, settings.actions_per_turn) == "Only one Wu left in hand."
+
+
+def test_at_most_half_a_turns_actions_may_be_spent_depositing():
+    """A bigger action budget buys TEMPO — a draw, a power, a stat — not a faster vault.
+
+    Derived from the budget rather than pinned per tier, so it cannot drift out of step with it: the
+    ordinary one-action turn is unchanged, and it binds only where the budget is larger.
+    """
+    assert deposit_limit(1) == 1
+    assert deposit_limit(3) == 2
+
+
+def test_a_turn_that_has_deposited_its_share_says_so(state, settings):
+    """The cap is what keeps a larger action budget from simply being more banks a turn."""
+    budget = settings.actions_per_turn + 2  # a budget big enough for the cap to bind before it
+    state.deposits_taken = deposit_limit(budget)
+
+    assert deposit_blocked(state, budget) == "No more deposits this turn."
 
 
 def test_a_hand_of_plain_wu_has_no_power_to_use(state, settings, card):

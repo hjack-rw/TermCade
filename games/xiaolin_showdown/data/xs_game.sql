@@ -37,7 +37,7 @@ CREATE TABLE "power" (
 );
 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-7, 'Beast Form', 'beast_form', 'Going over to the dark side, Chase became infused with the power of a Heylin Demon. He refuses however to meddle in mere mortal affairs.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-6, 'Witchcraft', 'witchcraft', 'Due to Wuya''s personal connection to the Shen Gong Wu, she can both find Wu''s that have been lost, while also using them in more efficient ways.', 1);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-6, 'Witchcraft', 'witchcraft', 'Wuya''s connection to the Shen Gong Wu runs both ways. She can call the lost Wu back into her hand, three times in a run, and a Wu she spends on its power returns to her hand. But the hunger that finds them is never fed.', 1);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-5, 'Free Allomorphia', 'morph', 'Given his condition of being a literal Heylin Bean, Hannibal took a hold of Moby Morpher and never let it go - so he wields it as a free Wu.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-4, 'Dragon of Earth', 'dragon', 'User has access to basic Earth-based attacks, and moves', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-3, 'Dragon of Fire', 'dragon', 'User has access to basic Fire-based attacks, and moves', 0);

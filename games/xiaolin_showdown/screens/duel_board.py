@@ -401,6 +401,15 @@ def _showdown_result(duel: DuelState) -> tuple[Text, ...]:
     who = display_name(duel.winner_character)
     if duel.prize_route is None:
         return (Text(f"{who} won the showdown, but not the Wu – "), prize, Text(" was lost!"))
+    if duel.prize_gifted:
+        # He won it and gave it away. Said outright because it is the one thing here the player cannot
+        # see happen: the Wu just turns up in their hand, and without this the line above would read
+        # as Chase keeping a Wu they are holding.
+        return (
+            Text(f"{who} won and claimed "),
+            prize,
+            Text(f" by {duel.prize_route.value} – then handed it to you!"),
+        )
     return (Text(f"{who} won and claimed "), prize, Text(f" by {duel.prize_route.value}!"))
 
 

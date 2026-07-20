@@ -148,6 +148,15 @@ class DuelScreen(XiaolinScreen):
             if stage == SETUP and duel.duel.player_priority and duel.duel.challenge != TOURNAMENT:
                 self._announce_wager(duel.duel, state)
             if stage == END:  # the end phase (the loser's stakes change hands) has run
+                if duel.duel.prize_gifted:
+                    # Toast only, not logged (the board's last line carries it): he won the Wu and
+                    # gave it back, and there is nothing on screen a player could read that from —
+                    # the Wu simply turns up in their hand. It is meant to land as a surprise.
+                    self.engine_app.notify(
+                        "He beat you for the Wu, then pressed it into your hands.",
+                        title="The Good Guys Finish Last",
+                        log=False,
+                    )
                 if any(r.player.element_cancelled or r.bot.element_cancelled for r in duel.duel.rounds):
                     # Toast only, not logged: two element-setters disagreed and cancelled — the player
                     # would otherwise see a Wu keep its own colour with no reason given.

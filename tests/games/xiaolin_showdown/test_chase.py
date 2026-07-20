@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.bot import choose_beast_form
+from xiaolin_showdown.logic.bot import BEAST_MARGIN, choose_beast_form
 from xiaolin_showdown.logic.duel import BEAST_BOOST, Duel, DuelChoices
 from xiaolin_showdown.logic.models import Character, Mechanic, Power
 from xiaolin_showdown.logic.settings import XiaolinSettings
@@ -36,9 +36,14 @@ def test_beast_form_when_the_contested_stat_is_close():
 
 
 def test_wu_play_when_chase_leads_the_stat_comfortably():
-    # Ahead by more than the boost — the +2 changes nothing, so keep the Wu and the prize.
+    """Ahead by the margin or more, the +2 is not worth the prize it forfeits — keep the Wu.
+
+    The opponent is built off ``BEAST_MARGIN`` rather than pinned, so this tests the RULE (a
+    comfortable lead declines the beast) and not the tuning: retuning the margin retunes the test.
+    """
     chase = _chase()
-    opp = duelist(stats={"force": 3, "agility": 3, "intellect": 3}, hand=[wu(1, name="F")])
+    base = 7 - BEAST_MARGIN - 1  # + the 1-force Wu below, this leaves Chase's lead at exactly the margin
+    opp = duelist(stats={"force": base, "agility": base, "intellect": base}, hand=[wu(1, name="F")])
     assert choose_beast_form(chase, opp, ["force"]) is None
 
 
@@ -84,17 +89,44 @@ async def test_beast_form_adds_the_boost_to_the_contested_stat():
     assert duel.duel.winner is False  # 7+3 contested beats the player's 5 + a 1-Wu
 
 
-async def test_the_good_guys_finish_last_gifts_the_prize_to_the_loser():
-    # Close on every stat (6 vs Chase 7) so he beasts whichever is contested, +2 still wins → gifts.
+async def test_the_good_guys_finish_last_gifts_a_wu_play_win():
+    """Beating them as a duelist, Chase hands the trophy back — that is the whole of his name.
+
+    Comfortably ahead (lead at the margin), so he declines the beast and fights with his Wu.
+    """
+    base = 7 - BEAST_MARGIN - 1  # + the 1-force Wu below leaves Chase's lead at exactly the margin
+    player = duelist(stats={"force": base, "agility": base, "intellect": base}, hand=[wu(1, name="P")])
+    chase = _chase(hand=[wu(0, name="Live"), wu(0, name="Live2")])
+    prize = wu(2, name="Prize")
+    state = XiaolinState(catalog=_NoPlaces(), player=player, bot=chase, card_deck=[prize])  # type: ignore[arg-type]
+    duel = Duel(state, Rng(0), _choices(), XiaolinSettings())
+    await _run(duel)
+    assert duel.duel.beast_stat is None  # he fought as a duelist
+    assert duel.duel.winner is False and duel.duel.card_won  # Chase won and earned the prize...
+    assert any(c.name == "Prize" for c in player.whole_hand)  # ...but the loser holds it
+    assert all(c.name != "Prize" for c in chase.whole_hand)
+    # Recorded, not re-derived: the screen says so outright, because a player cannot see him do it.
+    assert duel.duel.prize_gifted
+
+
+async def test_the_beast_keeps_what_it_cannot_wield():
+    """In the beast his Wu are dead, so a Wu he takes is denied, not wielded — and he keeps it.
+
+    The beast used to forfeit the prize AND deaden his Wu, which made the mode never worth taking.
+    Keeping the spoils is what makes it a choice rather than a self-inflicted wound.
+    """
+    # Close on every stat (6 vs Chase 7) so he beasts whichever is contested, and the +2 still wins.
     player = duelist(stats={"force": 6, "agility": 6, "intellect": 6}, hand=[wu(0, name="P")])
     chase = _chase(hand=[wu(0, name="Dead"), wu(0, name="Dead2")])
     prize = wu(2, name="Prize")
     state = XiaolinState(catalog=_NoPlaces(), player=player, bot=chase, card_deck=[prize])  # type: ignore[arg-type]
     duel = Duel(state, Rng(0), _choices(), XiaolinSettings())
     await _run(duel)
-    assert duel.duel.winner is False and duel.duel.card_won  # Chase won and earned the prize...
-    assert any(c.name == "Prize" for c in player.whole_hand)  # ...but the loser holds it
-    assert all(c.name != "Prize" for c in chase.whole_hand)
+    assert duel.duel.beast_stat is not None  # he took the beast
+    assert duel.duel.winner is False and duel.duel.card_won
+    assert any(c.name == "Prize" for c in chase.whole_hand)  # the spoils stay with him
+    assert all(c.name != "Prize" for c in player.whole_hand)
+    assert not duel.duel.prize_gifted  # nothing to announce — he kept it
 
 
 async def test_a_plain_opponent_never_takes_beast_form():
@@ -148,10 +180,19 @@ def test_neither_dampening_nor_subjugation_nullifies_beast_form():
 
 
 def test_the_boost_is_element_free():
-    # It lands on BASE, which carries no element — so no arena bonus, and no elemental counter (they
-    # act on the elemental bonus) can touch it. But a player CURSE still bites: it lands on Chase's
-    # side (his counted() keeps the suffered mirrors), reducing his beast score. See below.
-    assert BEAST_BOOST == 2
+    """It lands on BASE, which carries no element — so the arena cannot lift it or drag it down.
+
+    That is what puts it out of reach of every elemental counter: they act on the elemental bonus,
+    and the beast never earns one. (A player CURSE still bites, which is the test below.)
+    """
+    from xiaolin_showdown.logic.battle import Side, end_stat
+
+    beast_base = {"force": 7 + BEAST_BOOST, "agility": 7, "intellect": 7}
+    on_metal = end_stat("force", 1, Side(), beast_base, "metal")
+
+    # Same score on a coloured ground as on neutral metal: the boost took no bonus either way.
+    assert end_stat("force", 1, Side(), beast_base, "fire") == on_metal
+    assert end_stat("force", 1, Side(), beast_base, "water") == on_metal
 
 
 def test_a_player_curse_still_bites_beast_form():

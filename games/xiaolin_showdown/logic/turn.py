@@ -26,7 +26,7 @@ from .mechanics.powers import (
 from .constants import WEAR_LIMIT
 from .mechanics.cards import hand_over
 from .models import Card, Player
-from .settings import XiaolinSettings, player_actions, plays_keen
+from .settings import XiaolinSettings, deposit_limit, player_actions, plays_keen
 from .state import XiaolinState
 from .training import TRAIN_LENGTH, add_progress, can_train, pick_stat, raise_stat, turn_over
 
@@ -58,6 +58,8 @@ def refill_hands(state: XiaolinState, settings: XiaolinSettings, *, rng: Rng) ->
 
     state.actions_taken = 0
     state.bot_actions_taken = 0
+    state.deposits_taken = 0
+    state.bot_deposits_taken = 0
     turn_over(state.player)  # a taken payout's bar showed full through the turn; reset it now
     turn_over(state.bot)
 
@@ -120,14 +122,21 @@ def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettin
 
     "Nothing playable" is not "nothing at all": a dragon (``boost``/0) can only ever be laid as a
     boost, so a hand of them has no answer to a showdown. An amplifier (``boost``/+1) *can* be fielded,
-    badly. ``empty_draw_limit`` is the target hand size, not a card count — an unfieldable Wu still
-    fills one of the slots.
+    badly.
+
+    ``empty_draw_limit`` is how many Wu the mercy PAYS, not the hand size it fills to. Filling to a
+    size paid a duelist holding a wudai one Wu LESS than one holding none — the wudai already occupied
+    a slot — so the rule shorted the very hands it exists to rescue. A count is blind to what is held.
+    ``max_hand_size`` still caps it: the mercy may not overfill a hand.
     """
-    target = min(settings.empty_draw_limit, max_hand_size(player, settings.max_hand_size))
-    while player.deck and len(player.whole_hand) < target:
+    room = max_hand_size(player, settings.max_hand_size) - len(player.whole_hand)
+    owed = min(settings.empty_draw_limit, room)
+    while player.deck and owed > 0:
         player.hand.append(player.deck.pop(0))
-    while state.card_deck and len(player.whole_hand) < target:
+        owed -= 1
+    while state.card_deck and owed > 0:
         _draw_from_main(state, player)
+        owed -= 1
 
 
 # What a Wu is worth on the table when its printed stats say nothing (a `? ? ?` card reads as ZERO).
@@ -261,6 +270,13 @@ def bank_value(card: Card, rng: Rng) -> int:
     The bot banks on the same terms as the player. Neither is told what the gamble is worth, and
     neither finds out until it is spent: the bot picks it by the expected value in the card DB (see
     ``GAMBLE_SPREAD``), the same way a player eyeing a ``?`` has only the odds to go on.
+
+    No duelist banks at a different rate. A "Shen Gong Wu hunger" that halved Wuya's deposits was
+    built and reverted the same day: it did not make her score less so much as stop her CLOSING, and
+    her runs went 7.7 showdowns to 13.8. Long runs feed the player's training bar — the one legal
+    asymmetry in a boss run — so the player took 2.04 stat raises to 1.03 and out-trained her. It
+    took her from 8.8% to 20.8% player win, the easiest boss in the tier. Run LENGTH predicts a
+    boss's difficulty better than its scoring; shortening her runs is what makes her hard.
     """
     return roll_gamble(rng) if is_gamble(card.power) else card.points
 
@@ -359,17 +375,21 @@ def _boss_acts(
         revived = state.lost.pop(0)
         bot.hand.append(hand_over(revived))
         state.bot_actions_taken += 1
+        state.witch_recalls += 1
         return BotMove(RECALL, f"{name} called {revived.name} back from the lost.")
 
     # Bank the surplus — the point race. Ahead of any power: reaching the target ends the run on the
     # boss's terms, before the player claws back.
-    if len(bot.hand) > DUEL_FLOOR:
+    if len(bot.hand) > DUEL_FLOOR and state.bot_deposits_taken < deposit_limit(
+        settings.actions_per_turn
+    ):
         banked = pick_deposit(bot.hand, difficulty)
         if banked is not None:
             points = bank_value(banked, rng)
             bot.points = max(0, bot.points + points)
             bot.remove_card(banked)
             state.bot_actions_taken += 1
+            state.bot_deposits_taken += 1
             return BotMove(
                 VAULT, f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}."
             )
@@ -439,6 +459,7 @@ def _bot_acts(
         revived = state.lost.pop(0)
         state.bot.hand.append(hand_over(revived))
         state.bot_actions_taken += 1
+        state.witch_recalls += 1
         return BotMove(RECALL, f"{name} called {revived.name} back from the lost.")
 
     # The last stretch of a nearly-full training bar outranks drawing or banking: a permanent +1
@@ -463,14 +484,18 @@ def _bot_acts(
         state.bot_actions_taken += 1
         return BotMove(DRAW, f"{name} drew {drawn.name} from their deck.")
 
-    # Mirrors `can_deposit`: never cash the last card out of the hand.
-    if len(state.bot.hand) > DUEL_FLOOR:
+    # Mirrors `can_deposit`: never cash the last card out of the hand, and never spend more than half
+    # the turn's budget doing it.
+    if len(state.bot.hand) > DUEL_FLOOR and state.bot_deposits_taken < deposit_limit(
+        settings.actions_per_turn
+    ):
         banked = pick_deposit(state.bot.hand, difficulty)
         if banked is not None:
             points = bank_value(banked, rng)
             state.bot.points = max(0, state.bot.points + points)  # a bad gamble cannot go below zero
             state.bot.remove_card(banked)
             state.bot_actions_taken += 1
+            state.bot_deposits_taken += 1
             return BotMove(
                 VAULT,
                 f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}.",

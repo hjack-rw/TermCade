@@ -42,11 +42,15 @@ class XiaolinSettings:
     # One temple turn, one action: deposit, spend a power, or draw. One budget, so a hand is a resource
     # and a Wu whose power beats its points has a price.
     actions_per_turn: int = 1
-    # Mercy rule: a duelist with nothing fieldable is dealt back up to this many Wu (running dry must
-    # not be an auto-loss). It is INCOME paid to whoever is losing — ~3.8 fires a run, ~7.5 Wu off a
-    # ~30-Wu pile, the largest source of Wu in the game. Clamped to `max_wager` in `__post_init__`:
-    # unclamped, 3 -> 4 took the hard tier 37% -> 72%, and 5 -> 75%. A guardrail, not a lock.
-    empty_draw_limit: int = 3
+    # Mercy rule: a duelist with nothing fieldable is PAID this many Wu (running dry must not be an
+    # auto-loss). It is INCOME paid to whoever is losing — the largest source of Wu in the game.
+    # Clamped to `max_wager` in `__post_init__`: unclamped, 3 -> 4 took the hard tier 37% -> 72%, and
+    # 5 -> 75%. A guardrail, not a lock.
+    # One, because the mercy and a Draw cost the same thing — the turn's action — so paying more made
+    # emptying your hand the better draw. Measured: banking down to a single Wu to farm the refill was
+    # worth +4 to +6 points of win rate against a boss (and nothing on easy/hard, where you are rarely
+    # empty). Parity with Draw removes the incentive without fencing off the 1-Wu hand.
+    empty_draw_limit: int = 1
     # The bar a winner's stats must clear to claim the prize Wu — the one number deciding whether Wu
     # circulate or the pile just drains. Measured across 6..9 (see BALANCE.md): 7 is the only value at
     # which all four routes of the prize cascade actually fire. Below it the decisive blow claims
@@ -252,6 +256,16 @@ def default_settings() -> Settings:
 # 200 runs: with the boss loss drip it takes the boss tier 0.5% -> 5.0%, and leaks nothing to the
 # boss itself. Global, it wrecks the normal game (easy 81%) — hence boss runs only.
 BOSS_PLAYER_ACTIONS = 3
+
+
+def deposit_limit(actions: int) -> int:
+    """How many of a turn's ``actions`` may be spent depositing — half, rounded up.
+
+    Derived from the budget rather than pinned per tier, so it cannot drift out of step with it. At
+    the ordinary one action a turn it changes nothing (1 -> 1); it binds only where the budget is
+    larger, which today means a boss run (3 -> 2). Extra actions are tempo, not a faster vault.
+    """
+    return -(-actions // 2)
 
 
 def player_actions(state, settings: XiaolinSettings) -> int:
