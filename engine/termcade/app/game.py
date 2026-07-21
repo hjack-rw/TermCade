@@ -54,6 +54,10 @@ class Game:
     min_size: tuple[int, int] | None = None
     # The grid the browser build sizes its font to fit — the layout the game wants at rest.
     fit_size: tuple[int, int] | None = None
+    # The same, for a touch device. A phone is short: asking it to fit the desktop's row count buys
+    # a font nobody can read, because the auto-fit shrinks until all those rows go in. Ask for fewer
+    # rows and a legible font follows — the screens that need the space scroll inside their panel.
+    touch_fit_size: tuple[int, int] | None = None
     # The musical rules the cartridge's theme is composed under. Default is the cabinet's own
     # voice, so a game that says nothing still gets a soundtrack that sounds like it belongs.
     music_style: Style = ARCADE

@@ -34,7 +34,14 @@ log = logging.getLogger("termcade.beta")
 
 CODES_ENV = "TERMCADE_CODES"
 DATA_DIR_ENV = "TERMCADE_DATA_DIR"
+TOUCH_ENV = "TERMCADE_TOUCH"
 COOKIE = "termcade_beta"
+
+# Enough to tell a phone or tablet from a desktop browser. Deliberately crude: the cost of being
+# wrong is a Back button that a mouse user did not need, or its absence for someone who can still
+# press Escape. Screen *size* cannot answer this — a phone in landscape reports a grid the same
+# shape as a laptop's, so the device has to say so itself.
+_TOUCH_UA = re.compile(r"Android|iPhone|iPad|iPod|Mobile|Silk|Kindle", re.I)
 
 # Passcodes are hashed into filesystem paths and put in a child's environment, so the safe set is
 # the one that cannot mean anything anywhere: no dots, no slashes, no shell metacharacters, no
@@ -68,6 +75,12 @@ def is_well_formed(code: str) -> bool:
     return bool(_CODE_RE.match(code))
 
 
+def is_touch(user_agent: str) -> bool:
+    """Whether ``user_agent`` belongs to a device with no keyboard, so its session gets a Back
+    button. See :data:`_TOUCH_UA` for why the terminal's own size cannot answer this."""
+    return bool(_TOUCH_UA.search(user_agent))
+
+
 def player_dir(base: Path, code: str) -> Path:
     """The data dir belonging to ``code``, under ``base``.
 
@@ -90,6 +103,19 @@ class _PlayerAppService(AppService):
     def __init__(self, command: str, *, extra_env: dict[str, str], **kwargs: object) -> None:
         super().__init__(command, **kwargs)  # type: ignore[arg-type]
         self._extra_env = extra_env
+
+    async def on_meta(self, data: bytes) -> None:
+        """Forward our own meta packets to the browser; everything else is upstream's business."""
+        import json
+
+        try:
+            payload = json.loads(data)
+        except ValueError:
+            payload = {}
+        if payload.get("type") == "termcade_back":
+            await self.remote_write_str(json.dumps(["termcade_back", payload]))
+            return
+        await super().on_meta(data)
 
     def _build_environment(self, width: int = 80, height: int = 24) -> dict[str, str]:
         environment = super()._build_environment(width=width, height=height)
@@ -173,9 +199,12 @@ class BetaServer(Server):
         app_service: _PlayerAppService | None = None
         try:
             await websocket.prepare(request)
+            env = {DATA_DIR_ENV: str(player_dir(self._data_dir, code))}
+            if is_touch(request.headers.get("User-Agent", "")):
+                env[TOUCH_ENV] = "1"
             app_service = _PlayerAppService(
                 self.command,
-                extra_env={DATA_DIR_ENV: str(player_dir(self._data_dir, code))},
+                extra_env=env,
                 write_bytes=websocket.send_bytes,
                 write_str=websocket.send_str,
                 close=websocket.close,

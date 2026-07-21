@@ -59,4 +59,5 @@ def build_game() -> Game:
         # The browser sizes its font to fit this grid, so it must cover the *tallest* screen, not
         # the board: the start menu (banner + wordmark + 5 buttons) measures 42 rows, the temple 30.
         fit_size=(110, 44),
+        touch_fit_size=(110, 30),
     )

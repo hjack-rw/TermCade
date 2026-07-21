@@ -67,6 +67,14 @@ TempleScreen #summary {
 TempleScreen #actions {
     width: 100%;  /* the three action columns spread across the panel rather than clustering */
     padding: 0 4;
+    /* Textual draws any span carrying an `@click` as a link, and a link is underlined. The actions
+       are a list of moves, not prose with links in it — the numbers already say they are live. */
+    link-style: none;
+    link-style-hover: bold;
+    link-color: initial;
+    link-background: initial;
+    link-background-hover: initial;
+    link-color-hover: initial;
 }
 TempleScreen > #hands {
     width: 84%;
@@ -266,6 +274,14 @@ DuelScreen #duel-prompt {
     width: 100%;
     padding: 0 1;
     color: $text-accent;
+    /* The prompt is a tap target, and Textual underlines anything clickable. Same reason as the
+       actions panel: this is a move to make, not a link to follow. */
+    link-style: none;
+    link-style-hover: bold;
+    link-color: initial;
+    link-color-hover: initial;
+    link-background: initial;
+    link-background-hover: initial;
 }
 
 /* The per-decision dialog raised over the duel board. */
@@ -379,4 +395,79 @@ RulesScreen #rule-search {
 
 RulesScreen #rule-search:focus {
     border: tall $accent;
+}
+
+/* --- Rules on a narrow screen -------------------------------------------- */
+/* The book is laid out for a desktop: a 72-column panel with a 28-column contents rail beside it.
+   On a phone that is wider than the whole terminal, so the page ran off the side. Narrow, the panel
+   takes what there is and the rail shrinks to the width of a heading's first words — still tappable,
+   still telling you where you are, without eating the text it is supposed to lead you to. */
+RulesScreen.-narrow BoxedPanel,
+RulesScreen.-touch BoxedPanel {
+    width: 100%;
+}
+RulesScreen.-narrow #rule-nav,
+RulesScreen.-touch #rule-nav {
+    width: 30%;
+    min-width: 12;
+}
+
+/* --- Start menu on a phone ------------------------------------------------ */
+/* The banner and the ASCII title are twenty-odd rows before the first button. On a 36-row phone the
+   options ended below the screen. The title art goes; the game's name is in the header bar anyway,
+   and a menu you cannot reach is worth less than a logo you can. */
+/* Landscape is the short one — 36 rows against portrait's 72 — so that is where the cabinet's own
+   banner goes and the game's title art stays. Portrait has room for both. */
+StartScreen.-touch.-wide #banner {
+    display: none;
+}
+
+/* The book scrolls by turning pages, not by dragging a viewport: it lays out `#rule-book` at 1fr
+   with the contents rail beside it. The engine's blanket touch rule wrapped that in a second
+   scroller and the layout came apart. It keeps its own. */
+RulesScreen.-touch #rule-book {
+    /* Same shape as the log and the Lore book: stop short of the screen so the border is inside it,
+       and scroll the page rather than letting it run past the bottom. 85%, because the contents rail
+       inside it is a ListView whose items are three rows each and would not clip at 90%. */
+    height: 85%;
+    max-height: 85%;
+}
+RulesScreen.-touch #rule-body {
+    overflow-y: auto;     /* the page scrolls; the rail beside it does not move */
+}
+
+/* The Lore book is written to a 32-row page — more rows than a phone in landscape has at all. The
+   panel stops at the screen and the page scrolls inside it. */
+LoreScreen.-touch #lore-panel {
+    height: 80%;
+    max-height: 80%;
+}
+LoreScreen.-touch #lore-page {
+    overflow-y: auto;
+}
+
+/* The contents rail is a ListView of nine headings, three rows each — more than a landscape phone
+   has. It scrolls within the book instead of spilling its last entries under the footer. */
+RulesScreen.-touch #rule-nav {
+    /* `height: 100%` is 100% of the book, which is itself taller than what is left after the search
+       box — so the rail still ran past the bottom. `1fr` takes what the row actually has. */
+    /* Stop the rail a clear row above the Back button. It sits on its own layer at the bottom-left,
+       directly over this column — overlapping, the first tap went to the list (collapsing it) and
+       only the second reached the button. */
+    /* Two rows short of the book, so the rail stops above the Back button in the corner below it.
+       Overlapping, the first tap hit the list and only the second reached the button. */
+    /* Percentages of a short landscape book still left the last item under the button. A hard row
+       budget does not: the rail ends where the corner begins, whatever the screen height. */
+    height: 1fr;
+    max-height: 100%;
+    margin: 0 0 3 0;
+    overflow-y: auto;
+}
+
+/* Neither of these screens may scroll as a whole: the Back button is docked to the bottom of the
+   screen, and on a scrolling screen "the bottom" is the bottom of the content — below the fold,
+   where a thumb never reaches it. Both already scroll where it matters, inside their own panes. */
+RulesScreen.-touch,
+LoreScreen.-touch {
+    overflow-y: hidden;
 }

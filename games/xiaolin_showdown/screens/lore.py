@@ -12,6 +12,7 @@ chapters read as one continuous text. The contents page opens the book and doubl
 from __future__ import annotations
 
 from rich.console import RenderableType
+from rich.style import Style
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -26,6 +27,8 @@ CONTENTS = "Contents"
 
 
 class LoreScreen(XiaolinScreen):
+    # No panel to follow — the book is a page and a counter, so the button takes the screen's corner.
+    BACK_RIGHT = True
     """The book. `_page` is the reader's place in a flat run of every page, contents first."""
 
     BINDINGS = [
@@ -108,8 +111,16 @@ class LoreScreen(XiaolinScreen):
         text.append("  Table of Contents\n", style="bold")
         text.append("\n\n")
         for number, chapter in enumerate(self._book, 1):
+            # The number IS the key that opens the chapter — and a phone has no number
+            # row, so the line itself opens it too: the same span the key would trigger.
+            start = len(text.plain)
             text.append(f"      {number}", style="bold")
             text.append(f"    {chapter.title}\n\n")
+            text.stylize(
+                Style(meta={"@click": f"screen.chapter({number - 1})"}),
+                start,
+                len(text.plain) - 2,
+            )
         text.append("\n")
         text.append("      Press a number to open a chapter, or ")
         text.append("Space", style="bold")

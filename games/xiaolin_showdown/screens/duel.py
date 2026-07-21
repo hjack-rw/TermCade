@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 
+from rich.style import Style
 from rich.text import Text
 from termcade.ui.work import work
 from textual.app import ComposeResult
@@ -69,6 +70,17 @@ class DuelScreen(XiaolinScreen):
     def on_mount(self) -> None:
         self._run_showdown()
 
+    def on_button_pressed(self, event) -> None:  # type: ignore[no-untyped-def]
+        """Back here means Retreat, not "pop the screen".
+
+        A duel *replaces* the temple (`switch_screen`), so popping it lands on the main menu and
+        abandons the run — which is exactly what a player tapping Back is not asking for. Retreat
+        walks back to the temple, and refuses once the showdown is committed.
+        """
+        if event.button.id == self.BACK_ID:
+            event.stop()
+            self.action_retreat()
+
     def action_continue(self) -> None:
         self._continue.set()
 
@@ -92,8 +104,22 @@ class DuelScreen(XiaolinScreen):
         self._retreating = True
         self._continue.set()
 
-    async def _await_continue(self, prompt: str) -> None:
-        self.query_one("#duel-prompt", Static).update(f"▶  {prompt}")
+    async def _await_continue(self, prompt: str, *, retreat: str = "") -> None:
+        # The prompt is the click target as well as the words: a showdown steps forward on Enter or
+        # Space, and a phone has neither. Tapping the line that says "Continue" is what a touch player
+        # tries first, and without this the duel simply stops for them at the opening board.
+        #
+        # ``retreat`` is a SECOND action on the same line, and it gets its own span — stylizing the
+        # whole line once made "Esc Retreat" continue the showdown instead of backing out of it.
+        line = Text(f"▶  {prompt}")
+        line.stylize(Style(meta={"@click": "screen.continue()"}))
+        if retreat:
+            start = len(line.plain) + 8
+            line.append(" " * 8)
+            line.append(retreat, style=Style(meta={"@click": "screen.retreat()"}))
+            # The gap belongs to neither action: a tap that lands between them should do nothing.
+            line.stylize(Style(meta={}), start - 8, start)
+        self.query_one("#duel-prompt", Static).update(line)
         self._continue.clear()
         await self._continue.wait()
         self.query_one("#duel-prompt", Static).update("")
@@ -131,11 +157,13 @@ class DuelScreen(XiaolinScreen):
         # Initiative is already on the board: this press commits you to the priority you can see, or
         # (on a tie) draws the coin that settles it. It is the last moment you may walk away.
         self._show_board(duel)
-        await self._await_continue("Continue to begin the showdown        Esc Retreat")
+        await self._await_continue("Continue to begin the showdown", retreat="Esc Retreat")
         if self._retreating:
             self._retreat_to_temple()
             return
         self._committed = True
+        # Past this point there is no walking away, so the way back stops being offered.
+        self.hide_back()
 
         while True:
             stage = await duel.advance()  # one phase; a choice phase raises its modal inline

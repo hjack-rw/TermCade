@@ -27,6 +27,17 @@ class ChoiceModal(ModalScreen[T]):
     """A list of buttons; dismisses with the value behind the chosen one. With ``title`` set, that is
     the border label and ``prompt`` shows inside; otherwise ``prompt`` is the border label itself."""
 
+    def on_mount(self) -> None:
+        # A modal is not an `EngineScreen`, so it misses the touch class the rest of the game gets —
+        # and the post-duel "let a Wu go" picker is a modal listing a whole hand, which ran off a
+        # phone exactly like Look Up did.
+        import os
+
+        from .base import TOUCH_ENV
+
+        if os.environ.get(TOUCH_ENV):
+            self.add_class("-touch")
+
     # No pre-selected option on open — same rule as EngineScreen, but ModalScreen doesn't inherit it.
     # Must be "" (not None): None makes Textual fall back to the app's "*" and auto-focus the first
     # button; the empty string is what actually leaves the modal un-highlighted until the player tabs.

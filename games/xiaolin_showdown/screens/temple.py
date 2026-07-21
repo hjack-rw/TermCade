@@ -62,6 +62,9 @@ from .use_power import UsePowerScreen
 
 
 class TempleScreen(XiaolinScreen):
+    # No Back here: the temple IS the run, and the only thing under it is the main menu.
+    BACK_ALLOWED = False
+
     BINDINGS = [
         ("1", "gong_yi_tanpai", "Duel"),
         ("2", "draw", "Draw"),
@@ -263,6 +266,12 @@ class TempleScreen(XiaolinScreen):
 
 
 # Temple actions, laid out row-major into three columns that fill the panel (see _actions_grid).
+# Which screen action each number key runs, read off the bindings rather than written out again —
+# so a rebound key moves its click target with it instead of quietly pointing at the old action.
+_ACTION_BY_KEY = {
+    key: action for key, action, *_ in TempleScreen.BINDINGS if key.isdigit()
+}
+
 _ACTIONS = [
     '1. "Gong Yi Tanpai!"',
     "2. Draw a Card",
@@ -380,7 +389,7 @@ def _actions_grid(blocked: dict[str, str | None]) -> Table:
     # Expand to the panel and split it into three equal columns, so the actions spread across the
     # width instead of huddling in a natural-width block in the middle. Each entry is centred in its
     # own column, which keeps the block balanced left-to-right at any panel width.
-    grid = Table.grid(expand=True, padding=(0, 2))
+    grid = Table.grid(expand=True, padding=(1, 2))
     for _ in range(3):
         grid.add_column(ratio=1, justify="center")
     for start in range(0, len(_ACTIONS), 3):
@@ -401,7 +410,13 @@ def _action_cell(entry: str, blocked: dict[str, str | None]) -> Text:
         cell.append(f"{key}. {rest}", style="dim")  # greyed out — you can't take this action now
     # Every action is tagged, so hovering a live one confirms what it does and a greyed one says why
     # it is out of reach (see TooltipStatic). Silence means the cursor missed the text.
-    cell.stylize(Style(meta={"tooltip": reason or _ACTION_HELP.get(key, rest)}))
+    meta: dict[str, str] = {"tooltip": reason or _ACTION_HELP.get(key, rest)}
+    # A live action is also *clickable*, running the same screen action its number key does. The
+    # panel reads as a list of shortcuts, but a phone has no number row — without this the nine
+    # actions are unreachable on a touch screen. A blocked one stays inert, as pressing its key would.
+    if reason is None and key in _ACTION_BY_KEY:
+        meta["@click"] = f"screen.{_ACTION_BY_KEY[key]}()"
+    cell.stylize(Style(meta=meta))
     return cell
 
 
