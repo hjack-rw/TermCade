@@ -1,7 +1,10 @@
 """The touch player's way off a screen.
 
 Every exit in the game is a key, and a phone has no keys — so a served touch session gets a Back
-button that presses Escape for it. A terminal gets nothing new: there, Escape already works.
+button in the page. A terminal gets nothing new: there, the keys already work.
+
+What that button *sends* is pinned in `test_page_back_key` and `test_serve`: not Escape, which each
+screen is free to give its own meaning, but one key that means going back and nothing else.
 """
 
 from __future__ import annotations
@@ -51,4 +54,3 @@ def test_the_way_back_is_a_page_button_not_a_widget() -> None:
     html = (templates / "app_index.html").read_text(encoding="utf-8")
     assert "tc-back-fab" in html
     assert "position:fixed" in html
-    assert "Escape" in html  # it sends the key each screen already answers

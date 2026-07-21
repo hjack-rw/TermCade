@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from rich.text import Text
+from textual import events
 from textual.content import ContentText
 from textual.screen import Screen
 from textual.widgets import Footer
@@ -51,6 +52,21 @@ class EngineScreen(Screen[None]):
     # one button several behaviours, and a menu read it as one of its own items.
     BACK_ID = "tc-back"
 
+    # What the page's Back button actually sends (see `serve._back_overlay`). NOT Escape: Escape is
+    # a key each screen gives its own meaning, and on the temple that meaning is "leave the run for
+    # the main menu". A button whose only guard was hiding itself therefore abandoned a live run
+    # whenever a tap beat the hide — the announcement is a round trip behind the finger.
+    #
+    # This key has one meaning everywhere, and `on_key` re-checks the guard at the moment it
+    # arrives, so the authority is here and not in a copy the page holds.
+    #
+    # Shift+F5 is not an aesthetic choice. The obvious pick was F24 — no keyboard has one, so no
+    # player could press it — but xterm.js does not encode F13 and up AT ALL: the button went dead
+    # silently, hiding itself on a tap that never reached the app. Measured, not assumed. Of the
+    # keys that do survive the terminal, this one is unreachable in practice: a browser eats Shift+F5
+    # as a reload before the page ever sees it, so only the button can send it.
+    BACK_KEY = "shift+f5"
+
     # A screen sets this False when going back from it would abandon something — the game's hub, where
     # Back would drop a live run at the main menu. Depth alone cannot tell that apart from the Lore
     # book, which sits at the same depth and *should* go back.
@@ -89,6 +105,21 @@ class EngineScreen(Screen[None]):
 
     def on_screen_resume(self) -> None:
         self.announce_back()
+
+    def on_key(self, event: events.Key) -> None:
+        """Answer the page's Back button — and only if going back is allowed *now*.
+
+        Dispatch walks the MRO, so this runs on screens that define their own ``on_key`` too. The
+        guard is deliberately the same expression `announce_back` sends to the page: the page's copy
+        decides whether the button is *drawn*, this one decides whether it *acts*, and a burst of
+        taps arriving before the page has caught up is refused here rather than obeyed.
+        """
+        if event.key != self.BACK_KEY:
+            return
+        event.stop()
+        event.prevent_default()
+        if self.BACK_ALLOWED and len(self.app.screen_stack) > 2:
+            self.app.pop_screen()
 
     def on_mount(self) -> None:
         # Dispatch walks the MRO, so this runs even on a screen that defines its own `on_mount`.

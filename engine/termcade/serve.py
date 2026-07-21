@@ -52,6 +52,17 @@ _STOCK_STACK = '"Roboto Mono", menlo, monospace'  # the page's own CSS: intro di
 # Roboto Mono and whatever the browser fell back to for the rest. A desktop hides that (Segoe UI
 # Symbol covers the icons); a phone has no such fallback and renders emoji or nothing.
 _TERM_STACK = "'Roboto Mono', Monaco, 'Courier New', monospace"
+
+# What the page's Back button sends. Must agree with ``EngineScreen.BACK_KEY``, which is the app's
+# side of the same contract — a test pins the two together rather than an import, so the server does
+# not have to load the UI to serve a page.
+#
+# The modifier is load-bearing. xterm.js encodes no function key above F12, so the first attempt
+# (F24, chosen because no keyboard has one) produced a button that hid itself and sent nothing.
+# Shift+F5 goes down the wire as ``\x1b[15;2~``; a real browser treats it as a reload and never
+# delivers it to the page, so the button remains its only source.
+_BACK_KEY, _BACK_CODE, _BACK_KEYCODE = "F5", "F5", 116
+_BACK_MODIFIER = "shiftKey:true,"
 # Where textual.js builds the terminal. We hold it until the font is in, because xterm measures the
 # cell and bakes a WebGL texture atlas at construction: a font that lands afterwards is never drawn
 # with, however correct the stack is by then.
@@ -135,8 +146,16 @@ def _back_overlay() -> str:
     A readable font makes the grid taller than a phone's viewport — that is the player's choice, not
     a bug — so the page scrolls. Anything drawn inside the grid scrolls with it, which is why a
     Textual widget in the corner kept ending up somewhere unreachable. Fixed to the viewport it stays
-    under the thumb at any font, zoom or scroll position, and it sends the same Escape the keyboard
-    would, so every screen keeps its own meaning for leaving.
+    under the thumb at any font, zoom or scroll position.
+
+    It sends ``EngineScreen.BACK_KEY``, NOT Escape. Escape means whatever the screen it lands on says
+    it means, and on the game's hub that is "abandon this run for the main menu" — so a tap that beat
+    the button's own hiding used to do exactly that. The key it sends now has one meaning, and the
+    app re-checks whether going back is allowed at the moment it arrives.
+
+    The button also hides itself the instant it is tapped, until the app says otherwise. That is not
+    the guard — the guard is in the app — but it stops a fast finger queueing presses down a channel
+    whose answer is a round trip away.
     """
     return (
         "<style>#tc-back-fab{position:fixed;right:12px;bottom:12px;z-index:99998;"
@@ -153,8 +172,10 @@ def _back_overlay() -> str:
         "setTimeout(paint,600);setTimeout(paint,2500);"
         "b.addEventListener('click',function(e){e.preventDefault();"
         "var t=document.querySelector('.xterm-helper-textarea');if(!t)return;t.focus();"
+        "b.style.display='none';"  # until the app says the next screen has a way back too
         "['keydown','keyup'].forEach(function(k){t.dispatchEvent(new KeyboardEvent(k,"
-        "{key:'Escape',code:'Escape',keyCode:27,which:27,bubbles:true}));});});})();</script>"
+        f"{{key:'{_BACK_KEY}',code:'{_BACK_CODE}',{_BACK_MODIFIER}keyCode:{_BACK_KEYCODE},"
+        f"which:{_BACK_KEYCODE},bubbles:true}}));}});}});}})();</script>"
     )
 
 

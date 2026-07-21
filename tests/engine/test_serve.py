@@ -118,6 +118,37 @@ def test_the_font_files_sit_where_the_page_asks_for_them() -> None:
         assert (statics / path.name).exists()
 
 
+def test_the_back_button_sends_the_key_the_app_listens_for() -> None:
+    """Two halves of one contract, held apart on purpose: the server must not import the UI just to
+    serve a page. This is what keeps them honest."""
+    from termcade.ui.screens.base import EngineScreen
+
+    modifiers = "".join(part[: -len("Key:true,")] for part in [serve._BACK_MODIFIER])
+    assert EngineScreen.BACK_KEY == f"{modifiers}+{serve._BACK_KEY}".lower()
+
+
+def test_the_back_button_does_not_send_escape() -> None:
+    """Escape is a key each screen gives its own meaning — on the game's hub it abandons the run.
+    A button whose only guard is hiding itself must never carry it."""
+    html = _html()
+    assert "'Escape'" not in html and "keyCode:27" not in html
+
+
+def test_the_back_button_carries_a_modifier() -> None:
+    """xterm.js encodes no function key above F12 — a bare exotic key is dropped on the floor and
+    the button goes silently dead. The modifier is what puts it on the wire."""
+    assert "Key:true" in serve._BACK_MODIFIER
+    assert serve._BACK_MODIFIER in _html()
+
+
+def test_the_back_button_hides_itself_the_moment_it_is_tapped() -> None:
+    """Not the guard — that is in the app — but it stops a fast finger queueing presses down a
+    channel whose answer is a round trip away."""
+    html = _html()
+    back = html[html.index("tc-back-fab") :]
+    assert "b.style.display='none'" in back[: back.index("</script>")]
+
+
 def test_the_page_can_play_the_games_sound() -> None:
     html = _html()
     assert "AudioContext" in html and "createBuffer" in html
