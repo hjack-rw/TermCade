@@ -23,23 +23,51 @@ def test_font_assets_are_bundled() -> None:
         assert path.exists(), f"{family} must ship inside the package"
 
 
-def test_the_bundled_fonts_cover_every_character_the_games_draw() -> None:
-    """0xProto alone is missing 14 of them — the dashes, the bullet, the arrows, the gear. Those
-    used to fall through to the browser, which on a phone means an emoji face or a blank box."""
+def _covered() -> set[int]:
     from fontTools.ttLib import TTFont
 
     covered: set[int] = set()
     for _, path in serve._faces():
         covered |= set(TTFont(path).getBestCmap())
-    drawn = {
+    return covered
+
+
+def _drawn() -> set[int]:
+    """Every non-ASCII character the games put on screen.
+
+    The card icons are NOT found by reading the source: they are written as ``\\U0001f580`` escapes
+    so the files stay ASCII, so a scan for literal characters sees backslashes and passes on an
+    empty set — which is exactly what this test used to do while reporting green. They are imported
+    from the game instead, which is the only way to read what it actually draws.
+    """
+    from xiaolin_showdown.screens.format import ICONS
+
+    literal = {
         ord(ch)
         for path in (Path(__file__).resolve().parents[2] / "games").rglob("*.py")
         for ch in path.read_text(encoding="utf-8")
-        if ord(ch) > 0x2000 and ch != "︎"  # a variation selector is never itself drawn
+        if ord(ch) > 0x2000
     }
-    assert not drawn - covered, "no bundled face covers: " + " ".join(
-        f"U+{cp:04X}" for cp in sorted(drawn - covered)
+    icons = {ord(ch) for icon in ICONS.values() for ch in icon}
+    return {cp for cp in literal | icons if cp != 0xFE0E}  # a selector is never itself drawn
+
+
+def test_the_bundled_fonts_cover_every_character_the_games_draw() -> None:
+    """The whole point of bundling two faces. Anything neither covers falls through to the browser,
+    which on a phone means an emoji face or a blank box."""
+    missing = _drawn() - _covered()
+    assert not missing, "no bundled face covers: " + " ".join(
+        f"U+{cp:04X}" for cp in sorted(missing)
     )
+
+
+def test_the_cover_check_actually_sees_the_card_icons() -> None:
+    """Guards the test above against the bug it used to have — a source scan finds no icon at all,
+    so the check passed on an empty set while every icon went unverified."""
+    from xiaolin_showdown.screens.format import ICONS
+
+    assert ord("\U0001f580") in _drawn(), "the icons are escaped in source and must be imported"
+    assert len([icon for icon in ICONS.values() if icon]) >= 8
 
 
 def test_patched_template_is_valid_jinja() -> None:
