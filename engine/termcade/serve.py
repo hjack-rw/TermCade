@@ -1,10 +1,14 @@
-"""Serve a termcade game to the browser with the bundled full-coverage font embedded.
+"""Serve a termcade game to the browser with the bundled full-coverage fonts embedded.
 
 ``textual-serve`` renders the game in xterm.js using a webfont that lacks the Unicode symbols
-games draw with, so the browser substitutes colour emoji (wrong width, broken alignment). We
-patch textual-serve's page template at runtime — embedding our bundled font as a ``data:`` URI
-and putting it first in the terminal's font stack — so every glyph renders consistently with no
+games draw with, so the browser substitutes colour emoji (wrong width, broken alignment). We patch
+textual-serve at runtime — serving our fonts from ``/static``, declaring them in the page, and
+putting them first in the terminal's font stack — so every glyph renders consistently with no
 host-side install. The xterm.js protocol and static assets are used exactly as shipped.
+
+That stack lives in ``textual.js``, not in the page's CSS. Patching the template alone changed the
+intro dialog and left the terminal drawing in Roboto Mono, which is why the icons only ever looked
+right on machines whose own fallback happened to cover them.
 
 Configured by environment: ``GAME`` (the console command to run), ``PORT``, ``PUBLIC_URL``
 (the browser-reachable URL — it must not be ``0.0.0.0`` or the websocket cannot connect back), and
@@ -26,14 +30,31 @@ from textual_serve.server import Server
 
 from termcade import beta
 
-# The embedded font gives xterm.js a clean mono text face *and* monochrome glyphs for the card /
-# affiliation icons (all text-presentation Unicode symbols). It leads the terminal font stack; any
-# glyph it lacks (e.g. the gear) falls through to the browser's own font fallback, which reaches a
-# covering system font (Segoe UI Symbol on Windows) — still monochrome, since none of the icons are
-# emoji-presentation.
-_FONT = Path(__file__).resolve().parent / "assets" / "0xProtoNerdFont-Regular.ttf"
+# Two embedded faces, because one does not cover the game. 0xProto gives xterm.js its text face and
+# the card / affiliation icons, but it is missing 14 of the 28 non-ASCII characters the game actually
+# draws — the en and em dash, the bullet, the ellipsis, the subscript digits, the arrows, and the
+# gear and warning signs among them. Those used to fall through to the browser's own fallback, which
+# on a desktop quietly lands on a covering system face (Segoe UI Symbol) and on a phone lands on an
+# emoji font or on nothing at all. The symbol face is a subset of DejaVu Sans Mono covering the
+# punctuation, arrow, technical, box, shape and symbol blocks a TUI draws from, so it fills the gaps
+# for characters the game has not used yet as well as the ones it has. Order is load-bearing: 0xProto
+# first keeps the text face consistent, and DejaVu is only ever reached for what 0xProto lacks.
+_ASSETS = Path(__file__).resolve().parent / "assets"
+_FONT = _ASSETS / "0xProtoNerdFont-Regular.ttf"
+_SYMBOL_FONT = _ASSETS / "TermCadeSymbols.ttf"
 _FAMILY = "TermCade Mono"
-_STOCK_STACK = '"Roboto Mono", menlo, monospace'  # textual-serve's terminal font stack
+_SYMBOL_FAMILY = "TermCade Symbols"
+_STOCK_STACK = '"Roboto Mono", menlo, monospace'  # the page's own CSS: intro dialog and buttons
+
+# The stack xterm.js actually draws the game with. It is hardcoded in textual.js where the terminal
+# is constructed, NOT in the page's CSS, so patching the template alone left every glyph coming from
+# Roboto Mono and whatever the browser fell back to for the rest. A desktop hides that (Segoe UI
+# Symbol covers the icons); a phone has no such fallback and renders emoji or nothing.
+_TERM_STACK = "'Roboto Mono', Monaco, 'Courier New', monospace"
+# Where textual.js builds the terminal. We hold it until the font is in, because xterm measures the
+# cell and bakes a WebGL texture atlas at construction: a font that lands afterwards is never drawn
+# with, however correct the stack is by then.
+_ONLOAD = 'window.onload=e=>{const t=document.querySelectorAll(".textual-terminal")'
 
 # Without this a phone lays the page out for an imaginary ~980px desktop and then scales the result
 # down, so the auto-fit sizes the font against a width the device does not have and everything
@@ -204,6 +225,11 @@ def _min_px(min_size: tuple[int, int]) -> tuple[int, int]:
     return round(cols * _CELL_W * _MIN_FONT), round(rows * _CELL_H * _MIN_FONT)
 
 
+def _faces() -> tuple[tuple[str, Path], ...]:
+    """The embedded faces, in the order the terminal should consult them."""
+    return ((_FAMILY, _FONT), (_SYMBOL_FAMILY, _SYMBOL_FONT))
+
+
 def _font_face(family: str, path: Path) -> str:
     """Point at the font as a *file*, not a 2.4MB base64 blob inlined in the page.
 
@@ -237,12 +263,12 @@ def _templates_dir(
     """A one-off templates dir holding textual-serve's page with our font embedded, or ``None`` if
     the upstream template can't be patched — then the game serves with the stock font."""
     template = Path(textual_serve.__file__).resolve().parent / "templates" / "app_index.html"
-    if not (template.exists() and _FONT.exists()):
+    if not (template.exists() and all(p.exists() for _, p in _faces())):
         return None
     html = template.read_text(encoding="utf-8")
     if _STOCK_STACK not in html:  # upstream changed shape — don't ship a half-patched page
         return None
-    face = f"<style>{_font_face(_FAMILY, _FONT)}</style>"
+    face = "<style>" + "".join(_font_face(f, p) for f, p in _faces()) + "</style>"
     gate, div = _too_small_gate(min_size) if min_size is not None else ("", "")
     # The page is a Jinja2 template (aiohttp_jinja2); wrap our snippets in {% raw %} so their CSS/JS
     # braces (e.g. `{#tc-toosmall`, a Jinja comment open) and the base64 aren't parsed as template tags.
@@ -272,14 +298,44 @@ def _templates_dir(
     return out
 
 
-def _statics_dir(font: Path) -> Path | None:
-    """textual-serve's own static tree, copied, with our font added — so it can be *served*."""
+def _patch_terminal_js(js: Path, families: tuple[str, ...]) -> bool:
+    """Put our fonts at the head of the *terminal's* stack, and hold the terminal until they load.
+
+    Both halves are needed. Leading the stack is what makes xterm ask for the fonts at all; awaiting
+    ``document.fonts`` is what makes it ask while the answer still matters, since the atlas is built
+    once. Left unpatched (upstream changed shape) the game serves with the stock font, as before.
+    """
+    if not js.exists():
+        return False
+    src = js.read_text(encoding="utf-8")
+    if _TERM_STACK not in src or _ONLOAD not in src:
+        return False
+    ours = "".join(f"'{f}', " for f in families)
+    loads = ",".join(f"document.fonts.load('16px \"{f}\"')" for f in families)
+    src = src.replace(_TERM_STACK, ours + _TERM_STACK, 1)
+    src = src.replace(
+        _ONLOAD,
+        "window.onload=async e=>{"
+        f"try{{await Promise.all([{loads}]);await document.fonts.ready;}}"
+        "catch(_){}"
+        'const t=document.querySelectorAll(".textual-terminal")',
+        1,
+    )
+    js.write_text(src, encoding="utf-8")
+    return True
+
+
+def _statics_dir(fonts: tuple[Path, ...]) -> Path | None:
+    """textual-serve's own static tree, copied, with our fonts added — so they can be *served* — and
+    its terminal script patched to draw with them."""
     upstream = Path(textual_serve.__file__).resolve().parent / "static"
-    if not (upstream.exists() and font.exists()):
+    if not (upstream.exists() and all(f.exists() for f in fonts)):
         return None
     out = Path(tempfile.mkdtemp(prefix="termcade-static-"))
     shutil.copytree(upstream, out, dirs_exist_ok=True)
-    shutil.copy2(font, out / font.name)
+    for font in fonts:
+        shutil.copy2(font, out / font.name)
+    _patch_terminal_js(out / "js" / "textual.js", tuple(f for f, _ in _faces()))
     return out
 
 
@@ -304,7 +360,7 @@ def make_server(
     the game to their own machine should not have to hold a passcode.
     """
     templates = _templates_dir(fit_size, min_size, touch_fit_size)
-    statics = _statics_dir(_FONT)
+    statics = _statics_dir(tuple(p for _, p in _faces()))
     kwargs: dict[str, object] = {
         "host": host, "port": port, "title": "TermCade", "public_url": public_url
     }

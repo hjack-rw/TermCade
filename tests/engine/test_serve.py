@@ -1,6 +1,8 @@
-"""The browser-serve page patch: bundled font, auto-fit sized to the game, and the too-small gate."""
+"""The browser-serve patch: bundled fonts, auto-fit sized to the game, and the too-small gate."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import jinja2
 
@@ -16,8 +18,28 @@ def _html(fit=_FIT, minimum=None) -> str:
     return (templates / "app_index.html").read_text(encoding="utf-8")
 
 
-def test_font_asset_is_bundled() -> None:
-    assert serve._FONT.exists(), "the browser font must ship inside the package"
+def test_font_assets_are_bundled() -> None:
+    for family, path in serve._faces():
+        assert path.exists(), f"{family} must ship inside the package"
+
+
+def test_the_bundled_fonts_cover_every_character_the_games_draw() -> None:
+    """0xProto alone is missing 14 of them — the dashes, the bullet, the arrows, the gear. Those
+    used to fall through to the browser, which on a phone means an emoji face or a blank box."""
+    from fontTools.ttLib import TTFont
+
+    covered: set[int] = set()
+    for _, path in serve._faces():
+        covered |= set(TTFont(path).getBestCmap())
+    drawn = {
+        ord(ch)
+        for path in (Path(__file__).resolve().parents[2] / "games").rglob("*.py")
+        for ch in path.read_text(encoding="utf-8")
+        if ord(ch) > 0x2000 and ch != "︎"  # a variation selector is never itself drawn
+    }
+    assert not drawn - covered, "no bundled face covers: " + " ".join(
+        f"U+{cp:04X}" for cp in sorted(drawn - covered)
+    )
 
 
 def test_patched_template_is_valid_jinja() -> None:
@@ -26,15 +48,46 @@ def test_patched_template_is_valid_jinja() -> None:
     jinja2.Environment().from_string(_html())  # raises TemplateSyntaxError if a brace is misread
 
 
-def test_serve_embeds_font_first_in_the_stack() -> None:
+def test_serve_declares_every_bundled_font() -> None:
     html = _html()
-    assert "@font-face" in html
-    # Served as a file, not inlined: a 2.4MB base64 blob in the page never finished loading on a
-    # phone, so the browser fell back to a system face and the game's glyphs went missing.
-    assert f"/static/{serve._FONT.name}" in html
+    for _, path in serve._faces():
+        # Served as a file, not inlined: a 2.4MB base64 blob in the page never finished loading on
+        # a phone, so the browser fell back to a system face and the game's glyphs went missing.
+        assert f"/static/{path.name}" in html
+    assert html.count("@font-face") == len(serve._faces())
     assert "base64" not in html
-    # our font leads the terminal font stack, ahead of textual-serve's stock fonts
-    assert f'"{serve._FAMILY}", {serve._STOCK_STACK}' in html
+
+
+def _statics() -> Path:
+    statics = serve._statics_dir(tuple(p for _, p in serve._faces()))
+    assert statics is not None
+    return statics
+
+
+def test_the_terminal_itself_draws_with_our_fonts() -> None:
+    """The page's CSS stack is not the one xterm draws with — that one is built in textual.js, so a
+    template-only patch left the game rendering in Roboto Mono and the browser's own fallback."""
+    ours = "".join(f"'{family}', " for family, _ in serve._faces())
+    assert ours + serve._TERM_STACK in (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
+
+
+def test_the_text_face_is_consulted_before_the_symbol_face() -> None:
+    """The symbol face only fills gaps; leading with it would change how ordinary text looks."""
+    js = (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
+    assert js.index(f"'{serve._FAMILY}'") < js.index(f"'{serve._SYMBOL_FAMILY}'")
+
+
+def test_the_terminal_waits_for_the_fonts_before_it_measures() -> None:
+    """xterm bakes a texture atlas at construction, so a font that arrives later is never used."""
+    js = (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
+    assert "document.fonts.ready" in js
+    assert js.index("document.fonts.ready") < js.index('querySelectorAll(".textual-terminal")')
+
+
+def test_the_font_files_sit_where_the_page_asks_for_them() -> None:
+    statics = _statics()
+    for _, path in serve._faces():
+        assert (statics / path.name).exists()
 
 
 def test_the_page_tells_a_phone_its_real_width() -> None:

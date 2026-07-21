@@ -85,8 +85,11 @@ silence — see `termcade.core.audio`.
 Games draw their board with plain Unicode symbols picked for *text* (monochrome) presentation. The icons render as monochrome glyphs anywhere a font covers them; the only catch is that a bare terminal font can lack a glyph and show tofu (☐). A monospace font with good symbol coverage is bundled under `fonts/`:
 
 - `0xProtoNerdFont-Regular.ttf` — [0xProto](https://github.com/0xType/0xProto), SIL Open Font License
+- `TermCadeSymbols.ttf` — a subset of [DejaVu Sans Mono](https://dejavu-fonts.github.io/) (see `DejaVu-LICENSE`) covering the punctuation, arrow, technical, box, shape and symbol blocks 0xProto leaves out
 
-Install it and select it in your terminal to play locally. On Windows the few glyphs it misses (the gear, for one) resolve automatically through the system's Segoe UI Symbol. The **browser build** (`serve`) embeds the font, so no install is needed there — and any glyph it lacks falls back to the browser's own system fonts, still monochrome.
+Install the first and select it in your terminal to play locally. The few glyphs it misses (the gear, the arrows, the dashes) resolve through whatever your system offers.
+
+The **browser build** (`serve`) embeds both, so nothing needs installing and nothing depends on what the device happens to have — which is what a phone does not have. 0xProto is consulted first, and the symbol subset only for what it lacks.
 
 ## Disclaimer
 
