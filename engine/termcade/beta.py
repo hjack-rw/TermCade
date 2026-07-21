@@ -7,6 +7,9 @@ save is keyed by slot alone. Rather than teach the save layer about identity, th
 types *becomes* the identity: it is checked at the door, then hashed into a directory name that
 only that session's subprocess is told about.
 
+Everything about a session that is *not* the gate — the per-session environment and the meta
+channel to the page — lives in :mod:`termcade.session`, so the open server has it too.
+
 The passcode is never interpolated into ``Server.command`` — that string is run through
 ``create_subprocess_shell``, so a code reaching it would be a shell injection. It travels in the
 child's environment only, and only after clearing :data:`_CODE_RE`.
@@ -18,7 +21,6 @@ made under, as in Docker).
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import os
@@ -27,21 +29,14 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from aiohttp import web
-from textual_serve.app_service import AppService
-from textual_serve.server import Server, to_int
+
+from termcade.session import TermCadeServer
 
 log = logging.getLogger("termcade.beta")
 
 CODES_ENV = "TERMCADE_CODES"
 DATA_DIR_ENV = "TERMCADE_DATA_DIR"
-TOUCH_ENV = "TERMCADE_TOUCH"
 COOKIE = "termcade_beta"
-
-# Enough to tell a phone or tablet from a desktop browser. Deliberately crude: the cost of being
-# wrong is a Back button that a mouse user did not need, or its absence for someone who can still
-# press Escape. Screen *size* cannot answer this — a phone in landscape reports a grid the same
-# shape as a laptop's, so the device has to say so itself.
-_TOUCH_UA = re.compile(r"Android|iPhone|iPad|iPod|Mobile|Silk|Kindle", re.I)
 
 # Passcodes are hashed into filesystem paths and put in a child's environment, so the safe set is
 # the one that cannot mean anything anywhere: no dots, no slashes, no shell metacharacters, no
@@ -75,12 +70,6 @@ def is_well_formed(code: str) -> bool:
     return bool(_CODE_RE.match(code))
 
 
-def is_touch(user_agent: str) -> bool:
-    """Whether ``user_agent`` belongs to a device with no keyboard, so its session gets a Back
-    button. See :data:`_TOUCH_UA` for why the terminal's own size cannot answer this."""
-    return bool(_TOUCH_UA.search(user_agent))
-
-
 def player_dir(base: Path, code: str) -> Path:
     """The data dir belonging to ``code``, under ``base``.
 
@@ -93,37 +82,7 @@ def player_dir(base: Path, code: str) -> Path:
     return base / _PLAYERS / digest
 
 
-class _PlayerAppService(AppService):
-    """An ``AppService`` that adds to the child's environment instead of only inheriting ours.
-
-    Upstream's ``_build_environment`` copies ``os.environ`` verbatim, which is exactly why every
-    session lands in the same save directory. This is the one hook needed to break that.
-    """
-
-    def __init__(self, command: str, *, extra_env: dict[str, str], **kwargs: object) -> None:
-        super().__init__(command, **kwargs)  # type: ignore[arg-type]
-        self._extra_env = extra_env
-
-    async def on_meta(self, data: bytes) -> None:
-        """Forward our own meta packets to the browser; everything else is upstream's business."""
-        import json
-
-        try:
-            payload = json.loads(data)
-        except ValueError:
-            payload = {}
-        if payload.get("type") == "termcade_back":
-            await self.remote_write_str(json.dumps(["termcade_back", payload]))
-            return
-        await super().on_meta(data)
-
-    def _build_environment(self, width: int = 80, height: int = 24) -> dict[str, str]:
-        environment = super()._build_environment(width=width, height=height)
-        environment.update(self._extra_env)
-        return environment
-
-
-class BetaServer(Server):
+class BetaServer(TermCadeServer):
     """A ``Server`` that checks a passcode at the door and gives each one its own save directory.
 
     ``codes_path`` is the file of valid passcodes; ``data_dir`` the base the per-player directories
@@ -180,50 +139,17 @@ class BetaServer(Server):
             )
         return web.Response(status=403, text="Beta access only.")
 
-    async def handle_websocket(self, request: web.Request) -> web.WebSocketResponse:
-        """As upstream, but the session's subprocess is told its own data directory.
+    def reject(self, request: web.Request) -> bool:
+        """The gate covers this; belt and braces on the one route that spawns a subprocess."""
+        return self.authorized_code(request) is None
 
-        Mirrors ``textual_serve.server.Server.handle_websocket`` rather than calling it, because
-        upstream names ``AppService`` directly and offers no seam for the environment. ``textual
-        -serve`` is hard-pinned in ``pyproject.toml`` for this class of patch (``serve.py`` rewrites
-        its page template on the same grounds); this must be re-read when that pin moves.
-        """
+    def session_env(self, request: web.Request) -> dict[str, str]:
+        """This session's own save directory, on top of what every session is told."""
+        env = super().session_env(request)
         code = self.authorized_code(request)
-        if code is None:  # the gate covers this; belt and braces on the one route that spawns
-            return web.WebSocketResponse()
-
-        websocket = web.WebSocketResponse(heartbeat=15)
-        width = to_int(request.query.get("width", "80"), 80)
-        height = to_int(request.query.get("height", "24"), 24)
-
-        app_service: _PlayerAppService | None = None
-        try:
-            await websocket.prepare(request)
-            env = {DATA_DIR_ENV: str(player_dir(self._data_dir, code))}
-            if is_touch(request.headers.get("User-Agent", "")):
-                env[TOUCH_ENV] = "1"
-            app_service = _PlayerAppService(
-                self.command,
-                extra_env=env,
-                write_bytes=websocket.send_bytes,
-                write_str=websocket.send_str,
-                close=websocket.close,
-                download_manager=self.download_manager,
-                debug=self.debug,
-            )
-            await app_service.start(width, height)
-            try:
-                await self._process_messages(websocket, app_service)
-            finally:
-                await app_service.stop()
-        except asyncio.CancelledError:
-            await websocket.close()
-        except Exception as error:  # noqa: BLE001 — upstream's own contract: log, close, move on
-            log.exception(error)
-        finally:
-            if app_service is not None:
-                await app_service.stop()
-        return websocket
+        if code is not None:
+            env[DATA_DIR_ENV] = str(player_dir(self._data_dir, code))
+        return env
 
 
 def _login_page(*, bad: bool) -> str:

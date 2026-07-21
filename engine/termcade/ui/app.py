@@ -15,7 +15,7 @@ from textual.widgets import Button, Footer, Header, Static
 from termcade.app.game import Game, GameContext
 from termcade.ui.screens.console import ConsoleScreen, debug_enabled
 from termcade.ui.screens.dialog import ChoiceModal
-from termcade.core import music
+from termcade.core import audio, music
 from termcade.core.audio import MUSIC_OPTION, SFX_OPTION, make_player
 from termcade.core.music import Style
 
@@ -154,11 +154,29 @@ class EngineApp(App[None]):
     def on_mount(self) -> None:
         self.register_theme(TERMCADE_THEME)
         self.theme = "termcade"
+        self._use_browser_audio()
         if self.game is not None and self.game.root_screen is not None:
             self.push_screen(self.game.root_screen())
         else:
             self.push_screen(HelloScreen())
         self.apply_music_setting()
+
+    def _use_browser_audio(self) -> None:
+        """Send sound to the page instead of the machine, when there is a page.
+
+        Not decided in ``__init__``: the driver does not exist until the app is running, and the
+        driver is what knows whether anyone is watching through a browser. The device player built
+        for a local run is released rather than left holding a stream — under ``xiaolin-play`` the
+        server and the browser are the *same* machine, so leaving it open would play the soundtrack
+        twice, once out of each.
+        """
+        player = audio.browser_player(self)
+        if player is None:
+            return
+        self._player.close()
+        self._player = player
+        if self.ctx is not None:
+            self.ctx.audio = player
 
     @property
     def music_on(self) -> bool:

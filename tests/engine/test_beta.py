@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
-from termcade import beta
+from termcade import beta, session
 from termcade.app.game import Game, GameContext
 
 _CODE = "beta-alpha-1"
@@ -137,7 +137,7 @@ def test_removing_a_line_locks_that_tester_out(server, codes_file) -> None:
 def test_the_session_subprocess_is_told_its_own_data_dir(tmp_path) -> None:
     """The whole point of the ``AppService`` subclass: upstream copies our environment verbatim, so
     without this every session resolves the same save directory."""
-    service = beta._PlayerAppService(
+    service = session.TermCadeAppService(
         "true",
         extra_env={beta.DATA_DIR_ENV: str(beta.player_dir(tmp_path, _CODE))},
         write_bytes=None, write_str=None, close=None, download_manager=None,
@@ -150,7 +150,7 @@ def test_the_session_subprocess_is_told_its_own_data_dir(tmp_path) -> None:
 
 def test_the_rest_of_the_environment_still_reaches_the_subprocess(tmp_path) -> None:
     """Adding to the environment, not replacing it — the child still needs textual's own vars."""
-    service = beta._PlayerAppService(
+    service = session.TermCadeAppService(
         "true", extra_env={beta.DATA_DIR_ENV: str(tmp_path)},
         write_bytes=None, write_str=None, close=None, download_manager=None,
     )

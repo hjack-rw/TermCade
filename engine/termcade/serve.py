@@ -29,6 +29,7 @@ import textual_serve
 from textual_serve.server import Server
 
 from termcade import beta
+from termcade.session import TermCadeServer
 
 # Two embedded faces, because one does not cover the game. 0xProto gives xterm.js its text face and
 # the card / affiliation icons, but it is missing 14 of the 28 non-ASCII characters the game actually
@@ -143,6 +144,8 @@ def _back_overlay() -> str:
         "cursor:pointer;-webkit-tap-highlight-color:transparent}</style>"
         "<button id='tc-back-fab' type='button' style='display:none'>◀ Back</button>"
         "<script>(function(){var b=document.getElementById('tc-back-fab');"
+        "window.__tcMeta=window.__tcMeta||{};"
+        "window.__tcMeta['termcade_back']=function(m){b.style.display=m.allowed?'':'none';};"
         "var paint=function(){var t=document.querySelector('.xterm');if(!t)return;"
         "var c=getComputedStyle(t);b.style.background=c.backgroundColor;"
         "b.style.color=c.color;b.style.border='1px solid '+c.color;"
@@ -155,20 +158,87 @@ def _back_overlay() -> str:
     )
 
 
-def _back_signal() -> str:
-    """Listen, in the HEAD, for the app saying whether this screen has a way back.
+def _meta_signal() -> str:
+    """Listen, in the HEAD, for everything the app says to the page.
 
     Must be installed before ``textual.js`` opens its websocket — wrapping the constructor after the
-    socket exists is too late.
+    socket exists is too late. What each message *means* is not decided here: a packet is handed to
+    whatever registered for its type in ``window.__tcMeta``, so the Back button and the speaker each
+    own their own behaviour and neither has to know the other exists.
     """
     return (
-        "<script>(function(){var W=window.WebSocket;"
+        "<script>(function(){window.__tcMeta=window.__tcMeta||{};var W=window.WebSocket;"
         "window.WebSocket=function(u,p){var s=p?new W(u,p):new W(u);"
         "s.addEventListener('message',function(e){if(typeof e.data!=='string')return;"
         "var m;try{m=JSON.parse(e.data);}catch(_){return;}"
-        "if(m&&m[0]==='termcade_back'){var b=document.getElementById('tc-back-fab');"
-        "if(b){b.style.display=m[1].allowed?'':'none';}}});return s;};"
+        "var h=m&&window.__tcMeta[m[0]];if(h){h(m[1]);}});return s;};"
         "window.WebSocket.prototype=W.prototype;})();</script>"
+    )
+
+
+def _audio_bridge() -> str:
+    """Play the game's sound in the browser, from samples the app sends down the meta channel.
+
+    The game generates its own audio, so there is nothing to fetch and no asset to serve: raw PCM
+    arrives in base64 chunks, is assembled into an ``AudioBuffer`` once, and is kept under the id
+    the app gave it. The app never sends the same sound twice, which is why the cache is not
+    optional — a music toggle replays what is already here.
+
+    Mixing is the browser's: two sources on one destination sum, so an effect lands over the music
+    exactly as the engine's own Mixer does it at a terminal.
+
+    Nothing can play before a gesture. Every browser refuses audio to a page the player has not
+    touched, and a phone refuses hardest — so the context is only *created* on the first tap or
+    keypress, and a loop that arrived before then is remembered and started at that moment instead
+    of being dropped. Without that the soundtrack, which starts on mount, would be lost every time.
+    """
+    return (
+        "<script>(function(){var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;"
+        "var ctx=null,music=null,pending=null,buf={},part={};"
+        # A gesture is what a browser will accept an AudioContext from. Any of these count, and the
+        # listeners stay: a context can fall back to 'suspended' when a phone is locked or the tab
+        # is backgrounded, and the next tap has to be able to bring it round again.
+        "var wake=function(){if(!ctx){ctx=new AC();}if(ctx.state==='suspended'){ctx.resume();}"
+        "if(pending){var p=pending;pending=null;loop(p);}};"
+        "['pointerdown','keydown','touchend'].forEach(function(e){"
+        "document.addEventListener(e,wake,{passive:true});});"
+        "var decode=function(b64){var s=atob(b64),n=s.length,b=new Uint8Array(n);"
+        "for(var i=0;i<n;i++){b[i]=s.charCodeAt(i);}return b;};"
+        # int16 little-endian to the float -1..1 WebAudio wants.
+        "var buffer=function(bytes,rate){var pcm=new Int16Array(bytes.buffer,0,bytes.length>>1);"
+        "var a=ctx.createBuffer(1,pcm.length,rate),c=a.getChannelData(0);"
+        "for(var i=0;i<pcm.length;i++){c[i]=pcm[i]/32768;}return a;};"
+        "var start=function(a,gain,looping){var s=ctx.createBufferSource(),g=ctx.createGain();"
+        "s.buffer=a;s.loop=looping;g.gain.value=gain;s.connect(g);g.connect(ctx.destination);"
+        "s.start();return {src:s,gain:g};};"
+        # A crossfade runs both loops for its length and drops the outgoing one at the end — the
+        # same shape as the engine's Mixer.fade, because it is replacing the same thing.
+        "var loop=function(m){if(!ctx){pending=m;return;}var a=buf[m.id];if(!a){pending=m;return;}"
+        "var t=ctx.currentTime,f=m.crossfade||0;"
+        "if(music&&f>0){var old=music;old.gain.gain.setValueAtTime(old.gain.gain.value,t);"
+        "old.gain.gain.linearRampToValueAtTime(0,t+f);old.src.stop(t+f);"
+        "music=start(a,0,true);music.gain.gain.setValueAtTime(0,t);"
+        "music.gain.gain.linearRampToValueAtTime(m.gain,t+f);return;}"
+        "if(music){try{music.src.stop();}catch(_){}}"
+        "music=start(a,m.gain,true);};"
+        "var handle=function(m){"
+        "if(m.action==='chunk'){var p=part[m.id]||(part[m.id]={n:0,total:m.total,s:''});"
+        "p.s+=m.data;p.n++;if(p.n<p.total)return;delete part[m.id];"
+        # The context may not exist yet (no gesture). Keep the bytes; build the buffer on the way in
+        # to `loop`, which only ever runs once there is a context to build it with.
+        "var bytes=decode(p.s);var make=function(){buf[m.id]=buffer(bytes,m.rate);};"
+        "if(ctx){make();}else{var once=function(){if(ctx){make();"
+        "if(pending&&pending.id===m.id){var q=pending;pending=null;loop(q);}"
+        "document.removeEventListener('pointerdown',once);"
+        "document.removeEventListener('keydown',once);"
+        "document.removeEventListener('touchend',once);}};"
+        "['pointerdown','keydown','touchend'].forEach(function(e){"
+        "document.addEventListener(e,once,{passive:true});});}return;}"
+        "if(m.action==='loop'){loop(m);return;}"
+        "if(m.action==='once'){if(!ctx||!buf[m.id])return;start(buf[m.id],m.gain,false);return;}"
+        "if(m.action==='stop'){if(music){try{music.src.stop();}catch(_){}music=null;}pending=null;}"
+        "};window.__tcMeta=window.__tcMeta||{};window.__tcMeta['termcade_audio']=handle;"
+        "})();</script>"
     )
 
 
@@ -278,7 +348,8 @@ def _templates_dir(
         "{% raw %}"
         + _VIEWPORT
         + _autofit(fit_size, touch_fit_size)
-        + _back_signal()
+        + _meta_signal()
+        + _audio_bridge()
         + _no_virtual_keyboard()
         + _touch_scroll()
         + _centre()
@@ -371,7 +442,7 @@ def make_server(
 
     codes = beta.codes_path()
     if codes is None:
-        return Server(game, **kwargs)  # type: ignore[arg-type]
+        return TermCadeServer(game, **kwargs)  # type: ignore[arg-type]
     return beta.BetaServer(game, codes_path=codes, data_dir=_data_dir(), **kwargs)
 
 

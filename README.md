@@ -77,8 +77,13 @@ code, and come back if the code does.
 
 Set `TERMCADE_CODES` to switch the gate on outside Docker. Unset, the server is open as before.
 
-**Sound is off in this mode.** A container has no audio device, so the served game falls back to
-silence — see `termcade.core.audio`.
+**Sound plays in the browser, not on the server.** A container has no audio device, and a server
+that had one would be playing to an empty room — so a served session sends its samples to the page
+and WebAudio mixes them there. The game generates its own audio, so nothing is fetched and no asset
+is served: the tune travels once (about 1.2MB for a 22s loop) and every replay after that is free.
+
+Browsers refuse sound to a page nobody has touched, so the soundtrack starts on the player's first
+tap or keypress rather than on load. On iOS the hardware mute switch silences it regardless.
 
 ## Fonts
 

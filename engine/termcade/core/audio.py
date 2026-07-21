@@ -1,14 +1,19 @@
-"""Playback: the only place in the engine that touches a sound device.
+"""Playback: the only place in the engine that decides where a sound comes out.
 
-A ``Protocol`` with a do-nothing implementation, because silence is the normal case, not the error
-case. Tests have no sound card, CI has no sound card, a player who turned sound off wants none, and
-a game served over ``textual-serve`` would play out of the *server*, which is worse than silence.
-Every one of those resolves to :class:`NullPlayer` and nothing upstream has to know.
+A ``Protocol`` with three implementations, because where the player is sitting is not the game's
+business. Tests have no sound card, CI has no sound card, and a player who turned sound off wants
+none — every one of those is :class:`NullPlayer`, and silence is the normal case, not the error
+case.
 
-Where there is a device, :class:`StreamPlayer` holds one open output stream and feeds it from a
+At a real terminal, :class:`StreamPlayer` holds one open output stream and feeds it from a
 :class:`~termcade.core.mixer.Mixer`. This is what buys sound effects: mixing in our own process sums
 the samples — which we generate anyway — before the device sees them, so an effect sounds *over* the
 music instead of cutting it off.
+
+In a browser, the device is on the wrong machine: a served game playing through ``sounddevice``
+sounds out of the *server*, to nobody. :class:`BrowserPlayer` sends the samples to the page instead
+and lets WebAudio do the mixing, which it does natively. Same Protocol, so nothing upstream knows
+which of the three it is holding.
 
 ``sounddevice`` is the one runtime dependency beyond Textual. It is used through
 ``RawOutputStream``, which hands the callback a plain writable buffer, so NumPy is not pulled in.
@@ -16,9 +21,12 @@ music instead of cutting it off.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import os
 import sys
 from array import array
+from collections.abc import Callable
 from typing import Any, Protocol
 
 from termcade.core.mixer import Mixer, Voice, pcm_of
@@ -43,6 +51,15 @@ SFX_GAIN = 0.85
 # Frames per callback. Small enough that a click feels immediate (a block is ~23ms at 22050),
 # large enough that a Python callback comfortably finishes before the device wants the next one.
 BLOCKSIZE = 512
+
+# The meta type the page listens for. Namespaced, because that prefix is what tells the session
+# layer a packet is ours to forward rather than upstream's to interpret.
+AUDIO_META = "termcade_audio"
+
+# Base64 characters per meta packet. Samples go to the browser down the subprocess's stdout, which
+# is a pipe the terminal's own output shares — a tune sent as one 900KB write would hold the game's
+# drawing behind it. Chunked, the transfer interleaves with the frames and nobody sees a pause.
+CHUNK = 48 * 1024
 
 
 class AudioPlayer(Protocol):
@@ -129,6 +146,71 @@ class StreamPlayer:
         self._mixer.stop()
         self._stream.stop()
         self._stream.close()
+
+
+class BrowserPlayer:
+    """Sound for a game being served: the samples go to the page, WebAudio does the rest.
+
+    ``write_meta`` is the app driver's channel to the browser — the same one the Back button uses.
+    Only raw PCM travels: the page builds an ``AudioBuffer`` from it directly, so neither side has
+    to agree on a container format, and the sample rate is the engine's own.
+
+    Every sound is keyed by the digest of its samples and sent **once**. A tune costs its transfer
+    on the first play and nothing on every play after, which is what makes a music toggle or a
+    return to a tune already heard instant rather than another 600KB. The cache lives in the page,
+    so this only has to remember what it already sent.
+    """
+
+    def __init__(self, write_meta: Callable[[dict[str, object]], None]) -> None:
+        self._write_meta = write_meta
+        self._sent: set[str] = set()
+
+    def _send(self, message: dict[str, object]) -> None:
+        message["type"] = AUDIO_META
+        self._write_meta(message)
+
+    def _ensure(self, pcm: bytes) -> str:
+        """The page's key for these samples, transferring them first if it has not seen them."""
+        key = hashlib.sha256(pcm).hexdigest()[:16]
+        if key in self._sent:
+            return key
+        encoded = base64.b64encode(pcm).decode("ascii")
+        chunks = [encoded[at : at + CHUNK] for at in range(0, len(encoded), CHUNK)]
+        for index, chunk in enumerate(chunks):
+            self._send({
+                "action": "chunk", "id": key, "seq": index, "total": len(chunks),
+                "rate": SAMPLE_RATE, "data": chunk,
+            })
+        self._sent.add(key)
+        return key
+
+    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
+        self._send({
+            "action": "loop", "id": self._ensure(pcm_of(wav).tobytes()),
+            "gain": MUSIC_GAIN, "crossfade": crossfade,
+        })
+
+    def play_once(self, pcm: array) -> None:
+        self._send({"action": "once", "id": self._ensure(pcm.tobytes()), "gain": SFX_GAIN})
+
+    def stop(self) -> None:
+        self._send({"action": "stop"})
+
+    def close(self) -> None:
+        self.stop()
+
+
+def browser_player(app: object) -> AudioPlayer | None:
+    """A :class:`BrowserPlayer` for ``app`` if it is being served, else ``None``.
+
+    The driver having a meta channel *is* the question — a real terminal has no such thing, and
+    nothing else distinguishes a served session from a local one as reliably. ``TERMCADE_MUTE``
+    still wins, so the test suite does not start narrating over the browser either.
+    """
+    if os.environ.get(MUTE_ENV):
+        return None
+    write_meta = getattr(getattr(app, "_driver", None), "write_meta", None)
+    return BrowserPlayer(write_meta) if callable(write_meta) else None
 
 
 def make_player(*, enabled: bool = True) -> AudioPlayer:

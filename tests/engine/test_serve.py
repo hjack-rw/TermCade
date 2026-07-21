@@ -90,6 +90,32 @@ def test_the_font_files_sit_where_the_page_asks_for_them() -> None:
         assert (statics / path.name).exists()
 
 
+def test_the_page_can_play_the_games_sound() -> None:
+    html = _html()
+    assert "AudioContext" in html and "createBuffer" in html
+
+
+def test_sound_waits_for_a_gesture_the_browser_will_accept() -> None:
+    """No browser lets a page nobody has touched make noise, and the soundtrack starts on mount —
+    so a tune arriving before the first tap has to be held, not dropped."""
+    html = _html()
+    assert "pointerdown" in html and "pending" in html
+
+
+def test_every_message_from_the_app_goes_through_one_registry() -> None:
+    """The Back button and the speaker both listen; neither should know the other exists."""
+    html = _html()
+    assert "__tcMeta" in html
+    for meta_type in ("termcade_back", "termcade_audio"):
+        assert f"__tcMeta['{meta_type}']" in html
+
+
+def test_the_socket_is_wrapped_before_textual_opens_it() -> None:
+    """Wrapping the constructor after the socket exists is too late — every message is missed."""
+    html = _html()
+    assert html.index("window.WebSocket=") < html.index("</head>")
+
+
 def test_the_page_tells_a_phone_its_real_width() -> None:
     """Without this a phone lays out for an imaginary ~980px desktop and scales the result down, so
     the auto-fit measures a width the device does not have and the game arrives shrunk."""

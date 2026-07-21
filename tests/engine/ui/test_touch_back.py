@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from termcade import beta
+from termcade import session
 from termcade.ui.screens.base import TOUCH_ENV
 
 
@@ -26,7 +26,7 @@ def touch(monkeypatch):
     ],
 )
 def test_a_phone_is_recognised(agent: str) -> None:
-    assert beta.is_touch(agent)
+    assert session.is_touch(agent)
 
 
 @pytest.mark.parametrize(
@@ -38,7 +38,7 @@ def test_a_phone_is_recognised(agent: str) -> None:
     ],
 )
 def test_a_desktop_is_not(agent: str) -> None:
-    assert not beta.is_touch(agent)
+    assert not session.is_touch(agent)
 
 
 def test_the_way_back_is_a_page_button_not_a_widget() -> None:
