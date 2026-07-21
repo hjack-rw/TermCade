@@ -18,7 +18,7 @@ from rich.text import Text
 from termcade.ui.work import work
 from textual.app import ComposeResult
 from textual.content import ContentText
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Button, Footer, Header, Static
 
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
@@ -70,7 +70,7 @@ class DuelScreen(XiaolinScreen):
     def on_mount(self) -> None:
         self._run_showdown()
 
-    def on_button_pressed(self, event) -> None:  # type: ignore[no-untyped-def]
+    def on_button_pressed(self, event: Button.Pressed) -> None:
         """Back here means Retreat, not "pop the screen".
 
         A duel *replaces* the temple (`switch_screen`), so popping it lands on the main menu and
@@ -147,6 +147,26 @@ class DuelScreen(XiaolinScreen):
             log=False,
         )
 
+    def _announce_end_surprises(self, duel: DuelState) -> None:
+        """Two outcomes the board shows without explaining, so only a toast can account for them."""
+        if duel.prize_gifted:
+            # Toast only, not logged (the board's last line carries it): he won the Wu and
+            # gave it back, and there is nothing on screen a player could read that from —
+            # the Wu simply turns up in their hand. It is meant to land as a surprise.
+            self.engine_app.notify(
+                "He beat you for the Wu, then pressed it into your hands.",
+                title="The Good Guys Finish Last",
+                log=False,
+            )
+        if any(r.player.element_cancelled or r.bot.element_cancelled for r in duel.rounds):
+            # Toast only, not logged: two element-setters disagreed and cancelled — the player
+            # would otherwise see a Wu keep its own colour with no reason given.
+            self.engine_app.notify(
+                "Two Wu clashed over the element — both cancelled; each side kept its own.",
+                title="Elements cancelled",
+                log=False,
+            )
+
     @work
     async def _run_showdown(self) -> None:
         state, settings, rng = self.state, self.rules, self.ctx.rng
@@ -176,23 +196,7 @@ class DuelScreen(XiaolinScreen):
             if stage == SETUP and duel.duel.player_priority and duel.duel.challenge != TOURNAMENT:
                 self._announce_wager(duel.duel, state)
             if stage == END:  # the end phase (the loser's stakes change hands) has run
-                if duel.duel.prize_gifted:
-                    # Toast only, not logged (the board's last line carries it): he won the Wu and
-                    # gave it back, and there is nothing on screen a player could read that from —
-                    # the Wu simply turns up in their hand. It is meant to land as a surprise.
-                    self.engine_app.notify(
-                        "He beat you for the Wu, then pressed it into your hands.",
-                        title="The Good Guys Finish Last",
-                        log=False,
-                    )
-                if any(r.player.element_cancelled or r.bot.element_cancelled for r in duel.duel.rounds):
-                    # Toast only, not logged: two element-setters disagreed and cancelled — the player
-                    # would otherwise see a Wu keep its own colour with no reason given.
-                    self.engine_app.notify(
-                        "Two Wu clashed over the element — both cancelled; each side kept its own.",
-                        title="Elements cancelled",
-                        log=False,
-                    )
+                self._announce_end_surprises(duel.duel)
                 break
             await self._await_continue("Continue")
 

@@ -15,6 +15,7 @@ from rich.table import Table
 from rich.text import Text
 from termcade.ui.work import work
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header
 
@@ -269,7 +270,9 @@ class TempleScreen(XiaolinScreen):
 # Which screen action each number key runs, read off the bindings rather than written out again —
 # so a rebound key moves its click target with it instead of quietly pointing at the old action.
 _ACTION_BY_KEY = {
-    key: action for key, action, *_ in TempleScreen.BINDINGS if key.isdigit()
+    binding.key: binding.action
+    for binding in Binding.make_bindings(TempleScreen.BINDINGS)
+    if binding.key.isdigit()
 }
 
 _ACTIONS = [
