@@ -87,7 +87,7 @@ def test_serve_declares_every_bundled_font() -> None:
 
 
 def _statics() -> Path:
-    statics = serve._statics_dir(tuple(p for _, p in serve._faces()))
+    statics = serve._statics_dir(tuple(p for _, p in serve._faces()) + (serve._ICON,))
     assert statics is not None
     return statics
 
@@ -116,6 +116,19 @@ def test_the_font_files_sit_where_the_page_asks_for_them() -> None:
     statics = _statics()
     for _, path in serve._faces():
         assert (statics / path.name).exists()
+
+
+def test_the_tab_wears_the_cabinets_icon() -> None:
+    """A tester returns to a beta build by tapping it on a home screen — without this that tile is
+    a screenshot of the page."""
+    html = _html()
+    assert f"/static/{serve._ICON.name}" in html
+    assert "apple-touch-icon" in html
+
+
+def test_the_icon_is_actually_served() -> None:
+    statics = _statics()
+    assert (statics / serve._ICON.name).exists()
 
 
 def test_the_back_button_sends_the_key_the_app_listens_for() -> None:

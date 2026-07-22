@@ -45,6 +45,11 @@ _FONT = _ASSETS / "0xProtoNerdFont-Regular.ttf"
 _SYMBOL_FONT = _ASSETS / "TermCadeSymbols.ttf"
 _FAMILY = "TermCade Mono"
 _SYMBOL_FAMILY = "TermCade Symbols"
+
+# The cabinet's own icon, already carrying every size a browser picks from (16 through 256). Without
+# it a tab shows the browser's blank page glyph, and a game saved to a phone's home screen — which
+# is how a tester actually returns to it — gets a screenshot of the page instead of an icon.
+_ICON = _ASSETS / "termcade.ico"
 _STOCK_STACK = '"Roboto Mono", menlo, monospace'  # the page's own CSS: intro dialog and buttons
 
 # The stack xterm.js actually draws the game with. It is hardcoded in textual.js where the terminal
@@ -321,6 +326,16 @@ def _faces() -> tuple[tuple[str, Path], ...]:
     return ((_FAMILY, _FONT), (_SYMBOL_FAMILY, _SYMBOL_FONT))
 
 
+def _favicon() -> str:
+    """Point the tab, and a phone's home screen, at the cabinet's icon."""
+    if not _ICON.exists():
+        return ""
+    return (
+        f"<link rel='icon' href='/static/{_ICON.name}'>"
+        f"<link rel='apple-touch-icon' href='/static/{_ICON.name}'>"
+    )
+
+
 def _font_face(family: str, path: Path) -> str:
     """Point at the font as a *file*, not a 2.4MB base64 blob inlined in the page.
 
@@ -374,6 +389,7 @@ def _templates_dir(
         + _no_virtual_keyboard()
         + _touch_scroll()
         + _centre()
+        + _favicon()
         + face
         + gate
         + "{% endraw %}</head>",
@@ -417,16 +433,16 @@ def _patch_terminal_js(js: Path, families: tuple[str, ...]) -> bool:
     return True
 
 
-def _statics_dir(fonts: tuple[Path, ...]) -> Path | None:
-    """textual-serve's own static tree, copied, with our fonts added — so they can be *served* — and
-    its terminal script patched to draw with them."""
+def _statics_dir(assets: tuple[Path, ...]) -> Path | None:
+    """textual-serve's own static tree, copied, with our fonts and icon added — so they can be
+    *served* — and its terminal script patched to draw with them."""
     upstream = Path(textual_serve.__file__).resolve().parent / "static"
-    if not (upstream.exists() and all(f.exists() for f in fonts)):
+    if not (upstream.exists() and all(a.exists() for a in assets)):
         return None
     out = Path(tempfile.mkdtemp(prefix="termcade-static-"))
     shutil.copytree(upstream, out, dirs_exist_ok=True)
-    for font in fonts:
-        shutil.copy2(font, out / font.name)
+    for asset in assets:
+        shutil.copy2(asset, out / asset.name)
     _patch_terminal_js(out / "js" / "textual.js", tuple(f for f, _ in _faces()))
     return out
 
@@ -452,7 +468,7 @@ def make_server(
     the game to their own machine should not have to hold a passcode.
     """
     templates = _templates_dir(fit_size, min_size, touch_fit_size)
-    statics = _statics_dir(tuple(p for _, p in _faces()))
+    statics = _statics_dir(tuple(p for _, p in _faces()) + (_ICON,))
     kwargs: dict[str, object] = {
         "host": host, "port": port, "title": "TermCade", "public_url": public_url
     }
