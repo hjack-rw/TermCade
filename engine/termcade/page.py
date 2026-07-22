@@ -61,14 +61,18 @@ VIEWPORT = (
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
 )
 
-# An xterm cell measures this much per px of font size. These were briefly made pessimistic to
+# An xterm cell measures about this much per px of font size. These were briefly made pessimistic to
 # force the whole grid inside a phone's viewport — and the result was a font nobody could read. A
 # player would rather scroll a legible board than squint at one that fits, and the way OUT of a
 # screen no longer depends on the fit: it is a page-level button (see `back_overlay`).
 #
-# 0.62 is 0xProto's own advance, measured in the browser and exact at every size: a canvas asked for
-# the width of "W" returns 0.62 × the font size to three decimals, from 6px to 16px. Nothing here
-# needs to measure at run time — but the rounding does, and it is the half that was wrong.
+# 0.62 is 0xProto's advance, and it is an ESTIMATE — good enough to pick a font size, not good enough
+# to lay anything out from. xterm rounds the cell to whole DEVICE pixels, so what a CSS pixel is
+# worth depends on the display: at font 8 the cell is 4px on a plain screen and about 4.96px at 3x,
+# where a third of a CSS pixel is still a real one. A width computed from this constant was 20% out
+# on a 3x phone, which is how a cap meant to hand the game 110 columns handed it 88 — below the
+# layout's own breakpoint, so the panels stacked and the state row truncated. Nothing sizes an
+# element from this any more; the browser measures its own cells and the fit addon reads them.
 CELL_W, CELL_H = 0.62, 1.25
 # The floor used to be 8, which is where a phone broke: fitting the game's 44 rows into a landscape
 # viewport needs 7px, and clamping back up to 8 made the grid 50px taller than the screen — the page
@@ -81,18 +85,6 @@ DEFAULT_FIT_SIZE = (110, 38)
 # No floor by default: a game whose screens scroll needs no "too small" overlay. Games that really
 # cannot reflow pass their own ``min_size``.
 DEFAULT_MIN_SIZE: tuple[int, int] | None = None
-
-
-def cell_px(size: int) -> int:
-    """The width in whole pixels of one cell at ``size``, as xterm will actually lay it out.
-
-    **Floor, not round, and never the ratio left fractional.** xterm draws on a whole-pixel grid,
-    and the fraction it discards is most of the error: at 8px the advance is 4.96 and the cell is
-    4, not 5. Multiplying the fractional cell by a column count and rounding once at the end —
-    which is what the width cap used to do — banks that fraction across every column, and 110
-    columns came out 132 wide. Per-cell and floored, it is exact at every size the auto-fit picks.
-    """
-    return int(CELL_W * size)
 
 
 def autofit(fit_size: tuple[int, int], touch_fit_size: tuple[int, int] | None = None) -> str:
@@ -131,36 +123,6 @@ def autofit(fit_size: tuple[int, int], touch_fit_size: tuple[int, int] | None = 
         "if(current!==f&&settled!==shape){"
         "try{sessionStorage.setItem('tcFit',shape);}catch(e){}"
         "p.set('fontsize',f);location.replace(location.pathname+'?'+p.toString());return;}"
-        # Cap the terminal WIDTH at the grid the game asked for. Without it, turning a phone
-        # sideways hands the fit addon twice the width it needs — the same 8px font spread over 175
-        # columns — and the temple stretches edge to edge at a size nobody chose. Capped, rotating
-        # moves the board and changes nothing about its scale.
-        #
-        # Width only. Capping the height as well was tried and it cost a portrait player 400px of
-        # screen: the grid stopped at 30 rows with black above and below, when the rows were the one
-        # thing that orientation had plenty of. More rows is more game; more columns is just wider.
-        #
-        # A cap and not a re-fit, because re-running the auto-fit would RELOAD, and a reload spawns a
-        # new textual-serve session and throws the run away. The xterm object that could be resized
-        # in place is not reachable from the page: `window.onresize` closes over it privately.
-        # Written as a STYLE RULE, not as inline style on the element: this runs in <head>, where
-        # `#terminal` does not exist yet, so setting a property on it would find null and do nothing
-        # at all — silently, which is the failure mode worth designing out rather than testing for.
-        # TOUCH ONLY. A desktop window is resized deliberately and a player who drags it wider means
-        # it; capping there took columns away from a screen that had asked for them, which is a
-        # regression dressed as a fix. The cap exists for a device whose width changes because it was
-        # turned over, not because anyone chose a size.
-        #
-        # The cap is `columns × one whole cell`, not `columns × a fractional cell` rounded at the
-        # end. See `cell_px`: the second form is what let a rotated phone into 132 columns when the
-        # cartridge asked for 110, because the fraction xterm discards per cell was being banked
-        # across all of them. This is the width at which the fit addon fits exactly `c` columns and
-        # not one more.
-        "if(!touch)return;"
-        f"var size=parseInt(p.get('fontsize'),10)||{MIN_FONT};"
-        "var s=document.createElement('style');"
-        f"s.textContent='#terminal{{max-width:'+(c*Math.floor({CELL_W}*size))+'px;margin:0 auto}}';"
-        "document.head.appendChild(s);"
         "})();</script>"
     )
 
@@ -211,10 +173,18 @@ def centre() -> str:
     across both edges: a device reported the terminal starting 24px above the top of the screen, so
     the first row and the last were both cut. ``safe`` falls back to start-alignment when it does not
     fit, which loses rows only at the end — and nothing at all once it does fit.
+
+    **The terminal is bounded by the WINDOW, in ``dvh``.** Left free it sizes to the screen, and a
+    phone's screen is not what a phone shows you: measured on a Samsung, the browser's own chrome
+    took 48px of a 360px screen sideways and 174px of 800px upright, and the terminal came out 360px
+    tall in a 312px window and 723px in a 626px one. That difference was the scrollbar, in both
+    orientations. ``vh`` cannot fix it — on mobile ``vh`` means the screen too, which is the whole
+    trap. ``dvh`` tracks the viewport that is actually there, including as the chrome slides away.
     """
     return (
         "<style>html,body{height:100%;margin:0}"
-        "body{display:flex;align-items:safe center;justify-content:safe center;overflow:auto}</style>"
+        "body{display:flex;align-items:safe center;justify-content:safe center;overflow:auto}"
+        "#terminal{max-height:100dvh}</style>"
     )
 
 

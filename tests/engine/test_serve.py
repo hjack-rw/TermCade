@@ -342,13 +342,20 @@ def test_autofit_sizes_the_font_to_the_games_fit_size() -> None:
     assert f"c=touch?{cols}:{cols}" in html and f"r=touch?{rows}:{rows}" in html
 
 
-def test_the_width_cap_is_a_whole_number_of_whole_cells() -> None:
-    """The cap has one job: leave room for exactly the columns the cartridge asked for.
+def test_the_terminal_is_never_taller_than_the_window() -> None:
+    """In ``dvh``, and that is the point. Left free the terminal sizes to the SCREEN, and a phone's
+    screen is not what it shows you — browser chrome took 174px of 800 on the device this was
+    measured on, and the grid overflowed by exactly that. ``vh`` means the screen too, so it cannot
+    be the fix; ``dvh`` is the viewport that is really there."""
+    assert "#terminal{max-height:100dvh}" in _html()
 
-    It is written per-cell and floored because xterm draws on a whole-pixel grid — multiplying a
-    fractional cell by the column count and rounding once at the end banks the discarded fraction
-    across every column, which is how a rotated phone ended up with 132 of them instead of 110."""
-    assert f"(c*Math.floor({page.CELL_W}*size))" in _html()
+
+def test_nothing_sizes_the_terminal_from_the_cell_estimate() -> None:
+    """``CELL_W`` picks a font size and nothing else. xterm rounds its cell to whole DEVICE pixels,
+    so the constant is 20% out at 3x — a width computed from it asked for 110 columns and produced
+    88, under the layout's own breakpoint. The browser measures its own cells; we do not guess."""
+    html = _html()
+    assert "max-width:" not in html.split("#tc-toosmall")[0]
 
 
 def test_a_game_with_a_min_size_gets_a_too_small_gate() -> None:
@@ -418,26 +425,9 @@ def test_a_phone_is_offered_the_games_own_touch_grid() -> None:
     assert "r=touch?30:44" in html
 
 
-def test_the_terminal_is_capped_to_the_grid_the_game_asked_for() -> None:
-    """Rotation, without a reload. A reload would spawn a new session and end the run, so the page
-    cannot re-run the auto-fit when a phone turns — and the xterm object it would resize instead is
-    not reachable. Capping the width means rotating moves the board without rescaling it: landscape
-    stops handing the fit addon 175 columns of an 8px font."""
-    html = _html(fit=(110, 44))
-    assert "max-width:" in html and "#terminal{max-width:" in html
-
-
-def test_only_the_width_is_capped() -> None:
-    """Capping height too cost a portrait player 400px of screen — the grid stopped at 30 rows with
-    black above and below, when rows are the one thing portrait has plenty of."""
-    html = _html()
-    cap = html[html.index("#terminal{max-width:") :][:200]
-    assert "max-height" not in cap
-
-
-def test_the_cap_is_a_style_rule_not_a_property_on_the_element() -> None:
-    """It runs in <head>, where `#terminal` does not exist yet: setting a property there finds null
-    and does nothing, silently."""
-    html = _html()
-    assert "createElement('style')" in html
-    assert "getElementById('terminal')" not in html
+def test_a_phone_is_given_its_whole_width() -> None:
+    """The width used to be capped to the grid the cartridge asked for, so that turning the phone
+    moved the board instead of rescaling it. It cost more than it bought: the cap was computed from
+    an estimated cell, and on a 3x screen it left a third of the display as black bars beside a grid
+    too narrow for the layout it was feeding. The fit addon can have the window."""
+    assert "#terminal{max-width:" not in _html()
