@@ -313,29 +313,50 @@ def _no_virtual_keyboard() -> str:
     )
 
 
-def _touch_scroll() -> str:
-    """Turn a finger drag into wheel events, so scrollable screens scroll on a phone.
+def _touch_gestures() -> str:
+    """Turn finger drags into the events the app already understands: wheels down, arrows across.
 
     xterm.js reports mouse buttons and wheels; a touch drag is neither, so the Rules book and the
-    Game Log simply would not move. This translates vertical drags into `wheel` events on the
-    terminal, which xterm forwards to the app as scrolling. Horizontal drags are left alone.
+    Game Log simply would not move. A VERTICAL drag becomes `wheel` events on the terminal, which
+    xterm forwards to the app as scrolling.
+
+    A HORIZONTAL drag sends Left or Right. The Lore book is the reason — it is paged, and turning
+    pages by hunting for a button is a poor way to read on a phone — and it already binds those keys
+    for a reader at a terminal, so the swipe asks for the same thing the keyboard does rather than
+    inventing a second way to say it. The page follows the finger: swiping left (dragging the page
+    away leftwards) is Right, the next page. Nothing else in the game binds the arrows, so a stray
+    swipe elsewhere at worst moves the focus ring.
 
     The 24px travel threshold is not cosmetic. xterm turns a wheel into an ESC-prefixed sequence,
     and Textual reads a stray ESC as the Escape key — so a tap that wobbled a couple of pixels sent
     Escape, and on the temple that means leaving for the main menu. A gesture has to be a real drag
     before any of this fires.
+
+    A swipe fires ONCE per gesture, and only when it is clearly sideways — a finger travelling twice
+    as far across as down. Otherwise a diagonal scroll would turn pages while the reader was trying
+    to move down one.
     """
     return (
-        "<script>(function(){var y=null,moved=0;"
+        "<script>(function(){var y=null,x=null,moved=0,swiped=false;"
+        "var key=function(name,code){"
+        "var t=document.querySelector('.xterm-helper-textarea');if(!t)return;t.focus();"
+        "['keydown','keyup'].forEach(function(k){t.dispatchEvent(new KeyboardEvent(k,"
+        "{key:name,code:name,keyCode:code,which:code,bubbles:true}));});};"
         "document.addEventListener('touchstart',function(e){"
-        "y=e.touches[0].clientY;moved=0;},{passive:true});"
+        "y=e.touches[0].clientY;x=e.touches[0].clientX;moved=0;swiped=false;},{passive:true});"
         "document.addEventListener('touchmove',function(e){"
-        "if(y===null)return;var n=e.touches[0].clientY,d=y-n;moved+=Math.abs(d);"
+        "if(y===null)return;var ny=e.touches[0].clientY,nx=e.touches[0].clientX;"
+        "var d=y-ny,ax=nx-x;"
+        "if(!swiped&&Math.abs(ax)>48&&Math.abs(ax)>Math.abs(ny-y)*2){"
+        "swiped=true;if(ax<0){key('ArrowRight',39);}else{key('ArrowLeft',37);}return;}"
+        "if(swiped)return;"
+        "moved+=Math.abs(d);"
         "if(moved<24||Math.abs(d)<3)return;"
         "var t=document.querySelector('.xterm-screen')||document.body;"
         "t.dispatchEvent(new WheelEvent('wheel',{deltaY:d*2,bubbles:true,cancelable:true}));"
-        "y=n;},{passive:true});"
-        "document.addEventListener('touchend',function(){y=null;moved=0;},{passive:true});"
+        "y=ny;},{passive:true});"
+        "document.addEventListener('touchend',function(){"
+        "y=null;x=null;moved=0;swiped=false;},{passive:true});"
         "})();</script>"
     )
 
@@ -412,7 +433,7 @@ def _templates_dir(
         + _meta_signal()
         + _audio_bridge()
         + _no_virtual_keyboard()
-        + _touch_scroll()
+        + _touch_gestures()
         + _centre()
         + _favicon()
         + face

@@ -118,6 +118,26 @@ def test_the_font_files_sit_where_the_page_asks_for_them() -> None:
         assert (statics / path.name).exists()
 
 
+def test_a_sideways_swipe_turns_a_page() -> None:
+    """The Lore book is paged and already binds the arrows, so the swipe asks for the same thing the
+    keyboard does. The page follows the finger: swiping left is the NEXT page."""
+    html = _html()
+    assert "ArrowRight" in html and "ArrowLeft" in html
+    assert html.index("ax<0") < html.index("ArrowRight")
+
+
+def test_a_swipe_fires_once_and_only_when_clearly_sideways() -> None:
+    """A diagonal scroll must not turn pages while the reader is moving down one."""
+    html = _html()
+    assert "swiped=true" in html
+    assert "Math.abs(ny-y)*2" in html  # twice as far across as down
+
+
+def test_a_vertical_drag_still_scrolls() -> None:
+    html = _html()
+    assert "WheelEvent" in html
+
+
 def test_the_tab_wears_the_cabinets_icon() -> None:
     """A tester returns to a beta build by tapping it on a home screen — without this that tile is
     a screenshot of the page."""
