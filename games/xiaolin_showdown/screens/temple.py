@@ -379,9 +379,15 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int, *,
     grid.add_column(justify="right", no_wrap=True)  # deck
     grid.add_column(width=4)  # gap between
     grid.add_column(justify="right", no_wrap=True)  # initiative
+    # Abbreviated where the row cannot afford words. A phone upright reports about 60 columns, and
+    # "Player 1:", "Training:", "Deck:" and "Initiative:" spend 34 of them on labels alone — the
+    # values then truncate to nothing, which is the one thing a label must never cost.
+    player_label, deck_label, init_label = (
+        ("P", "Dk", "Init") if compact else ("Player ", "Deck", "Initiative")
+    )
     rows = (
-        ("Player 1", player, init_player, player_sources),
-        ("Player 2", bot, init_bot, bot_sources),
+        (f"{player_label}1", player, init_player, player_sources),
+        (f"{player_label}2", bot, init_bot, bot_sources),
     )
     for label, duelist, init, sources in rows:
         char = duelist.character
@@ -393,7 +399,7 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int, *,
         # nothing applied, so a hover that shows nothing means the cursor missed, not that the
         # duelist is unbuffed.
         bonuses = [card.power.initiative_bonus for card in sources]
-        initiative_cell = labelled("Initiative", str(init))
+        initiative_cell = labelled(init_label, str(init))
         initiative_cell.stylize(Style(meta={"tooltip": bonus_tooltip(bonuses)}))
         grid.add_row(
             Text(f"{label}:", style="dim"),
@@ -401,7 +407,7 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int, *,
             Text(""),  # flex spacer
             _training_cell(duelist, compact=compact),
             Text(""),  # flex spacer
-            labelled("Deck", str(len(duelist.deck))),
+            labelled(deck_label, str(len(duelist.deck))),
             Text(""),  # gap before Initiative
             initiative_cell,
         )
@@ -415,7 +421,7 @@ def _training_cell(duelist: Player, *, compact: bool = False) -> Text:
 
     Both rows start with the same ``Training:`` prefix in a left-justified column, so their labels line
     up under each other; a spacer column holds them clear of the name."""
-    cell = Text("Training: ", style="dim")
+    cell = Text("Train: " if compact else "Training: ", style="dim")
     if duelist.character.tier == "boss":
         # Measured off the real bar, percent included — that whole span is what the eye centres
         # against, and a hand-derived segment count leaves MASTER sitting left of it.
