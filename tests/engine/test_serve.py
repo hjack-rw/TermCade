@@ -342,6 +342,15 @@ def test_autofit_sizes_the_font_to_the_games_fit_size() -> None:
     assert f"c=touch?{cols}:{cols}" in html and f"r=touch?{rows}:{rows}" in html
 
 
+def test_the_width_cap_is_a_whole_number_of_whole_cells() -> None:
+    """The cap has one job: leave room for exactly the columns the cartridge asked for.
+
+    It is written per-cell and floored because xterm draws on a whole-pixel grid — multiplying a
+    fractional cell by the column count and rounding once at the end banks the discarded fraction
+    across every column, which is how a rotated phone ended up with 132 of them instead of 110."""
+    assert f"(c*Math.floor({page.CELL_W}*size))" in _html()
+
+
 def test_a_game_with_a_min_size_gets_a_too_small_gate() -> None:
     min_w, min_h = page.min_px(_MIN)
     html = _html(minimum=_MIN)
@@ -365,12 +374,24 @@ def test_autofit_clamps_to_the_readable_font_range() -> None:
 
 def test_the_page_ships_no_controls_that_reload_the_session() -> None:
     """A reload starts a *new* textual-serve session, throwing the player's run away. Only the
-    auto-fit may navigate, and only before the game starts (when `fontsize` is absent)."""
+    auto-fit may navigate."""
     html = _html()
     assert "tc-zoom" not in html  # the zoom cluster reloaded on every click
-    # The one surviving `location.replace` is the auto-fit, guarded by `if (!p.has('fontsize'))`.
     assert html.count("location.replace") == 1
-    assert "if(!p.has('fontsize'))" in html
+
+
+def test_the_auto_fit_reloads_only_to_correct_a_size_it_has_not_already_corrected() -> None:
+    """Two conditions, and both are load-bearing.
+
+    `current!==f` is what makes the fit run on EVERY load instead of only the first — the size lives
+    in the URL, and a URL outlives the visit that made it, so a phone kept whatever was chosen the
+    first time it ever opened the game.
+
+    `settled!==shape` is what stops that becoming a loop. The reload costs a session, and a browser
+    whose reported height moves as its chrome slides away can disagree with its own answer; without
+    the guard it would reload forever."""
+    html = _html()
+    assert "if(current!==f&&settled!==shape)" in html
 
 
 def test_serve_reads_the_sizes_off_the_game_descriptor(monkeypatch) -> None:

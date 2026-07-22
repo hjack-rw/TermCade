@@ -61,11 +61,15 @@ VIEWPORT = (
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
 )
 
-# An xterm cell measures about this much per px of font size. These were briefly made pessimistic to
+# An xterm cell measures this much per px of font size. These were briefly made pessimistic to
 # force the whole grid inside a phone's viewport — and the result was a font nobody could read. A
 # player would rather scroll a legible board than squint at one that fits, and the way OUT of a
 # screen no longer depends on the fit: it is a page-level button (see `back_overlay`).
-CELL_W, CELL_H = 0.60, 1.25
+#
+# 0.62 is 0xProto's own advance, measured in the browser and exact at every size: a canvas asked for
+# the width of "W" returns 0.62 × the font size to three decimals, from 6px to 16px. Nothing here
+# needs to measure at run time — but the rounding does, and it is the half that was wrong.
+CELL_W, CELL_H = 0.62, 1.25
 # The floor used to be 8, which is where a phone broke: fitting the game's 44 rows into a landscape
 # viewport needs 7px, and clamping back up to 8 made the grid 50px taller than the screen — the page
 # loaded overflowing and had to be pinched and scrolled. The floor only ever applies when even
@@ -79,15 +83,38 @@ DEFAULT_FIT_SIZE = (110, 38)
 DEFAULT_MIN_SIZE: tuple[int, int] | None = None
 
 
+def cell_px(size: int) -> int:
+    """The width in whole pixels of one cell at ``size``, as xterm will actually lay it out.
+
+    **Floor, not round, and never the ratio left fractional.** xterm draws on a whole-pixel grid,
+    and the fraction it discards is most of the error: at 8px the advance is 4.96 and the cell is
+    4, not 5. Multiplying the fractional cell by a column count and rounding once at the end —
+    which is what the width cap used to do — banks that fraction across every column, and 110
+    columns came out 132 wide. Per-cell and floored, it is exact at every size the auto-fit picks.
+    """
+    return int(CELL_W * size)
+
+
 def autofit(fit_size: tuple[int, int], touch_fit_size: tuple[int, int] | None = None) -> str:
     """Runs first, in ``<head>``: pick the largest xterm font that fits the game's grid in this
-    window, then reload once with ``?fontsize=N``. Guarded on the param being absent, so it only ever
-    runs before the game starts and never fights a size the player zoomed to.
+    window, and reload with ``?fontsize=N`` when that is not the size already in the URL.
+
+    **Every load re-fits.** It used to run only when the parameter was ABSENT, which sounds like the
+    same thing and is not: the parameter is written into the URL, and the URL is what a phone keeps.
+    Bookmark it, add it to the home screen, press back, reopen the tab — the fit is skipped, because
+    the answer it wrote the first time is still sitting in the query string. A player who first
+    opened the game upright was then held at that size in landscape forever, and no amount of
+    reloading could recover, since reloading is exactly what carried the stale answer forward.
 
     A touch device fits a DIFFERENT grid when the cartridge offers one. A phone is short — 312px of
     height against a laptop's 800 — so fitting the desktop's row count means shrinking the font until
     it is unreadable. Asking for fewer rows there gives a legible font instead, and the screens that
     want the space scroll inside their own panel.
+
+    The reload costs a session, so it must not be able to happen twice for one shape. The viewport it
+    last replaced for is remembered, and a disagreement it has already acted on is left alone —
+    otherwise a browser whose reported height changes as its chrome slides away could bounce between
+    two sizes forever, reloading the game each time.
     """
     cols, rows = fit_size
     t_cols, t_rows = touch_fit_size or fit_size
@@ -95,10 +122,14 @@ def autofit(fit_size: tuple[int, int], touch_fit_size: tuple[int, int] | None = 
         "<script>(function(){var p=new URLSearchParams(location.search);"
         f"var touch=window.matchMedia('(pointer: coarse)').matches;"
         f"var c=touch?{t_cols}:{cols},r=touch?{t_rows}:{rows};"
-        f"if(!p.has('fontsize')){{"
         f"var a=Math.floor(window.innerWidth/(c*{CELL_W})),"
         f"b=Math.floor(window.innerHeight/(r*{CELL_H})),"
         f"f=Math.max({MIN_FONT},Math.min(a,b,{MAX_FONT}));"
+        "var current=parseInt(p.get('fontsize'),10);"
+        "var shape=window.innerWidth+'x'+window.innerHeight;"
+        "var settled=null;try{settled=sessionStorage.getItem('tcFit');}catch(e){}"
+        "if(current!==f&&settled!==shape){"
+        "try{sessionStorage.setItem('tcFit',shape);}catch(e){}"
         "p.set('fontsize',f);location.replace(location.pathname+'?'+p.toString());return;}"
         # Cap the terminal WIDTH at the grid the game asked for. Without it, turning a phone
         # sideways hands the fit addon twice the width it needs — the same 8px font spread over 175
@@ -119,10 +150,16 @@ def autofit(fit_size: tuple[int, int], touch_fit_size: tuple[int, int] | None = 
         # it; capping there took columns away from a screen that had asked for them, which is a
         # regression dressed as a fix. The cap exists for a device whose width changes because it was
         # turned over, not because anyone chose a size.
+        #
+        # The cap is `columns × one whole cell`, not `columns × a fractional cell` rounded at the
+        # end. See `cell_px`: the second form is what let a rotated phone into 132 columns when the
+        # cartridge asked for 110, because the fraction xterm discards per cell was being banked
+        # across all of them. This is the width at which the fit addon fits exactly `c` columns and
+        # not one more.
         "if(!touch)return;"
         f"var size=parseInt(p.get('fontsize'),10)||{MIN_FONT};"
         "var s=document.createElement('style');"
-        f"s.textContent='#terminal{{max-width:'+Math.ceil(c*{CELL_W}*size)+'px;margin:0 auto}}';"
+        f"s.textContent='#terminal{{max-width:'+(c*Math.floor({CELL_W}*size))+'px;margin:0 auto}}';"
         "document.head.appendChild(s);"
         "})();</script>"
     )

@@ -24,6 +24,8 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Awaitable, Callable
+
 from aiohttp import web
 from textual_serve.app_service import AppService
 from textual_serve.server import Server, to_int
@@ -94,6 +96,32 @@ class TermCadeServer(Server):
     Subclasses extend :meth:`session_env` to add to what a session is told; the meta channel is the
     same for every session and needs no hook.
     """
+
+    async def _make_app(self) -> web.Application:
+        """As upstream, plus: the PAGE is never cached.
+
+        The page is not a document, it is the current build of the app — it carries every script the
+        engine injects, inline. Cached, a phone keeps running whatever was served the first time it
+        visited, and a server restarted with new code changes nothing it can see. That failure is
+        invisible from both ends: the server logs a normal request, the browser shows a working game,
+        and the only symptom is a fix that "did not work".
+
+        Only the page. ``/static`` is fonts and the terminal bundle, which are large, change with a
+        release rather than with an edit, and are exactly what a phone on a slow link should keep.
+        """
+        app = await super()._make_app()
+        app.middlewares.append(self._no_store)
+        return app
+
+    @staticmethod
+    @web.middleware
+    async def _no_store(
+        request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    ) -> web.StreamResponse:
+        response = await handler(request)
+        if response.content_type == "text/html":
+            response.headers["Cache-Control"] = "no-store, must-revalidate"
+        return response
 
     def session_env(self, request: web.Request) -> dict[str, str]:
         """What this session's subprocess is told beyond what it inherits."""
