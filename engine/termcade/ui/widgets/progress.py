@@ -14,17 +14,24 @@ _FILL = "▰"
 _EMPTY = "▱"
 
 
-def render_bar(fraction: float, width: int = 10) -> str:
+def render_bar(fraction: float, width: int = 10, *, segments: bool = True) -> str:
     """``▰ ▰ ▰ ▰ ▰ ▰ ▰ ▱ ▱ ▱  70%`` — ``fraction`` (clamped to 0..1) of ``width`` segments filled.
 
     A space between segments, so no two glyphs ever touch — glyphs that fill their cell edge-to-edge
     would otherwise merge into one solid strip. Two spaces before the percent, always exactly two:
     the number is NOT right-justified into a slot, which read as a hole at low percentages.
+
+    ``segments=False`` drops the bar and keeps the number. Ten spaced segments plus the percent cost
+    25 columns, which is a quarter of a phone held upright — and the bar is the decorative half of
+    the pair. The percentage carries the same fact in four columns.
     """
     fraction = max(0.0, min(1.0, fraction))
+    percent = f"{round(fraction * 100)}%"
+    if not segments:
+        return percent
     filled = round(fraction * width)
     bar = " ".join(_FILL * filled + _EMPTY * (width - filled))
-    return f"{bar}  {round(fraction * 100)}%"
+    return f"{bar}  {percent}"
 
 
 class ProgressBar(Static):

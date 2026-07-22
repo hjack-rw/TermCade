@@ -395,3 +395,28 @@ def test_a_phone_is_offered_the_games_own_touch_grid() -> None:
     html = (templates / "app_index.html").read_text(encoding="utf-8")
     assert "pointer: coarse" in html
     assert "r=touch?30:44" in html
+
+
+def test_the_terminal_is_capped_to_the_grid_the_game_asked_for() -> None:
+    """Rotation, without a reload. A reload would spawn a new session and end the run, so the page
+    cannot re-run the auto-fit when a phone turns — and the xterm object it would resize instead is
+    not reachable. Capping the width means rotating moves the board without rescaling it: landscape
+    stops handing the fit addon 175 columns of an 8px font."""
+    html = _html(fit=(110, 44))
+    assert "max-width:" in html and "#terminal{max-width:" in html
+
+
+def test_only_the_width_is_capped() -> None:
+    """Capping height too cost a portrait player 400px of screen — the grid stopped at 30 rows with
+    black above and below, when rows are the one thing portrait has plenty of."""
+    html = _html()
+    cap = html[html.index("#terminal{max-width:") :][:200]
+    assert "max-height" not in cap
+
+
+def test_the_cap_is_a_style_rule_not_a_property_on_the_element() -> None:
+    """It runs in <head>, where `#terminal` does not exist yet: setting a property there finds null
+    and does nothing, silently."""
+    html = _html()
+    assert "createElement('style')" in html
+    assert "getElementById('terminal')" not in html

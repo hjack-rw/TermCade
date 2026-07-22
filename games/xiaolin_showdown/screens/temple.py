@@ -62,9 +62,45 @@ from .rules import RulesScreen
 from .use_power import UsePowerScreen
 
 
+# Anything narrower than this, relative to its height, is a phone held upright. Portrait grids
+# measure about 1.4; landscape and desktop measure about 4. Nothing sits near 2.5.
+_PORTRAIT_RATIO = 2.5
+
+
 class TempleScreen(XiaolinScreen):
     # No Back here: the temple IS the run, and the only thing under it is the main menu.
     BACK_ALLOWED = False
+
+    # Seeded by `compose` with the value it actually rendered, so the first resize — which arrives
+    # DURING mount — compares against the truth and does nothing. Defaulting it to a guess meant a
+    # narrow screen always rebuilt itself mid-mount, tearing down a Header that was still building.
+    _bars_were_compact = False
+
+    def _compact_bars(self) -> bool:
+        """Whether the training bars should be a percentage instead of a bar.
+
+        Portrait is an ASPECT RATIO, not a width. Column counts were tried twice and both were
+        wrong: an xterm cell is about half its font size, so a phone reports 97 columns on a 390px
+        screen and 107 on a larger one, and any threshold picked from that lands on the wrong side
+        of somebody's phone. A grid only 1.4 times wider than it is tall is a phone stood upright;
+        landscape and every desktop are 4 times wider.
+        """
+        size = self.app.size
+        if not size.height:
+            return False
+        return size.width / size.height < _PORTRAIT_RATIO
+
+    def on_resize(self) -> None:
+        """Rebuild when a rotation crosses the breakpoint, and only then.
+
+        The bars are Rich text baked at compose time, so unlike the stylesheet they do not reflow on
+        their own. Guarded on the value actually changing: a resize arrives as a burst, and
+        rebuilding the temple on every one of them would tear the screen apart while a phone turns.
+        """
+        compact = self._compact_bars()
+        if compact != self._bars_were_compact:
+            self._bars_were_compact = compact
+            self.rebuild()
 
     BINDINGS = [
         ("1", "gong_yi_tanpai", "Duel"),
@@ -102,7 +138,13 @@ class TempleScreen(XiaolinScreen):
                 ),
                 id="summary",
             )
-            yield TooltipStatic(_state_grid(player, bot, init_player, init_bot), id="state")
+            self._bars_were_compact = self._compact_bars()
+            yield TooltipStatic(
+                _state_grid(
+                    player, bot, init_player, init_bot, compact=self._bars_were_compact
+                ),
+                id="state",
+            )
 
         player_rows, bot_rows = hands_lines(player.whole_hand, bot.whole_hand)
         with Horizontal(id="hands"):
@@ -320,7 +362,7 @@ def _summary_line(
     return line
 
 
-def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) -> Table:
+def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int, *, compact: bool = False) -> Table:
     # The Wu behind each initiative: this duelist's own buffs plus the opponent's debuffs, which is
     # why a card in your bracket may be sitting in their hand.
     player_sources, bot_sources = initiative_sources(player, bot)
@@ -357,7 +399,7 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
             Text(f"{label}:", style="dim"),
             name,
             Text(""),  # flex spacer
-            _training_cell(duelist),
+            _training_cell(duelist, compact=compact),
             Text(""),  # flex spacer
             labelled("Deck", str(len(duelist.deck))),
             Text(""),  # gap before Initiative
@@ -366,7 +408,7 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int) ->
     return grid
 
 
-def _training_cell(duelist: Player) -> Text:
+def _training_cell(duelist: Player, *, compact: bool = False) -> Text:
     """A duelist's training bar (see ``logic.training``). A boss is at the stat cap and *cannot*
     train — it reads MASTER, centred in a dashed ruler as wide as the bar, and its tooltip is
     ``-/-``, not a full bar.
@@ -377,13 +419,13 @@ def _training_cell(duelist: Player) -> Text:
     if duelist.character.tier == "boss":
         # Measured off the real bar, percent included — that whole span is what the eye centres
         # against, and a hand-derived segment count leaves MASTER sitting left of it.
-        width = cell_len(render_bar(0.0, TRAIN_LENGTH))
+        width = cell_len(render_bar(0.0, TRAIN_LENGTH, segments=not compact))
         word = " MASTER "
         dashes = (width - len(word)) // 2  # the same run both sides: symmetry beats exact width
         cell.append("-" * dashes + word + "-" * dashes)
         cell.stylize(Style(meta={"tooltip": "-/-"}))
         return cell
-    cell.append(render_bar(duelist.training / TRAIN_LENGTH, TRAIN_LENGTH))
+    cell.append(render_bar(duelist.training / TRAIN_LENGTH, TRAIN_LENGTH, segments=not compact))
     cell.stylize(Style(meta={"tooltip": f"{duelist.training}/{TRAIN_LENGTH}"}))
     return cell
 

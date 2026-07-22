@@ -204,6 +204,28 @@ class EngineApp(App[None]):
         if self.ctx is not None:
             self.ctx.audio = player
 
+    def _set_mouse_over(self, widget: Any, hover_widget: Any) -> None:
+        """A finger does not hover, so on a touch session nothing ever does.
+
+        Textual re-applies the hover at ``mouse_position`` on every repaint, to keep it honest when
+        widgets move under a stationary mouse. A finger has no resting position for it to be honest
+        about: ``mouse_position`` is wherever the last tap landed, and it stays there. So the widget
+        the NEXT screen puts on that spot comes up hovered without being touched — and a hovered
+        `Button` wears the accent border and the flattened label, which is what a *chosen* option
+        looks like. Tap Play, and the character screen arrives with Raimundo already lit.
+
+        Suppressed at the source rather than in the theme: hover reaches the screen by two routes —
+        the `:hover` pseudo-class the TCSS styles, and the `mouse_hover` flag `Button.render` reads —
+        and both are set here. A `.-touch` twin for every `:hover` rule would have to be written
+        again for every rule a cartridge adds, and would still leave the flag set.
+
+        Nothing else is lost. A tap is routed by what is under it, not by what is hovered, and a
+        tooltip is a thing you get by resting a pointer you do not have.
+        """
+        if os.environ.get(TOUCH_ENV):
+            return
+        super()._set_mouse_over(widget, hover_widget)
+
     @property
     def music_on(self) -> bool:
         """The live answer, re-read every time — this is what makes the toggle take effect now."""

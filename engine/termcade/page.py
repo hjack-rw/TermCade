@@ -14,10 +14,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-# emoji font or on nothing at all. The symbol face is a subset of DejaVu Sans Mono covering the
-# punctuation, arrow, technical, box, shape and symbol blocks a TUI draws from, so it fills the gaps
-# for characters the game has not used yet as well as the ones it has. Order is load-bearing: 0xProto
-# first keeps the text face consistent, and DejaVu is only ever reached for what 0xProto lacks.
+# Two embedded faces, because one does not cover the game. 0xProto gives xterm.js its text face and
+# the card icons; the symbol face is a subset of DejaVu Sans Mono carrying exactly the glyphs 0xProto
+# lacks, so no codepoint is claimed twice. Order is load-bearing: 0xProto keeps the text face
+# consistent, and DejaVu is only ever reached for what it is missing.
 ASSETS = Path(__file__).resolve().parent / "assets"
 FONT = ASSETS / "0xProtoNerdFont-Regular.ttf"
 SYMBOL_FONT = ASSETS / "TermCadeSymbols.ttf"
@@ -93,12 +93,67 @@ def autofit(fit_size: tuple[int, int], touch_fit_size: tuple[int, int] | None = 
     t_cols, t_rows = touch_fit_size or fit_size
     return (
         "<script>(function(){var p=new URLSearchParams(location.search);"
-        f"if(!p.has('fontsize')){{var touch=window.matchMedia('(pointer: coarse)').matches;"
+        f"var touch=window.matchMedia('(pointer: coarse)').matches;"
         f"var c=touch?{t_cols}:{cols},r=touch?{t_rows}:{rows};"
+        f"if(!p.has('fontsize')){{"
         f"var a=Math.floor(window.innerWidth/(c*{CELL_W})),"
         f"b=Math.floor(window.innerHeight/(r*{CELL_H})),"
         f"f=Math.max({MIN_FONT},Math.min(a,b,{MAX_FONT}));"
-        "p.set('fontsize',f);location.replace(location.pathname+'?'+p.toString());}})();</script>"
+        "p.set('fontsize',f);location.replace(location.pathname+'?'+p.toString());return;}"
+        # Cap the terminal WIDTH at the grid the game asked for. Without it, turning a phone
+        # sideways hands the fit addon twice the width it needs — the same 8px font spread over 175
+        # columns — and the temple stretches edge to edge at a size nobody chose. Capped, rotating
+        # moves the board and changes nothing about its scale.
+        #
+        # Width only. Capping the height as well was tried and it cost a portrait player 400px of
+        # screen: the grid stopped at 30 rows with black above and below, when the rows were the one
+        # thing that orientation had plenty of. More rows is more game; more columns is just wider.
+        #
+        # A cap and not a re-fit, because re-running the auto-fit would RELOAD, and a reload spawns a
+        # new textual-serve session and throws the run away. The xterm object that could be resized
+        # in place is not reachable from the page: `window.onresize` closes over it privately.
+        # Written as a STYLE RULE, not as inline style on the element: this runs in <head>, where
+        # `#terminal` does not exist yet, so setting a property on it would find null and do nothing
+        # at all — silently, which is the failure mode worth designing out rather than testing for.
+        # TOUCH ONLY. A desktop window is resized deliberately and a player who drags it wider means
+        # it; capping there took columns away from a screen that had asked for them, which is a
+        # regression dressed as a fix. The cap exists for a device whose width changes because it was
+        # turned over, not because anyone chose a size.
+        "if(!touch)return;"
+        f"var size=parseInt(p.get('fontsize'),10)||{MIN_FONT};"
+        "var s=document.createElement('style');"
+        f"s.textContent='#terminal{{max-width:'+Math.ceil(c*{CELL_W}*size)+'px;margin:0 auto}}';"
+        "document.head.appendChild(s);"
+        "})();</script>"
+    )
+
+
+def refit_on_rotate() -> str:
+    """Make the terminal re-fit when a phone is turned.
+
+    ``textual.js`` fits the grid from ``window.onresize`` and nothing else. A desktop window drag
+    fires that continuously, so it has always looked fine — but a phone rotating fires
+    ``orientationchange``, and the ``resize`` that follows it arrives while the browser is still
+    settling the new viewport. The fit then measures the OLD dimensions and keeps them, which is why
+    turning the phone did nothing until the page was reloaded.
+
+    Kicked several times over a second rather than once: there is no event for "the viewport has
+    finished changing", and iOS in particular reports intermediate sizes mid-rotation. Re-fitting an
+    already-correct grid costs nothing, so the cheap answer is to ask more than once.
+    """
+    return (
+        "<script>(function(){"
+        # Touch only, like the width cap. A desktop window already re-fits continuously while it is
+        # dragged, and `visualViewport` fires on zoom there — so this would add refits to a platform
+        # that never needed them and was not asked about.
+        "if(!window.matchMedia('(pointer: coarse)').matches)return;"
+        "var kick=function(){window.dispatchEvent(new Event('resize'));};"
+        "var settle=function(){[60,250,600,1000].forEach(function(d){setTimeout(kick,d);});};"
+        "window.addEventListener('orientationchange',settle);"
+        "if(window.screen&&window.screen.orientation){"
+        "window.screen.orientation.addEventListener('change',settle);}"
+        "if(window.visualViewport){window.visualViewport.addEventListener('resize',settle);}"
+        "})();</script>"
     )
 
 
@@ -466,6 +521,7 @@ def head(
         + autofit(fit_size, touch_fit_size)
         + meta_signal()
         + audio_bridge()
+        + refit_on_rotate()
         + no_virtual_keyboard()
         + touch_gestures()
         + centre()
