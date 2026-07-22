@@ -24,6 +24,20 @@ jobs:
       - name: Install chromium for the browser tests
         run: playwright install --with-deps chromium
 
+      # The page's scripts are `.js` files now, so something that reads JavaScript can check them.
+      # While they were Python string literals nothing could: a missing brace was invisible until
+      # the browser silently did less than it used to, with no error and no failing test.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install the asset linters
+        run: npm ci
+
+      - name: ESLint + Prettier (engine/termcade/web)
+        run: npm run lint
+
       - name: Ruff
         run: ruff check .
 

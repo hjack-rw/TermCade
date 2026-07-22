@@ -19,6 +19,19 @@ def _html(fit=_FIT, minimum=None) -> str:
     return (templates / "app_index.html").read_text(encoding="utf-8")
 
 
+def _squashed(fit=_FIT, minimum=None) -> str:
+    """The page with every run of whitespace removed.
+
+    The scripts and stylesheets are files now, formatted for a person to read, so a test that spells
+    a snippet the way the old string literals ran it together would fail on an indent — and would go
+    on failing after every tidy-up, which is the definition of a test pinned to the wrong thing.
+    What these are actually about is the token sequence: that the latch is checked before the scroll
+    reaches the wheel, that the threshold is applied at all. That survives reformatting, and this is
+    what lets the assertion say so.
+    """
+    return "".join(_html(fit, minimum).split())
+
+
 def test_font_assets_are_bundled() -> None:
     # The count first: half this file loops over `_faces()`, and every one of those loops would pass
     # on an empty tuple — including the coverage check, which would then verify nothing at all.
@@ -176,8 +189,8 @@ def test_the_terminal_waits_for_the_fonts_before_it_measures() -> None:
 def test_the_terminal_loads_even_when_the_fonts_do_not() -> None:
     """A game in the stock font beats a game that never starts, so every path ends in `go`."""
     html = _html()
-    assert "if(!document.fonts){go();return;}" in html
-    assert html.count(".catch(function(){})") == 2
+    assert "if(!document.fonts){go();return;}" in _squashed()
+    assert html.count(".catch(function () {})") == 2
 
 
 def test_the_font_files_sit_where_the_page_asks_for_them() -> None:
@@ -191,14 +204,15 @@ def test_a_sideways_swipe_turns_a_page() -> None:
     keyboard does. The page follows the finger: swiping left is the NEXT page."""
     html = _html()
     assert "ArrowRight" in html and "ArrowLeft" in html
-    assert html.index("ax<0") < html.index("ArrowRight")
+    squashed = _squashed()
+    assert squashed.index("ax<0") < squashed.index("ArrowRight")
 
 
 def test_a_swipe_is_latched_so_one_drag_turns_one_page() -> None:
     """Both halves of the latch, not just the flag. Asserting `swiped=true` appears somewhere proves
     only that the word was typed — the behaviour is that the flag is CHECKED before firing again and
     that a latched gesture stops feeding the scroller."""
-    html = _html()
+    html = _squashed()
     assert "if(!swiped&&" in html, "the swipe fires without checking whether it already did"
     assert "if(swiped)return;" in html, "a latched swipe still falls through to scrolling"
 
@@ -206,8 +220,7 @@ def test_a_swipe_is_latched_so_one_drag_turns_one_page() -> None:
 def test_a_swipe_must_be_clearly_sideways_before_it_counts() -> None:
     """A diagonal scroll must not turn pages while the reader is moving down one. The comparison has
     to be against the vertical travel — a bare distance threshold fires on any long drag."""
-    html = _html()
-    assert "Math.abs(ax)>48&&Math.abs(ax)>Math.abs(ny-y)*2" in html
+    assert "Math.abs(ax)>48&&Math.abs(ax)>Math.abs(ny-y)*2" in _squashed()
 
 
 def test_a_vertical_drag_still_scrolls() -> None:
@@ -218,8 +231,8 @@ def test_a_vertical_drag_still_scrolls() -> None:
     What this cannot prove is that a real finger clears the threshold — that was measured in a
     browser (a 180px drag produced six wheel events, a 3px wobble produced none).
     """
-    html = _html()
-    body = html[html.index("var y=null,x=null") :]
+    html = _squashed()
+    body = html[html.index("vary=null,x=null") :]
     assert body.index("if(swiped)return;") < body.index("WheelEvent"), "the latch swallows scrolling"
     assert body.index("moved<24") < body.index("WheelEvent"), "the travel threshold is not applied"
 
@@ -242,7 +255,7 @@ def test_the_back_button_sends_the_key_the_app_listens_for() -> None:
     serve a page. This is what keeps them honest."""
     from termcade.ui.screens.base import EngineScreen
 
-    modifiers = "".join(part[: -len("Key:true,")] for part in [page.BACK_MODIFIER])
+    modifiers = "".join(page.BACK_MODIFIERS)
     assert EngineScreen.BACK_KEY == f"{modifiers}+{page.BACK_KEY}".lower()
 
 
@@ -281,18 +294,21 @@ def test_the_back_key_carries_its_modifier_down_the_wire() -> None:
 def test_the_back_button_carries_a_modifier() -> None:
     """xterm.js encodes no function key above F12 — a bare exotic key is dropped on the floor and
     the button goes silently dead. The modifier is what puts it on the wire."""
-    assert "Key:true" in page.BACK_MODIFIER
-    assert page.BACK_MODIFIER in _html()
+    assert page.BACK_MODIFIERS, "the button holds no modifier and xterm will drop the key"
+    html = _squashed()
+    for name in page.MODIFIER_KEYS:
+        held = str(name in page.BACK_MODIFIERS).lower()
+        assert f"{name}Key:{held}" in html
 
 
 def test_the_back_button_is_for_devices_with_no_keys() -> None:
     """A desktop browser has Escape and a footer that says so, which makes a moulded plastic button
     over the terminal pure decoration. Hidden by default, so a browser that cannot answer the media
     query gets the keyboard's UI rather than a control it does not need."""
-    html = _html()
-    assert "@media (pointer: coarse)" in html
+    html = _squashed()
+    assert "@media(pointer:coarse)" in html
     fab = html[html.index("#tc-back-fab{position:fixed") :]
-    assert fab.index("#tc-back-fab{display:none}") < fab.index("@media (pointer: coarse)")
+    assert fab.index("display:none") < fab.index("@media(pointer:coarse)")
 
 
 def test_the_back_button_hides_itself_the_moment_it_is_tapped() -> None:
@@ -300,7 +316,7 @@ def test_the_back_button_hides_itself_the_moment_it_is_tapped() -> None:
     channel whose answer is a round trip away."""
     html = _html()
     back = html[html.index("<button id='tc-back-fab'") :]
-    assert "b.hidden=true" in back[: back.index("</script>")]
+    assert "b.hidden=true" in "".join(back[: back.index("</script>")].split())
 
 
 def test_the_page_can_play_the_games_sound() -> None:
@@ -326,6 +342,7 @@ def test_every_message_from_the_app_goes_through_one_registry() -> None:
 def test_the_socket_is_wrapped_before_textual_opens_it() -> None:
     """Wrapping the constructor after the socket exists is too late — every message is missed."""
     html = _html()
+    html = _squashed()
     assert html.index("window.WebSocket=") < html.index("</head>")
 
 
@@ -346,7 +363,7 @@ def test_a_tap_does_not_raise_the_phones_keyboard() -> None:
     """xterm.js keeps a hidden textarea focused, and a focused textarea is what opens the on-screen
     keyboard — so every tap on the board buried the game under keys nobody typed on."""
     html = _html()
-    assert "xterm-helper-textarea" in html and "'inputmode','none'" in html
+    assert "xterm-helper-textarea" in html and "'inputmode','none'" in _squashed()
 
 
 def test_the_keyboard_suppressor_survives_the_terminal_being_rebuilt() -> None:
@@ -355,8 +372,8 @@ def test_the_keyboard_suppressor_survives_the_terminal_being_rebuilt() -> None:
     An observer that is constructed and never started would satisfy a search for its name, so this
     checks it is actually observing, and observing the whole document rather than one node that may
     not exist yet."""
-    html = _html()
-    assert "new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})" in html
+    observing = "newMutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})"
+    assert observing in _squashed()
 
 
 def test_autofit_sizes_the_font_to_the_games_fit_size() -> None:
@@ -367,7 +384,8 @@ def test_autofit_sizes_the_font_to_the_games_fit_size() -> None:
     cols, rows = 96, 31
     html = _html(fit=(cols, rows))
     assert "fontsize" in html and "location.replace" in html
-    assert f"c=touch?{cols}:{cols}" in html and f"r=touch?{rows}:{rows}" in html
+    squashed = _squashed(fit=(cols, rows))
+    assert f"c=touch?{cols}:{cols}" in squashed and f"r=touch?{rows}:{rows}" in squashed
 
 
 def test_the_terminal_is_never_taller_than_the_window() -> None:
@@ -375,7 +393,7 @@ def test_the_terminal_is_never_taller_than_the_window() -> None:
     screen is not what it shows you — browser chrome took 174px of 800 on the device this was
     measured on, and the grid overflowed by exactly that. ``vh`` means the screen too, so it cannot
     be the fix; ``dvh`` is the viewport that is really there."""
-    assert "#terminal{max-height:100dvh}" in _html()
+    assert "#terminal{max-height:100dvh" in _squashed()
 
 
 def test_nothing_sizes_the_terminal_from_the_cell_estimate() -> None:
@@ -388,7 +406,7 @@ def test_nothing_sizes_the_terminal_from_the_cell_estimate() -> None:
 
 def test_a_game_with_a_min_size_gets_a_too_small_gate() -> None:
     min_w, min_h = page.min_px(_MIN)
-    html = _html(minimum=_MIN)
+    html = _squashed(minimum=_MIN)
     assert "tc-toosmall" in html
     assert f"max-width:{min_w - 1}px" in html and f"max-height:{min_h - 1}px" in html
 
@@ -404,6 +422,7 @@ def test_autofit_clamps_to_the_readable_font_range() -> None:
     assert page.MIN_FONT < page.MAX_FONT
     assert page.MIN_FONT >= 5, "a font this small is a texture, not text"
     html = _html()
+    html = _squashed()
     assert f"Math.max({page.MIN_FONT}" in html and f"Math.min(a,b,{page.MAX_FONT})" in html
 
 
@@ -425,8 +444,7 @@ def test_the_auto_fit_reloads_only_to_correct_a_size_it_has_not_already_correcte
     `settled!==shape` is what stops that becoming a loop. The reload costs a session, and a browser
     whose reported height moves as its chrome slides away can disagree with its own answer; without
     the guard it would reload forever."""
-    html = _html()
-    assert "if(current!==f&&settled!==shape)" in html
+    assert "if(current!==f&&settled!==shape)" in _squashed()
 
 
 def test_serve_reads_the_sizes_off_the_game_descriptor(monkeypatch) -> None:
@@ -450,7 +468,7 @@ def test_a_phone_is_offered_the_games_own_touch_grid() -> None:
     assert templates is not None
     html = (templates / "app_index.html").read_text(encoding="utf-8")
     assert "pointer: coarse" in html
-    assert "r=touch?30:44" in html
+    assert "r=touch?30:44" in "".join(html.split())
 
 
 def test_a_phone_is_given_its_whole_width() -> None:
@@ -458,4 +476,4 @@ def test_a_phone_is_given_its_whole_width() -> None:
     moved the board instead of rescaling it. It cost more than it bought: the cap was computed from
     an estimated cell, and on a 3x screen it left a third of the display as black bars beside a grid
     too narrow for the layout it was feeding. The fit addon can have the window."""
-    assert "#terminal{max-width:" not in _html()
+    assert "#terminal{max-width:" not in _squashed()

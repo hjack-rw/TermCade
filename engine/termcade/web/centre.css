@@ -1,0 +1,30 @@
+/* Put the terminal in the middle of the window. Upstream's page styles it for opacity and nothing
+   else, so the grid sits at the document's top-left against the default body margin. */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  /* `safe` is load-bearing. Plain centring of something TALLER than the window splits the overflow
+     across both edges: a device reported the terminal starting 24px above the top of the screen, so
+     the first row and the last were both cut. `safe` falls back to start-alignment when it does not
+     fit, which loses rows only at the end — and nothing at all once it does fit. */
+  align-items: safe center;
+  justify-content: safe center;
+  /* `auto`, not `hidden`: a font large enough to read makes the grid taller than a phone, and
+     hiding the overflow made the bottom rows unreachable rather than merely off-screen. */
+  overflow: auto;
+}
+
+/* Bounded by the WINDOW, in `dvh`. Left free the terminal sizes to the SCREEN, and a phone's screen
+   is not what a phone shows you: measured on a Samsung, the browser's own chrome took 48px of a
+   360px screen sideways and 174px of 800px upright, and the terminal came out 360px tall in a 312px
+   window and 723px in a 626px one. That difference was the scrollbar, in both orientations. `vh`
+   cannot fix it — on mobile `vh` means the screen too, which is the whole trap. */
+#terminal {
+  max-height: 100dvh;
+}

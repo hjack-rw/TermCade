@@ -1,0 +1,68 @@
+/* A cabinet pushbutton: round, convex, sitting on a collar it visibly sinks into when pressed. The
+   travel is the point — a flat rectangle gives a touch player no feedback that a tap registered, and
+   this one is deliberately the only control on the page that looks like hardware, because it is the
+   only one that is not part of the game's own screen. */
+
+#tc-back-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 99998;
+  width: 66px;
+  height: 66px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #6d1a0e;
+  background: radial-gradient(circle at 50% 30%, #ff9166 0%, #ec4a2b 52%, #b31d0d 100%);
+  color: #2b0803;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  /* Three shadows: the collar it stands on, the drop under the whole thing, and the sheen inside
+     the cap that makes it read as convex rather than as a flat disc. */
+  box-shadow:
+    0 6px 0 #6d1a0e,
+    0 9px 14px rgba(0, 0, 0, 0.55),
+    inset 0 2px 7px rgba(255, 255, 255, 0.45),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.35);
+  transition:
+    transform 0.06s linear,
+    box-shadow 0.06s linear;
+  /* Hidden by DEFAULT, so a browser that cannot answer the media query below gets the keyboard's UI
+     rather than a control it does not need. */
+  display: none;
+}
+
+/* Touch devices only. This button exists because a phone has no keys — a desktop browser has
+   Escape, and the footer already says so, which makes a piece of moulded plastic sitting over the
+   terminal pure decoration there. `pointer: coarse` is the same test the auto-fit uses, and it
+   answers for the device rather than for the window: a laptop with a narrow window is still a
+   laptop. */
+@media (pointer: coarse) {
+  #tc-back-fab:not([hidden]) {
+    display: flex;
+  }
+}
+
+#tc-back-fab:active {
+  transform: translateY(5px);
+  box-shadow:
+    0 1px 0 #6d1a0e,
+    0 2px 5px rgba(0, 0, 0, 0.5),
+    inset 0 2px 7px rgba(255, 255, 255, 0.35),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.35);
+}
+
+#tc-back-fab .tc-glyph {
+  font-size: 21px;
+  line-height: 1;
+}
+
+#tc-back-fab .tc-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+}

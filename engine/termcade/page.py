@@ -1,18 +1,27 @@
 """Everything the served PAGE is made of: its CSS, its scripts, and the fonts it declares.
 
-Pure string building. Nothing here opens a file, starts a server or touches the network — each
-function answers "what goes in the page", and :mod:`termcade.serve` decides where to put it. That
-split is why this module is testable by reading its output, and it is most of the reason `serve.py`
-stopped being two files' worth of one.
+Each function answers "what goes in the page", and :mod:`termcade.serve` decides where to put it.
+That split is why this module is testable by reading its output, and it is most of the reason
+`serve.py` stopped being two files' worth of one.
 
 The browser features the game needs all live here: the auto-fit that sizes the terminal to the
 window, the meta channel the app talks to the page through, the WebAudio bridge, the touch
 gestures, the arcade Back button, and the font declarations that reach xterm without patching it.
+
+**The CSS and JavaScript are in ``web/``, not in this file.** They used to be written out as Python
+string literals, which meant no editor knew any of it was JavaScript: nothing checked a bracket,
+nothing coloured a keyword, and every value Python had to supply arrived as an f-string brace in a
+language made of braces. What stays here is the part that is genuinely a decision — which grid to
+fit, which keycode the Back button sends, which faces are declared and over what range — while
+:mod:`termcade.asset` does the reading and the filling in. The docstrings stay here too: they are
+about *why the page needs this at all*, which is a question about the game, not about the script.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+
+from termcade import asset
 
 # Two embedded faces, because one does not cover the game. 0xProto gives xterm.js its text face and
 # the card icons; the symbol face is a subset of DejaVu Sans Mono carrying exactly the glyphs 0xProto
@@ -72,7 +81,16 @@ TERMINAL_SCRIPT = '<script src="{{ config.static.url }}js/textual.js"></script>'
 # Shift+F5 goes down the wire as ``\x1b[15;2~``; a real browser treats it as a reload and never
 # delivers it to the page, so the button remains its only source.
 BACK_KEY, BACK_CODE, BACK_KEYCODE = "F5", "F5", 116
-BACK_MODIFIER = "shiftKey:true,"
+# Held as NAMES, not as the JavaScript that expresses them. This was ``"shiftKey:true,"`` — a
+# fragment of one language kept in a constant of another, spliced into the middle of an object
+# literal. It read fine and it was the single thing stopping ``back-button.js`` from being valid
+# JavaScript: a parser sees a property with no comma after it and gives up, so no linter could ever
+# have checked the file that decides whether the Back button works at all.
+BACK_MODIFIERS = ("shift",)
+# Every modifier ``KeyboardEvent`` takes, so the template names each one and Python answers true or
+# false. A flag the button does not hold is stated rather than omitted — an absent property and a
+# false one mean the same thing to the browser, but only one of them can be read off the page.
+MODIFIER_KEYS = ("shift", "ctrl", "alt", "meta")
 
 # Without this a phone lays the page out for an imaginary ~980px desktop and then scales the result
 # down, so the auto-fit sizes the font against a width the device does not have and everything
@@ -130,20 +148,16 @@ def autofit(fit_size: tuple[int, int], touch_fit_size: tuple[int, int] | None = 
     """
     cols, rows = fit_size
     t_cols, t_rows = touch_fit_size or fit_size
-    return (
-        "<script>(function(){var p=new URLSearchParams(location.search);"
-        f"var touch=window.matchMedia('(pointer: coarse)').matches;"
-        f"var c=touch?{t_cols}:{cols},r=touch?{t_rows}:{rows};"
-        f"var a=Math.floor(window.innerWidth/(c*{CELL_W})),"
-        f"b=Math.floor(window.innerHeight/(r*{CELL_H})),"
-        f"f=Math.max({MIN_FONT},Math.min(a,b,{MAX_FONT}));"
-        "var current=parseInt(p.get('fontsize'),10);"
-        "var shape=window.innerWidth+'x'+window.innerHeight;"
-        "var settled=null;try{settled=sessionStorage.getItem('tcFit');}catch(e){}"
-        "if(current!==f&&settled!==shape){"
-        "try{sessionStorage.setItem('tcFit',shape);}catch(e){}"
-        "p.set('fontsize',f);location.replace(location.pathname+'?'+p.toString());return;}"
-        "})();</script>"
+    return asset.script(
+        "autofit.js",
+        cols=cols,
+        rows=rows,
+        touch_cols=t_cols,
+        touch_rows=t_rows,
+        cell_w=CELL_W,
+        cell_h=CELL_H,
+        min_font=MIN_FONT,
+        max_font=MAX_FONT,
     )
 
 
@@ -160,20 +174,7 @@ def refit_on_rotate() -> str:
     finished changing", and iOS in particular reports intermediate sizes mid-rotation. Re-fitting an
     already-correct grid costs nothing, so the cheap answer is to ask more than once.
     """
-    return (
-        "<script>(function(){"
-        # Touch only, like the width cap. A desktop window already re-fits continuously while it is
-        # dragged, and `visualViewport` fires on zoom there — so this would add refits to a platform
-        # that never needed them and was not asked about.
-        "if(!window.matchMedia('(pointer: coarse)').matches)return;"
-        "var kick=function(){window.dispatchEvent(new Event('resize'));};"
-        "var settle=function(){[60,250,600,1000].forEach(function(d){setTimeout(kick,d);});};"
-        "window.addEventListener('orientationchange',settle);"
-        "if(window.screen&&window.screen.orientation){"
-        "window.screen.orientation.addEventListener('change',settle);}"
-        "if(window.visualViewport){window.visualViewport.addEventListener('resize',settle);}"
-        "})();</script>"
-    )
+    return asset.script("refit-on-rotate.js")
 
 
 def centre() -> str:
@@ -201,11 +202,7 @@ def centre() -> str:
     orientations. ``vh`` cannot fix it — on mobile ``vh`` means the screen too, which is the whole
     trap. ``dvh`` tracks the viewport that is actually there, including as the chrome slides away.
     """
-    return (
-        "<style>html,body{height:100%;margin:0}"
-        "body{display:flex;align-items:safe center;justify-content:safe center;overflow:auto}"
-        "#terminal{max-height:100dvh}</style>"
-    )
+    return asset.style("centre.css")
 
 
 def back_overlay() -> str:
@@ -226,49 +223,16 @@ def back_overlay() -> str:
     whose answer is a round trip away.
     """
     return (
-        # A cabinet pushbutton: round, convex, sitting on a collar it visibly sinks into when
-        # pressed. The travel is the point — a flat rectangle gives a touch player no feedback that
-        # a tap registered, and this one is deliberately the only control on the page that looks
-        # like hardware, because it is the only one that is not part of the game's own screen.
-        "<style>#tc-back-fab{position:fixed;right:16px;bottom:16px;z-index:99998;"
-        "width:66px;height:66px;padding:0;border-radius:50%;border:2px solid #6d1a0e;"
-        "background:radial-gradient(circle at 50% 30%,#ff9166 0%,#ec4a2b 52%,#b31d0d 100%);"
-        "color:#2b0803;cursor:pointer;-webkit-tap-highlight-color:transparent;"
-        "flex-direction:column;align-items:center;justify-content:center;gap:1px;"
-        # Three shadows: the collar it stands on, the drop under the whole thing, and the sheen
-        # inside the cap that makes it read as convex rather than as a flat disc.
-        "box-shadow:0 6px 0 #6d1a0e,0 9px 14px rgba(0,0,0,.55),"
-        "inset 0 2px 7px rgba(255,255,255,.45),inset 0 -3px 8px rgba(0,0,0,.35);"
-        "transition:transform .06s linear,box-shadow .06s linear}"
-        # Touch devices only. This button exists because a phone has no keys — a desktop browser has
-        # Escape, and the footer already says so, which makes a piece of moulded plastic sitting over
-        # the terminal pure decoration there. `pointer: coarse` is the same test the auto-fit uses,
-        # and it answers for the device rather than for the window: a laptop with a narrow window is
-        # still a laptop. Hidden by DEFAULT, so a browser that cannot answer the query gets the
-        # keyboard's UI rather than a control it does not need.
-        "#tc-back-fab{display:none}"
-        "@media (pointer: coarse){#tc-back-fab:not([hidden]){display:flex}}"
-        "#tc-back-fab:active{transform:translateY(5px);"
-        "box-shadow:0 1px 0 #6d1a0e,0 2px 5px rgba(0,0,0,.5),"
-        "inset 0 2px 7px rgba(255,255,255,.35),inset 0 -3px 8px rgba(0,0,0,.35)}"
-        "#tc-back-fab .tc-glyph{font-size:21px;line-height:1}"
-        "#tc-back-fab .tc-label{font-size:9px;letter-spacing:.14em;font-weight:700}</style>"
-        "<button id='tc-back-fab' type='button' aria-label='Back' hidden>"
+        asset.style("back-button.css")
+        + "<button id='tc-back-fab' type='button' aria-label='Back' hidden>"
         "<span class='tc-glyph'>&#9664;</span><span class='tc-label'>BACK</span></button>"
-        "<script>(function(){var b=document.getElementById('tc-back-fab');"
-        "window.__tcMeta=window.__tcMeta||{};"
-        "window.__tcMeta['termcade_back']=function(m){b.hidden=!m.allowed;};"
-        # Only the typeface is borrowed from the terminal now — the colours are the button's own, so
-        # it stays a piece of the cabinet whatever theme the game is drawing in.
-        "var paint=function(){var t=document.querySelector('.xterm');if(!t)return;"
-        "b.style.fontFamily=getComputedStyle(t).fontFamily;};"
-        "setTimeout(paint,600);setTimeout(paint,2500);"
-        "b.addEventListener('click',function(e){e.preventDefault();"
-        "var t=document.querySelector('.xterm-helper-textarea');if(!t)return;t.focus();"
-        "b.hidden=true;"  # until the app says the next screen has a way back too
-        "['keydown','keyup'].forEach(function(k){t.dispatchEvent(new KeyboardEvent(k,"
-        f"{{key:'{BACK_KEY}',code:'{BACK_CODE}',{BACK_MODIFIER}keyCode:{BACK_KEYCODE},"
-        f"which:{BACK_KEYCODE},bubbles:true}}));}});}});}})();</script>"
+        + asset.script(
+            "back-button.js",
+            back_key=BACK_KEY,
+            back_code=BACK_CODE,
+            back_keycode=BACK_KEYCODE,
+            **{name: str(name in BACK_MODIFIERS).lower() for name in MODIFIER_KEYS},
+        )
     )
 
 
@@ -280,14 +244,7 @@ def meta_signal() -> str:
     whatever registered for its type in ``window.__tcMeta``, so the Back button and the speaker each
     own their own behaviour and neither has to know the other exists.
     """
-    return (
-        "<script>(function(){window.__tcMeta=window.__tcMeta||{};var W=window.WebSocket;"
-        "window.WebSocket=function(u,p){var s=p?new W(u,p):new W(u);"
-        "s.addEventListener('message',function(e){if(typeof e.data!=='string')return;"
-        "var m;try{m=JSON.parse(e.data);}catch(_){return;}"
-        "var h=m&&window.__tcMeta[m[0]];if(h){h(m[1]);}});return s;};"
-        "window.WebSocket.prototype=W.prototype;})();</script>"
-    )
+    return asset.script("meta-signal.js")
 
 
 def audio_bridge() -> str:
@@ -306,59 +263,7 @@ def audio_bridge() -> str:
     keypress, and a loop that arrived before then is remembered and started at that moment instead
     of being dropped. Without that the soundtrack, which starts on mount, would be lost every time.
     """
-    return (
-        "<script>(function(){var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;"
-        "var ctx=null,music=null,pending=null,buf={},part={};"
-        # A gesture is what a browser will accept an AudioContext from. Any of these count, and the
-        # listeners stay: a context can fall back to 'suspended' when a phone is locked or the tab
-        # is backgrounded, and the next tap has to be able to bring it round again.
-        "var wake=function(){if(!ctx){ctx=new AC();}if(ctx.state==='suspended'){ctx.resume();}"
-        "if(pending){var p=pending;pending=null;loop(p);}};"
-        "['pointerdown','keydown','touchend'].forEach(function(e){"
-        "document.addEventListener(e,wake,{passive:true});});"
-        "var decode=function(b64){var s=atob(b64),n=s.length,b=new Uint8Array(n);"
-        "for(var i=0;i<n;i++){b[i]=s.charCodeAt(i);}return b;};"
-        # int16 little-endian to the float -1..1 WebAudio wants.
-        "var buffer=function(bytes,rate){var pcm=new Int16Array(bytes.buffer,0,bytes.length>>1);"
-        "var a=ctx.createBuffer(1,pcm.length,rate),c=a.getChannelData(0);"
-        "for(var i=0;i<pcm.length;i++){c[i]=pcm[i]/32768;}return a;};"
-        "var start=function(a,gain,looping){var s=ctx.createBufferSource(),g=ctx.createGain();"
-        "s.buffer=a;s.loop=looping;g.gain.value=gain;s.connect(g);g.connect(ctx.destination);"
-        "s.start();return {src:s,gain:g};};"
-        # A crossfade runs both loops for its length and drops the outgoing one at the end — the
-        # same shape as the engine's Mixer.fade, because it is replacing the same thing.
-        "var loop=function(m){if(!ctx){pending=m;return;}var a=buf[m.id];if(!a){pending=m;return;}"
-        "var t=ctx.currentTime,f=m.crossfade||0;"
-        "if(music&&f>0){var old=music;old.gain.gain.setValueAtTime(old.gain.gain.value,t);"
-        "old.gain.gain.linearRampToValueAtTime(0,t+f);old.src.stop(t+f);"
-        "music=start(a,0,true);music.gain.gain.setValueAtTime(0,t);"
-        "music.gain.gain.linearRampToValueAtTime(m.gain,t+f);return;}"
-        "if(music){try{music.src.stop();}catch(_){}}"
-        "music=start(a,m.gain,true);};"
-        "var handle=function(m){"
-        # Chunks are PLACED by their `seq`, not appended in arrival order. The socket delivers in
-        # order today, which is exactly why appending looked correct — but the sender states a
-        # sequence number, and a guarantee nobody checks is not a guarantee. Placing also makes a
-        # duplicate harmless instead of corrupting the tune.
-        "if(m.action==='chunk'){var p=part[m.id]||(part[m.id]={n:0,total:m.total,a:[]});"
-        "if(p.a[m.seq]===undefined){p.a[m.seq]=m.data;p.n++;}"
-        "if(p.n<p.total)return;delete part[m.id];"
-        # The context may not exist yet (no gesture). Keep the bytes; build the buffer on the way in
-        # to `loop`, which only ever runs once there is a context to build it with.
-        "var bytes=decode(p.a.join(''));var make=function(){buf[m.id]=buffer(bytes,m.rate);};"
-        "if(ctx){make();}else{var once=function(){if(ctx){make();"
-        "if(pending&&pending.id===m.id){var q=pending;pending=null;loop(q);}"
-        "document.removeEventListener('pointerdown',once);"
-        "document.removeEventListener('keydown',once);"
-        "document.removeEventListener('touchend',once);}};"
-        "['pointerdown','keydown','touchend'].forEach(function(e){"
-        "document.addEventListener(e,once,{passive:true});});}return;}"
-        "if(m.action==='loop'){loop(m);return;}"
-        "if(m.action==='once'){if(!ctx||!buf[m.id])return;start(buf[m.id],m.gain,false);return;}"
-        "if(m.action==='stop'){if(music){try{music.src.stop();}catch(_){}music=null;}pending=null;}"
-        "};window.__tcMeta=window.__tcMeta||{};window.__tcMeta['termcade_audio']=handle;"
-        "})();</script>"
-    )
+    return asset.script("audio-bridge.js")
 
 
 def no_virtual_keyboard() -> str:
@@ -372,13 +277,7 @@ def no_virtual_keyboard() -> str:
     The textarea is created by xterm.js after this runs, and again whenever the terminal is rebuilt,
     so an observer sets the attribute rather than a one-off query.
     """
-    return (
-        "<script>(function(){var f=function(){"
-        "document.querySelectorAll('.xterm-helper-textarea').forEach(function(t){"
-        "if(t.getAttribute('inputmode')!=='none'){t.setAttribute('inputmode','none');}});};"
-        "new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true});"
-        "document.addEventListener('DOMContentLoaded',f);f();})();</script>"
-    )
+    return asset.script("no-virtual-keyboard.js")
 
 
 def touch_gestures() -> str:
@@ -404,29 +303,7 @@ def touch_gestures() -> str:
     as far across as down. Otherwise a diagonal scroll would turn pages while the reader was trying
     to move down one.
     """
-    return (
-        "<script>(function(){var y=null,x=null,moved=0,swiped=false;"
-        "var key=function(name,code){"
-        "var t=document.querySelector('.xterm-helper-textarea');if(!t)return;t.focus();"
-        "['keydown','keyup'].forEach(function(k){t.dispatchEvent(new KeyboardEvent(k,"
-        "{key:name,code:name,keyCode:code,which:code,bubbles:true}));});};"
-        "document.addEventListener('touchstart',function(e){"
-        "y=e.touches[0].clientY;x=e.touches[0].clientX;moved=0;swiped=false;},{passive:true});"
-        "document.addEventListener('touchmove',function(e){"
-        "if(y===null)return;var ny=e.touches[0].clientY,nx=e.touches[0].clientX;"
-        "var d=y-ny,ax=nx-x;"
-        "if(!swiped&&Math.abs(ax)>48&&Math.abs(ax)>Math.abs(ny-y)*2){"
-        "swiped=true;if(ax<0){key('ArrowRight',39);}else{key('ArrowLeft',37);}return;}"
-        "if(swiped)return;"
-        "moved+=Math.abs(d);"
-        "if(moved<24||Math.abs(d)<3)return;"
-        "var t=document.querySelector('.xterm-screen')||document.body;"
-        "t.dispatchEvent(new WheelEvent('wheel',{deltaY:d*2,bubbles:true,cancelable:true}));"
-        "y=ny;},{passive:true});"
-        "document.addEventListener('touchend',function(){"
-        "y=null;x=null;moved=0;swiped=false;},{passive:true});"
-        "})();</script>"
-    )
+    return asset.script("touch-gestures.js")
 
 
 def min_px(min_size: tuple[int, int]) -> tuple[int, int]:
@@ -476,20 +353,7 @@ def deferred_terminal_script() -> str:
     happens outside our ``{% raw %}`` block so the URL is still filled in by the template engine.
     """
     families = ", ".join(f"document.fonts.load(\"16px '{family}'\")" for family, _ in faces())
-    return (
-        "<script>(function(){var go=function(){var s=document.createElement('script');"
-        # textual.js starts the terminal from `window.onload`. Injected late, it misses that event
-        # entirely — the script loads, defines its handler, and nothing ever calls it, which shows
-        # up as a page that renders no terminal at all and reports no error. So when the document
-        # has already finished loading, we call the handler it just installed.
-        "s.onload=function(){if(document.readyState==='complete'"
-        "&&typeof window.onload==='function'){window.onload();}};"
-        f"s.src='{{{{ config.static.url }}}}js/textual.js';document.head.appendChild(s);}};"
-        "if(!document.fonts){go();return;}"
-        f"Promise.all([{families},document.fonts.load(\"16px 'Roboto Mono'\")])"
-        ".catch(function(){}).then(function(){return document.fonts.ready;})"
-        ".catch(function(){}).then(go);})();</script>"
-    )
+    return asset.script("deferred-terminal.js", families=families)
 
 
 def shadowed_faces() -> str:
@@ -530,13 +394,7 @@ def shadowed_faces() -> str:
 def too_small_gate(min_size: tuple[int, int]) -> tuple[str, str]:
     """A CSS overlay for a game that cannot reflow below ``min_size``. Empty for one that scrolls."""
     min_w, min_h = min_px(min_size)
-    style = (
-        f"<style>#tc-toosmall{{position:fixed;inset:0;z-index:99999;display:none;"
-        f"background:#000;color:#f2c14e;font-family:monospace;font-size:18px;padding:2rem;"
-        f"align-items:center;justify-content:center;text-align:center}}"
-        f"@media (max-width:{min_w - 1}px),(max-height:{min_h - 1}px)"
-        f"{{#tc-toosmall{{display:flex}}}}</style>"
-    )
+    style = asset.style("too-small.css", max_w=min_w - 1, max_h=min_h - 1)
     return style, '<div id="tc-toosmall">Window too small &mdash; make it bigger to play.</div>'
 
 

@@ -30,6 +30,7 @@ from pathlib import Path
 
 from aiohttp import web
 
+from termcade import asset
 from termcade.session import TermCadeServer
 
 log = logging.getLogger("termcade.beta")
@@ -153,22 +154,11 @@ class BetaServer(TermCadeServer):
 
 
 def _login_page(*, bad: bool) -> str:
-    """The door. Deliberately one plain form served inline: it must render before the player is
-    allowed to fetch anything from ``/static``."""
+    """The door. Deliberately one plain form served inline — it must render before the player is
+    allowed to fetch anything from ``/static``, which is also why its styling is in the same file
+    rather than a stylesheet the gate would have to let through."""
     message = "That code is not on the list." if bad else "This build is closed beta."
-    return (
-        "<!doctype html><meta charset=utf-8><title>TermCade &mdash; beta</title>"
-        "<style>body{background:#000;color:#f2c14e;font-family:monospace;display:flex;"
-        "min-height:100vh;margin:0;align-items:center;justify-content:center;text-align:center}"
-        "input{background:#111;color:#f2c14e;border:1px solid #f2c14e;font-family:inherit;"
-        "font-size:1.2rem;padding:.5rem;text-align:center}"
-        "button{background:#f2c14e;color:#000;border:0;font-family:inherit;font-size:1.2rem;"
-        "padding:.55rem 1.2rem;margin-left:.5rem;cursor:pointer}</style>"
-        "<form method=get action=/><h1>TermCade</h1>"
-        f"<p>{message}</p>"
-        "<input name=code autofocus autocapitalize=off autocomplete=off spellcheck=false "
-        "placeholder=passcode><button type=submit>Enter</button></form>"
-    )
+    return asset.read("beta-login.html", message=message)
 
 
 def codes_path() -> Path | None:

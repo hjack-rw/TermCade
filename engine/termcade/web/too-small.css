@@ -1,0 +1,23 @@
+/* The overlay for a game that cannot reflow below its floor grid. A game whose screens scroll never
+   asks for this, and gets no overlay at all. */
+
+#tc-toosmall {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+  background: #000;
+  color: #f2c14e;
+  font-family: monospace;
+  font-size: 18px;
+  padding: 2rem;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+@media (max-width: ${max_w}px), (max-height: ${max_h}px) {
+  #tc-toosmall {
+    display: flex;
+  }
+}

@@ -53,4 +53,4 @@ def test_the_way_back_is_a_page_button_not_a_widget() -> None:
     assert templates is not None
     html = (templates / "app_index.html").read_text(encoding="utf-8")
     assert "tc-back-fab" in html
-    assert "position:fixed" in html
+    assert "position: fixed" in html

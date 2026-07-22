@@ -29,3 +29,7 @@ build/
 # Local, kept out of the repo
 .claude/
 docs/
+
+# JS tooling for the page assets (engine/termcade/web). The lockfile IS committed, so CI can
+# `npm ci` and get the exact linters this was checked with.
+node_modules/

@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>TermCade &mdash; beta</title>
+<style>
+  body {
+    background: #000;
+    color: #f2c14e;
+    font-family: monospace;
+    display: flex;
+    min-height: 100vh;
+    margin: 0;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  input {
+    background: #111;
+    color: #f2c14e;
+    border: 1px solid #f2c14e;
+    font-family: inherit;
+    font-size: 1.2rem;
+    padding: 0.5rem;
+    text-align: center;
+  }
+
+  button {
+    background: #f2c14e;
+    color: #000;
+    border: 0;
+    font-family: inherit;
+    font-size: 1.2rem;
+    padding: 0.55rem 1.2rem;
+    margin-left: 0.5rem;
+    cursor: pointer;
+  }
+</style>
+
+<!-- `action="/"` is quoted on purpose. Unquoted, `action=/` is one character from parsing as a
+     self-closing `<form/>`: browsers take the `/` as the value and the door works, but a parser is
+     entitled to read it the other way, and one that did would drop the passcode field out of the
+     form entirely. -->
+<form method="get" action="/">
+  <h1>TermCade</h1>
+  <p>$message</p>
+  <input
+    name="code"
+    autofocus
+    autocapitalize="off"
+    autocomplete="off"
+    spellcheck="false"
+    placeholder="passcode"
+  />
+  <button type="submit">Enter</button>
+</form>
