@@ -45,6 +45,39 @@ StartScreen {
     text-opacity: 55%;
     text-style: none;
 }
+/* Narrow screens swap both wordmarks for versions that fit; everything else keeps the full ones.
+   Both are mounted and one is hidden, so turning a phone changes no widget tree.
+
+   The FULL pair is the default and `-narrow` is the override, which is not arbitrary. Written the
+   other way round, the screen laid itself out while the full marks were hidden and the class that
+   reveals them arrived with the first resize — after that layout. They came back displayed with a
+   zero-width region, every button under them sat at a stale position, and a click on Lore opened
+   Settings. The default has to be the case that is already correct before any class lands. */
+#start-root #banner-compact,
+#start-root #title-compact {
+    display: none;
+}
+/* The colours are repeated rather than inherited: the engine styles `#banner` and `#title` by id,
+   and an id is exactly what these two do not share with them. `text-opacity` is deliberately NOT
+   carried over to the compact banner — the full one is dimmed to sit behind the game's title, and
+   at a phone's font size that same dimming read as a rendering fault rather than as depth. */
+#start-root #banner-compact {
+    color: $accent;
+    text-style: bold;
+}
+#start-root #title-compact {
+    color: $accent-lighten-2;
+    text-style: bold;
+}
+StartScreen.-narrow #start-root #banner,
+StartScreen.-narrow #start-root #title {
+    display: none;
+}
+StartScreen.-narrow #start-root #banner-compact,
+StartScreen.-narrow #start-root #title-compact {
+    display: block;
+    width: auto;
+}
 #start-root BoxedPanel {
     margin-top: 2;
 }

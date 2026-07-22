@@ -6,12 +6,12 @@ from textual.app import ComposeResult
 from textual.containers import Center, Vertical
 from textual.widgets import Footer, Header, Static
 
-from termcade.ui.app import BANNER
+from termcade.ui.app import BANNER, BANNER_COMPACT
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel, Button
 
-from ._logo import SUBTITLE_ART, TITLE_ART
+from ._logo import SUBTITLE_ART, TITLE_ART, TITLE_ART_STACKED
 from .character_select import CharacterSelectScreen
 from .lore import LoreScreen
 from .rules import RulesScreen
@@ -23,10 +23,15 @@ class StartScreen(EngineScreen):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="start-root"):
+            # Both wordmarks are mounted and the stylesheet picks one on the `-narrow` breakpoint.
+            # Choosing in Python would mean recomposing the screen on every resize, and this screen
+            # is the first thing a player sees — it should not flicker while a phone is turned.
             with Center():
                 yield Static(BANNER, id="banner")
+                yield Static(BANNER_COMPACT, id="banner-compact")
             with Center():
                 yield Static(TITLE_ART, id="title")
+                yield Static(TITLE_ART_STACKED, id="title-compact")
             with Center():
                 yield Static(SUBTITLE_ART, classes="subtitle")
             with Center():
