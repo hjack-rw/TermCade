@@ -13,18 +13,22 @@ requires-python = ">=3.12"
 dependencies = ["textual>=0.80", "sounddevice>=0.4"]
 
 [project.optional-dependencies]
-# Browser mode. Pinned: serve.py patches textual-serve's page template, so its shape must be stable.
-serve = ["textual-serve==1.1.3"]
+# Browser mode. No longer hard-pinned: nothing is matched inside textual-serve's generated
+# JavaScript any more. The two things read out of it are hand-written tags in its HTML template
+# (the Google Fonts link and the terminal's script tag), and both bail out loudly if they move —
+# so a minor upgrade is a normal upgrade again rather than a silent loss of the game's glyphs.
+# Still bounded to 1.x: `session.py` mirrors `Server.handle_websocket`, which is a real API.
+serve = ["textual-serve~=1.1"]
 # fonttools is a TEST dependency, not a runtime one: the font-coverage test reads the cmap out of
 # the bundled faces to prove every character the game draws has a glyph. Nothing ships it — the
 # fonts are built once and committed — but without it that test cannot run, and a skipped coverage
 # test is the same silence as the vacuous one it replaced.
 dev = [
-    "pytest", "pytest-asyncio", "textual-dev", "ruff", "mypy", "textual-serve==1.1.3", "fonttools",
+    "pytest", "pytest-asyncio", "textual-dev", "ruff", "mypy", "textual-serve~=1.1", "fonttools",
 ]
 # Build the standalone double-click executable (see build_launcher.py). Pillow is here rather than
 # in the runtime deps because only `make_icon.py` needs it — the game never imports it.
-build = ["pyinstaller>=6.0", "textual-serve==1.1.3", "pillow"]
+build = ["pyinstaller>=6.0", "textual-serve~=1.1", "pillow"]
 
 [project.scripts]
 termcade = "termcade.__main__:main"

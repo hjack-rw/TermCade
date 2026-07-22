@@ -11,20 +11,20 @@ from rich.text import Text
 from textual import events
 from textual.content import ContentText
 from textual.screen import Screen
-from textual.widgets import Footer
 from textual.worker import Worker, WorkerState
 
 from termcade.app.game import Game, GameContext
 
 from .dialog import ChoiceModal
-from ..widgets.button import Button
 
 if TYPE_CHECKING:
     from ..app import EngineApp
 
 _T = TypeVar("_T")
 
-# Set per session by the browser gateway when the player is on a touch device (see `termcade.beta`).
+# Set per session by the browser gateway when the player is on a touch device (see
+# `termcade.session`, which owns the name it is written under; this is the reader's copy, and the
+# engine cannot import that module — `textual-serve` is an optional dependency the game runs without).
 # Every way out of a screen is a key — Escape, mostly — and a phone has no keys, so a touch player
 # can reach a screen and then be stuck on it. Unset everywhere else: a terminal has the keys.
 TOUCH_ENV = "TERMCADE_TOUCH"
@@ -47,11 +47,6 @@ class EngineScreen(Screen[None]):
     # The focus key (Tab) is advertised by `EngineApp`, not here: the app binds it with `priority=True`,
     # which beats any screen binding, so a copy on this class would be dead code pretending to work.
 
-    # A touch player's only way off a screen. It does one thing everywhere: go back one screen.
-    # It did send Escape, so that each screen could keep its own meaning for leaving — but that gave
-    # one button several behaviours, and a menu read it as one of its own items.
-    BACK_ID = "tc-back"
-
     # What the page's Back button actually sends (see `serve._back_overlay`). NOT Escape: Escape is
     # a key each screen gives its own meaning, and on the temple that meaning is "leave the run for
     # the main menu". A button whose only guard was hiding itself therefore abandoned a live run
@@ -71,15 +66,6 @@ class EngineScreen(Screen[None]):
     # Back would drop a live run at the main menu. Depth alone cannot tell that apart from the Lore
     # book, which sits at the same depth and *should* go back.
     BACK_ALLOWED = True
-
-    # Put the button at the bottom-RIGHT instead of following the panel's left edge. For a screen
-    # whose panel ends in a line of its own — the Lore book's page counter — the left corner is
-    # already spoken for, and the button sat on top of it.
-    BACK_RIGHT = False
-
-    # Wide enough for "◀ Back" and its padding. Fixed, because the right-hand placement has to be
-    # computed before Textual has measured the button.
-    BACK_WIDTH = 20
 
     def announce_back(self) -> None:
         """Tell the PAGE whether this screen has a way back, so its Back button can hide itself.
@@ -139,34 +125,7 @@ class EngineScreen(Screen[None]):
         # fires there and the desktop layout lands on a 6cm screen. The device tells us instead.
         if os.environ.get(TOUCH_ENV):
             self.add_class("-touch")
-        self._mount_back()
         self.call_after_refresh(self.announce_back)
-
-    def _mount_back(self) -> None:
-        # The touch Back button lives in the PAGE now (see `serve._back_overlay`), fixed to the
-        # viewport. Inside the grid it scrolled away with the terminal whenever the font was large
-        # enough to read. Kept as a no-op rather than torn out: `hide_back` and `BACK_ALLOWED` are
-        # still the contract a screen uses to say it has no way back.
-        return
-        if not os.environ.get(TOUCH_ENV) or self.query(f"#{self.BACK_ID}"):  # noqa: F841
-            return
-        # Nothing underneath to return to on the game's own root screen ([default, root]).
-        if len(self.app.screen_stack) <= 2 or not self.BACK_ALLOWED:
-            return
-        # Before the Footer, not after it: both dock to the bottom and docked widgets stack in DOM
-        # order, so mounting last put the button *on* the footer's row instead of above it.
-        # Mounting rather than composing keeps every screen's own `compose` untouched — this has to
-        # hold for screens the cartridge defines too.
-        back = Button("◀ Back", id=self.BACK_ID, classes="tc-back")
-        footer = self.query(Footer)
-        if footer:
-            self.mount(back, before=footer.first())
-        else:
-            self.mount(back)
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == self.BACK_ID:
-            event.stop()
-            self.app.pop_screen()
 
     def rebuild(self) -> None:
         """Recompose the screen — and put its footer back.
@@ -182,9 +141,6 @@ class EngineScreen(Screen[None]):
         """
         self.refresh(recompose=True)
         self.call_after_refresh(self.refresh_bindings)
-        # A recompose builds the screen from its own `compose`, which knows nothing about the Back
-        # button — so it has to be put back, or a touch player loses the way out on the first rebuild.
-        self.call_after_refresh(self._mount_back)
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
         """A worker that died takes its error to the player, not to the void.

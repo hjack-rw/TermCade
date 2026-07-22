@@ -27,8 +27,6 @@ CONTENTS = "Contents"
 
 
 class LoreScreen(XiaolinScreen):
-    # No panel to follow — the book is a page and a counter, so the button takes the screen's corner.
-    BACK_RIGHT = True
     """The book. `_page` is the reader's place in a flat run of every page, contents first."""
 
     BINDINGS = [

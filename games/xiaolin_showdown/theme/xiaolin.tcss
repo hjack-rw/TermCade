@@ -503,9 +503,14 @@ RulesScreen.-touch #rule-nav {
     overflow-y: auto;
 }
 
-/* Neither of these screens may scroll as a whole: the Back button is docked to the bottom of the
-   screen, and on a scrolling screen "the bottom" is the bottom of the content — below the fold,
-   where a thumb never reaches it. Both already scroll where it matters, inside their own panes. */
+/* Neither of these screens may scroll as a whole: both already scroll where it matters, inside
+   their own panes, and a second scroller wrapping the first gives a finger two things to drag and
+   no way to say which it meant.
+
+   The original reason given here was that the Back button was docked to the bottom of the screen
+   and would ride below the fold. That has not been true since the button moved into the page
+   (`serve._back_overlay`), where it is fixed to the viewport and cannot scroll at all — but the
+   rule outlives its first justification, so it keeps the one that is still load-bearing. */
 RulesScreen.-touch,
 LoreScreen.-touch {
     overflow-y: hidden;

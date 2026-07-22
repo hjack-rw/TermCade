@@ -19,6 +19,8 @@ The engine layers with a one-directional purity boundary — `core` (TUI-agnosti
 
 **Controls:** click any option, or drive it from the keyboard — **Tab** enters focus mode (highlights the first option; press Tab again to leave it), then **↑ / ↓** move the highlight and **Enter** selects. In-game actions also have single-key shortcuts, shown along the footer.
 
+**On a phone** there is no keyboard and none is needed: tap an option, drag up or down to scroll, and swipe sideways to turn a page in the Lore book. The arcade pushbutton in the corner is Back — it appears only on a screen that has somewhere to go, and only on a touch device.
+
 ## Play — no terminal, no Docker
 
 For anyone who just wants to click and go: grab **`TermCade.exe`** — one file, put it anywhere, double-click it. It runs the game in a maximized browser window and auto-sizes to fit your screen; a small console shows the address and stays open while you play (close it to stop). Nothing to install: no Python, no Docker, no terminal. First launch takes a few seconds (it self-unpacks); if SmartScreen prompts once, choose *More info → Run anyway*.
@@ -76,6 +78,8 @@ their next session is refused. Their saves stay on disk under `players/`, keyed 
 code, and come back if the code does.
 
 Set `TERMCADE_CODES` to switch the gate on outside Docker. Unset, the server is open as before.
+
+The page carries the cabinet's icon, so a tester who saves it to a phone's home screen gets the cabinet rather than a screenshot of one.
 
 **Sound plays in the browser, not on the server.** A container has no audio device, and a server
 that had one would be playing to an empty room — so a served session sends its samples to the page

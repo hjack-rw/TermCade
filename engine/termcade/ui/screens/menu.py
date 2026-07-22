@@ -118,10 +118,4 @@ class MenuScreen(EngineScreen):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         assert event.button.id is not None
-        # The touch Back button is mounted by `EngineScreen`, not composed as a menu item, but it is
-        # still a Button on this screen — and Textual dispatches to every handler in the MRO, so
-        # `event.stop()` in the base class does not spare this one. Without the guard a menu reads
-        # "tc-back" as one of its own ids: LOOK UP hands it to `index_of`, which has no such item.
-        if event.button.id == self.BACK_ID:
-            return
         self.on_select(event.button.id)

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import jinja2
 
-from termcade import serve
+from termcade import page, serve
 
 _FIT = (110, 38)
 _MIN = (80, 36)
@@ -20,7 +20,10 @@ def _html(fit=_FIT, minimum=None) -> str:
 
 
 def test_font_assets_are_bundled() -> None:
-    for family, path in serve._faces():
+    # The count first: half this file loops over `_faces()`, and every one of those loops would pass
+    # on an empty tuple — including the coverage check, which would then verify nothing at all.
+    assert len(page.faces()) == 2
+    for family, path in page.faces():
         assert path.exists(), f"{family} must ship inside the package"
 
 
@@ -28,7 +31,7 @@ def _covered() -> set[int]:
     from fontTools.ttLib import TTFont
 
     covered: set[int] = set()
-    for _, path in serve._faces():
+    for _, path in page.faces():
         covered |= set(TTFont(path).getBestCmap())
     return covered
 
@@ -79,43 +82,79 @@ def test_patched_template_is_valid_jinja() -> None:
 
 def test_serve_declares_every_bundled_font() -> None:
     html = _html()
-    for _, path in serve._faces():
+    for _, path in page.faces():
         # Served as a file, not inlined: a 2.4MB base64 blob in the page never finished loading on
         # a phone, so the browser fell back to a system face and the game's glyphs went missing.
         assert f"/static/{path.name}" in html
-    assert html.count("@font-face") == len(serve._faces())
+    # Twice per file: once under its own name, once shadowing the name xterm asks for.
+    assert html.count("@font-face") == 2 * len(page.faces())
     assert "base64" not in html
 
 
 def _statics() -> Path:
-    statics = serve._statics_dir(tuple(p for _, p in serve._faces()) + (serve._ICON,))
+    statics = serve._statics_dir(tuple(p for _, p in page.faces()) + (page.ICON,))
     assert statics is not None
     return statics
 
 
-def test_the_terminal_itself_draws_with_our_fonts() -> None:
-    """The page's CSS stack is not the one xterm draws with — that one is built in textual.js, so a
-    template-only patch left the game rendering in Roboto Mono and the browser's own fallback."""
-    ours = "".join(f"'{family}', " for family, _ in serve._faces())
-    assert ours + serve._TERM_STACK in (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
+def test_the_terminal_draws_with_our_fonts_without_touching_the_bundle() -> None:
+    """The whole point of the shadow. xterm asks for its stack BY NAME, so declaring that name to
+    mean our files reaches the terminal with nothing patched inside generated JavaScript."""
+    html = _html()
+    for _, path in page.faces():
+        assert f"@font-face{{font-family:'Roboto Mono';src:url('/static/{path.name}')" in html
 
 
-def test_the_text_face_is_consulted_before_the_symbol_face() -> None:
-    """The symbol face only fills gaps; leading with it would change how ordinary text looks."""
-    js = (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
-    assert js.index(f"'{serve._FAMILY}'") < js.index(f"'{serve._SYMBOL_FAMILY}'")
+def test_the_shipped_bundle_is_served_exactly_as_upstream_wrote_it() -> None:
+    """The regression this refactor exists to prevent: any edit to textual.js is a hostage to
+    upstream's next rebuild."""
+    shipped = (_statics() / "js" / "textual.js").read_bytes()
+    upstream = (
+        Path(serve.textual_serve.__file__).resolve().parent / "static" / "js" / "textual.js"
+    ).read_bytes()
+    assert shipped == upstream, "textual.js was modified — the brittle patch is back"
+
+
+def test_the_two_faces_never_claim_the_same_character() -> None:
+    """They share one family name now, and where two faces of a family overlap the LAST declared
+    wins — which would hand every box-drawing character to DejaVu and redraw every panel border.
+    The subset is built to hold only what 0xProto lacks, so there is nothing to arbitrate."""
+    from fontTools.ttLib import TTFont
+
+    text, symbols = (TTFont(path).getBestCmap().keys() for _, path in page.faces())
+    assert not set(text) & set(symbols)
+
+
+def test_nothing_else_answers_to_the_shadowed_name() -> None:
+    """Upstream fetches Roboto Mono from Google. With both declarations live an ordinary letter
+    could come from either, so the game's text face would be decided by a race."""
+    assert "fonts.googleapis.com" not in _html()
 
 
 def test_the_terminal_waits_for_the_fonts_before_it_measures() -> None:
-    """xterm bakes a texture atlas at construction, so a font that arrives later is never used."""
-    js = (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
-    assert "document.fonts.ready" in js
-    assert js.index("document.fonts.ready") < js.index('querySelectorAll(".textual-terminal")')
+    """xterm bakes a texture atlas at construction, so a font that arrives later is never used.
+
+    Held back at the SCRIPT now rather than inside it: the page loads textual.js itself, once
+    `document.fonts` has settled."""
+    html = _html()
+    assert page.TERMINAL_SCRIPT not in html, "the script still loads before the fonts"
+    assert "document.fonts.ready" in html
+    # The src is only ever assigned inside `go`, and `go` is only reached from the promise chain —
+    # ordering by position in the file would prove nothing, since `go` is DEFINED first.
+    assert ".then(go);" in html, "nothing calls the loader once the fonts settle"
+    assert "<script src=" not in html, "an unconditional script tag is still in the page"
+
+
+def test_the_terminal_loads_even_when_the_fonts_do_not() -> None:
+    """A game in the stock font beats a game that never starts, so every path ends in `go`."""
+    html = _html()
+    assert "if(!document.fonts){go();return;}" in html
+    assert html.count(".catch(function(){})") == 2
 
 
 def test_the_font_files_sit_where_the_page_asks_for_them() -> None:
     statics = _statics()
-    for _, path in serve._faces():
+    for _, path in page.faces():
         assert (statics / path.name).exists()
 
 
@@ -127,29 +166,47 @@ def test_a_sideways_swipe_turns_a_page() -> None:
     assert html.index("ax<0") < html.index("ArrowRight")
 
 
-def test_a_swipe_fires_once_and_only_when_clearly_sideways() -> None:
-    """A diagonal scroll must not turn pages while the reader is moving down one."""
+def test_a_swipe_is_latched_so_one_drag_turns_one_page() -> None:
+    """Both halves of the latch, not just the flag. Asserting `swiped=true` appears somewhere proves
+    only that the word was typed — the behaviour is that the flag is CHECKED before firing again and
+    that a latched gesture stops feeding the scroller."""
     html = _html()
-    assert "swiped=true" in html
-    assert "Math.abs(ny-y)*2" in html  # twice as far across as down
+    assert "if(!swiped&&" in html, "the swipe fires without checking whether it already did"
+    assert "if(swiped)return;" in html, "a latched swipe still falls through to scrolling"
+
+
+def test_a_swipe_must_be_clearly_sideways_before_it_counts() -> None:
+    """A diagonal scroll must not turn pages while the reader is moving down one. The comparison has
+    to be against the vertical travel — a bare distance threshold fires on any long drag."""
+    html = _html()
+    assert "Math.abs(ax)>48&&Math.abs(ax)>Math.abs(ny-y)*2" in html
 
 
 def test_a_vertical_drag_still_scrolls() -> None:
+    """The wheel dispatch has to be REACHED, not merely present: it sits after the swipe latch and
+    after the travel threshold, and either one swallowing every drag would leave the word in the
+    page and the scrolling broken.
+
+    What this cannot prove is that a real finger clears the threshold — that was measured in a
+    browser (a 180px drag produced six wheel events, a 3px wobble produced none).
+    """
     html = _html()
-    assert "WheelEvent" in html
+    body = html[html.index("var y=null,x=null") :]
+    assert body.index("if(swiped)return;") < body.index("WheelEvent"), "the latch swallows scrolling"
+    assert body.index("moved<24") < body.index("WheelEvent"), "the travel threshold is not applied"
 
 
 def test_the_tab_wears_the_cabinets_icon() -> None:
     """A tester returns to a beta build by tapping it on a home screen — without this that tile is
     a screenshot of the page."""
     html = _html()
-    assert f"/static/{serve._ICON.name}" in html
+    assert f"/static/{page.ICON.name}" in html
     assert "apple-touch-icon" in html
 
 
 def test_the_icon_is_actually_served() -> None:
     statics = _statics()
-    assert (statics / serve._ICON.name).exists()
+    assert (statics / page.ICON.name).exists()
 
 
 def test_the_back_button_sends_the_key_the_app_listens_for() -> None:
@@ -157,15 +214,17 @@ def test_the_back_button_sends_the_key_the_app_listens_for() -> None:
     serve a page. This is what keeps them honest."""
     from termcade.ui.screens.base import EngineScreen
 
-    modifiers = "".join(part[: -len("Key:true,")] for part in [serve._BACK_MODIFIER])
-    assert EngineScreen.BACK_KEY == f"{modifiers}+{serve._BACK_KEY}".lower()
+    modifiers = "".join(part[: -len("Key:true,")] for part in [page.BACK_MODIFIER])
+    assert EngineScreen.BACK_KEY == f"{modifiers}+{page.BACK_KEY}".lower()
 
 
 def test_the_back_button_does_not_send_escape() -> None:
     """Escape is a key each screen gives its own meaning — on the game's hub it abandons the run.
     A button whose only guard is hiding itself must never carry it."""
     html = _html()
-    assert "'Escape'" not in html and "keyCode:27" not in html
+    back = html[html.index("<button id='tc-back-fab'") : html.index("</body>")]
+    assert "Escape" not in back, "the Back button carries Escape again"
+    assert "27" not in back.split("keyCode:")[1][:4], "the Back button sends Escape's key code"
 
 
 def test_the_back_key_is_one_xterm_actually_encodes() -> None:
@@ -177,8 +236,8 @@ def test_the_back_key_is_one_xterm_actually_encodes() -> None:
     encoding table out of the bundle we actually ship.
     """
     js = (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
-    assert f"case {serve._BACK_KEYCODE}:" in js, (
-        f"xterm.js cannot encode keyCode {serve._BACK_KEYCODE} — the Back button would be silent"
+    assert f"case {page.BACK_KEYCODE}:" in js, (
+        f"xterm.js cannot encode keyCode {page.BACK_KEYCODE} — the Back button would be silent"
     )
 
 
@@ -186,7 +245,7 @@ def test_the_back_key_carries_its_modifier_down_the_wire() -> None:
     """The modifier is not decoration: it is what distinguishes this from a bare F5 reload. xterm
     only emits the modified form from the `a?` branch of that key's case."""
     js = (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
-    assert re.search(rf"case {serve._BACK_KEYCODE}:o\.key=a\?", js), (
+    assert re.search(rf"case {page.BACK_KEYCODE}:o\.key=a\?", js), (
         "xterm encodes this key with no modifier branch, so shift is dropped on the way out"
     )
 
@@ -194,8 +253,8 @@ def test_the_back_key_carries_its_modifier_down_the_wire() -> None:
 def test_the_back_button_carries_a_modifier() -> None:
     """xterm.js encodes no function key above F12 — a bare exotic key is dropped on the floor and
     the button goes silently dead. The modifier is what puts it on the wire."""
-    assert "Key:true" in serve._BACK_MODIFIER
-    assert serve._BACK_MODIFIER in _html()
+    assert "Key:true" in page.BACK_MODIFIER
+    assert page.BACK_MODIFIER in _html()
 
 
 def test_the_back_button_is_for_devices_with_no_keys() -> None:
@@ -263,19 +322,28 @@ def test_a_tap_does_not_raise_the_phones_keyboard() -> None:
 
 
 def test_the_keyboard_suppressor_survives_the_terminal_being_rebuilt() -> None:
-    """The textarea does not exist when the page loads, and is remade with the terminal."""
-    assert "MutationObserver" in _html()
+    """The textarea does not exist when the page loads, and is remade with the terminal.
+
+    An observer that is constructed and never started would satisfy a search for its name, so this
+    checks it is actually observing, and observing the whole document rather than one node that may
+    not exist yet."""
+    html = _html()
+    assert "new MutationObserver(f).observe(document.documentElement,{childList:true,subtree:true})" in html
 
 
 def test_autofit_sizes_the_font_to_the_games_fit_size() -> None:
-    """The page fits the layout the game *wants*, not the floor it merely survives."""
-    html = _html(fit=(110, 38))
+    """The page fits the layout the game *wants*, not the floor it merely survives.
+
+    Derived from the argument rather than hardcoded, so the test cannot drift away from the grid it
+    claims to check."""
+    cols, rows = 96, 31
+    html = _html(fit=(cols, rows))
     assert "fontsize" in html and "location.replace" in html
-    assert "c=touch?110:110" in html and "r=touch?38:38" in html
+    assert f"c=touch?{cols}:{cols}" in html and f"r=touch?{rows}:{rows}" in html
 
 
 def test_a_game_with_a_min_size_gets_a_too_small_gate() -> None:
-    min_w, min_h = serve._min_px(_MIN)
+    min_w, min_h = page.min_px(_MIN)
     html = _html(minimum=_MIN)
     assert "tc-toosmall" in html
     assert f"max-width:{min_w - 1}px" in html and f"max-height:{min_h - 1}px" in html
@@ -287,8 +355,12 @@ def test_a_game_without_a_min_size_gets_no_gate() -> None:
 
 
 def test_autofit_clamps_to_the_readable_font_range() -> None:
+    """Interpolating the constants back out of the page only proves they were interpolated. What
+    matters is the RELATION: a floor below the ceiling, and a floor a person can still read."""
+    assert page.MIN_FONT < page.MAX_FONT
+    assert page.MIN_FONT >= 5, "a font this small is a texture, not text"
     html = _html()
-    assert f"Math.max({serve._MIN_FONT}" in html and f"Math.min(a,b,{serve._MAX_FONT})" in html
+    assert f"Math.max({page.MIN_FONT}" in html and f"Math.min(a,b,{page.MAX_FONT})" in html
 
 
 def test_the_page_ships_no_controls_that_reload_the_session() -> None:

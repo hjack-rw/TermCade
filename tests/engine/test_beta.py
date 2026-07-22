@@ -127,11 +127,20 @@ async def test_a_passcode_holder_reaches_the_assets(client) -> None:
     assert (await client.get("/static/js/textual.js", allow_redirects=False)).status == 200
 
 
-def test_removing_a_line_locks_that_tester_out(server, codes_file) -> None:
-    """Revocation is editing the file — so the codes are re-read per request, never cached."""
-    assert _CODE in beta.load_codes(codes_file)
+async def test_removing_a_line_locks_that_tester_out(client, codes_file) -> None:
+    """Revocation is editing the file — so the codes are re-read per request, never cached.
+
+    Driven through the real client on purpose. The old version of this test called ``load_codes``
+    twice and asserted a file-reading function reads files, which is true of any implementation:
+    caching the set in ``BetaServer.__init__`` would have left it green while revocation quietly
+    stopped working — and revocation is the only reason the gate exists.
+    """
+    await client.get("/", params={"code": _CODE})
+    assert (await client.get("/", allow_redirects=False)).status == 200
+
     codes_file.write_text(_OTHER, encoding="utf-8")
-    assert _CODE not in beta.load_codes(codes_file)
+
+    assert (await client.get("/", allow_redirects=False)).status == 401
 
 
 def test_the_session_subprocess_is_told_its_own_data_dir(tmp_path) -> None:

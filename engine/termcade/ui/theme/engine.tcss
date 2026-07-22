@@ -224,13 +224,6 @@ GameLogScreen #log-entries {
     height: auto;
 }
 
-/* The touch player's way out. Mounted by `EngineScreen` only when the browser gateway reports a
-   touch device, so a terminal never sees it — there, Escape and the footer already do this job.
-   Full width because a thumb is a blunt instrument: the whole row is the target, not a word in it. */
-/* The Back button floats on its own layer, so it neither takes a row from the screen nor stretches
-   across it. Docked into the layout it either pushed the panels around or fell off the bottom of a
-   screen that fills its height; on a layer it just sits over the bottom-left corner, always on
-   screen, costing the layout nothing. */
 EngineScreen {
     /* Textual underlines every span carrying an `@click`, because it treats it as a link. Nothing in
        this game is a link — a clickable span is a move, an action, a chapter. Set once here for every
@@ -242,22 +235,6 @@ EngineScreen {
     link-background: initial;
     link-background-hover: initial;
 }
-.tc-back {
-    /* A full-width row docked to the bottom, with the label at its right end. Width 100% is the
-       whole point: there is no coordinate to compute and nothing to drift past, which is what went
-       wrong every other way this was tried — offsets and margins against a box the phone crops. */
-    dock: bottom;
-    offset: 0 -1;      /* clear of the Footer, which owns the last row */
-    width: 100%;
-    height: 1;
-    min-height: 1;
-    margin: 0;
-    padding: 0 1;
-    border: none;
-    content-align: right middle;
-    text-align: right;
-}
-
 /* --- Narrow (a phone) ----------------------------------------------------- */
 /* A menu's panel is sized for a desktop line: "You: Longest Wu Name  (5/4/3)" fits 48 columns with
    room to spare there, and runs past the edge on a phone. Narrow, the panel takes the width it has

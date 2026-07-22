@@ -164,10 +164,24 @@ class BrowserPlayer:
     def __init__(self, write_meta: Callable[[dict[str, object]], None]) -> None:
         self._write_meta = write_meta
         self._sent: set[str] = set()
+        self._alive = True
 
     def _send(self, message: dict[str, object]) -> None:
+        """Never raises, because this module's whole contract is that sound is not an error path.
+
+        The channel dies before the app does — a closed tab, a dropped socket, a session being torn
+        down — and `close()` runs during exactly that teardown. A click sounding into a dead pipe
+        must be silence, not an exception surfacing in the UI of a game that is already leaving.
+        """
+        if not self._alive:
+            return
         message["type"] = AUDIO_META
-        self._write_meta(message)
+        try:
+            self._write_meta(message)
+        except Exception:  # noqa: BLE001 — a dead channel is silence, like a missing sound card
+            # Latched, not retried per sound: once the page is gone every later call would raise
+            # too, and a chunked tune is hundreds of them.
+            self._alive = False
 
     def _ensure(self, pcm: bytes) -> str:
         """The page's key for these samples, transferring them first if it has not seen them."""

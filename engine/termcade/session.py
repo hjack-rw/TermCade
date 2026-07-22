@@ -12,8 +12,10 @@ the engine needs are not offered by upstream, and both live on the same seam:
   it does not recognise, which is every one of ours.
 
 ``Server.handle_websocket`` is mirrored rather than called because upstream names ``AppService``
-directly and offers no seam for either. ``textual-serve`` is hard-pinned in ``pyproject.toml`` for
-this class of patch; this must be re-read when that pin moves.
+directly and offers no seam for either. This is the one place the engine still depends on
+upstream's *shape* rather than its behaviour — but it depends on a Python API, so a change breaks
+loudly at import or attribute lookup instead of silently at render. ``pyproject.toml`` bounds
+``textual-serve`` to 1.x on the strength of that; the page itself no longer needs a hard pin.
 """
 
 from __future__ import annotations
@@ -58,9 +60,15 @@ class TermCadeAppService(AppService):
 
     async def on_meta(self, data: bytes) -> None:
         """Forward our own meta packets to the browser; everything else is upstream's business."""
+        # Anything that is not a JSON OBJECT is not ours, and must reach upstream unchanged rather
+        # than raising: `json.loads(b'[1,2]')` parses fine and returns a list, whose `.get` does not
+        # exist. That AttributeError propagates into the websocket loop and takes the whole session
+        # down — one malformed frame costing a player their run.
         try:
             payload = json.loads(data)
         except ValueError:
+            payload = {}
+        if not isinstance(payload, dict):
             payload = {}
         meta_type = payload.get("type", "")
         if isinstance(meta_type, str) and meta_type.startswith(_OURS):
