@@ -165,9 +165,9 @@ def _beast_for(duel: DuelState, live: Round) -> str | None:
 
 
 def _beast_offensive(stat: str, cards: list[Card], challenge: str | None) -> _CardsLine:
-    """Chase's Beast Form as the boost it is: ``Offensive: Beast Form (0/2/0) + <Wu> (-/-/-)`` — an
+    """Chase's Beast Form as the boost it is: ``Offensive: Beast Form (0/1/0) + <Wu> (-/-/-)`` — an
     element-free, uncoloured boost lifting his own Wu, which are nullified beside it (offence_negated,
-    struck like an Emperor Scorpion's victim). The +2 sits on the one stat he named."""
+    struck like an Emperor Scorpion's victim). BEAST_BOOST sits on the one stat he named."""
     tag = Text()
     tag.append("     Offensive: ", style="dim")
 

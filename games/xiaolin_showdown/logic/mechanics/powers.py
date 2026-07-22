@@ -185,7 +185,9 @@ RULES: dict[Mechanic, Rule] = {
         Mechanic.BEAST_FORM,
         "boost",  # it reads "On Boost" on his sheet — it IS a boost, just his own, not a Wu's
         Timing.IN_DUEL,
-        "Beast Form: once a showdown, +3 to the contested stat — element-free, beyond the reach of "
+        # The magnitude is `duel.BEAST_BOOST`, which cannot be imported here — `duel` imports this
+        # module. Keep the two in step by hand; the harness sweeps the constant, not this sentence.
+        "Beast Form: once a showdown, +1 to the contested stat — element-free, beyond the reach of "
         "any counter. His Wu score nothing while it holds; he wagers them, never wields them.",
     ),
     Mechanic.DRAGON: Rule(

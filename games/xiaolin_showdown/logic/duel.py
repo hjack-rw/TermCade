@@ -87,7 +87,7 @@ class DuelState:
     # The stat the BOT's training raised when this loss filled its bar, for the screen to report.
     # The player's payout is never taken here — the temple offers them the choice instead.
     bot_trained: str | None = None
-    # Chase Young's Beast Form (see logic/bot.choose_beast_form): the stat he boosts +3 this showdown.
+    # Chase Young's Beast Form (see logic/bot.choose_beast_form): the stat BEAST_BOOST lands on.
     # When set, his fielded Wu score NOTHING (offence_negated) — he wagers them, never wields them.
     beast_stat: str | None = None
     # Chase won the Wu and handed it to the duelist he beat ("The Good Guys Finish Last", see
@@ -273,8 +273,9 @@ class Duel:
             if not self._is_tournament():
                 self.duel.wager = await self.choices.wager(self._wager_options())
         self.duel.background_name = self._draw_place(self.duel.background)
-        # Chase Young decides now, the challenge known: go Beast Form (+2 on one stat, his Wu all
-        # dead) or field his Wu as an ordinary duelist and keep the prizes he wins. Chase ALONE.
+        # Chase Young decides now, the challenge known: go Beast Form (BEAST_BOOST on one stat, his
+        # Wu all dead, and he KEEPS what he wins) or field his Wu as an ordinary duelist — who gifts
+        # the prize on a win, see `_award_prize`. Chase ALONE.
         # Beast Form is once a fight — in a tournament he still boosts only one of the three stats.
         if self._is_chase(self.state.bot) and self.duel.challenge:
             contested = self._stat_names() if self._is_tournament() else [self.duel.challenge]
@@ -417,7 +418,7 @@ class Duel:
         )
 
     def _bot_base(self) -> dict[str, int]:
-        """The bot's base stats — Chase's Beast Form adds +2 to the stat it named, in the ONE battle
+        """The bot's base stats — Beast Form adds BEAST_BOOST to the stat it named, in the ONE battle
         that contests it. Like a boost: once a showdown, one stat, one battle (a tournament's other
         two legs see the plain 7/7/7).
 

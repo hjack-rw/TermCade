@@ -14,6 +14,7 @@ from rich.style import Style
 from rich.text import Text
 
 from ..logic.catalog import load_catalog
+from ..logic.duel import BEAST_BOOST
 from ..logic.mechanics.powers import (
     NAMED_STAT_VALUE,
     SCOPE_DEPTH,
@@ -254,7 +255,9 @@ EFFECTS = {
     Mechanic.WARD: "Your Wu of its element cannot be dragged down this battle.",
     Mechanic.TRANSFER: "Swap your entire hand with your opponent's.",
     Mechanic.WITCHCRAFT: "Spent Wu return to her hand, worn; her turn can recall the lost.",
-    Mechanic.BEAST_FORM: "+3 to the contested stat, element-free; his Wu score nothing.",
+    # Read off the constant, not typed out. This said "+3" while the duel dealt 1 — the card was
+    # lying to the player about a number the game had already measured and chosen.
+    Mechanic.BEAST_FORM: f"+{BEAST_BOOST} to the contested stat, element-free; his Wu score nothing.",
     Mechanic.READ_DECK: "Read your opponent's personal Deck.",
     Mechanic.SCRY: f"Look at the next {SCOPE_DEPTH} Wu in the incoming Wu pile.",
     Mechanic.ENHANCED_VISION: "Take or refuse the next Showdown's Initiative.",
@@ -296,7 +299,10 @@ def effect_line(power: Power, *, is_card: bool = True) -> str | None:
         if mechanic is Mechanic.WITCHCRAFT:
             return "Her spent Wu return to her; the lost answer her call."
         if mechanic is Mechanic.BEAST_FORM:
-            return "Takes Beast Form for +3, but wields no Wu; gifts the prize he wins."
+            # Was "+3 ... gifts the prize he wins" — wrong twice over. The beast KEEPS its prize;
+            # it is the ordinary Wu-play win that gifts one away (`duel._award_prize`), and that is
+            # the whole reason the mode is a choice worth making rather than a trap.
+            return f"Takes Beast Form for +{BEAST_BOOST}, but wields no Wu; keeps the prize he wins."
     return EFFECTS.get(mechanic)
 
 

@@ -26,9 +26,10 @@ from .mechanics.resolve import as_boost, resolve_played_power
 from .models import Card, Player
 from .turn import duel_value
 
-# Chase Young activates Beast Form's +2 only when a contested stat is close — his lead on it is
-# under the boost, so the +2 could decide the battle. Ahead by more, he keeps his raw stats and the
-# prize he would otherwise gift. Swept from the harness (XS_BEAST_MARGIN).
+# Chase Young activates Beast Form only when a contested stat is close — his lead on it is under
+# `duel.BEAST_BOOST`, so the boost could decide the battle. Ahead by more he stays an ordinary
+# duelist: his Wu score, and a win GIFTS the prize to the duelist he beat. Swept from the harness
+# (XS_BEAST_MARGIN).
 #
 # Since the beast KEEPS its prize (see the duel's `_award_prize`), beasting more makes him STRONGER,
 # monotonically: 0 (never) 5.5% player win, 2 -> 3.2%, 4 -> 2.5%, always -> 2.0% (n=600). Sweeps
@@ -41,12 +42,16 @@ BEAST_MARGIN = 3
 
 
 def choose_beast_form(chase: Player, opponent: Player, stats: Sequence[str]) -> str | None:
-    """Chase's per-showdown call: which contested stat to spend Beast Form's +2 on, or ``None``.
+    """Chase's per-showdown call: which contested stat to spend Beast Form on, or ``None``.
 
-    His Wu are dead weight regardless — Beast Form is only the +2, once a fight, on one stat, and
-    activating it FORFEITS the prize (see the duel's `_award_prize`). So he spends it only where a
-    battle is close: the tightest contested stat, where his base lead over the opponent's reach is
-    under the boost. Ahead by more on all of them, he keeps his raw stats and the prize.
+    Beast Form is `duel.BEAST_BOOST` on ONE stat, once a fight, and it deadens his Wu — they are
+    wagered, never wielded. What it does NOT cost him is the prize: the beast KEEPS what it wins,
+    and it is the ordinary Wu-play win that gifts the prize away (see the duel's `_award_prize`).
+    That is why beasting more makes him stronger, and why the margin below is the whole choice.
+
+    So he spends it where a battle is close: the tightest contested stat, where his base lead over
+    the opponent's reach is under the margin. Ahead by more on all of them, he fields his Wu like
+    anyone else — and gifts the prize if he wins.
 
     ``stats`` is the contested set — one stat for a challenge, all three for a tournament (he may
     still boost only one).
