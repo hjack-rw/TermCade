@@ -101,3 +101,37 @@ async def test_escape_still_leaves_a_hub_that_binds_it(make_app):
         await pilot.press(EngineScreen.BACK_KEY)
         await pilot.pause()
         assert isinstance(app.screen, _HubWithEscape), "the page's button is not escape"
+
+
+class _Replaces(EngineScreen):
+    """A screen that REPLACED what it came from, so popping it lands somewhere else entirely."""
+
+    went_back = False
+
+    def compose(self) -> ComposeResult:
+        yield Static("replaces", id="replaces")
+
+    def page_back(self) -> None:
+        self.went_back = True
+
+
+async def test_a_screen_decides_for_itself_what_going_back_means(make_app):
+    """Popping is the default, not the rule.
+
+    A duel replaces the temple rather than stacking on it, so popping one lands on the main menu and
+    throws the run away — there, back means Retreat. That distinction used to live in a handler for
+    the Back *widget*, and when the widget went away the page's button walked straight past it and
+    abandoned live runs.
+    """
+    app = make_app(_Root)
+    async with app.run_test() as pilot:
+        app.push_screen(_Replaces())
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, _Replaces)
+
+        await pilot.press(EngineScreen.BACK_KEY)
+        await pilot.pause()
+
+        assert screen.went_back, "the screen's own answer was not asked for"
+        assert app.screen is screen, "the default pop ran anyway and took the screen with it"

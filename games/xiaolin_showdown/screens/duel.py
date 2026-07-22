@@ -18,7 +18,7 @@ from rich.text import Text
 from termcade.ui.work import work
 from textual.app import ComposeResult
 from textual.content import ContentText
-from textual.widgets import Button, Footer, Header, Static
+from textual.widgets import Footer, Header, Static
 
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
@@ -70,16 +70,14 @@ class DuelScreen(XiaolinScreen):
     def on_mount(self) -> None:
         self._run_showdown()
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
+    def page_back(self) -> None:
         """Back here means Retreat, not "pop the screen".
 
         A duel *replaces* the temple (`switch_screen`), so popping it lands on the main menu and
         abandons the run — which is exactly what a player tapping Back is not asking for. Retreat
         walks back to the temple, and refuses once the showdown is committed.
         """
-        if event.button.id == self.BACK_ID:
-            event.stop()
-            self.action_retreat()
+        self.action_retreat()
 
     def action_continue(self) -> None:
         self._continue.set()

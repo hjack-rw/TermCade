@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import jinja2
@@ -165,6 +166,29 @@ def test_the_back_button_does_not_send_escape() -> None:
     A button whose only guard is hiding itself must never carry it."""
     html = _html()
     assert "'Escape'" not in html and "keyCode:27" not in html
+
+
+def test_the_back_key_is_one_xterm_actually_encodes() -> None:
+    """The gap every other Back-button test missed.
+
+    F24 was chosen first because no keyboard has one — and xterm.js has no case for any function key
+    above F12, so the button hid itself on tap and sent nothing at all. Every Python test still
+    passed: they press the key straight into Textual and never cross the terminal. This one reads the
+    encoding table out of the bundle we actually ship.
+    """
+    js = (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
+    assert f"case {serve._BACK_KEYCODE}:" in js, (
+        f"xterm.js cannot encode keyCode {serve._BACK_KEYCODE} — the Back button would be silent"
+    )
+
+
+def test_the_back_key_carries_its_modifier_down_the_wire() -> None:
+    """The modifier is not decoration: it is what distinguishes this from a bare F5 reload. xterm
+    only emits the modified form from the `a?` branch of that key's case."""
+    js = (_statics() / "js" / "textual.js").read_text(encoding="utf-8")
+    assert re.search(rf"case {serve._BACK_KEYCODE}:o\.key=a\?", js), (
+        "xterm encodes this key with no modifier branch, so shift is dropped on the way out"
+    )
 
 
 def test_the_back_button_carries_a_modifier() -> None:

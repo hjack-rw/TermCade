@@ -119,7 +119,17 @@ class EngineScreen(Screen[None]):
         event.stop()
         event.prevent_default()
         if self.BACK_ALLOWED and len(self.app.screen_stack) > 2:
-            self.app.pop_screen()
+            self.page_back()
+
+    def page_back(self) -> None:
+        """What this screen does when the page's Back button is pressed. Popping, by default.
+
+        Overridable because popping is not always what going back MEANS. A duel *replaces* the
+        temple rather than stacking on it, so popping one lands on the main menu and throws the run
+        away — there, back means Retreat. That distinction used to live in a handler for the Back
+        *widget*, which no longer exists, so the page button walked straight past it.
+        """
+        self.app.pop_screen()
 
     def on_mount(self) -> None:
         # Dispatch walks the MRO, so this runs even on a screen that defines its own `on_mount`.
