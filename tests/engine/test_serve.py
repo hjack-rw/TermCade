@@ -125,6 +125,34 @@ def test_the_two_faces_never_claim_the_same_character() -> None:
     assert not set(text) & set(symbols)
 
 
+def test_the_symbol_range_matches_the_font() -> None:
+    """``SYMBOL_RANGE`` is generated from the subset. Kept as a constant because the engine must not
+    need a font parser to serve a page — fontTools is a test dependency on purpose — so this is what
+    makes it a derived value rather than a second, rotting answer to what the file contains."""
+    from fontTools.ttLib import TTFont
+
+    spans: list[str] = []
+    previous: int | None = None
+    for point in sorted(TTFont(page.SYMBOL_FONT).getBestCmap()):
+        if previous is not None and point == previous + 1:
+            spans[-1] = f"{spans[-1].split('-')[0]}-{point:04X}"
+        else:
+            spans.append(f"U+{point:04X}")
+        previous = point
+
+    assert page.SYMBOL_RANGE == ", ".join(spans)
+
+
+def test_only_the_symbol_face_is_ranged() -> None:
+    """Two faces of one family are not reliably merged by coverage — the browser may settle on one
+    and let everything it lacks fall out of the family. Ranging the subset is what pins each file to
+    what it holds; ranging the text face too would leave a codepoint neither names with nowhere to
+    go but the system."""
+    css = page.shadowed_faces()
+    assert css.count("unicode-range") == 1
+    assert f"/static/{page.FONT.name}') format('truetype');font-display:block;}}" in css
+
+
 def test_nothing_else_answers_to_the_shadowed_name() -> None:
     """Upstream fetches Roboto Mono from Google. With both declarations live an ordinary letter
     could come from either, so the game's text face would be decided by a race."""

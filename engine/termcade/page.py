@@ -36,6 +36,26 @@ STOCK_STACK = '"Roboto Mono", menlo, monospace'  # the page's own CSS: intro dia
 # Symbol covers the icons); a phone has no such fallback and renders emoji or nothing.
 TERM_STACK = "'Roboto Mono', Monaco, 'Courier New', monospace"
 
+# Exactly what TermCadeSymbols.ttf contains, as a CSS `unicode-range`. Both faces are declared under
+# the stack's FIRST name, and this is what stops the subset — declared last — claiming the whole
+# family and starving every glyph it lacks. See `shadowed_faces` for why the second name is not an
+# option.
+#
+# Generated, never hand-edited: `test_the_symbol_range_matches_the_font` re-derives it from the file
+# with fontTools (a test dependency, deliberately not a runtime one — the engine must not need a
+# font parser to serve a page) and fails if the subset is rebuilt without refreshing this.
+SYMBOL_RANGE = (
+    "U+00A0-00FF, U+2000-200A, U+2010-2017, U+201A-201B, U+201E-2023, U+2026, U+202F-2037, "
+    "U+2039-203A, U+203C-203F, U+2045-2049, U+204B, U+205F, U+2070-2071, U+2074-208E, U+2090-209C, "
+    "U+2190-2211, U+2213, U+2215, U+2217-2220, U+2223, U+2227-222D, U+2234-223D, U+2241-2269, "
+    "U+226D-228B, U+228D-22A5, U+22B2-22B5, U+22B8, U+22C2-22C6, U+22CD-22D1, U+22DA-22E9, U+22EF, "
+    "U+2300-2306, U+2308-2315, U+2318-2319, U+231C-2321, U+2325-2328, U+232B, U+2335-237A, U+237D, "
+    "U+2380-2383, U+2388-238B, U+2395, U+239B-23AE, U+23CE-23CF, U+25A0-262E, U+2639-2653, "
+    "U+2655-2664, U+2666-268B, U+2690-269C, U+26A0, U+26B0-26B1, U+2701-2704, U+2706-2709, "
+    "U+270C-2727, U+2729-272A, U+272C-274B, U+274D, U+274F-2752, U+2756, U+2758-275E, U+2761-276B, "
+    "U+2772-2775, U+2794, U+2798-27AF, U+27B1-27BE, U+27DC"
+)
+
 # The two things we match in upstream's TEMPLATE. Both are hand-written HTML, which is the whole
 # point: they change when a person edits the page, not when a bundler re-minifies it. Matching
 # inside `textual.js` — which is what we used to do — meant any upstream rebuild could silently
@@ -485,15 +505,24 @@ def shadowed_faces() -> str:
     that would otherwise claim the same name is stripped from the page (see ``_templates_dir``) —
     with it present the two declarations both answer, and ordinary letters could come from either.
 
-    Two declarations of the same name, and NO ``unicode-range`` on either — because the two files
-    cannot disagree. The symbol subset is built to carry exactly the glyphs 0xProto lacks, so no
-    codepoint is claimed twice and the cascade has nothing to arbitrate. That is deliberate: with
-    overlapping faces the LAST declaration wins a shared codepoint, which would have handed every
-    box-drawing character to DejaVu and quietly redrawn every panel border in the game.
+    **Both files answer to the FIRST name in the stack, and the subset carries a ``unicode-range``.**
+    Two faces of one family do not combine their coverage on their own: CSS picks a single face per
+    family, so declared bare the subset won ``Roboto Mono`` outright and every glyph only 0xProto has
+    — `♔`, `☯`, the box drawing — fell out of the family to whatever the device owned. The range is
+    what makes the pair behave as one face: each is asked only for what it holds.
+
+    Declaring the subset as the stack's SECOND name instead looks tidier and does not work. A stack
+    falls through family by family for an ordinary glyph, but a codepoint the browser considers
+    emoji-capable — `⚙` is `Emoji=Yes` — is routed to the colour emoji font ahead of any later family
+    in the stack. So `⚙` never reached the subset and came back as an emoji, which is the exact bug
+    the embedded fonts exist to prevent. The first family has to cover everything.
+
+    ``SYMBOL_RANGE`` is generated from the file, not typed out — see the test that re-derives it.
     """
+    ranges = {SYMBOL_FONT: f"unicode-range:{SYMBOL_RANGE};"}
     return "".join(
         f"@font-face{{font-family:'Roboto Mono';src:url('/static/{path.name}') "
-        "format('truetype');font-display:block;}"
+        f"format('truetype');font-display:block;{ranges.get(path, '')}}}"
         for _, path in faces()
     )
 
