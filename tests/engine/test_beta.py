@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
-from termcade import beta, session
+from termcade import beta, session, web_driver
 from termcade.app.game import Game, GameContext
 
 _CODE = "beta-alpha-1"
@@ -164,4 +164,17 @@ def test_the_rest_of_the_environment_still_reaches_the_subprocess(tmp_path) -> N
         write_bytes=None, write_str=None, close=None, download_manager=None,
     )
 
-    assert service._build_environment()["TEXTUAL_DRIVER"].startswith("textual.drivers")
+    assert service._build_environment()["TERM_PROGRAM"] == "textual"
+
+
+def test_the_session_runs_the_engines_own_driver(tmp_path) -> None:
+    """Upstream's driver takes a resize and never lays the app out again — see
+    :mod:`termcade.web_driver`. The environment is where that substitution happens, so a session
+    quietly falling back to `textual.drivers.web_driver` is a phone that no longer survives being
+    turned over."""
+    service = session.TermCadeAppService(
+        "true", extra_env={beta.DATA_DIR_ENV: str(tmp_path)},
+        write_bytes=None, write_str=None, close=None, download_manager=None,
+    )
+
+    assert service._build_environment()["TEXTUAL_DRIVER"] == web_driver.DRIVER

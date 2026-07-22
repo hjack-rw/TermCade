@@ -28,6 +28,8 @@ from aiohttp import web
 from textual_serve.app_service import AppService
 from textual_serve.server import Server, to_int
 
+from termcade.web_driver import DRIVER
+
 log = logging.getLogger("termcade.session")
 
 TOUCH_ENV = "TERMCADE_TOUCH"
@@ -78,6 +80,10 @@ class TermCadeAppService(AppService):
 
     def _build_environment(self, width: int = 80, height: int = 24) -> dict[str, str]:
         environment = super()._build_environment(width=width, height=height)
+        # Textual chooses its driver by name from the environment, which is the seam that lets the
+        # engine fix a resize the stock driver queues without waking the app. See
+        # :mod:`termcade.web_driver` for what upstream does and why a phone is where it shows.
+        environment["TEXTUAL_DRIVER"] = DRIVER
         environment.update(self._extra_env)
         return environment
 
