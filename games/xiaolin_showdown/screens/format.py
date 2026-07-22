@@ -105,10 +105,26 @@ def char_stats(character: Character) -> str:
     return stats_line(character.stats)
 
 
-def display_name(name: str, *, upper: bool = False) -> str:
+# A name longer than this is shortened to its first word where space is scarce. The threshold is the
+# point of it: "Le Mime" is two words and seven characters, and "Le" is not a name — so the rule has
+# to fire on what a name COSTS, not on how many words it happens to have. At 10 it takes Salvador
+# Cumo, Hannibal Roy Bean and Chase Young, all of whom are known by their first name, and leaves
+# Le Mime whole.
+SHORTEN_OVER = 10
+
+
+def display_name(name: str, *, upper: bool = False, short: bool = False) -> str:
     """A stored name shown for humans: underscores become spaces (``Salvador_Cumo`` -> ``Salvador Cumo``).
-    ``upper`` shouts it for a heading, keeping the underscore rule in one place."""
+    ``upper`` shouts it for a heading, keeping the underscore rule in one place.
+
+    ``short`` asks for the first word alone, and is honoured only for a name long enough to be worth
+    it (see ``SHORTEN_OVER``). A phone is the caller: the temple's state row has about 86 columns to
+    spend and a full name pushes Deck and Initiative off the end entirely — they truncate to
+    ``Deck:…`` and ``Initiative: …``, which is a label costing the value it was there to introduce.
+    """
     shown = name.replace("_", " ")
+    if short and len(shown) > SHORTEN_OVER:
+        shown = shown.split(" ", 1)[0]
     return shown.upper() if upper else shown
 
 

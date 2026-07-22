@@ -124,6 +124,22 @@ TempleScreen > #hands {
     height: auto;
 }
 
+/* A phone spends its width on the game, not on margins. Measured on a 110-column landscape phone:
+   the 84% panel and the 8-column inset together left the duelist row 70 columns to work in, and it
+   needs about 90 — so Deck and Initiative truncated to their own labels, and the longer a duelist's
+   name the worse it read. Both are comfortable on a desktop, where the margins are what stop a wide
+   window turning the row into a stretched-out line; a phone has no width to spare for that.
+
+   Keyed on `-touch`, not on a breakpoint. A landscape phone reports 110 columns — more than some
+   laptops — so it lands in `-wide` and no width rule ever fires for it. The device knows. */
+TempleScreen.-touch > BoxedPanel,
+TempleScreen.-touch > #hands {
+    width: 100%;
+}
+TempleScreen.-touch #state {
+    padding: 0 1;
+}
+
 /* Narrow terminals (engine breakpoint `-narrow`): the hand panels can't sit side by side. */
 TempleScreen.-narrow > BoxedPanel,
 TempleScreen.-narrow > #hands {

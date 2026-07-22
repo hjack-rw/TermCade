@@ -7,6 +7,7 @@ are emphasised, and the whole screen rebuilds on return so deposits and draws sh
 
 from __future__ import annotations
 
+import os
 from typing import Literal
 
 from rich.cells import cell_len
@@ -14,11 +15,14 @@ from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 from termcade.ui.work import work
+from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
+from textual.geometry import Size
 from textual.widgets import Footer, Header
 
+from termcade.ui.screens.base import TOUCH_ENV
 from termcade.ui.screens.log import GameLogScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic, render_bar
@@ -76,7 +80,19 @@ class TempleScreen(XiaolinScreen):
     # narrow screen always rebuilt itself mid-mount, tearing down a Header that was still building.
     _bars_were_compact = False
 
-    def _compact_bars(self) -> bool:
+    @property
+    def _short_names(self) -> bool:
+        """Whether to show a duelist by their first name alone.
+
+        The DEVICE answers this, not the width — the same reason the Back button asks. A phone in
+        landscape reports 110 columns, more than some laptops, and the state row still cannot afford
+        "SALVADOR CUMO": at that width the full name pushes Deck and Initiative past the edge and
+        both truncate to their labels. A desktop at 110 columns has the same row and does not need
+        the help, because nothing about it is going to get narrower.
+        """
+        return bool(os.environ.get(TOUCH_ENV))
+
+    def _compact_bars(self, size: Size | None = None) -> bool:
         """Whether the training bars should be a percentage instead of a bar.
 
         Portrait is an ASPECT RATIO, not a width. Column counts were tried twice and both were
@@ -84,20 +100,25 @@ class TempleScreen(XiaolinScreen):
         screen and 107 on a larger one, and any threshold picked from that lands on the wrong side
         of somebody's phone. A grid only 1.4 times wider than it is tall is a phone stood upright;
         landscape and every desktop are 4 times wider.
+
+        ``size`` is the shape to judge, and a resize MUST pass the one its event carries. Reading
+        ``app.size`` there answers with the size the app still had when the handler ran, which on a
+        rotation is the shape being left behind — so the temple compared the new orientation against
+        itself, found nothing had changed, and stayed in the layout it was already in.
         """
-        size = self.app.size
+        size = size if size is not None else self.app.size
         if not size.height:
             return False
         return size.width / size.height < _PORTRAIT_RATIO
 
-    def on_resize(self) -> None:
+    def on_resize(self, event: events.Resize) -> None:
         """Rebuild when a rotation crosses the breakpoint, and only then.
 
         The bars are Rich text baked at compose time, so unlike the stylesheet they do not reflow on
         their own. Guarded on the value actually changing: a resize arrives as a burst, and
         rebuilding the temple on every one of them would tear the screen apart while a phone turns.
         """
-        compact = self._compact_bars()
+        compact = self._compact_bars(event.size)
         if compact != self._bars_were_compact:
             self._bars_were_compact = compact
             self.rebuild()
@@ -141,7 +162,8 @@ class TempleScreen(XiaolinScreen):
             self._bars_were_compact = self._compact_bars()
             yield TooltipStatic(
                 _state_grid(
-                    player, bot, init_player, init_bot, compact=self._bars_were_compact
+                    player, bot, init_player, init_bot,
+                    compact=self._bars_were_compact, short_names=self._short_names,
                 ),
                 id="state",
             )
@@ -362,7 +384,15 @@ def _summary_line(
     return line
 
 
-def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int, *, compact: bool = False) -> Table:
+def _state_grid(
+    player: Player,
+    bot: Player,
+    init_player: int,
+    init_bot: int,
+    *,
+    compact: bool = False,
+    short_names: bool = False,
+) -> Table:
     # The Wu behind each initiative: this duelist's own buffs plus the opponent's debuffs, which is
     # why a card in your bracket may be sitting in their hand.
     player_sources, bot_sources = initiative_sources(player, bot)
@@ -392,7 +422,7 @@ def _state_grid(player: Player, bot: Player, init_player: int, init_bot: int, *,
     for label, duelist, init, sources in rows:
         char = duelist.character
         name = Text(f"{affiliation_icon(char)} ")
-        name.append(display_name(char.name, upper=True), style="bold")
+        name.append(display_name(char.name, upper=True, short=short_names), style="bold")
         name.append(f" ({char_stats(char)})", style="dim")  # stats in brackets, next to the name
         # The two rows share one Static, so a widget-level tooltip could not tell them apart — the
         # bonuses ride on this cell's own span instead (see TooltipStatic). Always tagged, even with
@@ -472,7 +502,10 @@ def _action_cell(entry: str, blocked: dict[str, str | None]) -> Text:
 
 
 def _hand_panel(character_name: str, rows: list[Text]) -> BoxedPanel:
-    title = f"{display_name(character_name, upper=True).split(' ')[0]}'S HAND"
+    # Always the short form — two of these titles sit side by side, so the panel has never had room
+    # for a full name at any width. Through `display_name` rather than a bare split on the space:
+    # the split turned "Le Mime" into "LE'S HAND", which is not a name and not an abbreviation.
+    title = f"{display_name(character_name, upper=True, short=True)}'S HAND"
     # All rows in one widget so the panel centres them as a block (rows stay left-aligned within
     # it) — a TooltipStatic, so each row's own wear tooltip answers on hover (see format._rows).
     return BoxedPanel(TooltipStatic(Text("\n").join(rows), classes="hand-block"), title=title)
