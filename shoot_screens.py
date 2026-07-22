@@ -10,7 +10,7 @@ dealt board identical between runs, so a picture that changes means the UI chang
 fallback and no shaping: a CSS list resolves to nothing, variation selectors draw as tofu, and the
 astral-plane icons come out blank. A browser does all three — and it is the engine `serve.py` already
 ships the game in, so the picture is what a browser player actually sees. The fonts must be INSTALLED
-(the browser reads system fonts, not `fonts/` in the repo).
+(the browser reads system fonts, not the bundled ones under `engine/termcade/assets/`).
 
 Two phases, and they cannot be interleaved: Textual drives an asyncio loop, and Playwright's sync API
 refuses to run inside one. So every SVG is captured first, then rasterised after the loop closes.

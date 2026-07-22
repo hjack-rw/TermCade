@@ -24,7 +24,7 @@ serve = ["textual-serve~=1.1"]
 # fonts are built once and committed — but without it that test cannot run, and a skipped coverage
 # test is the same silence as the vacuous one it replaced.
 dev = [
-    "pytest", "pytest-asyncio", "textual-dev", "ruff", "mypy", "textual-serve~=1.1", "fonttools",
+    "pytest", "pytest-asyncio", "textual-dev", "ruff", "mypy", "textual-serve~=1.1", "fonttools", "pytest-playwright",
 ]
 # Build the standalone double-click executable (see build_launcher.py). Pillow is here rather than
 # in the runtime deps because only `make_icon.py` needs it — the game never imports it.
@@ -42,11 +42,23 @@ packages = ["engine/termcade", "games/xiaolin_showdown"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# The browser tests are deselected by DEFAULT and run as their own pass — not because they are
+# optional, but because they cannot share a session with the rest. Playwright's sync API holds an
+# event loop open, and pytest-asyncio's async tests then cannot start one:
+#   RuntimeError: Runner.run() cannot be called from a running event loop
+# So: `pytest` for the suite, `pytest -m browser` for the browser. CI runs both, and fails if the
+# second one collects nothing.
+addopts = "-m 'not browser'"
 # A test either exercises the rules or it drives the app. The second kind boots a real Textual
 # app per test and costs ~50x the first, so it is marked and can be left out of a working loop:
 #   pytest -m "not slow"   the rules, in about a second
 #   pytest                 everything, before you commit
-markers = ["slow: boots a real Textual app (screens, save/load, whole-game flows)"]
+markers = [
+    "slow: boots a real Textual app (screens, save/load, whole-game flows)",
+    # The only tests that cross the terminal. Everything else checks the page as a string, which
+    # is how a Back button that xterm.js silently refused to encode passed a green suite.
+    "browser: drives a real browser against a real server (needs playwright + chromium)",
+]
 
 [tool.ruff]
 line-length = 100

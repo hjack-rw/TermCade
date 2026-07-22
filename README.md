@@ -91,10 +91,10 @@ tap or keypress rather than on load. On iOS the hardware mute switch silences it
 
 ## Fonts
 
-Games draw their board with plain Unicode symbols picked for *text* (monochrome) presentation. The icons render as monochrome glyphs anywhere a font covers them; the only catch is that a bare terminal font can lack a glyph and show tofu (☐). A monospace font with good symbol coverage is bundled under `fonts/`:
+Games draw their board with plain Unicode symbols picked for *text* (monochrome) presentation. The icons render as monochrome glyphs anywhere a font covers them; the only catch is that a bare terminal font can lack a glyph and show tofu (☐). A monospace font with good symbol coverage is bundled under `engine/termcade/assets/`, which is also where the browser build reads it from:
 
 - `0xProtoNerdFont-Regular.ttf` — [0xProto](https://github.com/0xType/0xProto), SIL Open Font License
-- `TermCadeSymbols.ttf` — a subset of [DejaVu Sans Mono](https://dejavu-fonts.github.io/) (see `DejaVu-LICENSE`) covering the punctuation, arrow, technical, box, shape and symbol blocks 0xProto leaves out
+- `TermCadeSymbols.ttf` — a subset of [DejaVu Sans Mono](https://dejavu-fonts.github.io/) (see `DejaVu-LICENSE`, alongside it) covering the punctuation, arrow, technical, box, shape and symbol blocks 0xProto leaves out
 
 Install the first and select it in your terminal to play locally. The few glyphs it misses (the gear, the arrows, the dashes) resolve through whatever your system offers.
 

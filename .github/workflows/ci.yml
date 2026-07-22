@@ -18,6 +18,12 @@ jobs:
       - name: Install (editable + dev extras)
         run: pip install -e ".[dev]"
 
+      # The browser tests are the only ones that cross xterm.js. Without this they SKIP, and a
+      # skipped test is the same silence as a test that never checked anything — which is how a
+      # Back button that sent an unencodable key once passed a fully green suite.
+      - name: Install chromium for the browser tests
+        run: playwright install --with-deps chromium
+
       - name: Ruff
         run: ruff check .
 
@@ -26,3 +32,19 @@ jobs:
 
       - name: Pytest
         run: pytest -q
+
+      # Its own pass: playwright's sync API holds an event loop, which pytest-asyncio's async tests
+      # cannot then start one inside. `-m browser` is deselected by default for that reason, so it
+      # has to be asked for explicitly or it silently never runs.
+      - name: Pytest (browser)
+        run: pytest -m browser -q
+
+      # A guard on the guard. If playwright or chromium ever goes missing, the step above would
+      # collect nothing and pass — the same silence that let a dead Back button ship green.
+      - name: Fail if the browser tests collected nothing
+        run: |
+          collected=$(pytest -m browser --collect-only -q | tail -1)
+          echo "$collected"
+          case "$collected" in
+            "no tests ran"*|"0 tests collected"*|"") echo "::error::browser tests did not run"; exit 1 ;;
+          esac
