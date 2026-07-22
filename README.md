@@ -19,7 +19,7 @@ The engine layers with a one-directional purity boundary — `core` (TUI-agnosti
 
 **Controls:** click any option, or drive it from the keyboard — **Tab** enters focus mode (highlights the first option; press Tab again to leave it), then **↑ / ↓** move the highlight and **Enter** selects. In-game actions also have single-key shortcuts, shown along the footer.
 
-**On a phone** there is no keyboard and none is needed: tap an option, drag up or down to scroll, and swipe sideways to turn a page in the Lore book. The arcade pushbutton in the corner is Back — it appears only on a screen that has somewhere to go, and only on a touch device.
+**On a phone** there is no keyboard and none is needed — focus mode is hidden there rather than advertised as a key nobody can press. Tap an option, drag up or down to scroll, and swipe sideways to turn a page in the Lore book. The arcade pushbutton in the corner is Back — it appears only on a screen that has somewhere to go, and only on a touch device.
 
 ## Play — no terminal, no Docker
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from array import array
 from pathlib import Path, PurePath
 from typing import Any
@@ -19,7 +20,7 @@ from termcade.core import audio, music
 from termcade.core.audio import MUSIC_OPTION, SFX_OPTION, make_player
 from termcade.core.music import Style
 
-from .screens.base import EngineScreen
+from .screens.base import TOUCH_ENV, EngineScreen
 from .theme import TERMCADE_THEME
 from .typography import spaced_dashes
 
@@ -131,8 +132,18 @@ class EngineApp(App[None]):
         the key is always listed and is only *live* where focus has somewhere to go — which is the
         honest compromise: a player learns the key exists, and the screen tells them when it does
         nothing here.
+
+        ``False`` removes it outright, and that is what a touch session gets. Focus mode is a way to
+        drive the game with keys a phone does not have: there is no Tab to enter it with and no
+        arrows to move inside it, so advertising it spends a slot in a footer that is already the
+        most crowded row on a 6cm screen. Tapping the thing you want was always the better answer
+        there — focus mode exists for the players who cannot do that.
         """
         if action == "toggle_focus":
+            # Hides the key. It does NOT disable it — this binding is priority, and a priority
+            # binding runs without asking. The action itself refuses; see action_toggle_focus.
+            if os.environ.get(TOUCH_ENV):
+                return False
             return True if self.screen.focus_chain else None
         return True
 
@@ -321,11 +332,31 @@ class EngineApp(App[None]):
 
     def action_toggle_focus(self) -> None:
         """Tab toggles keyboard-nav mode: focus the first option if nothing is focused, or clear focus
-        (step out of the mode) if something already is."""
+        (step out of the mode) if something already is.
+
+        Refused outright on a touch session, and the guard has to be HERE rather than in
+        ``check_action``: this binding is ``priority=True``, and a priority binding runs without
+        consulting the check. Hiding the key from the footer therefore left it fully live — pressed
+        from a tablet's keyboard case it would drop a player into a mode with no visible way out,
+        since the footer no longer advertises the key that leaves it.
+        """
+        if os.environ.get(TOUCH_ENV):
+            return
         if self.screen.focused is None:
             self.screen.focus_next()
         else:
             self.screen.set_focus(None)
+
+    def action_focus_next(self) -> None:
+        """The arrows move *within* focus mode, so they are off wherever the mode is."""
+        if os.environ.get(TOUCH_ENV):
+            return
+        self.screen.focus_next()
+
+    def action_focus_previous(self) -> None:
+        if os.environ.get(TOUCH_ENV):
+            return
+        self.screen.focus_previous()
 
     def on_resize(self) -> None:
         # A drag-resize fires a burst of events; coalesce to one check after it settles, so we never

@@ -13,12 +13,22 @@ screen's. A test that cannot see what the player sees will happily bless a key n
 from __future__ import annotations
 
 import pytest
-from textual.widgets import Input, Static
+from textual.widgets import Footer, Input, Static
+from textual.widgets._footer import FooterKey
 
 from termcade.app.game import Game
 from termcade.core.settings import Settings
 from termcade.ui.app import EngineApp
-from termcade.ui.screens.base import EngineScreen
+from termcade.ui.screens.base import TOUCH_ENV, EngineScreen
+
+
+class _WithFooter(EngineScreen):
+    """A screen that actually draws a Footer, so the test can read what the player is offered."""
+
+    def compose(self):
+        yield Input(id="one")
+        yield Input(id="two")
+        yield Footer()
 
 
 class _Focusable(EngineScreen):
@@ -111,3 +121,35 @@ async def test_pressing_it_again_leaves_focus_mode(app):
         await pilot.pause()
 
         assert pilot.app.screen.focused is None
+
+
+async def test_a_phone_is_not_offered_focus_mode(make_app, monkeypatch):
+    """Focus mode is a way to drive the game with keys a phone does not have — no Tab to enter it,
+    no arrows to move inside it. Advertising it spends a slot in the most crowded row on a 6cm
+    screen, and the footer is the only place the game tells a player what it can do."""
+    monkeypatch.setenv(TOUCH_ENV, "1")
+    app = make_app(_WithFooter)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        keys = {key.key for key in app.screen.query_one(Footer).query(FooterKey)}
+        assert "tab" not in keys, f"the phone is still shown a key it cannot press: {keys}"
+
+        # And it must be OFF, not merely hidden. `check_action` returning False does not stop a
+        # `priority=True` binding — hiding the key alone left Tab fully live, which on a tablet with
+        # a keyboard case drops the player into a mode whose exit is no longer advertised.
+        await pilot.press("tab")
+        await pilot.pause()
+        assert app.focused is None, "focus mode still fires on a touch session"
+        await pilot.press("down")
+        await pilot.pause()
+        assert app.focused is None, "the arrows still move focus on a touch session"
+
+
+async def test_a_terminal_still_gets_it(make_app):
+    """The other half of the claim — this must be a touch concession, not a removal."""
+    app = make_app(_WithFooter)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("tab")
+        await pilot.pause()
+        assert app.focused is not None, "focus mode stopped working where it is the only way to nav"
