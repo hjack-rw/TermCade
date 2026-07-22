@@ -73,6 +73,45 @@ def test_each_mechanic_states_its_rule(rule):
     assert isinstance(rule.timing, Timing)
 
 
+# --- the tables a new mechanic must also be added to --------------------------------
+#
+# `RULES` is guarded above: a card whose mechanic has no rule shouts. But a mechanic can HAVE a rule
+# and still fall out of one of the downstream tables that turn it into behaviour and words — the
+# handler that runs it, the report it fills, the blurb the player reads. Miss one and the Wu loads,
+# has a rule, and quietly does less than the rule promises. Each guard below derives what a table
+# should hold from `RULES.trigger` — the single source of truth for how a Wu is triggered — so
+# adding a mechanic without wiring its table fails here instead of in a player's hands.
+
+
+def _triggering(trigger: str) -> set[Mechanic]:
+    return {m for m, rule in RULES.items() if rule.trigger == trigger}
+
+
+def test_every_temple_power_has_a_handler_and_a_report():
+    """A ``use`` Wu is spent at the temple to DO something — that something is a ``_FIRE`` handler,
+    and what it tells the player is its ``REPORTS`` row. The one exception is the Gamble, which is
+    not *acted*: it is banked for a random score it never announces, so it has neither."""
+    from xiaolin_showdown.logic.power_effects import REPORTS, _FIRE
+
+    acted = _triggering("use") - {Mechanic.GAMBLE}
+    assert set(_FIRE) == acted, "a temple power has no handler (or a handler outlived its mechanic)"
+    assert set(REPORTS) == set(_FIRE), "a handler runs with no words to report — REPORTS drifted"
+
+
+def test_every_mechanic_a_player_can_meet_has_a_blurb():
+    """``EFFECTS`` is the one-line the card face shows. Everything printed needs one except the four
+    with nothing to say: FILLER does nothing, INITIATIVE and INNATE are read straight off the stats,
+    and the GAMBLE deliberately shows ``?`` rather than name its own odds."""
+    from xiaolin_showdown.screens.format import EFFECTS
+
+    silent = {Mechanic.FILLER, Mechanic.INITIATIVE, Mechanic.INNATE, Mechanic.GAMBLE}
+    printed = set(Mechanic) - UNPRINTED - silent
+    missing = printed - set(EFFECTS)
+    assert not missing, "a mechanic a player can meet has no card blurb: " + ", ".join(
+        m.name for m in missing
+    )
+
+
 # --- the in-duel mechanics, resolved through the real card DB --------------------
 
 SILVER_MANTA_RAY = 1  # boost/0, dragon element

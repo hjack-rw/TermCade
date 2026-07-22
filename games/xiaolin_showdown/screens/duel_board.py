@@ -14,7 +14,7 @@ from rich.text import Text
 
 from ..logic.battle import Round, Side
 from ..logic.constants import TOURNAMENT, TOURNAMENT_BATTLES
-from ..logic.duel import BEAST_BOOST, DuelState
+from ..logic.duel import BEAST_BOOST, BOOST, CARD, COMMITMENT, END, RESOLVEMENT, SETUP, DuelState
 from ..logic.mechanics.cards import is_one_of
 from ..logic.mechanics.powers import is_boost_slot
 from ..logic.mechanics.scoring import contributing, element_score
@@ -41,22 +41,24 @@ def _wager_label(wager: int) -> str:
     return f"{wager} vs {wager}"
 
 
-_SETUP_STAGE = 2  # named for what *you* do there: pick the challenge, or answer with the background
-
+# Keyed by the stage machine's own constants (imported from `duel`), never by the bare integers.
+# Written out as `{0: "End", 1: ...}` this was a second, silent copy of `range(6)`: reorder the
+# stages there and the board would keep the old labels, naming Boost as Card and nobody the wiser.
+# SETUP is absent on purpose — it has two names depending on who moved, handled below.
 _PHASE_NAMES = {
-    0: "End",
-    1: "Commitment",
-    3: "Boost",
-    4: "Card",
-    5: "Resolvement",
+    END: "End",
+    COMMITMENT: "Commitment",
+    BOOST: "Boost",
+    CARD: "Card",
+    RESOLVEMENT: "Resolvement",
 }
 
 
 def _phase_name(duel: DuelState) -> str:
-    # stage 0 is reused: the fresh pre-showdown board (no winner yet) vs the closing end phase.
-    if duel.stage == 0 and duel.winner_character is None:
+    # END is reused: the fresh pre-showdown board (no winner yet) vs the closing end phase.
+    if duel.stage == END and duel.winner_character is None:
         return "Gong Yi Tanpai!"
-    if duel.stage == _SETUP_STAGE:
+    if duel.stage == SETUP:
         # Setup is one stage but two moves: the priority holder names the contested stat, the other
         # answers with the element. Title it with the move *this* duelist made.
         return "Challenge" if duel.player_priority else "Background"

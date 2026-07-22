@@ -292,6 +292,28 @@ async def test_reaching_the_point_limit_ends_the_game_instead_of_dueling(tmp_pat
         assert isinstance(app.screen, OutcomeScreen)  # the run ends now, no extra duel
 
 
+async def test_a_subset_run_ends_at_its_own_target_not_the_settings_default(tmp_path):
+    """The reason ``win_target`` exists — and the bypass it kept catching. A run dealt a subset pool
+    carries its own lower ``point_limit`` on the state; the win check must read THAT, not the
+    settings default. Reading ``rules.point_limit`` instead left a subset run playing on past its
+    own finish, which is exactly what two of the three win checks used to do."""
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
+    async with app.run_test(size=(150, 60)) as pilot:
+        from xiaolin_showdown.logic.settings import XiaolinSettings
+
+        await _boot(app, pilot)
+        await _new_game_at_vault(app, pilot)
+        rules = XiaolinSettings.from_settings(app.ctx.settings.current)
+        assert rules.point_limit > 6, "the default must sit above the subset target to test"
+        app.ctx.state.point_limit = 5  # a subset pool dealt a lower finish line
+        app.ctx.state.player.points = 6  # past it, but below the settings default
+
+        await pilot.press("1")  # Gong Yi Tanpai
+        await pilot.pause()
+
+        assert isinstance(app.screen, OutcomeScreen), "the run ignored its own point_limit"
+
+
 async def test_depositing_a_power_wu_asks_to_confirm_first(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:  # tall enough that every card button is on-screen

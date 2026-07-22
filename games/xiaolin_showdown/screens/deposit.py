@@ -52,7 +52,7 @@ class DepositScreen(XiaolinMenu):
             # A deposit raises no toast (you watch the points move), so the log must be told.
             self.ctx.journal.add(f"You deposited {card.name} for {paid} pts.", title=your_move(VAULT))
 
-        if self.state.player.points >= self.rules.point_limit:
+        if self.state.player.points >= self.state.win_target(self.rules):
             self.end_run()
         else:
             self.app.pop_screen()

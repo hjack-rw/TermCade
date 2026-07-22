@@ -226,7 +226,9 @@ class TempleScreen(XiaolinScreen):
 
     def action_gong_yi_tanpai(self) -> None:
         state = self.state
-        if state.has_ended or max(state.player.points, state.bot.points) >= self.rules.point_limit:
+        if state.has_ended or max(state.player.points, state.bot.points) >= state.win_target(
+            self.rules
+        ):
             self.end_run()  # someone is already at the limit — no more duels
             return
 
