@@ -76,7 +76,10 @@ class SettingsScreen(XiaolinScreen):
             yield Button(_difficulty_label(self._difficulty), id="difficulty")
             yield Button(_music_label(self._music), id="music")
             yield Button(_sfx_label(self._sfx), id="sfx")
-            yield Button("Save", id="save", variant="primary")
+        # OUTSIDE the panel: the panel scrolls once the rows outgrow it, and Save was its last child,
+        # so on a short screen the only way to commit the changes scrolled out of sight. Out here it
+        # keeps its place at the bottom however far the settings themselves are scrolled.
+        yield Button("Save", id="save", variant="primary")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

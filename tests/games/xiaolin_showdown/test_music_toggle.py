@@ -52,6 +52,10 @@ async def test_saving_with_music_off_persists_the_option(tmp_path):
         await pilot.pause()
 
         app.screen.query_one("#music", Button).press()
+        # Save sits OUTSIDE the settings panel, one hop shallower than the toggles, so its bubbled
+        # Pressed overtakes theirs when both are sent in a single tick. A player cannot do that —
+        # every tap drains the queue — so the pause is what makes this the sequence a player makes.
+        await pilot.pause()
         app.screen.query_one("#save", Button).press()
         await pilot.pause()
 
@@ -68,6 +72,10 @@ async def test_turning_music_off_stops_it_there_and_then(tmp_path):
         await pilot.pause()
 
         app.screen.query_one("#music", Button).press()
+        # Save sits OUTSIDE the settings panel, one hop shallower than the toggles, so its bubbled
+        # Pressed overtakes theirs when both are sent in a single tick. A player cannot do that —
+        # every tap drains the queue — so the pause is what makes this the sequence a player makes.
+        await pilot.pause()
         app.screen.query_one("#save", Button).press()
         await pilot.pause()
 

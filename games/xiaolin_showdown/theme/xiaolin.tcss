@@ -119,9 +119,12 @@ DuelScreen.-narrow > BoxedPanel {
 SettingsScreen BoxedPanel {
     width: 44;  /* wider than the rows so align-horizontal has room to centre them */
     height: auto;
-    max-height: 90%;
+    /* Leaves room for Save, which lives outside the panel now — at 90% a short screen gave the
+       panel everything and pushed the button off the bottom, which is the problem it was moved
+       out to solve. */
+    max-height: 80%;
     overflow-y: auto;
-    align-horizontal: center;  /* centre the setting rows and the Save button */
+    align-horizontal: center;  /* centre the setting rows */
 }
 SettingsScreen .setting-row {
     height: 1;
@@ -138,16 +141,19 @@ SettingsScreen Input {
     border: none;
     background: $boost;
 }
-/* The toggles sit under the numeric rows, above Save; they cycle rather than submit. One width for
-   both, wide enough for the longer label — auto-sizing them would size each to its own text and
-   leave two buttons of different lengths stacked on each other. */
+/* The toggles sit under the numeric rows, at the end of the panel; they cycle rather than submit.
+   One width for both, wide enough for the longer label — auto-sizing them would size each to its own
+   text and leave two buttons of different lengths stacked on each other. */
 SettingsScreen #difficulty,
 SettingsScreen #music,
 SettingsScreen #sfx {
     width: 28;
     margin-top: 1;
 }
+/* Sits below the panel, not in it, so scrolling the settings never takes it away. Same width as the
+   toggles so the column still reads as one stack despite the border between them. */
 SettingsScreen #save {
+    width: 28;
     margin-top: 1;
 }
 
