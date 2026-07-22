@@ -114,8 +114,12 @@ class LoreScreen(XiaolinScreen):
             # The number IS the key that opens the chapter — and a phone has no number
             # row, so the line itself opens it too: the same span the key would trigger.
             start = len(text.plain)
-            text.append(f"      {number}", style="bold")
-            text.append(f"    {chapter.title}\n\n")
+            # ONE styled run for the whole row, number included. Styled separately — the number bold,
+            # the title plain — they render as two segments, and the hover highlight follows the
+            # segment under the cursor rather than the clickable span: the row lit up from the title
+            # onwards and left its own number outside the highlight, looking like the number was not
+            # part of the target. It always was; only the lighting disagreed.
+            text.append(f"      {number}    {chapter.title}\n\n", style="bold")
             text.stylize(
                 Style(meta={"@click": f"screen.chapter({number - 1})"}),
                 start,
