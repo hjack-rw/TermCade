@@ -154,12 +154,22 @@ def test_the_back_button_carries_a_modifier() -> None:
     assert serve._BACK_MODIFIER in _html()
 
 
+def test_the_back_button_is_for_devices_with_no_keys() -> None:
+    """A desktop browser has Escape and a footer that says so, which makes a moulded plastic button
+    over the terminal pure decoration. Hidden by default, so a browser that cannot answer the media
+    query gets the keyboard's UI rather than a control it does not need."""
+    html = _html()
+    assert "@media (pointer: coarse)" in html
+    fab = html[html.index("#tc-back-fab{position:fixed") :]
+    assert fab.index("#tc-back-fab{display:none}") < fab.index("@media (pointer: coarse)")
+
+
 def test_the_back_button_hides_itself_the_moment_it_is_tapped() -> None:
     """Not the guard — that is in the app — but it stops a fast finger queueing presses down a
     channel whose answer is a round trip away."""
     html = _html()
-    back = html[html.index("tc-back-fab") :]
-    assert "b.style.display='none'" in back[: back.index("</script>")]
+    back = html[html.index("<button id='tc-back-fab'") :]
+    assert "b.hidden=true" in back[: back.index("</script>")]
 
 
 def test_the_page_can_play_the_games_sound() -> None:

@@ -163,21 +163,46 @@ def _back_overlay() -> str:
     whose answer is a round trip away.
     """
     return (
-        "<style>#tc-back-fab{position:fixed;right:12px;bottom:12px;z-index:99998;"
-        "font-size:15px;padding:10px 16px;border-radius:8px;"
-        "cursor:pointer;-webkit-tap-highlight-color:transparent}</style>"
-        "<button id='tc-back-fab' type='button' style='display:none'>◀ Back</button>"
+        # A cabinet pushbutton: round, convex, sitting on a collar it visibly sinks into when
+        # pressed. The travel is the point — a flat rectangle gives a touch player no feedback that
+        # a tap registered, and this one is deliberately the only control on the page that looks
+        # like hardware, because it is the only one that is not part of the game's own screen.
+        "<style>#tc-back-fab{position:fixed;right:16px;bottom:16px;z-index:99998;"
+        "width:66px;height:66px;padding:0;border-radius:50%;border:2px solid #6d1a0e;"
+        "background:radial-gradient(circle at 50% 30%,#ff9166 0%,#ec4a2b 52%,#b31d0d 100%);"
+        "color:#2b0803;cursor:pointer;-webkit-tap-highlight-color:transparent;"
+        "flex-direction:column;align-items:center;justify-content:center;gap:1px;"
+        # Three shadows: the collar it stands on, the drop under the whole thing, and the sheen
+        # inside the cap that makes it read as convex rather than as a flat disc.
+        "box-shadow:0 6px 0 #6d1a0e,0 9px 14px rgba(0,0,0,.55),"
+        "inset 0 2px 7px rgba(255,255,255,.45),inset 0 -3px 8px rgba(0,0,0,.35);"
+        "transition:transform .06s linear,box-shadow .06s linear}"
+        # Touch devices only. This button exists because a phone has no keys — a desktop browser has
+        # Escape, and the footer already says so, which makes a piece of moulded plastic sitting over
+        # the terminal pure decoration there. `pointer: coarse` is the same test the auto-fit uses,
+        # and it answers for the device rather than for the window: a laptop with a narrow window is
+        # still a laptop. Hidden by DEFAULT, so a browser that cannot answer the query gets the
+        # keyboard's UI rather than a control it does not need.
+        "#tc-back-fab{display:none}"
+        "@media (pointer: coarse){#tc-back-fab:not([hidden]){display:flex}}"
+        "#tc-back-fab:active{transform:translateY(5px);"
+        "box-shadow:0 1px 0 #6d1a0e,0 2px 5px rgba(0,0,0,.5),"
+        "inset 0 2px 7px rgba(255,255,255,.35),inset 0 -3px 8px rgba(0,0,0,.35)}"
+        "#tc-back-fab .tc-glyph{font-size:21px;line-height:1}"
+        "#tc-back-fab .tc-label{font-size:9px;letter-spacing:.14em;font-weight:700}</style>"
+        "<button id='tc-back-fab' type='button' aria-label='Back' hidden>"
+        "<span class='tc-glyph'>&#9664;</span><span class='tc-label'>BACK</span></button>"
         "<script>(function(){var b=document.getElementById('tc-back-fab');"
         "window.__tcMeta=window.__tcMeta||{};"
-        "window.__tcMeta['termcade_back']=function(m){b.style.display=m.allowed?'':'none';};"
+        "window.__tcMeta['termcade_back']=function(m){b.hidden=!m.allowed;};"
+        # Only the typeface is borrowed from the terminal now — the colours are the button's own, so
+        # it stays a piece of the cabinet whatever theme the game is drawing in.
         "var paint=function(){var t=document.querySelector('.xterm');if(!t)return;"
-        "var c=getComputedStyle(t);b.style.background=c.backgroundColor;"
-        "b.style.color=c.color;b.style.border='1px solid '+c.color;"
-        "b.style.fontFamily=c.fontFamily;};"
+        "b.style.fontFamily=getComputedStyle(t).fontFamily;};"
         "setTimeout(paint,600);setTimeout(paint,2500);"
         "b.addEventListener('click',function(e){e.preventDefault();"
         "var t=document.querySelector('.xterm-helper-textarea');if(!t)return;t.focus();"
-        "b.style.display='none';"  # until the app says the next screen has a way back too
+        "b.hidden=true;"  # until the app says the next screen has a way back too
         "['keydown','keyup'].forEach(function(k){t.dispatchEvent(new KeyboardEvent(k,"
         f"{{key:'{_BACK_KEY}',code:'{_BACK_CODE}',{_BACK_MODIFIER}keyCode:{_BACK_KEYCODE},"
         f"which:{_BACK_KEYCODE},bubbles:true}}));}});}});}})();</script>"
