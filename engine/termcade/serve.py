@@ -21,6 +21,7 @@ closed-beta gate in front of everything — see :mod:`termcade.beta`.
 
 from __future__ import annotations
 
+import atexit
 import importlib
 import logging
 import os
@@ -91,8 +92,23 @@ def _templates_dir(
     # The intro dialog and Start button, which are the page's own furniture rather than the game.
     # Cosmetic, and allowed to miss: if upstream restyles them the game still renders correctly.
     html = html.replace(STOCK_STACK, f'"{FAMILY}", {STOCK_STACK}')
-    out = Path(tempfile.mkdtemp(prefix="termcade-serve-"))
+    out = _scratch("termcade-serve-")
     (out / "app_index.html").write_text(html, encoding="utf-8")
+    return out
+
+
+def _scratch(prefix: str) -> Path:
+    """A temp directory that goes away when the process does.
+
+    Both callers hand their directory to the server, which serves out of it for as long as it runs
+    — so it cannot be a context manager, and for a real server "until the process exits" is the
+    right lifetime anyway. What made it worth fixing is the test suite, which is not one process
+    serving one page: ``test_serve.py`` builds a template directory on nearly every test and a full
+    copy of upstream's static tree six times over, and none of it was ever removed. Measured at
+    roughly 20MB of orphaned temp data per run, left behind on every CI invocation.
+    """
+    out = Path(tempfile.mkdtemp(prefix=prefix))
+    atexit.register(shutil.rmtree, out, ignore_errors=True)
     return out
 
 
@@ -102,7 +118,7 @@ def _statics_dir(assets: tuple[Path, ...]) -> Path | None:
     upstream = Path(textual_serve.__file__).resolve().parent / "static"
     if not (upstream.exists() and all(a.exists() for a in assets)):
         return None
-    out = Path(tempfile.mkdtemp(prefix="termcade-static-"))
+    out = _scratch("termcade-static-")
     shutil.copytree(upstream, out, dirs_exist_ok=True)
     for asset in assets:
         shutil.copy2(asset, out / asset.name)

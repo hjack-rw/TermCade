@@ -44,11 +44,18 @@
       var d = y - ny,
         ax = nx - x;
 
+      // Both totals are measured over the WHOLE gesture. `ax` always was — `x` is set at touchstart
+      // and never moves — but the vertical side used to be `ny - y`, and `y` is reset on every wheel
+      // dispatch below, so it only ever held the travel since the last scroll event. A growing
+      // number was being compared against a resetting one: scrolling 200px with 60px of thumb drift
+      // read as 60 against ~10 and turned the page, which is the exact thing this test is here to
+      // prevent. Measured in a browser, before and after.
+      var down = moved + Math.abs(d);
+
       // A swipe fires ONCE per gesture, and only when it is clearly sideways — a finger travelling
-      // twice as far across as down. Otherwise a diagonal scroll would turn pages while the reader
-      // was trying to move down one. The page follows the finger: dragging it away leftwards is
+      // twice as far across as down. The page follows the finger: dragging it away leftwards is
       // Right, the next page.
-      if (!swiped && Math.abs(ax) > 48 && Math.abs(ax) > Math.abs(ny - y) * 2) {
+      if (!swiped && Math.abs(ax) > 48 && Math.abs(ax) > down * 2) {
         swiped = true;
         if (ax < 0) key('ArrowRight', 39);
         else key('ArrowLeft', 37);

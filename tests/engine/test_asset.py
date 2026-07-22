@@ -41,16 +41,40 @@ def test_a_placeholder_nobody_filled_in_is_loud() -> None:
         asset.read("autofit.js", cols=110)
 
 
+def test_a_call_that_lost_its_last_value_is_loud_too() -> None:
+    """The hole the test above could not see. It passes one value, so it only ever exercised the
+    branch where there was something to substitute — and the shortcut that skipped substitution
+    entirely for the empty case turned this exact call into a silent success that served the literal
+    ``${max_w}`` into a media query."""
+    with pytest.raises(KeyError):
+        asset.read("too-small.css")
+
+
 @pytest.mark.parametrize("name", sorted(p.name for p in asset.WEB.glob("*")))
 def test_no_asset_sends_its_comments_to_the_browser(name: str) -> None:
     """These blocks are inlined into ``<head>`` on every load, uncached, so prose in them is prose
     paid for on every page view. The files are commented heavily on purpose — that is the whole
     point of them being files — and none of it may reach the wire."""
-    body = asset._strip((asset.WEB / name).read_text(encoding="utf-8"))
+    body = asset._strip((asset.WEB / name).read_text(encoding="utf-8"), name)
     assert body.strip(), f"{name} is empty once its comments are gone"
     assert "//" not in body.replace("://", "")
     assert "/*" not in body
     assert "<!--" not in body
+
+
+def test_a_comment_that_does_not_own_its_line_is_refused() -> None:
+    """The silent-deletion trap. ``/* note */ display: flex;`` opens a comment and does not end in
+    the closer, so the old rule armed the block and dropped every line after it until one happened
+    to end in ``*/`` — losing real CSS with no error and no failing test. A file that will not load
+    is a far better answer than a page missing rules nobody can account for."""
+    with pytest.raises(ValueError, match="own its whole line"):
+        asset._strip("/* note */ display: flex;\ncolor: red;\n", "made-up.css")
+
+
+def test_a_comment_that_does_own_its_line_still_works() -> None:
+    """The other half — the refusal must not catch the form every asset actually uses."""
+    assert asset._strip("/* just a note */\ncolor: red;\n") == "color: red;"
+    assert asset._strip("/* opens\n   and closes */\ncolor: red;\n") == "color: red;"
 
 
 def test_the_page_carries_something_from_every_asset() -> None:

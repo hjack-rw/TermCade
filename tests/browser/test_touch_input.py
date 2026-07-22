@@ -88,6 +88,22 @@ def test_dragging_up_scrolls_and_turns_nothing(tapped: Page) -> None:
     assert ARROW_RIGHT not in sent and ARROW_LEFT not in sent
 
 
+def test_a_scroll_with_a_wandering_thumb_still_turns_nothing(tapped: Page) -> None:
+    """The drift a real thumb has, which the 5px drag above is too tidy to produce.
+
+    This failed before the fix and is the reason for it. The swipe gate compared the gesture's
+    CUMULATIVE sideways travel against only the vertical travel since the last wheel event, because
+    that one is reset on every scroll — so a growing number was measured against a resetting one. A
+    200px scroll with 60px of drift read as 60 against about 10 and turned the page, in a browser,
+    on the exact path a reader uses to get down the Lore book.
+    """
+    sent = _drag(tapped, 400, 320, 460, 120)
+    assert sent, "the drag scrolled nothing at all"
+    assert ARROW_RIGHT not in sent and ARROW_LEFT not in sent, (
+        "a mostly-vertical scroll turned the page"
+    )
+
+
 def test_a_tap_that_wobbles_sends_nothing(tapped: Page) -> None:
     """The threshold exists because a wheel becomes an ESC-prefixed sequence, and Textual reads a
     stray ESC as Escape — which on the temple abandons the run."""

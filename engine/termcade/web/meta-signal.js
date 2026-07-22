@@ -24,4 +24,13 @@
   };
 
   window.WebSocket.prototype = W.prototype;
+
+  // The statics come across too. Only `prototype` did, which left `WebSocket.OPEN` and its siblings
+  // undefined on the replaced global. The shipped textual.js reads none of them today — checked —
+  // so this is not a bug being fixed but a trap being closed: the day upstream writes
+  // `socket.readyState === WebSocket.OPEN`, that comparison silently becomes false forever and the
+  // symptom is a game that connects and then does nothing.
+  ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function (state) {
+    window.WebSocket[state] = W[state];
+  });
 })();

@@ -217,10 +217,15 @@ def test_a_swipe_is_latched_so_one_drag_turns_one_page() -> None:
     assert "if(swiped)return;" in html, "a latched swipe still falls through to scrolling"
 
 
-def test_a_swipe_must_be_clearly_sideways_before_it_counts() -> None:
-    """A diagonal scroll must not turn pages while the reader is moving down one. The comparison has
-    to be against the vertical travel — a bare distance threshold fires on any long drag."""
-    assert "Math.abs(ax)>48&&Math.abs(ax)>Math.abs(ny-y)*2" in _squashed()
+def test_a_swipe_is_weighed_against_the_whole_gesture() -> None:
+    """Both totals must span the WHOLE drag. This used to pin the comparison character for
+    character, which meant it defended the bug it was named after: the vertical side was the travel
+    since the last wheel event, and a test spelling that out could only ever agree with it. The
+    behaviour lives in ``tests/browser/test_touch_input.py``; what is left here is the one thing a
+    string can honestly say — that the sideways total is not measured against a per-event delta."""
+    html = _squashed()
+    assert "Math.abs(ax)>down*2" in html
+    assert "Math.abs(ny-y)" not in html, "the swipe gate is comparing against a resetting number"
 
 
 def test_a_vertical_drag_still_scrolls() -> None:
@@ -341,7 +346,6 @@ def test_every_message_from_the_app_goes_through_one_registry() -> None:
 
 def test_the_socket_is_wrapped_before_textual_opens_it() -> None:
     """Wrapping the constructor after the socket exists is too late — every message is missed."""
-    html = _html()
     html = _squashed()
     assert html.index("window.WebSocket=") < html.index("</head>")
 
@@ -421,7 +425,6 @@ def test_autofit_clamps_to_the_readable_font_range() -> None:
     matters is the RELATION: a floor below the ceiling, and a floor a person can still read."""
     assert page.MIN_FONT < page.MAX_FONT
     assert page.MIN_FONT >= 5, "a font this small is a texture, not text"
-    html = _html()
     html = _squashed()
     assert f"Math.max({page.MIN_FONT}" in html and f"Math.min(a,b,{page.MAX_FONT})" in html
 

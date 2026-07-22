@@ -22,9 +22,12 @@ ENV TERMCADE_DATA_DIR=/data \
     PYTHONUNBUFFERED=1 \
     GAME_FACTORY=xiaolin_showdown.game:build_game
 
-# Install the wheel plus textual-serve (browser mode); the terminal mode needs only the wheel.
+# Install the wheel with its `serve` extra (browser mode); terminal mode needs only the wheel.
+# The extra is asked for BY NAME rather than naming textual-serve and a version here: this line used
+# to pin ==1.1.3 while pyproject said ~=1.1, so the image could ship a version nothing was tested
+# against, and the pin silently contradicted the decision recorded next to the dependency.
 COPY --from=builder /dist/*.whl /tmp/
-RUN pip install --no-cache-dir /tmp/*.whl textual-serve==1.1.3 && rm -rf /tmp/*.whl
+RUN pip install --no-cache-dir "$(ls /tmp/*.whl)[serve]" && rm -rf /tmp/*.whl
 
 RUN useradd --create-home --uid 1000 player && mkdir -p /data && chown player /data
 VOLUME ["/data"]

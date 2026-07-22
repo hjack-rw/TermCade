@@ -34,8 +34,12 @@ def read(name: str, /, **values: object) -> str:
     Raises rather than papering over either half: a missing file is a packaging bug (the wheel
     shipped a page with no scripts), and a missing value is a rename that has not finished.
     """
-    body = _strip((WEB / name).read_text(encoding="utf-8"))
-    return Template(body).substitute(values) if values else body
+    body = _strip((WEB / name).read_text(encoding="utf-8"), name)
+    # Always substituted, even with nothing to substitute. Skipping the call when ``values`` is
+    # empty looks like a harmless shortcut and quietly repeals the guarantee above: a caller that
+    # loses its last keyword argument stops raising and starts serving the literal text
+    # ``${max_w}`` into a media query, which is a broken breakpoint no test would see.
+    return Template(body).substitute(values)
 
 
 def script(name: str, /, **values: object) -> str:
@@ -48,7 +52,7 @@ def style(name: str, /, **values: object) -> str:
     return f"<style>{read(name, **values)}</style>"
 
 
-def _strip(source: str) -> str:
+def _strip(source: str, name_hint: str = "<source>") -> str:
     """Drop blank lines and whole-line comments, and join what is left with newlines.
 
     Deliberately not a minifier and deliberately not a parser. It looks at whole lines only, so a
@@ -57,8 +61,9 @@ def _strip(source: str) -> str:
 
     A CSS ``/* */`` or an HTML ``<!-- -->`` may run over several lines, because a comment worth
     writing rarely fits on one and neither language has a ``//``. It still has to own every line it
-    touches: the opener starts a line and the closer ends one. Anything else is code, and code is
-    not something this will guess at.
+    touches: the opener starts a line and the closer ends one. A line that does both and then
+    carries on is refused outright — it used to arm the block and silently drop everything after it,
+    and code deleted without a word is a worse answer than a file that will not load.
 
     Line structure and indentation survive; only blank lines and comments go. That is what keeps
     the page legible in a browser's devtools — the place anyone debugging it is actually standing —
@@ -78,7 +83,18 @@ def _strip(source: str) -> str:
             continue
         opened = next((o for o in openers if stripped.startswith(o)), None)
         if opened is not None:
-            closer = None if stripped.endswith(openers[opened]) else openers[opened]
+            end = openers[opened]
+            if stripped.endswith(end):
+                continue
+            # A line that opens a comment, closes it, and then carries on is the trap: it would arm
+            # the block and silently delete every line after it until something happened to end in
+            # `*/`. Deleting code without a word is worse than refusing the file, so refuse it.
+            if end in stripped[len(opened) :]:
+                raise ValueError(
+                    f"{name_hint}: a comment must own its whole line — {stripped!r} closes one and "
+                    "then keeps going, which would swallow the code that follows it"
+                )
+            closer = end
             continue
         kept.append(line.rstrip())
     return "\n".join(kept)

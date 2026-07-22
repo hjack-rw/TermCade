@@ -109,8 +109,15 @@ VIEWPORT = (
 # worth depends on the display: at font 8 the cell is 4px on a plain screen and about 4.96px at 3x,
 # where a third of a CSS pixel is still a real one. A width computed from this constant was 20% out
 # on a 3x phone, which is how a cap meant to hand the game 110 columns handed it 88 — below the
-# layout's own breakpoint, so the panels stacked and the state row truncated. Nothing sizes an
-# element from this any more; the browser measures its own cells and the fit addon reads them.
+# layout's own breakpoint, so the panels stacked and the state row truncated. The width cap that
+# caused it is gone: the browser measures its own cells and the fit addon reads them.
+#
+# ONE thing still lays out from this estimate — ``min_px``, and through it the too-small overlay's
+# breakpoints. That is the same 20% error, so on a 3x display the overlay can cover a window the
+# game would have run in, or stay hidden over one it cannot. It is tolerable only because the games
+# that ship set no ``min_size`` at all, so the overlay is never emitted; a cartridge that asks for
+# one inherits a threshold nobody has measured. Fixing it means asking the browser for its cell
+# before deciding, the way the fit does.
 CELL_W, CELL_H = 0.62, 1.25
 # The floor used to be 8, which is where a phone broke: fitting the game's 44 rows into a landscape
 # viewport needs 7px, and clamping back up to 8 made the grid 50px taller than the screen — the page
@@ -118,11 +125,9 @@ CELL_W, CELL_H = 0.62, 1.25
 # the smallest fit fails; landscape still resolves to 7, portrait to 5.
 MIN_FONT, MAX_FONT = 8, 28
 
-# Fallbacks when no game descriptor is on hand (``serve.main`` under Docker); override via env.
-DEFAULT_FIT_SIZE = (110, 38)
-# No floor by default: a game whose screens scroll needs no "too small" overlay. Games that really
-# cannot reflow pass their own ``min_size``.
-DEFAULT_MIN_SIZE: tuple[int, int] | None = None
+# The fallback grid for a server with no game descriptor lives in `serve.py`, which is what decides
+# it. A second copy sat here — same values, same comment, and no readers at all, so editing the one
+# a person would reach for first changed nothing.
 
 
 def autofit(fit_size: tuple[int, int], touch_fit_size: tuple[int, int] | None = None) -> str:
@@ -294,14 +299,16 @@ def touch_gestures() -> str:
     away leftwards) is Right, the next page. Nothing else in the game binds the arrows, so a stray
     swipe elsewhere at worst moves the focus ring.
 
-    The 24px travel threshold is not cosmetic. xterm turns a wheel into an ESC-prefixed sequence,
-    and Textual reads a stray ESC as the Escape key — so a tap that wobbled a couple of pixels sent
-    Escape, and on the temple that means leaving for the main menu. A gesture has to be a real drag
-    before any of this fires.
+    Two thresholds, and they are not the same number. **24px of travel** gates the SCROLL: xterm
+    turns a wheel into an ESC-prefixed sequence, and Textual reads a stray ESC as the Escape key — so
+    a tap that wobbled a couple of pixels sent Escape, and on the temple that means leaving for the
+    main menu. **48px sideways** gates the SWIPE. Tuning one from a docstring that named only the
+    other is how the wrong constant gets changed.
 
     A swipe fires ONCE per gesture, and only when it is clearly sideways — a finger travelling twice
-    as far across as down. Otherwise a diagonal scroll would turn pages while the reader was trying
-    to move down one.
+    as far across as down, both measured over the whole gesture. Otherwise a diagonal scroll turns
+    pages while the reader is trying to move down one, which it did: the vertical half of that
+    comparison was reset on every scroll event, so it was never the whole gesture at all.
     """
     return asset.script("touch-gestures.js")
 

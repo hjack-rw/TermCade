@@ -12,3 +12,6 @@ dist
 build
 *.egg-info
 .DS_Store
+# 24MB of linters for the page assets. Never installed in the image — the Dockerfile copies
+# engine/ and games/ by name — but the whole context is sent to the daemon on every build.
+node_modules
