@@ -158,7 +158,7 @@ def _login_page(*, bad: bool) -> str:
     allowed to fetch anything from ``/static``, which is also why its styling is in the same file
     rather than a stylesheet the gate would have to let through."""
     message = "That code is not on the list." if bad else "This build is closed beta."
-    return asset.read("beta-login.html", message=message, theme=asset.read(asset.THEME))
+    return asset.read("beta-login.html", message=message, theme=asset.style(asset.THEME))
 
 
 def codes_path() -> Path | None:
