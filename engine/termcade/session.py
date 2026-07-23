@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 from collections.abc import Awaitable, Callable
 
@@ -30,11 +31,33 @@ from aiohttp import web
 from textual_serve.app_service import AppService
 from textual_serve.server import Server, to_int
 
+from termcade import asset
 from termcade.web_driver import DRIVER
 
 log = logging.getLogger("termcade.session")
 
 TOUCH_ENV = "TERMCADE_TOUCH"
+
+# The most players served at once. Each is a full Textual render process, so on a CPU-metered host
+# too many at once trips the governor and the box is killed for EVERYONE — better to turn the next
+# player away than lose it for all. Raise TERMCADE_MAX_SESSIONS in the environment to lift the cap
+# with no redeploy. The default is a guess until one player's steady CPU is measured on the box.
+MAX_SESSIONS_ENV = "TERMCADE_MAX_SESSIONS"
+DEFAULT_MAX_SESSIONS = 6
+
+# The page a visitor gets when the arcade is full — a real styled page (see ``web/full.html``), served
+# through the same asset reader as the beta door, not a terminal that loads and then cannot connect.
+_FULL_PAGE_ASSET = "full.html"
+
+
+def _max_sessions() -> int:
+    """The session cap from the environment, or the default. A garbage value falls back rather than
+    crashing the server at boot — a wrong cap must not be worse than no server."""
+    try:
+        return max(1, int(os.environ.get(MAX_SESSIONS_ENV, DEFAULT_MAX_SESSIONS)))
+    except ValueError:
+        return DEFAULT_MAX_SESSIONS
+
 
 # Every meta type the engine sends is namespaced, so forwarding is a prefix test rather than a list
 # that has to be kept in step with the app. Anything else is upstream's own business (`exit`,
@@ -95,7 +118,16 @@ class TermCadeServer(Server):
 
     Subclasses extend :meth:`session_env` to add to what a session is told; the meta channel is the
     same for every session and needs no hook.
+
+    It also caps concurrent sessions (:data:`MAX_SESSIONS_ENV`): each is a full render process, and a
+    CPU-metered free host kills the box once too many run at once. Over the cap, a visitor gets the
+    "full" page rather than a session, so the overflow costs one player instead of everyone.
     """
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self._active = 0
+        self._max_sessions = _max_sessions()
 
     async def _make_app(self) -> web.Application:
         """As upstream, plus: the PAGE is never cached.
@@ -111,7 +143,22 @@ class TermCadeServer(Server):
         """
         app = await super()._make_app()
         app.middlewares.append(self._no_store)
+        app.middlewares.append(self._full_gate)
         return app
+
+    @web.middleware
+    async def _full_gate(
+        self, request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    ) -> web.StreamResponse:
+        """Serve the "full" page to a new visitor once the cap is reached, so they never load a
+        terminal that cannot get a session. Only the page GET is gated — assets and the websocket of
+        players already in are left alone."""
+        if request.method == "GET" and request.path == "/" and self._active >= self._max_sessions:
+            return web.Response(
+                text=asset.read(_FULL_PAGE_ASSET), content_type="text/html", status=503,
+                headers={"Retry-After": "120"},
+            )
+        return await handler(request)
 
     @staticmethod
     @web.middleware
@@ -138,7 +185,13 @@ class TermCadeServer(Server):
         """As upstream, but with our own ``AppService`` and this session's environment."""
         if self.reject(request):
             return web.WebSocketResponse()
+        if self._active >= self._max_sessions:
+            # Full. The page gate already turns visitors away; this only trips on a direct websocket
+            # hit or a race, so refuse without starting a session. Single-threaded loop, so the
+            # check-then-increment below has no await between it and cannot oversubscribe.
+            return web.WebSocketResponse()
 
+        self._active += 1
         websocket = web.WebSocketResponse(heartbeat=15)
         width = to_int(request.query.get("width", "80"), 80)
         height = to_int(request.query.get("height", "24"), 24)
@@ -167,4 +220,5 @@ class TermCadeServer(Server):
         finally:
             if app_service is not None:
                 await app_service.stop()
+            self._active -= 1
         return websocket

@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 
 import pytest
+from aiohttp import web
+from aiohttp.test_utils import make_mocked_request
 
 from termcade import session
 from termcade.core.audio import AUDIO_META
@@ -124,3 +126,43 @@ def test_the_open_server_refuses_nobody() -> None:
     server = session.TermCadeServer("true", public_url="http://localhost:8000")
 
     assert server.reject(_Request(_DESKTOP)) is False
+
+
+async def test_a_visitor_gets_the_full_page_at_capacity() -> None:
+    """At the cap, the page GET is answered with the "full" page, not a terminal that cannot connect."""
+    server = session.TermCadeServer("true", public_url="http://localhost:8000")
+    server._active = server._max_sessions
+
+    async def _handler(_req: web.Request) -> web.StreamResponse:
+        raise AssertionError("the handler must not run when the arcade is full")
+
+    response = await server._full_gate(make_mocked_request("GET", "/"), _handler)
+
+    assert response.status == 503
+
+
+async def test_a_visitor_passes_through_below_capacity() -> None:
+    """Below the cap the page is served as normal — the gate only bites when full."""
+    server = session.TermCadeServer("true", public_url="http://localhost:8000")
+    server._active = 0
+    served = web.Response(text="the game")
+
+    async def _handler(_req: web.Request) -> web.StreamResponse:
+        return served
+
+    response = await server._full_gate(make_mocked_request("GET", "/"), _handler)
+
+    assert response is served
+
+
+def test_the_session_cap_reads_the_environment(monkeypatch) -> None:
+    monkeypatch.setenv(session.MAX_SESSIONS_ENV, "3")
+
+    assert session._max_sessions() == 3
+
+
+def test_a_garbage_cap_falls_back_to_the_default(monkeypatch) -> None:
+    """A typo in the cap must not crash the server at boot — a wrong cap beats no server."""
+    monkeypatch.setenv(session.MAX_SESSIONS_ENV, "lots")
+
+    assert session._max_sessions() == session.DEFAULT_MAX_SESSIONS
