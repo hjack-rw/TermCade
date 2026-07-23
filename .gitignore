@@ -33,3 +33,7 @@ docs/
 # JS tooling for the page assets (engine/termcade/web). The lockfile IS committed, so CI can
 # `npm ci` and get the exact linters this was checked with.
 node_modules/
+
+# Wispbyte container-local deploy config + beta passcodes (never commit — public repo)
+.env
+codes.txt

@@ -1,0 +1,3 @@
+# The parkervcp Python egg installs this on boot (`pip install -r requirements.txt`): our two
+# packages plus the browser-serve extra (textual-serve). `.[serve]` installs the repo it sits in.
+.[serve]
