@@ -157,7 +157,7 @@ def make_server(
 
     codes = beta.codes_path()
     if codes is None:
-        return TermCadeServer(game, **kwargs)  # type: ignore[arg-type]
+        return TermCadeServer(game, **kwargs)
     return beta.BetaServer(game, codes_path=codes, data_dir=_data_dir(), **kwargs)
 
 

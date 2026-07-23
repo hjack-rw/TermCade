@@ -25,7 +25,7 @@ def test_every_asset_ships_inside_the_package() -> None:
 
     assert asset.WEB.is_dir()
     assert asset.WEB.parent == Path(termcade.__file__).resolve().parent
-    assert list(asset.WEB.glob("*")), "the asset directory is empty"
+    assert asset._ASSETS, "no assets were discovered under web/"
 
 
 def test_a_missing_file_is_loud() -> None:
@@ -33,6 +33,18 @@ def test_a_missing_file_is_loud() -> None:
     would serve a page whose scripts are simply absent, and nothing downstream would notice."""
     with pytest.raises(OSError):
         asset.read("no-such-file.js")
+
+
+def test_two_assets_with_the_same_name_are_refused(tmp_path) -> None:
+    """The folders order the directory, but a caller still names a bare file — so the same name in
+    two folders would make the lookup a coin toss. Caught at index time, not at the coin toss."""
+    (tmp_path / "css").mkdir()
+    (tmp_path / "js").mkdir()
+    (tmp_path / "css" / "shared.txt").write_text("one", encoding="utf-8")
+    (tmp_path / "js" / "shared.txt").write_text("two", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="share the name"):
+        asset._index(tmp_path)
 
 
 def test_a_placeholder_nobody_filled_in_is_loud() -> None:
@@ -50,12 +62,12 @@ def test_a_call_that_lost_its_last_value_is_loud_too() -> None:
         asset.read("too-small.css")
 
 
-@pytest.mark.parametrize("name", sorted(p.name for p in asset.WEB.glob("*")))
+@pytest.mark.parametrize("name", sorted(asset._ASSETS))
 def test_no_asset_sends_its_comments_to_the_browser(name: str) -> None:
     """These blocks are inlined into ``<head>`` on every load, uncached, so prose in them is prose
     paid for on every page view. The files are commented heavily on purpose — that is the whole
     point of them being files — and none of it may reach the wire."""
-    body = asset._strip((asset.WEB / name).read_text(encoding="utf-8"), name)
+    body = asset._strip(asset._ASSETS[name].read_text(encoding="utf-8"), name)
     assert body.strip(), f"{name} is empty once its comments are gone"
     assert "//" not in body.replace("://", "")
     assert "/*" not in body

@@ -91,7 +91,7 @@ class BetaServer(TermCadeServer):
     """
 
     def __init__(self, *args: object, codes_path: Path, data_dir: Path, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        super().__init__(*args, **kwargs)
         self._codes_path = codes_path
         self._data_dir = data_dir
 
@@ -158,7 +158,7 @@ def _login_page(*, bad: bool) -> str:
     allowed to fetch anything from ``/static``, which is also why its styling is in the same file
     rather than a stylesheet the gate would have to let through."""
     message = "That code is not on the list." if bad else "This build is closed beta."
-    return asset.read("beta-login.html", message=message)
+    return asset.read("beta-login.html", message=message, theme=asset.read(asset.THEME))
 
 
 def codes_path() -> Path | None:

@@ -155,8 +155,8 @@ class TermCadeServer(Server):
         players already in are left alone."""
         if request.method == "GET" and request.path == "/" and self._active >= self._max_sessions:
             return web.Response(
-                text=asset.read(_FULL_PAGE_ASSET), content_type="text/html", status=503,
-                headers={"Retry-After": "120"},
+                text=asset.read(_FULL_PAGE_ASSET, theme=asset.read(asset.THEME)),
+                content_type="text/html", status=503, headers={"Retry-After": "120"},
             )
         return await handler(request)
 

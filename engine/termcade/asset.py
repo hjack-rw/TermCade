@@ -27,14 +27,52 @@ from string import Template
 
 WEB = Path(__file__).resolve().parent / "web"
 
+# The shared arcade palette + the centred full-page body, injected into every standalone page (the
+# beta door, the "full" screen) as ``$theme``. One file owns the colours, so a re-theme is one edit.
+THEME = "theme.css"
+
+
+def _index(base: Path) -> dict[str, Path]:
+    """Map each asset's bare filename to its path, wherever under ``base`` it is filed.
+
+    So ``read("centre.css")`` does not care that the file lives in ``css/`` — the folders order the
+    directory for a human; the callers name a file and nothing more. A duplicate basename is refused
+    at import: two files answering to one name would make the lookup a coin toss, and the layout is
+    supposed to be free to move without that ever becoming a question.
+    """
+    index: dict[str, Path] = {}
+    for path in sorted(base.rglob("*")):
+        if not path.is_file():
+            continue
+        if path.name in index:
+            raise ValueError(
+                f"two assets share the name {path.name!r}: {index[path.name]} and {path} — a bare "
+                "name must resolve to exactly one file"
+            )
+        index[path.name] = path
+    return index
+
+
+_ASSETS = _index(WEB)
+
+
+def _resolve(name: str) -> Path:
+    """The path filed under ``name``. A miss is an ``OSError`` like the old direct read: a name that
+    resolves to nothing is a packaging bug or a rename that did not finish, not an empty page."""
+    path = _ASSETS.get(name)
+    if path is None:
+        raise FileNotFoundError(f"no asset named {name!r} under {WEB}")
+    return path
+
 
 def read(name: str, /, **values: object) -> str:
-    """The contents of ``web/name``, with ``$placeholders`` filled in and comments stripped.
+    """The contents of the asset filed under ``name``, with ``$placeholders`` filled in and comments
+    stripped. ``name`` is a bare filename; where it sits under ``web/`` is not the caller's concern.
 
     Raises rather than papering over either half: a missing file is a packaging bug (the wheel
     shipped a page with no scripts), and a missing value is a rename that has not finished.
     """
-    body = _strip((WEB / name).read_text(encoding="utf-8"), name)
+    body = _strip(_resolve(name).read_text(encoding="utf-8"), name)
     # Always substituted, even with nothing to substitute. Skipping the call when ``values`` is
     # empty looks like a harmless shortcut and quietly repeals the guarantee above: a caller that
     # loses its last keyword argument stops raising and starts serving the literal text
