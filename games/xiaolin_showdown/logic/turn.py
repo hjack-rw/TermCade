@@ -337,95 +337,114 @@ def bot_turn(
     return log or [BotMove(PASSED, f"{name} did nothing this turn.")]
 
 
-def _boss_acts(
+# The bot's temple actions, each a self-contained attempt that either DOES the thing and returns its
+# log line, or returns ``None`` to say "not now, try the next". They used to be inlined twice —
+# once in the boss policy and once in the generic one — verbatim, down to the pluralised "pt". A
+# policy is now just an ORDER over these: change how the bot banks, and it changes for every duelist
+# that banks, because there is one place that banks.
+
+
+def _draw_thin_hand(
     state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
 ) -> BotMove | None:
-    """A boss's one temple action, or ``None`` to let the generic policy (a power) handle it.
-
-    A boss wins showdowns on its stats, so the temple is a race to the point target: keep a hand big
-    enough to field a full wager, snatch cheap Wu off the pile, and BANK the surplus. A power is not
-    taken here — it falls through to the generic path, which fires one only once the surplus is gone.
-    That is the whole fix: banking outranks a power for a boss, so a reusable witchcraft power stops
-    being an every-turn substitute for reaching the target.
-    """
-    from .actions import early_bird  # local: actions imports this module
-    from .temple_ai import choose_early_bird, worth_recalling
-
+    """Draw from the personal deck when the hand is too thin to field a full wager. A duelist that
+    banks its way down to one Wu can only ever be wagered one, and wins nothing that way."""
     bot = state.bot
-
-    # Thin hand first: a boss that banks down to one Wu can be wagered only one, and wins nothing.
     if len(bot.hand) < settings.max_wager and bot.deck:
         drawn = bot.deck.pop(0)
         bot.hand.append(drawn)
         state.bot_actions_taken += 1
         return BotMove(DRAW, f"{name} drew {drawn.name} from their deck.")
+    return None
 
-    # A Wu off the pile with no showdown — cheap for Wuya (she gives up a scrap), pure profit.
+
+def _fly_early_bird(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """Take a Wu off the shared pile with no showdown — the one action that raids the pile rather
+    than the bot's own shelf. ``early_bird`` charges the turn itself."""
+    from .actions import early_bird  # local: actions imports this module
+    from .temple_ai import choose_early_bird
+
     bird = choose_early_bird(state, settings)
     if bird is not None:
         taken = state.card_deck[0]
         early_bird(state, bird, is_player=False)
         return BotMove(
             EARLY_BIRD,
-            f"{name} used Early Bird to take {taken.name} from under your nose, giving up {bird.name}.",
+            f"{name} used Early Bird to take {taken.name} from under your nose, "
+            f"giving up {bird.name}.",
         )
+    return None
 
-    # Wuya's witchcraft: a known weapon called back from the lost beats a blind draw.
-    if mechanic_of(bot.character.power) is Mechanic.WITCHCRAFT and worth_recalling(state):
+
+def _recall_witchcraft(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """Wuya's temple action: call the OLDEST lost Wu back, paying no Wu for it. A known weapon from
+    the lost beats a blind draw."""
+    from .temple_ai import worth_recalling
+
+    if mechanic_of(state.bot.character.power) is Mechanic.WITCHCRAFT and worth_recalling(state):
         revived = state.lost.pop(0)
-        bot.hand.append(hand_over(revived))
+        state.bot.hand.append(hand_over(revived))
         state.bot_actions_taken += 1
         state.witch_recalls += 1
         return BotMove(RECALL, f"{name} called {revived.name} back from the lost.")
+    return None
 
-    # Bank the surplus — the point race. Ahead of any power: reaching the target ends the run on the
-    # boss's terms, before the player claws back.
+
+def _cash_training(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """Spend the turn on a nearly-full training bar: a permanent +1 base stat pays in every showdown
+    left in the run. A just-taken payout waits for the turnover — the bar cannot climb until it
+    resets."""
+    if (
+        can_train(state.bot)
+        and not state.bot.just_trained
+        and TRAIN_LENGTH - state.bot.training <= _TRAIN_WITHIN
+    ):
+        state.bot_actions_taken += 1
+        if add_progress(state.bot):
+            stat = pick_stat(state.bot)
+            raise_stat(state.bot, stat)
+            return BotMove(TRAIN, f"{name} completed their training: their {stat} rose.")
+        return BotMove(TRAIN, f"{name} spent the turn training.")
+    return None
+
+
+def _bank_surplus(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """Convert a surplus Wu to points — the win condition. Mirrors ``can_deposit``: never cash the
+    last card out of the hand, and never spend more than half the turn's budget doing it."""
+    bot = state.bot
     if len(bot.hand) > DUEL_FLOOR and state.bot_deposits_taken < deposit_limit(
         settings.actions_per_turn
     ):
         banked = pick_deposit(bot.hand, difficulty)
         if banked is not None:
             points = bank_value(banked, rng)
-            bot.points = max(0, bot.points + points)
+            bot.points = max(0, bot.points + points)  # a bad gamble cannot go below zero
             bot.remove_card(banked)
             state.bot_actions_taken += 1
             state.bot_deposits_taken += 1
             return BotMove(
                 VAULT, f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}."
             )
-    return None  # nothing to draw/bank — the generic path may still fire a power
+    return None
 
 
-def _bot_acts(
+def _play_power(
     state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
 ) -> BotMove | None:
-    """The bot's one action, or ``None`` when it has nothing worth doing.
+    """Spend a Wu's power when one is worth more than the points it would bank. The opponent reads
+    only what a player could — see ``temple_ai.choose_temple_power``."""
+    from .actions import use_power  # local: actions imports this module
+    from .temple_ai import choose_temple_power
 
-    Draw first when the hand is too thin to field a full showdown: a duelist who banks its way down
-    to one Wu can only ever be wagered one Wu, and wins nothing that way. Otherwise bank — points
-    are the win condition, and the bot that hoards its weapons never reaches it (see
-    :func:`pick_deposit`).
-    """
-    # A Wu's power, when one of them is worth more than the points it would bank. The opponent reads
-    # only what a player could — see `temple_ai`, which is also where two of the Wu are explained as
-    # worthless *to it* and banked instead.
-    from .actions import early_bird, use_power  # local: actions imports this module
-    from .temple_ai import choose_early_bird, choose_temple_power, worth_recalling
-
-    # Chase Young meddles in no mere mortal affairs: at the temple he only draws or banks — never
-    # spends a Wu's power, never flies the Early Bird. His Wu are points and wagers, nothing more.
-    chase = mechanic_of(state.bot.character.power) is Mechanic.BEAST_FORM
-
-    # A BOSS races the point target: it wins showdowns on its stats, so it converts surplus Wu to
-    # points and uses a power only when nothing better is on the table — never the greedy every-turn
-    # spam that a shared, weapon-poor opponent policy falls into (which made witchcraft's reusable
-    # powers a NET LOSS: she shoved every turn and never banked). Boss temple order below.
-    if state.bot.character.tier == "boss" and not chase:
-        boss = _boss_acts(state, settings, rng, difficulty, name)
-        if boss is not None:
-            return boss
-
-    play = None if chase else choose_temple_power(state, settings)
+    play = choose_temple_power(state, settings)
     if play is not None:
         report = use_power(
             state,
@@ -440,67 +459,68 @@ def _bot_acts(
             POWER,
             f"{name} played {play.card.power.name} from the {play.card.name}.\n{report.log}",
         )
-
-    # The Early Bird, before drawing or banking: a Wu off the pile with no showdown beats either, and
-    # it is the only action here that takes from the *shared* pile rather than the bot's own shelf.
-    bird = None if chase else choose_early_bird(state, settings)
-    if bird is not None:
-        taken = state.card_deck[0]  # the Wu the bird snatches, off the top of the pile
-        early_bird(state, bird, is_player=False)
-        return BotMove(
-            EARLY_BIRD,
-            f"{name} used Early Bird to take {taken.name} from under your nose, "
-            f"giving up {bird.name}.",
-        )
-
-    # Wuya's witchcraft: her temple action can call the OLDEST lost Wu back — Euthymia's rule, but
-    # she pays no Wu for it. Ahead of training and drawing: a known weapon beats a blind draw.
-    if mechanic_of(state.bot.character.power) is Mechanic.WITCHCRAFT and worth_recalling(state):
-        revived = state.lost.pop(0)
-        state.bot.hand.append(hand_over(revived))
-        state.bot_actions_taken += 1
-        state.witch_recalls += 1
-        return BotMove(RECALL, f"{name} called {revived.name} back from the lost.")
-
-    # The last stretch of a nearly-full training bar outranks drawing or banking: a permanent +1
-    # base stat pays in every showdown left in the run. The bot cashes a full bar on the spot,
-    # shoring up its lowest stat (see `training.pick_stat`). A just-taken payout waits for the
-    # turnover instead — the bar cannot climb until it resets.
-    if (
-        can_train(state.bot)
-        and not state.bot.just_trained
-        and TRAIN_LENGTH - state.bot.training <= _TRAIN_WITHIN
-    ):
-        state.bot_actions_taken += 1
-        if add_progress(state.bot):
-            stat = pick_stat(state.bot)
-            raise_stat(state.bot, stat)
-            return BotMove(TRAIN, f"{name} completed their training: their {stat} rose.")
-        return BotMove(TRAIN, f"{name} spent the turn training.")
-
-    if len(state.bot.hand) < settings.max_wager and state.bot.deck:
-        drawn = state.bot.deck.pop(0)
-        state.bot.hand.append(drawn)
-        state.bot_actions_taken += 1
-        return BotMove(DRAW, f"{name} drew {drawn.name} from their deck.")
-
-    # Mirrors `can_deposit`: never cash the last card out of the hand, and never spend more than half
-    # the turn's budget doing it.
-    if len(state.bot.hand) > DUEL_FLOOR and state.bot_deposits_taken < deposit_limit(
-        settings.actions_per_turn
-    ):
-        banked = pick_deposit(state.bot.hand, difficulty)
-        if banked is not None:
-            points = bank_value(banked, rng)
-            state.bot.points = max(0, state.bot.points + points)  # a bad gamble cannot go below zero
-            state.bot.remove_card(banked)
-            state.bot_actions_taken += 1
-            state.bot_deposits_taken += 1
-            return BotMove(
-                VAULT,
-                f"{name} deposited {banked.name} for {points} pt{'s' if points != 1 else ''}.",
-            )
     return None
+
+
+# The boss temple order: bank the surplus AHEAD of any power. A boss wins showdowns on its stats, so
+# the temple is a race to the point target — keep a hand big enough to field a full wager, snatch
+# cheap Wu off the pile, and BANK. A power is not taken here; it falls through to the generic path,
+# which fires one only once the surplus is gone. That is the whole fix: banking outranks a power for
+# a boss, so a reusable witchcraft power stops being an every-turn substitute for reaching the target.
+_BOSS_ORDER = (_draw_thin_hand, _fly_early_bird, _recall_witchcraft, _bank_surplus)
+
+# The generic order: a power first (when one beats banking), then the pile raid, the recall, the
+# training cash-in, a thin-hand draw, and banking last.
+_GENERIC_ORDER = (
+    _play_power,
+    _fly_early_bird,
+    _recall_witchcraft,
+    _cash_training,
+    _draw_thin_hand,
+    _bank_surplus,
+)
+
+# Chase Young meddles in no mere mortal affairs: at the temple he only trains, draws, or banks —
+# never spends a Wu's power, never flies the Early Bird. His Wu are points and wagers, nothing more.
+_CHASE_ORDER = (_cash_training, _draw_thin_hand, _bank_surplus)
+
+
+def _first_move(
+    order, state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """The first action in ``order`` that does something, or ``None`` if none will."""
+    for action in order:
+        move = action(state, settings, rng, difficulty, name)
+        if move is not None:
+            return move
+    return None
+
+
+def _boss_acts(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """A boss's one temple action, or ``None`` to let the generic policy (a power) handle it."""
+    return _first_move(_BOSS_ORDER, state, settings, rng, difficulty, name)
+
+
+def _bot_acts(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """The bot's one action, or ``None`` when it has nothing worth doing.
+
+    A boss runs its own order first (bank before power); if that finds nothing, it falls through to
+    the generic order, which is where its power finally fires. Chase runs a stripped order that spends
+    no powers at all.
+    """
+    chase = mechanic_of(state.bot.character.power) is Mechanic.BEAST_FORM
+
+    if state.bot.character.tier == "boss" and not chase:
+        boss = _boss_acts(state, settings, rng, difficulty, name)
+        if boss is not None:
+            return boss
+
+    order = _CHASE_ORDER if chase else _GENERIC_ORDER
+    return _first_move(order, state, settings, rng, difficulty, name)
 
 
 def max_hand_size(player: Player, base: int) -> int:
