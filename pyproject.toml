@@ -24,7 +24,10 @@ serve = ["textual-serve~=1.1"]
 # fonts are built once and committed — but without it that test cannot run, and a skipped coverage
 # test is the same silence as the vacuous one it replaced.
 dev = [
-    "pytest", "pytest-asyncio", "textual-dev", "ruff", "mypy", "textual-serve~=1.1", "fonttools", "pytest-playwright",
+    # ruff and mypy are PINNED: unpinned, CI installs a newer release than the local venv, and a lint
+    # rule that shifts between versions fails CI on files nobody touched (ruff 0.15's isort re-sorted
+    # the whole tree once). Pin, so `ruff check .` means the same thing on both sides. Bump deliberately.
+    "pytest", "pytest-asyncio", "textual-dev", "ruff==0.15.20", "mypy==2.1.0", "textual-serve~=1.1", "fonttools", "pytest-playwright",
 ]
 # Build the standalone double-click executable (see build_launcher.py). Pillow is here rather than
 # in the runtime deps because only `make_icon.py` needs it — the game never imports it.
