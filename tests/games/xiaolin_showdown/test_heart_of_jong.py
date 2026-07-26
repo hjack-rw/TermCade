@@ -14,7 +14,8 @@ from termcade.core.rng import Rng
 from xiaolin_showdown.logic.battle import Round
 from xiaolin_showdown.logic.catalog import load_catalog
 from xiaolin_showdown.logic.constants import ELEMENTS
-from xiaolin_showdown.logic.duel import Duel, DuelChoices, _JONG_FORMS
+from xiaolin_showdown.logic.duel import Duel, DuelChoices
+from xiaolin_showdown.logic.summons import _JONG_FORMS
 from xiaolin_showdown.logic.mechanics.powers import ANIMATE_STAT, is_boost_slot
 from xiaolin_showdown.logic.mechanics.resolve import as_boost, resolve_played_power
 from xiaolin_showdown.logic.setup import new_game

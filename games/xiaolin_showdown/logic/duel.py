@@ -45,8 +45,8 @@ from .mechanics.prize import PrizeRoute, claim_route
 from .mechanics.resolve import as_boost, resolve_played_power, stand_in
 from .mechanics.scoring import initiative
 from .models import Card, Player
-from .naming import display_name
 from .settings import XiaolinSettings
+from .summons import jong_form, summon_name
 from .state import XiaolinState
 from .training import record_showdown
 from . import wear
@@ -59,77 +59,9 @@ LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD rep
 # Monsoon (the whole arena's).
 _CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET_ARENA})
 
-# What a summon Wu whose name contains ``{beast}`` calls up, one per ARENA element — the background
-# decides it (Tongue of Saiping's animals, Imo Gazer's drawn ones), so the same Wu summons a shoal on
-# water and a troop on metal. Flavour, drafted with the user — reword freely; ``earth`` is still a draft.
-_BEASTS = {
-    "water": "a Pod of Seals",
-    "fire": "a Congress of Salamanders",
-    "wind": "a Kettle of Vultures",
-    "earth": "a Sounder of Boars",
-    "metal": "a Troop of Monkeys",
-}
-
-# Imo Gazer's own pool (``{drawing}``): a fantastic beast of Chinese myth sketched to life, one per
-# element — the Four Symbols and the Qilin, mapped onto the arena. Flavour, drafted with the user.
-_DRAWINGS = {
-    "water": "the Black Turtle-Snake",
-    "fire": "the Vermilion Bird",
-    "wind": "the Azure Dragon",  # East/Wood in myth; wind is this game's stand-in for it
-    "earth": "the Qilin",
-    "metal": "the White Tiger",
-}
-
-# Moonstone Cat's Eye ({desire}) conjures whatever the caster most wants made real — keyed to the
-# duelist, not the arena, one per character. Flavour, the user's own picks; reword freely. A caster with
-# no entry (a construct, say) falls back to a plain figment.
-_DESIRES = {
-    "Omi": "his Long Lost Parents",
-    "Kimiko": "a Wave of Space Invaders",
-    "Raimundo": "a Carnival of Revelers",
-    "Clay": "a Herd of Texan Longhorns",
-    "Tubbimura": "a Sumo Wrestler",
-    "Katnappé": "a Litter of Kittens",
-    "Salvador_Cumo": "a Komodo Dragon",
-    "Vlad": "a Set of Matryoshka Dolls",
-    "Le_Mime": "an Invisible Impenetrable Box",
-    "PandaBubba": "a Mob of Goons",
-    "Hannibal_Roy_Bean": "a Towering Suit of Armor",
-    "Wuya": "an Army of Rock Golems",
-    "Chase_Young": "an Evil Omi",
-}
-_A_FIGMENT = "a Figment of the Imagination"
-
-# Heart of Jong (ANIMATE): the character its life leaps into in the boost slot, one per background
-# element. Metal waits on a face not yet in the roster — Jack Spicer's form is the Dude-Bot; until he
-# is a playable, everyone's metal form is the T-Rex. Flavour, the user's own; reword freely.
-_JONG_FORMS = {
-    "water": "Raksha",
-    "fire": "Cyclops",
-    "wind": "Bird of Paradise",
-    "earth": "Gigi",
-    "metal": "T-Rex",
-}
-
-# Shadow of Fear ({fear}) gives a body to the worst fear of the duelist it is used ON — the target, not
-# the caster. Keyed to the victim's character. The Heylin bosses fear the one who bound them, Grand
-# Master Dashi. The minions' fears are still to come; until then they meet a nameless dread. His picks.
-_FEARS = {
-    "Omi": "a Squirrel",
-    "Kimiko": "a Melted Tamochika Doll",
-    "Raimundo": "a Jellyfish Monster",
-    "Clay": "Clay's Granny Lily",
-    "Tubbimura": "an Empty Rice Bowl",
-    "Katnappé": "a Dog",
-    "Salvador_Cumo": "an Angry Wuya",
-    "Vlad": "a Swimming Pool",
-    "Le_Mime": "a Booing Crowd",
-    "PandaBubba": "a Jail Cell",
-    "Hannibal_Roy_Bean": "a Vision of Grand Master Dashi",
-    "Wuya": "a Vision of Grand Master Dashi",
-    "Chase_Young": "a Vision of Grand Master Dashi",
-}
-_A_NAMELESS_DREAD = "a Nameless Dread"
+# The summon-flavour pools ({beast}, {drawing}, {desire}, {spirit}, {fear}, the Jong forms) and their
+# resolvers live in :mod:`.summons`; the duel passes the two characters and the arena, and shows the
+# name they return in place of the Wu's own.
 
 # Chase Young's Beast Form: +1 on the contested stat, in exchange for his Wu. One, not two: the beast
 # KEEPS its prize now (see `_award_prize`), and at +2 that was worth so much it crushed the whole
@@ -632,41 +564,18 @@ class Duel:
         )
 
     def _summon_display(self, card: Card, *, is_player: bool) -> str | None:
-        """A summon Wu enters the board as the thing it calls up — a clone, a horde — not as itself; the
-        hand still shows the Wu. ``{caster}`` fills with the fielding duelist's character. Flavour only:
-        the stats are the Wu's own. ``None`` for an ordinary Wu (its own name stands)."""
+        """A summon Wu enters the board as the thing it calls up — a clone, a horde, a fear — not as
+        itself; the hand still shows the Wu. Flavour only: the stats are the Wu's own. ``None`` for an
+        ordinary Wu (its own name stands). The pools and their keying live in :mod:`.summons`."""
         template = card.power.summon
         if not template:
             return None
-        caster = display_name(self.state.duelist(is_player).character.name, short=True)
-        arena = self.duel.background or ""
-        return (
-            template.replace("{caster}", caster)
-            .replace("{beast}", _BEASTS.get(arena, ""))
-            .replace("{drawing}", _DRAWINGS.get(arena, ""))
-            .replace("{spirit}", self._spirit(is_player))
-            .replace("{desire}", self._desire(is_player))
-            .replace("{fear}", self._fear(is_player))
+        return summon_name(
+            template,
+            caster=self.state.duelist(is_player).character,
+            target=self.state.duelist(not is_player).character,
+            arena=self.duel.background or "",
         )
-
-    def _spirit(self, is_player: bool) -> str:
-        """Monarch Wings ({spirit}) calls a spirit chosen by the caster's side, not the arena: a Chi
-        Creature for the Xiaolin, Sibini for the Heylin — but Hannibal, a Yin-Yang world native, draws
-        no Sibini and gets the Ying-Yang Bird. Flavour, the user's own picks."""
-        character = self.state.duelist(is_player).character
-        if character.name == "Hannibal_Roy_Bean":
-            return "Ying-Yang Bird"
-        return "Chi Creature" if character.affiliation == "xiaolin" else "Sibini"
-
-    def _desire(self, is_player: bool) -> str:
-        """Moonstone Cat's Eye ({desire}) conjures what the caster most wants — keyed to the character."""
-        return _DESIRES.get(self.state.duelist(is_player).character.name, _A_FIGMENT)
-
-    def _fear(self, is_player: bool) -> str:
-        """Shadow of Fear ({fear}) gives a body to the TARGET's worst fear — the duelist it lands on, the
-        caster's opponent, not the caster. Keyed to that character."""
-        target = self.state.duelist(not is_player).character
-        return _FEARS.get(target.name) or _A_NAMELESS_DREAD  # an unfilled entry meets the dread too
 
     def _ground(self) -> Ground:
         """The terms this battle is fought under — what the scorer and the bot both read."""
@@ -849,16 +758,8 @@ class Duel:
         # rest, so in tune it NETS 1/1/1 (see `as_boost`).
         boosted = as_boost(card, element, self._stat_of(self.duel.round_number - 1))
         if mechanic_of(card.power) is Mechanic.ANIMATE:  # the board shows the form the background called up
-            boosted.name = self._jong_form(element, is_player)
+            boosted.name = jong_form(element, self.state.duelist(is_player).character)
         mine.queue.append(boosted)
-
-    def _jong_form(self, element: str, is_player: bool) -> str:
-        """Which animated form the Heart of Jong wakes, by the arena element — and, on metal, by who cast
-        it: Jack Spicer's own construct is the Dude-Bot, not the T-Rex. Dormant until Jack joins the
-        roster (there is no such character yet), so the branch waits with him."""
-        if element == "metal" and self.state.duelist(is_player).character.name == "Jack_Spicer":
-            return "Dude-Bot"
-        return _JONG_FORMS.get(element, "")
 
     @staticmethod
     def _is_chase(player: Player) -> bool:

@@ -170,6 +170,34 @@ def test_the_desire_is_the_casters_own():
     assert got == "his Long Lost Parents"
 
 
+def _bot_temple_state(cards, bar):
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1))
+    state.bot.character = cat.character(6)  # Katnappé — room under the cap to train
+    state.bot.hand = [deepcopy(cat.card(c)) for c in cards]
+    state.bot.training = bar
+    return state
+
+
+def test_the_bot_spends_the_sapphire_dragon_to_train():
+    """It can never field it, so the temple is the only use — and its full-bar boost is a free level."""
+    from xiaolin_showdown.logic.temple_ai import choose_temple_power
+
+    play = choose_temple_power(_bot_temple_state([SAPPHIRE, FIST], 0), XiaolinSettings(), is_player=False)
+    assert play is not None and play.card.id == SAPPHIRE
+
+
+def test_the_bot_feeds_a_summon_only_when_it_completes_a_level():
+    """A +3 is worth more fielded than fed to a low bar; near the top, it finishes a level and pays out."""
+    from xiaolin_showdown.logic.temple_ai import choose_temple_power
+
+    settings = XiaolinSettings()
+    low = choose_temple_power(_bot_temple_state([TONGUE, FIST], 2), settings, is_player=False)
+    high = choose_temple_power(_bot_temple_state([TONGUE, FIST], 8), settings, is_player=False)
+    assert low is None  # 2 + 3 falls short of a full bar
+    assert high is not None and high.card.id == TONGUE  # 8 + 3 completes it
+
+
 def _duel_where_the_player_fields_the_dragon():
     cat = load_catalog()
     rng = Rng(1)
@@ -215,7 +243,7 @@ def _duel_targeting(bot_char_id: int) -> Duel:
 
 def test_the_fear_is_the_targets_not_the_casters():
     """Shadow of Fear gives a body to the worst fear of whoever it lands on — the caster's opponent."""
-    from xiaolin_showdown.logic.duel import _FEARS
+    from xiaolin_showdown.logic.summons import _FEARS
 
     duel = _duel_targeting(13)  # the bot is Chase Young
     fear = deepcopy(load_catalog().card(SHADOW_OF_FEAR))
@@ -224,7 +252,7 @@ def test_the_fear_is_the_targets_not_the_casters():
 
 
 def test_a_target_with_no_fear_named_meets_a_nameless_dread():
-    from xiaolin_showdown.logic.duel import _A_NAMELESS_DREAD
+    from xiaolin_showdown.logic.summons import _A_NAMELESS_DREAD
 
     duel = _duel_targeting(1)
     nameless = deepcopy(duel.state.bot.character)
@@ -236,7 +264,7 @@ def test_a_target_with_no_fear_named_meets_a_nameless_dread():
 def test_every_duelist_has_a_desire():
     """Moonstone conjures per character, so a fighter added to the roster needs its own entry — without
     one it silently falls back to a plain figment. This is the guard the fallback would otherwise hide."""
-    from xiaolin_showdown.logic.duel import _DESIRES
+    from xiaolin_showdown.logic.summons import _DESIRES
 
     duelists = [c for c in load_catalog().characters if c.affiliation in {"xiaolin", "heylin"}]
     missing = [c.name for c in duelists if c.name not in _DESIRES]

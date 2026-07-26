@@ -14,6 +14,7 @@ from .mechanics.scoring import initiative
 from .models import Card
 from .settings import XiaolinSettings, player_actions
 from .state import XiaolinState
+from .training import TRAIN_BOOST_STEP, TRAIN_LENGTH, can_train
 from .turn import duel_value
 
 # How much better the best Wu on the shelf must be than the one a plain Draw would hand over, before
@@ -103,7 +104,25 @@ def choose_temple_power(
         if mechanic is Mechanic.REFRESH and _worth_refreshing(state):
             return TemplePlay(card)
 
+        if mechanic is Mechanic.TRAIN_BOOST and _worth_summoning_to_train(state, card, is_player):
+            return TemplePlay(card)
+
     return None
+
+
+def _worth_summoning_to_train(state: XiaolinState, card: Card, is_player: bool = False) -> bool:
+    """Spend a summon Wu at the temple only when its shove COMPLETES the training bar.
+
+    A summon Wu is worth more fielded than fed to a half-full bar — but a shove that finishes a level
+    pays out a stat on the spot, a permanent gain nothing else this turn can match, and never a wasted
+    partial fill. The Sapphire Dragon's full-bar boost always qualifies (and it can never be fielded, so
+    the temple is its only use); a +3/+6 only near the top of the bar. Never on the last card in hand.
+    """
+    me = state.duelist(is_player)
+    if not can_train(me) or me.just_trained or len(me.hand) <= 1:
+        return False
+    step = card.power.train_step or TRAIN_BOOST_STEP
+    return me.training + step >= TRAIN_LENGTH
 
 
 def worth_recalling(state: XiaolinState) -> bool:
