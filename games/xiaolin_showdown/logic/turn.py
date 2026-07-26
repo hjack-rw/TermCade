@@ -60,6 +60,7 @@ def refill_hands(state: XiaolinState, settings: XiaolinSettings, *, rng: Rng) ->
     state.bot_actions_taken = 0
     state.deposits_taken = 0
     state.bot_deposits_taken = 0
+    state.undo_stash = None  # a new turn: last turn's actions are past undoing
     turn_over(state.player)  # a taken payout's bar showed full through the turn; reset it now
     turn_over(state.bot)
 
@@ -156,6 +157,10 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     # Refresh prints 0/0/0 — its worth is the second use it buys back, not stats. Priced as a modest
     # utility so the bot holds it rather than banking it as junk; the bot has no policy to spend it yet.
     Mechanic.REFRESH: 3,
+    # The Treasurebox prints 0/0/0 but FIELDED it wins the showdown outright — the highest table value
+    # there is. The bot has no policy to field or wish it; this only keeps it from banking the strongest
+    # Wu in the pool as junk. (Deposited it is worth its 10 printed points, counted the ordinary way.)
+    Mechanic.WISH: 10,
 }
 
 # (Witchcraft is a CHARACTER power — no card carries it, so its table price is moot; it sits in
@@ -217,6 +222,16 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         # Prints real stats; its shield (no curse on the stat it boosts) is contextual, read by the
         # bot's play-it-out eval, not priced here.
         Mechanic.STAT_SHIELD,
+        # Prints real stats; its seize (the challenger's ground for the showdown) only decides level
+        # battles, so it is contextual — and the bot does not yet field it *for* the seize, so pricing
+        # it would be a number nothing measured. Excused until the bot plays it deliberately.
+        Mechanic.SEIZE_GROUND,
+        # Prints real stats; its undo is a temple ``use`` the bot never spends (no policy), so on the
+        # table it is only ever the 1/1/1 it wagers. Excused, not priced.
+        Mechanic.AMEND,
+        # A summon: on the table it is just its printed stats (the fielded horde/clone). Its extra worth
+        # is the temple +training, a use the bot has no policy for — so table value is the stats alone.
+        Mechanic.TRAIN_BOOST,
         # Prints real stats; its doubled elemental bonus is contextual (great in tune, awful against),
         # read by the bot's play-it-out eval, not priced here.
         Mechanic.DOUBLE_ELEMENT,
@@ -251,7 +266,11 @@ def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
     every weight, and refusing to deposit a booster cost 5 points of win rate. Points are the win
     condition. Easy sheds its least useful Wu and hoards weapons — it duels as well, and never closes.
     """
-    candidates = [card for card in hand if card.points > 0]
+    # A Treasurebox is worth far more fielded (it wins the showdown) than its 10 banked points, so the
+    # bot keeps it for the duel rather than cashing it — see bot.choose_card, which always fields it.
+    candidates = [
+        card for card in hand if card.points > 0 and mechanic_of(card.power) is not Mechanic.WISH
+    ]
     if not candidates:
         return None
     # A Wu one showdown from wearing out banks ITSELF, free (see wear.py) — spending the turn's
@@ -428,6 +447,8 @@ def _bank_surplus(
             points = bank_value(banked, rng)
             bot.points = max(0, bot.points + points)  # a bad gamble cannot go below zero
             bot.remove_card(banked)
+            if mechanic_of(banked.power) is not Mechanic.WISH:
+                bot.vault.append(banked)  # into the Vault, where the player's Treasurebox can steal it
             state.bot_actions_taken += 1
             state.bot_deposits_taken += 1
             return BotMove(

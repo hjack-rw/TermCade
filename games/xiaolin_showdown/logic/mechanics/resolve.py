@@ -38,7 +38,8 @@ if TYPE_CHECKING:
 _NEUTRAL_POWER = Power(id=0, name="", mechanic=Mechanic.FILLER, description="")
 
 def resolve_played_power(
-    round_: "Round", card: Card, *, is_player: bool, element: str, stat: str | None = None
+    round_: "Round", card: Card, *, is_player: bool, element: str, stat: str | None = None,
+    display_name: str | None = None,
 ) -> str | None:
     """Resolve ``card`` into this round's scoring queues; return the elemental flag it raised, if any.
 
@@ -53,7 +54,7 @@ def resolve_played_power(
     """
     mine, theirs = round_.sides(is_player)
     mechanic = mechanic_of(card.power)
-    played = stand_in(card)
+    played = stand_in(card, display_name)
     cursed = _apply_mechanic(
         mechanic, card, played, mine, theirs, element, stat, contested=round_.stat
     )
@@ -75,6 +76,8 @@ def resolve_played_power(
         return "reverse"
     if mechanic is Mechanic.SET_ARENA:  # Monsoon Sandals — the arena becomes the chosen element
         return f"background:{element}"
+    if mechanic is Mechanic.SEIZE_GROUND:  # Cube of Haniku — its caster takes the challenger's ground
+        return "seize:player" if is_player else "seize:bot"
     return None
 
 
@@ -254,11 +257,14 @@ def _apply_booster(booster: Card, played: Card, opponent: "Side", *, cursed: boo
         booster.stats = {stat: 1 if played.stats[stat] else 0 for stat in played.stats}
 
 
-def stand_in(card: Card) -> Card:
-    """A scratch copy of ``card`` wearing a neutral power — safe for the duel to mutate."""
+def stand_in(card: Card, display_name: str | None = None) -> Card:
+    """A scratch copy of ``card`` wearing a neutral power — safe for the duel to mutate.
+
+    ``display_name`` overrides the copy's name on the board: a summon Wu enters the queue as the thing
+    it summons (a clone, a horde) rather than as itself. The stats are untouched — flavour only."""
     return Card(
         id=card.id,
-        name=card.name,
+        name=display_name or card.name,
         stats=dict(card.stats),
         power=_NEUTRAL_POWER,
         element=card.element,

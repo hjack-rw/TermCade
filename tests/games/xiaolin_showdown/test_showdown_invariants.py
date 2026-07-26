@@ -109,8 +109,12 @@ def _assert_invariants(duel, state, before_hand: list) -> None:
     assert player_rounds == sum(1 for r in d.rounds if r.winner is True)
     assert bot_rounds == sum(1 for r in d.rounds if r.winner is False)
 
-    # the winner is the one the cascade names: rounds, then margin, then the challenger
-    if player_rounds != bot_rounds:
+    # the winner is the one the cascade names: rounds, then margin, then the challenger — UNLESS a
+    # Treasurebox of the Blind Swordsman was fielded, which wins the showdown outright, whatever the
+    # battles said. That is the one rule allowed to override the cascade.
+    if d.auto_winner is not None:
+        assert d.winner is d.auto_winner
+    elif player_rounds != bot_rounds:
         assert d.winner is (player_rounds > bot_rounds)
     else:
         margin = sum(r.score for r in d.rounds)

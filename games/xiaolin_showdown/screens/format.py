@@ -24,6 +24,8 @@ from ..logic.mechanics.powers import (
     trigger_of,
 )
 from ..logic.models import Card, Character, Power
+from ..logic.naming import display_name  # moved to logic (the duel needs it too); screens import it here
+from ..logic.training import TRAIN_BOOST_STEP
 
 # element -> colour, as explicit hex so the theme's ANSI palette can't remap it (the OG mapping:
 # water blue, fire red, wind/air yellow, earth green, metal a neutral grey).
@@ -106,31 +108,26 @@ def char_stats(character: Character) -> str:
     return stats_line(character.stats)
 
 
-# A name longer than this is shortened to its first word where space is scarce. The threshold is the
-# point of it: "Le Mime" is two words and seven characters, and "Le" is not a name — so the rule has
-# to fire on what a name COSTS, not on how many words it happens to have. At 10 it takes Salvador
-# Cumo, Hannibal Roy Bean and Chase Young, all of whom are known by their first name, and leaves
-# Le Mime whole.
-SHORTEN_OVER = 10
-
-
-def display_name(name: str, *, upper: bool = False, short: bool = False) -> str:
-    """A stored name shown for humans: underscores become spaces (``Salvador_Cumo`` -> ``Salvador Cumo``).
-    ``upper`` shouts it for a heading, keeping the underscore rule in one place.
-
-    ``short`` asks for the first word alone, and is honoured only for a name long enough to be worth
-    it (see ``SHORTEN_OVER``). A phone is the caller: the temple's state row has about 86 columns to
-    spend and a full name pushes Deck and Initiative off the end entirely — they truncate to
-    ``Deck:…`` and ``Initiative: …``, which is a label costing the value it was there to introduce.
-    """
-    shown = name.replace("_", " ")
-    if short and len(shown) > SHORTEN_OVER:
-        shown = shown.split(" ", 1)[0]
-    return shown.upper() if upper else shown
+# Name shortening moved to `logic.naming` (the duel needs it too, for summon names) — imported at the
+# top and re-exported, so every `from .format import display_name` across the screens keeps working.
 
 
 def affiliation_icon(character: Character) -> str:
     return ICONS.get(character.affiliation, "")
+
+
+# The five elements in turn, for a name that belongs to all of them — the Treasurebox of the Blind
+# Swordsman, whose wish reaches into every colour.
+_ELEMENT_CYCLE = ("water", "fire", "wind", "earth", "metal")
+
+
+def _rainbow_name(name: str, *, bold: bool = False) -> Text:
+    """A name lettered through the five element colours, one per character in turn."""
+    weight = "bold " if bold else ""
+    text = Text()
+    for index, char in enumerate(name):
+        text.append(char, style=f"{weight}{COLORS[_ELEMENT_CYCLE[index % len(_ELEMENT_CYCLE)]]}")
+    return text
 
 
 def card_name_text(card: Card, *, bold: bool = False) -> Text:
@@ -140,7 +137,12 @@ def card_name_text(card: Card, *, bold: bool = False) -> Text:
     wears its chosen element — so this shows the in-duel element, not the printed one. A curse mirror
     keeps the element it is, and earns no bonus for the side it lands on (that is the duel's job, not
     a colour's). A card with no element falls back to plain white.
+
+    The Treasurebox of the Blind Swordsman (WISH) is the one exception: it is every element and none,
+    so its name runs through all five colours rather than taking one.
     """
+    if mechanic_of(card.power) is Mechanic.WISH:
+        return _rainbow_name(display_name(card.name), bold=bold)
     colour = COLORS.get(card.element, "white")
     return Text(display_name(card.name), style=f"bold {colour}" if bold else colour)
 
@@ -262,6 +264,10 @@ EFFECTS = {
     Mechanic.SCRY: f"Look at the next {SCOPE_DEPTH} Wu in the incoming Wu pile.",
     Mechanic.ENHANCED_VISION: "Take or refuse the next Showdown's Initiative.",
     Mechanic.PROGNOSIS: "Your opponent leads next Showdown, but you read their challenge and hold the tiebreak.",
+    Mechanic.SEIZE_GROUND: "You hold the tiebreak all Showdown, overriding a Prognosis.",
+    Mechanic.AMEND: "Take back your previous action this turn (boss runs only).",
+    Mechanic.WISH: "One wish, then gone: deposit for points, restore a Vaulted Wu, or field to win the Showdown.",
+    Mechanic.TRAIN_BOOST: f"Spend it to summon help to train against: +{TRAIN_BOOST_STEP} to your training bar, once.",
     Mechanic.BUFF: f"You name one stat. It takes +{NAMED_STAT_VALUE} in the battle.",
     Mechanic.MISFORTUNE: f"You name one stat. Your opponent takes −{NAMED_STAT_VALUE} in the battle.",
     Mechanic.FETCH: "Pull any one Wu from your own Deck into your hand.",

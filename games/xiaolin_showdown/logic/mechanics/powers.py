@@ -167,12 +167,41 @@ RULES: dict[Mechanic, Rule] = {
         "Spend it to let your opponent lead the next Showdown — but you read the challenge before they play "
         ", and keep the challenger's ground after the battle.",
     ),
+    Mechanic.SEIZE_GROUND: Rule(
+        Mechanic.SEIZE_GROUND,
+        "play",
+        Timing.IN_DUEL,
+        "Field it and its caster holds the challenger's ground for the rest of the Showdown, "
+        "winning every level battle — overriding a Prognosis set at the temple. Both duelists "
+        "fielding one cancels it, and the ground goes back to whoever leads.",
+    ),
     Mechanic.TRANSFER: Rule(
         Mechanic.TRANSFER,
         "use",
         Timing.AT_TEMPLE,
         "Spend it to swap your entire hand with your opponent's — a Wudai weapon stays with its "
         "soul's owner.",
+    ),
+    Mechanic.AMEND: Rule(
+        Mechanic.AMEND,
+        "use",
+        Timing.AT_TEMPLE,
+        "Spend it to take back your previous action this turn — a fumbled deposit, draw, or power, put "
+        "right. One undo, and the Mouse is spent doing it; in a one-action turn there is nothing to fix.",
+    ),
+    Mechanic.WISH: Rule(
+        Mechanic.WISH,
+        "use",
+        Timing.AT_TEMPLE,
+        "One wish, then gone for good — no power brings it back. Deposit it for a heap of points, spend "
+        "it to wish a Wu back from your Vault, or field it in a Showdown to win outright.",
+    ),
+    Mechanic.TRAIN_BOOST: Rule(
+        Mechanic.TRAIN_BOOST,
+        "use",
+        Timing.AT_TEMPLE,
+        "Spend it at the temple to summon help to train against — a one-time shove forward on your "
+        "training bar, then it is gone. Useless once every base stat is capped.",
     ),
     Mechanic.WITCHCRAFT: Rule(
         Mechanic.WITCHCRAFT,

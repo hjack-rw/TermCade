@@ -12,8 +12,9 @@ from dataclasses import dataclass
 
 from termcade.core.rng import Rng
 
-from .mechanics.cards import index_of
+from .mechanics.cards import index_of, is_one_of
 from .mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of
+from .training import TRAIN_BOOST_STEP, add_progress
 from .models import Card, Player
 from .state import XiaolinState
 from .turn import bank_value, shelve
@@ -87,6 +88,18 @@ REPORTS: dict[Mechanic, PowerReport] = {
     Mechanic.TRANSFER: PowerReport(
         "The Lantern shone on you both — every Wu in your hand is theirs, and theirs are yours.",
         "{caster} swapped the two hands entirely: {count} Wu crossed to {caster_poss} side.",
+    ),
+    Mechanic.AMEND: PowerReport(
+        "The Hodoku Mouse scurried back through time — your last move is undone.",
+        "{caster} took back {caster_poss} last temple move.",
+    ),
+    Mechanic.WISH: PowerReport(
+        "The Blind Swordsman granted a wish — {name} is back from the Vault, and the Treasurebox is spent.",
+        "{caster} wished {name} back from the Vault.",
+    ),
+    Mechanic.TRAIN_BOOST: PowerReport(
+        "You summoned help to train against — the bar surges by {step}.",
+        "{caster} summoned help and gained {step} training.",
     ),
 }
 
@@ -311,6 +324,39 @@ def _swap_souls(spend: _Spend) -> _Fill | None:
     return {"count": len(theirs)}
 
 
+def _amend(spend: _Spend) -> _Fill | None:
+    """Hodoku Mouse: put the board back the way it was before your last temple action.
+
+    Nothing stashed → it fizzles (and ``usable_powers`` will not even have offered it). The Mouse is
+    consumed by ``use_power`` either way — one undo per Mouse — and the restore never hands it back.
+    The RNG rides along, so a gamble deposit undone does not desync the stream."""
+    if spend.rng is None:
+        raise ValueError("Amend restores the RNG stream — pass the rng")
+    return {} if spend.state.undo(spend.rng) else None
+
+
+def _train_boost(spend: _Spend) -> _Fill | None:
+    """A summon Wu (Tongue of Saiping and kin) spent at the temple: shove ``TRAIN_BOOST_STEP`` into the
+    caster's training bar at once. ``usable_powers`` only offers it while a stat can still climb, so the
+    fill is always real — it never fizzles."""
+    add_progress(spend.me, TRAIN_BOOST_STEP)
+    return {"step": TRAIN_BOOST_STEP}
+
+
+def _restore(spend: _Spend) -> _Fill | None:
+    """Treasurebox of the Blind Swordsman, wished at the temple: one Wu out of EITHER Vault, into your
+    hand. Your own deposit is a modest wish; the strength is reaching into your opponent's Vault and
+    taking a Wu they had banked. Fizzles when both Vaults are empty. The Treasurebox is exiled by
+    ``use_power`` afterwards: one wish, and it is gone."""
+    if not (spend.me.vault or spend.them.vault):
+        return None
+    pulled = spend.wu()  # the Vault Wu the caller named, from either side
+    vault = spend.me.vault if is_one_of(pulled, spend.me.vault) else spend.them.vault
+    vault.pop(index_of(vault, pulled))
+    spend.me.hand.append(pulled)
+    return {"name": pulled.name}
+
+
 def _shove(spend: _Spend) -> _Fill | None:
     """Repulsion: a Wu out of the opponent's hand — the caster picks where it lands.
 
@@ -347,6 +393,9 @@ _FIRE: dict[Mechanic, Callable[[_Spend], _Fill | None]] = {
     Mechanic.REFRESH: _refresh,
     Mechanic.PROGNOSIS: _foresee,
     Mechanic.TRANSFER: _swap_souls,
+    Mechanic.AMEND: _amend,
+    Mechanic.WISH: _restore,
+    Mechanic.TRAIN_BOOST: _train_boost,
 }
 
 

@@ -12,7 +12,7 @@ from termcade.core.rng import Rng
 from .constants import WEAR_LIMIT
 from .mechanics.scoring import initiative
 from .mechanics.powers import Mechanic, mechanic_of, trigger_of
-from .models import Card
+from .models import Card, Player
 from .settings import XiaolinSettings, deposit_limit, player_actions
 from .state import XiaolinState
 from .training import add_progress, can_train, doubles_training, payout_ready
@@ -75,9 +75,14 @@ def deposit(state: XiaolinState, card: Card, *, rng: Rng) -> int:
 
     The derived ``Player.initiative`` updates itself when the hand changes.
     """
+    state.stash_undo(rng)  # remember the board so a Hodoku Mouse can take this deposit back
     state.player.hand.remove(card)
     paid = bank_value(card, rng)
     state.player.points = max(0, state.player.points + paid)
+    # Into the Vault, where a Treasurebox can wish it back — but a Treasurebox itself is never vaulted:
+    # its every use is final, so depositing it cashes the points and it is simply gone.
+    if mechanic_of(card.power) is not Mechanic.WISH:
+        state.player.vault.append(card)
     state.actions_taken += 1
     state.deposits_taken += 1
     return paid
@@ -107,8 +112,13 @@ def draw_swaps(state: XiaolinState, settings: XiaolinSettings) -> bool:
     return len(state.player.whole_hand) >= max_hand_size(state.player, settings.max_hand_size)
 
 
-def draw(state: XiaolinState) -> Card:
-    """Pull the top Wu of the player's personal deck into their hand; costs the turn's action."""
+def draw(state: XiaolinState, *, rng: Rng | None = None) -> Card:
+    """Pull the top Wu of the player's personal deck into their hand; costs the turn's action.
+
+    ``rng`` is only for the undo stash — a draw itself rolls nothing. Passed by the player's screen so
+    a Hodoku Mouse can take the draw back; omitted where undo is moot (the bot draws its own way)."""
+    if rng is not None:
+        state.stash_undo(rng)
     card = state.player.deck.pop(0)
     state.player.hand.append(card)
     state.actions_taken += 1
@@ -122,6 +132,7 @@ def swap_from_hand(state: XiaolinState, shelved: Card, *, rng: Rng) -> Card:
     are putting down. The shelved Wu is then shuffled into the deck for later. The hand ends the same
     size, and the swap is never a wasted action that hands you back your own card.
     """
+    state.stash_undo(rng)  # remember the board so a Hodoku Mouse can take this swap back
     drawn = state.player.deck.pop(0)
     state.player.hand.append(drawn)
     state.player.remove_card(shelved)
@@ -147,10 +158,14 @@ def train_blocked(state: XiaolinState, actions_per_turn: int) -> str | None:
     return None
 
 
-def train(state: XiaolinState) -> bool:
+def train(state: XiaolinState, *, rng: Rng | None = None) -> bool:
     """Spend the turn's action on the bar. Returns whether the payout is now waiting.
 
-    A Ring of Nine Xing in hand doubles the point earned, as it doubles a lost showdown's."""
+    A Ring of Nine Xing in hand doubles the point earned, as it doubles a lost showdown's. ``rng`` is
+    only for the undo stash (training rolls nothing) — passed by the player's screen so a Hodoku Mouse
+    can take the fill back."""
+    if rng is not None:
+        state.stash_undo(rng)
     state.actions_taken += 1
     return add_progress(state.player, 2 if doubles_training(state.player) else 1)
 
@@ -193,6 +208,15 @@ def _has_target(state: XiaolinState, card: Card, is_player: bool = True) -> bool
         return bool(state.used)  # nobody has used anything yet — there is nothing to call back
     if mechanic is Mechanic.TRANSFER:
         return bool(them.hand)  # a one-way gift is not a swap
+    if mechanic is Mechanic.AMEND:
+        # Only offer the Mouse when there is a stashed action to undo. In a one-action turn there
+        # never is (the turn's one action is spent the moment it is taken), so it never shows — which
+        # is the point: undoing your only move is useless.
+        return state.undo_stash is not None
+    if mechanic is Mechanic.WISH:
+        return bool(me.vault or them.vault)  # a Treasurebox wishes back a deposit — yours or, better, theirs
+    if mechanic is Mechanic.TRAIN_BOOST:
+        return can_train(me)  # a summon trains you against it — useless once every base stat is capped
     return True
 
 
@@ -253,7 +277,9 @@ def initiative_lead(state: XiaolinState, *, is_player: bool) -> int:
     return max(0, mine - theirs)
 
 
-def early_bird(state: XiaolinState, surrendered: Card, *, is_player: bool = True) -> str:
+def early_bird(
+    state: XiaolinState, surrendered: Card, *, is_player: bool = True, rng: Rng | None = None
+) -> str:
     """Take the next Wu off the pile with no showdown, and give up a Wu of speed for it.
 
     You were simply faster: you reached the Wu first, so there was nothing to duel over. The Wu you
@@ -262,8 +288,10 @@ def early_bird(state: XiaolinState, surrendered: Card, *, is_player: bool = True
     run, exactly as it does when the last prize is drawn.
 
     ``is_player`` is which duelist flew it. The bot is held to the same rule, down to the surrender.
-    """
+    ``rng`` is only for the player's undo stash (the flight rolls nothing)."""
     me = state.duelist(is_player)
+    if is_player and rng is not None:
+        state.stash_undo(rng)  # remember the board so a Hodoku Mouse can take this flight back
     me.remove_card(surrendered)
     taken = state.card_deck.pop(0)
     me.hand.append(taken)
@@ -295,6 +323,17 @@ def coming_wu(state: XiaolinState, depth: int = 1) -> list[Card]:
     return state.card_deck[:depth]
 
 
+def _consume_amend(state: XiaolinState, me: Player) -> None:
+    """Spend the Mouse for its undo. The restore rebuilt the hand, so the copy sitting in it now is a
+    FRESH one, not the instance the caller held — find it by mechanic and move it to the used pile.
+    One undo per Mouse: the restore never hands it back. A fizzled Amend left the board alone, so the
+    same by-value search finds the original."""
+    used = next((c for c in me.whole_hand if mechanic_of(c.power) is Mechanic.AMEND), None)
+    if used is not None:
+        me.remove_card(used)
+        state.used.append(used)
+
+
 def use_power(
     state: XiaolinState,
     card: Card,
@@ -323,9 +362,20 @@ def use_power(
     if trigger_of(card.power) != "use":  # a hand power-up is passive — nothing to trigger, kept
         return FIZZLE_MESSAGE
 
+    mechanic = mechanic_of(card.power)
+    # A use-power is itself an undoable action, so stash the board first — unless it IS the Mouse,
+    # which must not stash over the very board it means to restore.
+    if is_player and rng is not None and mechanic is not Mechanic.AMEND:
+        state.stash_undo(rng)
     spend = _Spend(state, card, is_player, priority, target, to_deck, rng)
     message = _fire(spend)
     state.spend_action(is_player)
+    if mechanic is Mechanic.AMEND:
+        _consume_amend(state, spend.me)
+        return message
+    if mechanic is Mechanic.WISH:
+        spend.me.remove_card(card)  # exiled: a Treasurebox's wish is final — not even the used pile
+        return message
     # Witchcraft (Wuya): the spent Wu returns to her hand instead of the discard — worn one further
     # by the sorcery. The wear rule is her leash: the return that brings it to the limit vaults it.
     if WITCHCRAFT_RETURNS and mechanic_of(spend.me.character.power) is Mechanic.WITCHCRAFT:

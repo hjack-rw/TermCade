@@ -242,7 +242,7 @@ class TempleScreen(XiaolinScreen):
         if draw_swaps(self.state, self.rules):
             self._swap_draw()  # a full hand cycles: pick one to shelve, take one back
             return
-        card = draw(self.state)
+        card = draw(self.state, rng=self.ctx.rng)  # rng lets a Hodoku Mouse take the draw back
         self.app.notify(f"Drew {card.name}.", title=your_move(DRAW))
         self.rebuild()  # show the drawn Wu without leaving the temple
 
@@ -276,7 +276,7 @@ class TempleScreen(XiaolinScreen):
         if payout_ready(self.state.player):
             self._pick_training_stat()  # the bar is already full: picking the stat is free
             return
-        if train(self.state):
+        if train(self.state, rng=self.ctx.rng):  # rng lets a Hodoku Mouse take the fill back
             self._pick_training_stat()  # this very turn filled it
             return
         self.app.notify(

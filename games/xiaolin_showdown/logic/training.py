@@ -18,6 +18,7 @@ from .state import XiaolinState
 TRAIN_LENGTH = 10  # what a full bar takes; the temple tooltip reads progress/TRAIN_LENGTH
 STAT_CAP = 5  # no base stat may pass this — outstat the plain Wu and the pricing collapses
 LOSS_FILL = 1  # what a lost showdown teaches
+TRAIN_BOOST_STEP = 3  # a summon Wu spent at the temple (TRAIN_BOOST) shoves this much into the bar at once
 # Boss-run rule: a beating from a boss teaches DOUBLE. One of the two asymmetries that offset a
 # boss's powers without touching duel stats (measured: 0.5% -> 3.0% alone, 5.0% with the extra
 # actions — docs/design/BOSSES.md). Written as the same law for both sides; the boss sits at the

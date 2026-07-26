@@ -165,6 +165,9 @@ def test_flying_costs_the_turns_action(state, catalog):
 def test_the_lead_that_bought_it_is_spent_on_it(state, catalog):
     """You cannot fly twice on the same wings: the price is taken out of the very lead that paid."""
     settings = _outrun(state, catalog)
+    # The worm taken off the pile must carry no speed of its own, or it would hand the lead straight
+    # back — pin a plain Wu on top so this measures the price paid, not what the shuffle happened to deal.
+    state.card_deck.insert(0, _plain(catalog))
     before = initiative_lead(state, is_player=True)
 
     early_bird(state, early_bird_options(state)[0])

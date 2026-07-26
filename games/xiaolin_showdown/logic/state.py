@@ -22,6 +22,8 @@ from .mechanics.cards import held_as_wudai
 from .models import Card, Player
 
 if TYPE_CHECKING:  # settings imports nothing from here, but importing it at runtime would still cycle
+    from termcade.core.rng import Rng
+
     from .settings import XiaolinSettings
 
 
@@ -67,6 +69,14 @@ class XiaolinState:
     # ``forced_priority``. ``None`` is the ordinary game.
     locked_challenge: str | None = None
     conch_tiebreak: bool | None = None
+    # A Cube of Haniku (seize_ground) fielded this showdown: who took the challenger's ground, or
+    # ``None`` for nobody. Tracked apart from ``conch_tiebreak`` so a second Cube reads as a clash to
+    # cancel, not as a temple Prognosis being legitimately overwritten. Spent by the duel end phase.
+    ground_seized: bool | None = None
+    # The board and RNG stream as they stood before the player's most recent temple action, kept so a
+    # Hodoku Mouse (AMEND) can put them back. One level deep. Never serialized — a run is saved only
+    # between turns, when it is ``None`` (cleared at turn-over by ``turn.refill_hands``).
+    undo_stash: tuple[dict[str, Any], list[Any]] | None = None
     # Both duelists reached for the initiative the same turn (a Conch and/or Glasses each): neither's
     # answer stands and the coin decides, since we cannot play the two out simultaneously. Set when a
     # second initiative power lands on an already-answered showdown; spent by the duel end phase.
@@ -118,6 +128,29 @@ class XiaolinState:
         else:
             self.bot_actions_taken += count
 
+    def stash_undo(self, rng: "Rng") -> None:
+        """Remember the board and RNG stream before a player temple action, so a Hodoku Mouse can put
+        them back. The RNG rides along: a gamble deposit undone without it would leave the stream
+        advanced and the next roll would come out different (see the engine's ``spawn`` note)."""
+        self.undo_stash = (self.snapshot(), rng.get_state())
+
+    def undo(self, rng: "Rng") -> bool:
+        """Put the board back the way it was before the last stashed action; restore the RNG too.
+
+        The turn's action *budget* is deliberately NOT restored — the undone action and the Amend both
+        cost — so it cannot loop. The Mouse itself is consumed by the caller, not handed back by this
+        restore. Returns ``False`` when there is nothing to undo (the Amend then fizzles)."""
+        if self.undo_stash is None:
+            return False
+        snapshot, rng_state = self.undo_stash
+        self.undo_stash = None
+        restored = XiaolinState.restore(snapshot, None)
+        for name in ("player", "bot", "card_deck", "previous_challenge",
+                     "previous_background", "lost", "used", "point_limit"):
+            setattr(self, name, getattr(restored, name))
+        rng.set_state(rng_state)
+        return True
+
     # --- engine GameState protocol -------------------------------------------------
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -136,6 +169,7 @@ class XiaolinState:
             "forced_priority": self.forced_priority,
             "locked_challenge": self.locked_challenge,
             "conch_tiebreak": self.conch_tiebreak,
+            "ground_seized": self.ground_seized,
             "initiative_contested": self.initiative_contested,
             "lost": [card.id for card in self.lost],
             "used": [card.id for card in self.used],
@@ -170,6 +204,7 @@ class XiaolinState:
             forced_priority=data.get("forced_priority"),  # absent in a save from before the Conch
             locked_challenge=data.get("locked_challenge"),
             conch_tiebreak=data.get("conch_tiebreak"),
+            ground_seized=data.get("ground_seized"),  # absent in a save from before the Cube
             initiative_contested=data.get("initiative_contested", False),
             lost=[_fresh_card(catalog, cid) for cid in data.get("lost", [])],
             used=[_fresh_card(catalog, cid) for cid in data.get("used", [])],
@@ -189,6 +224,7 @@ def _player_dict(p: Player) -> dict[str, Any]:
         "hand": [c.id for c in p.hand],
         "inalienable_hand": [c.id for c in p.inalienable_hand],
         "deck": [c.id for c in p.deck],
+        "vault": [c.id for c in p.vault],  # deposited Wu, kept so a Treasurebox can wish one back
         # Wear rides beside the ids (same order): a rebuilt card must remember its showdowns —
         # the live count AND the other duelist's pocketed one (see wear.hand_over).
         "hand_uses": [c.uses for c in p.hand],
@@ -209,6 +245,7 @@ def _player_from_dict(data: dict[str, Any], catalog: Catalog) -> Player:
         hand=[_fresh_card(catalog, cid) for cid in data["hand"]],
         inalienable_hand=[held_as_wudai(_fresh_card(catalog, cid)) for cid in data["inalienable_hand"]],
         deck=[_fresh_card(catalog, cid) for cid in data["deck"]],
+        vault=[_fresh_card(catalog, cid) for cid in data.get("vault", ())],  # absent in a pre-Vault save
         points=data["points"],
         training=data.get("training", 0),
         just_trained=data.get("just_trained", False),

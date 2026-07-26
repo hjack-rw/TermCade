@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.screens.format import SHORTEN_OVER, display_name
+from xiaolin_showdown.logic.naming import SHORTEN_OVER, display_name
 
 ROSTER = [character.name for character in load_catalog().characters]
 

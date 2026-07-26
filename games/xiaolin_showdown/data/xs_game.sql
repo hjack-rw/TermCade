@@ -33,6 +33,7 @@ CREATE TABLE "power" (
 	"mechanic"	TEXT NOT NULL,
 	"description"	TEXT,
 	"initiative_bonus"	INTEGER NOT NULL DEFAULT 0,
+	"summon"	TEXT,
 	PRIMARY KEY("id")
 );
 
@@ -57,7 +58,7 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (11, 'Chronokinesis', 'draw', 'Freezes anything it is pointed at in time and place for a short while', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (12, 'Impenetrable Defence', 'innate', 'Can temporarily transform into an armor capable of blocking all sorts of attacks, but its weight increases drastically while active', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (13, 'Umbrakinesis', 'innate', 'Allows for shadow manipulation that can influence a physical target. It can absorb and dissipate shadows at will, allowing the user to create shadow copies when it''s charged up', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (14, 'Tongue Twister', 'innate', 'Makes the user''s enemies babble nonsense non stop. The effect prevents them of taking coherent actions', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (14, 'Mnenokinesis', 'innate', 'Erases memory for a short while, leaving its victim unable to recall what they knew', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (15, 'Self-conscious Rope', 'initiative', 'Rope that can fulfill simple orders, behaving like a snake while at it. Apart from that it possess all the abilities of an ordinary rope', -1);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (16, 'Extendable Tendrils', 'initiative', 'It shoots a stream of hair from the comb''s teeth at the intended target and binds it. However, it requires complete focus from the user as you need to control each hair separately', -1);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (17, 'Méllissakinesis', 'initiative', 'When opened, unleashes a swarm of insects (e.g. ants, flies, bees) at a desired target', -1);
@@ -78,7 +79,7 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (32, 'Invisibility', 'initiative', 'Renders its user unseen', 2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (33, 'Reality Cutting', 'initiative', 'Cuts through anything, reality included: a clawed portal opens onto any place the user names, and stays open a short while – long enough that others may follow, until reality mends itself', 2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (34, 'Blinding Glare', 'initiative', 'Throws up a glittering sphere of light that nobody can look away from and nobody can see past', -2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (35, 'Mnenokinesis', 'initiative', 'Erases memory for a short while', -2);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (35, 'Tongue Twister', 'initiative', 'Makes the user''s enemies babble nonsense non stop. The effect prevents them of taking coherent actions', -2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (36, 'Stupefaction', 'initiative', 'Releases a purple gas that leaves its victims confused and foolish, or drops them into a deep sleep outright', -2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (37, 'Efiáltiskinesis', 'initiative', 'Walks into a sleeping mind and gives its worst fear a body. It has no hold on anyone awake', -2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (38, 'Euthymia', 'luck', 'Your good spirits turn fortune your way and a lost Wu finds its way back to you', 0);
@@ -99,11 +100,17 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (53, 'Spirit Sealing', 'treasure', 'Traps spiritual bodies, such as Sibini or Wuya. There were multiple occurrences of this Wu.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (54, 'Fool''s Gold', 'treasure', 'Could produce laser beams of different colors, that could change everyone and everything color. Making people very enamoured by the object.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (55, 'Palingenesis', 'refresh', 'Heals any injury. Also regenerates aging over time.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (56, 'Klonogenesis', 'double_training', 'Multiplies the user into as many as nine people, but it also divides up the user''s skills (and mental prower is a skill) among all the clones.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (56, 'Klonogenesis', 'double_training', 'Multiplies the user into as many as nine people, but it also divides up the user''s skills (and mental prower is a skill) among all the clones.', 0, 'Clone of {caster}');
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (57, 'Hypersthenia', 'stat_shield', 'Grants the user super strength.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (58, 'Proaisthesis', 'stat_shield', 'It warned its user of impending danger.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (59, 'Gnoseokinesis', 'stat_shield', 'In form of a crown, grants the user infinite, but random knowledge. It can also grant perspective and sentience to an unintelligent beast. To gain specific knowledge use it with the Wushu Brcelet.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (60, 'Thyellokinesis', 'double_element', 'Allows the user to generate or manipulate strong winds and tornados (leting its user to become a walking hurricane), but the sword itself cannot be used for physical attacks as it phases through enemies.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (61, 'Seismokinesis', 'seize_ground', 'Grants the user seismic sense, and the power to open earthquakes or fissures at will - taking the ground itself, and the advantage of the one who called the challenge.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (62, 'Retrokinesis', 'amend', 'Winds a recent moment back a heartbeat, undoing the user''s last action so a mistake can be taken back and made afresh.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (63, 'Wish', 'wish', 'A mystical chest housing the spirit of a powerful yet blind swordsman in the guise of a genie; it grants a single wish to whoever holds it, and is spent forever in the granting.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (64, 'Zooglossia', 'train_boost', 'Grants the user the ability to talk to and understand animals, and to call a host of them to their side.', 0, '{beast}');
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (65, 'Empsychosis', 'train_boost', 'With just a look it could bring drawings to life, sketching a creature into being to fight at your side.', 0, '{drawing}');
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (66, 'Nekrokinesis', 'train_boost', 'Turns targets into mindless, obedient zombies, raising a shambling horde to do the user''s bidding.', 0, 'a Horde of Zombies');
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE card (id INTEGER, name TEXT, force INTEGER, agility INTEGER, intellect INTEGER, power_id INTEGER NOT NULL REFERENCES power (id), element TEXT, type TEXT, points INTEGER, PRIMARY KEY (id AUTOINCREMENT));
@@ -127,7 +134,7 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (16, 'Bras Finger', 1, 1, 1, 11, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (17, 'Two-Ton Tunic', -5, 0, 0, 12, 'metal', 'torso', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (18, 'Shadow Slicer', 0, -5, 0, 13, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (19, 'Pearl of LiBai', 0, 0, -5, 14, 'metal', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (19, 'Pearl of LiBai', 0, 0, -4, 35, 'metal', 'amulet', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (20, 'Lasso Boa-Boa', -3, 0, 0, 15, 'earth', 'arms', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (21, 'Tangle Web Comb', 0, -3, 0, 16, 'fire', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (22, 'Ju-Ju Flytrap', 0, 0, -3, 17, 'wind', 'item', 2);
@@ -148,7 +155,7 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (37, 'Shroud of Shadows', 0, 2, 2, 32, 'metal', 'amulet', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (38, 'Golden Tiger Claws', 2, 2, 0, 33, 'metal', 'arms', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (39, 'Culver Crystal', -2, -2, 0, 34, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (40, 'Wushan Geyser', 0, 0, -4, 35, 'metal', 'head', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (40, 'Wushan Geyser', 0, 0, -5, 14, 'metal', 'head', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (41, 'Woozy Shooter', 0, -1, -3, 36, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (42, 'Shadow of Fear', -2, 0, -2, 37, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (43, 'Rooster Booster', 1, 1, 1, 38, 'metal', 'item', 3);
@@ -173,6 +180,12 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (62, 'Ninja Tabi', 0, 3, 0, 58, 'metal', 'torso', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (63, 'Fountain of Hui', 0, 0, 3, 59, 'metal', 'head', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (64, 'Blade of the Nebula', 0, 2, 2, 60, 'wind', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (65, 'Cube of Haniku', 2, 1, 0, 61, 'earth', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (66, 'Hodoku Mouse', 1, 1, 1, 62, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (67, 'Treasurebox of the Blind Swordsman', 0, 0, 0, 63, 'metal', 'item', 10);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (68, 'Tongue of Saiping', 2, 0, 2, 64, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (69, 'Imo Gazer', 1, 1, 1, 65, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (70, 'Zing Zom-Bone', 0, -2, -1, 66, 'metal', 'item', 3);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (

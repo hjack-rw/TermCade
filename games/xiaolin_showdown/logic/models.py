@@ -58,6 +58,10 @@ class Mechanic(StrEnum):
     DOUBLE_TRAINING = "double_training"  # held: every point of training its holder gains counts double
     STAT_SHIELD = "stat_shield"  # fielded: its caster is immune to curses on the stat it boosts
     DOUBLE_ELEMENT = "double_element"  # this Wu's own elemental bonus, resonance and drag alike, counts double
+    SEIZE_GROUND = "seize_ground"  # Cube of Haniku — fielded, its caster takes the challenger's ground, overriding a temple Prognosis
+    AMEND = "amend"  # Hodoku Mouse — spent at the temple, it puts the board back the way it was before your last action
+    WISH = "wish"  # Treasurebox of the Blind Swordsman — one wish, chosen by where it is used, then gone for good: deposit for points, spend to restore a Wu from the Vault, or field to win the showdown outright
+    TRAIN_BOOST = "train_boost"  # a summon Wu spent at the temple — one-time shove of TRAIN_BOOST_STEP into the training bar
 
 
 @dataclass
@@ -77,6 +81,10 @@ class Power:
     mechanic: Mechanic
     description: str
     initiative_bonus: int = 0
+    # A summon Wu's flavour: what it calls up to fight in its place. When set, a fielded copy shows this
+    # on the board instead of the Wu's own name (the hand still shows the Wu). ``{caster}`` fills with the
+    # duelist's character. Purely cosmetic — stats never change. ``None`` for an ordinary Wu.
+    summon: str | None = None
 
 
 @dataclass
@@ -134,6 +142,10 @@ class Player:
     hand: list[Card] = field(default_factory=list)
     inalienable_hand: list[Card] = field(default_factory=list)
     deck: list[Card] = field(default_factory=list)
+    # The Vault: every Wu this duelist has deposited, kept (not just cashed) so a Treasurebox of the
+    # Blind Swordsman can wish one back into hand. Deposits are the only things here; a Treasurebox is
+    # never itself vaulted — its every use is final.
+    vault: list[Card] = field(default_factory=list)
     points: int = 0
     # The training bar (see logic/training.py): progress toward the next payout, and whether a
     # payout was just taken — the bar shows full until the turn turns over, then resets to climb.

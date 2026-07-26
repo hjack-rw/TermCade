@@ -21,7 +21,7 @@ from termcade.core.rng import Rng
 
 from .battle import Ground, Round, score_battle
 from .constants import OPPOSITES, TOURNAMENT
-from .mechanics.powers import names_a_stat
+from .mechanics.powers import Mechanic, mechanic_of, names_a_stat
 from .mechanics.resolve import as_boost, resolve_played_power
 from .models import Card, Player
 from .turn import duel_value
@@ -174,6 +174,12 @@ def choose_card(
     """
     if not playable:
         raise ValueError("nothing to field")
+
+    # A Treasurebox of the Blind Swordsman wins the showdown outright — field it over anything scored
+    # on stats. The bot keeps it for exactly this: pick_deposit never banks it away.
+    for card in playable:
+        if mechanic_of(card.power) is Mechanic.WISH:
+            return card
 
     best: Card | None = None
     best_key: tuple[int, int] | None = None

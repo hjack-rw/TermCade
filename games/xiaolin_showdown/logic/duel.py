@@ -44,6 +44,7 @@ from .mechanics.prize import PrizeRoute, claim_route
 from .mechanics.resolve import as_boost, resolve_played_power, stand_in
 from .mechanics.scoring import initiative
 from .models import Card, Player
+from .naming import display_name
 from .settings import XiaolinSettings
 from .state import XiaolinState
 from .training import record_showdown
@@ -56,6 +57,27 @@ LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD rep
 # The Wu that ask their caster for an element: the Morpher (its shape), the Eye (its own colour), the
 # Monsoon (the whole arena's).
 _CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET_ARENA})
+
+# What a summon Wu whose name contains ``{beast}`` calls up, one per ARENA element — the background
+# decides it (Tongue of Saiping's animals, Imo Gazer's drawn ones), so the same Wu summons a shoal on
+# water and a troop on metal. Flavour, drafted with the user — reword freely; ``earth`` is still a draft.
+_BEASTS = {
+    "water": "a Pod of Seals",
+    "fire": "a Congress of Salamanders",
+    "wind": "a Kettle of Vultures",
+    "earth": "a Sounder of Boars",
+    "metal": "a Troop of Monkeys",
+}
+
+# Imo Gazer's own pool (``{drawing}``): a fantastic beast of Chinese myth sketched to life, one per
+# element — the Four Symbols and the Qilin, mapped onto the arena. Flavour, drafted with the user.
+_DRAWINGS = {
+    "water": "the Black Turtle-Snake",
+    "fire": "the Vermilion Bird",
+    "wind": "the Azure Dragon",  # East/Wood in myth; wind is this game's stand-in for it
+    "earth": "the Qilin",
+    "metal": "the White Tiger",
+}
 
 # Chase Young's Beast Form: +1 on the contested stat, in exchange for his Wu. One, not two: the beast
 # KEEPS its prize now (see `_award_prize`), and at +2 that was worth so much it crushed the whole
@@ -82,6 +104,9 @@ class DuelState:
     wager: int = 1
     rounds: list[Round] = field(default_factory=list)  # the battles fought, in order
     winner: bool | None = None  # True = player won, False = bot won
+    # A Treasurebox of the Blind Swordsman (WISH) was fielded: that side wins the showdown outright, whatever
+    # the battles said. ``None`` is the ordinary game, decided on the ground. Spent with the showdown.
+    auto_winner: bool | None = None
     winner_character: str | None = None
     card_won: bool = False
     # The stat the BOT's training raised when this loss filled its bar, for the screen to report.
@@ -126,6 +151,46 @@ class DuelState:
         )
 
 
+@dataclass(frozen=True)
+class AmendOptions:
+    """What a fielded Hodoku Mouse may rewrite in the current round — the terms still open to it."""
+
+    stats: list[str]  # switch the contest to one of these (the stats it does not already contest)
+    elements: list[str]  # switch the arena to one of these (the elements it is not already)
+    can_take_ground: bool  # take the challenger's ground — offered only when the player lacks it
+    wagers: list[int]  # raise the stake to one of these counts (a stat challenge only, never lower)
+    swap_out: list[Card]  # a Wu of yours already fielded this battle, that a hand Wu could replace
+    swap_in: list[Card]  # a plain Wu in hand that could take a fielded one's place
+
+
+@dataclass(frozen=True)
+class Amend:
+    """One rewrite of the current round, chosen by the player who fielded the Mouse.
+
+    ``kind`` names the term; the rest carry its new value — ``value`` for the scalar terms (a stat, an
+    element, a wager count), ``swap_out``/``swap_in`` for the fielded-Wu swap.
+    """
+
+    kind: str  # "challenge" | "background" | "initiative" | "wager" | "swap"
+    value: str = ""
+    swap_out: Card | None = None
+    swap_in: Card | None = None
+
+
+# The default when a DuelChoices is built without an amend answerer (every headless caller): decline.
+# Only the real duel screen overrides it, so tests and the balance harness need not know the Mouse.
+async def _decline_amend(_: AmendOptions) -> Amend | None:
+    return None
+
+
+def _is_plain_fighter(card: Card) -> bool:
+    """A Wu the Mouse may swap into the field cleanly: real printed stats, none negative (no curse to
+    mirror onto the opponent) and not a boost-only Wu. Its stats are the whole of it, so it simply
+    takes a fielded Wu's place — no boost or curse in the queue to unwind."""
+    values = list(card.stats.values())
+    return all(v is not None and v >= 0 for v in values) and any(values) and not is_boost_slot(card.power)
+
+
 @dataclass
 class DuelChoices:
     """The human duelist's decisions, injected by the screen (the bot's come from :mod:`.bot`).
@@ -141,6 +206,9 @@ class DuelChoices:
     card: Callable[[list[Card]], Awaitable[Card]]  # play a card from hand
     element: Callable[[str], Awaitable[str]]  # a Morpher's element (given the background)
     stat: Callable[[list[str]], Awaitable[str]]  # an Orb/Curse Wu's stat (given the three)
+    # A fielded Hodoku Mouse: rewrite one term of the round, or ``None`` to decline. Defaulted so only
+    # the duel screen — the one caller with a Mouse to play — must supply it.
+    amend: Callable[[AmendOptions], Awaitable["Amend | None"]] = _decline_amend
 
 
 class Duel:
@@ -366,7 +434,10 @@ class Duel:
             element = await self._element_for(player_card)
             stat = await self._stat_for(player_card)
             self._apply_elemental(
-                resolve_played_power(current, player_card, is_player=True, element=element, stat=stat)
+                resolve_played_power(
+                    current, player_card, is_player=True, element=element, stat=stat,
+                    display_name=self._summon_display(player_card, is_player=True),
+                )
             )
         if bot_card is not None:
             if self.duel.beast_stat is None:
@@ -379,23 +450,131 @@ class Duel:
                 current.bot.queue.append(stand_in(bot_card))
 
         current.fielded += 1
+        # Treasurebox of the Blind Swordsman (WISH): fielded, it wins the showdown outright — the ground
+        # is overridden at Resolvement, and it is exiled at the End. Either duelist's win it (the bot
+        # never fields it by policy, but the rule is written for whoever does).
+        if player_card is not None and mechanic_of(player_card.power) is Mechanic.WISH:
+            self.duel.auto_winner = True
+        if bot_card is not None and mechanic_of(bot_card.power) is Mechanic.WISH:
+            self.duel.auto_winner = False
+        # Hodoku Mouse (AMEND): fielded, after the reveal, it lets its player rewrite ONE term of
+        # THIS round before it is weighed — the contested stat, the arena, or the challenger's ground.
+        # It fights as its own 1/1/1 too (resolved above like any Wu). The bot never amends.
+        if player_card is not None and mechanic_of(player_card.power) is Mechanic.AMEND:
+            await self._offer_amend()
         # Score only once the battle is full — a wagered field is weighed as a whole, not per Wu.
         if current.fielded >= self._wu_per_battle():
             self._score_round(current)
 
+    async def _offer_amend(self) -> None:
+        """Let the player rewrite one term of the current round. Declining changes nothing."""
+        choice = await self.choices.amend(self._amend_options())
+        if choice is not None:
+            self._apply_amend(choice)
+
+    def _amend_options(self) -> AmendOptions:
+        """What the Mouse may rewrite: the contested stat, the arena, the challenger's ground, the
+        stake (raise it), or one of your fielded Wu (swap it for a plain one in hand). Swap is a stat
+        challenge's alone — a tournament battle is one Wu, and that Wu is the Mouse itself."""
+        raises = [] if self._is_tournament() else list(range(self.duel.wager + 1, self._can_field() + 1))
+        swap_out = [] if self._is_tournament() else [
+            wu for wu in self.duel.player.stakes if mechanic_of(wu.power) is not Mechanic.AMEND
+        ]
+        return AmendOptions(
+            stats=[s for s in self._stat_names() if s != self.duel.round.stat],
+            elements=[e for e in ELEMENTS if e != self.duel.background],
+            can_take_ground=self._ground().challenger_is_player is not True,
+            wagers=raises,
+            swap_out=swap_out,
+            swap_in=[wu for wu in self.state.player.hand if _is_plain_fighter(wu)] if swap_out else [],
+        )
+
+    def _apply_amend(self, amend: Amend) -> None:
+        """Rewrite one term of the current round in place — the next ``_score_round`` reads it.
+
+        A tournament amends only THIS battle's stat; a stat challenge, its one stat. The ground is
+        taken through ``conch_tiebreak``, the same lever a Cube of Haniku or a Prognosis writes."""
+        if amend.kind == "challenge":
+            self.duel.round.stat = amend.value
+            if not self._is_tournament():
+                self.duel.challenge = amend.value
+        elif amend.kind == "background":
+            self.duel.background = amend.value
+        elif amend.kind == "initiative":
+            self.state.conch_tiebreak = True  # the player takes the challenger's ground
+        elif amend.kind == "wager":
+            # Raise the stake into this battle: the stage machine loops Boost→Card until the new
+            # count is fielded (`_wu_per_battle` reads it live). Only ever up — what is down is down.
+            self.duel.wager = int(amend.value)
+        elif amend.kind == "swap" and amend.swap_out is not None and amend.swap_in is not None:
+            self._swap_fielded(amend.swap_out, amend.swap_in)
+
+    def _swap_fielded(self, out_wu: Card, in_wu: Card) -> None:
+        """Replace a Wu already fielded this battle with a plain one from hand: the new Wu takes the
+        old one's place in the queue (its stand-in becomes the new Wu's stats), the old returns to
+        hand un-staked, the new is staked in its stead. The next ``_score_round`` weighs the result."""
+        queue = self.duel.round.player.queue
+        stand = next(
+            (c for c in queue if c.id == out_wu.id and mechanic_of(c.power) is not Mechanic.AMEND),
+            None,
+        )
+        if stand is None or not is_one_of(in_wu, self.state.player.hand):
+            return
+        stand.id, stand.name = in_wu.id, in_wu.name
+        stand.stats = {s: (in_wu.stats[s] or 0) for s in in_wu.stats}
+        stand.element, stand.points = in_wu.element, in_wu.points
+        # The two Wu change places: the pulled one back to hand, the played one out of it and onto the
+        # stakes in the other's slot — so prize and wear at the end count the field as it really stands.
+        self.state.player.remove_card(in_wu)
+        self.state.player.hand.append(out_wu)
+        self.duel.player.stakes[self.duel.player.stakes.index(out_wu)] = in_wu
+
     def _apply_elemental(self, effect: str | None) -> None:
-        """A played Wu's showdown-wide elemental effect: void, reverse, or re-colour the arena."""
+        """A played Wu's showdown-wide effect: void, reverse or re-colour the arena, or seize the ground."""
         if effect and effect.startswith("background:"):
             self.duel.background = effect.split(":", 1)[1]
         elif effect == "cancel":
             self.duel.elemental_bonus_cancelled = True
         elif effect == "reverse":
             self.duel.elemental_bonus_reversed = True
+        elif effect and effect.startswith("seize:"):
+            self._seize_ground(effect.split(":", 1)[1] == "player")
+
+    def _seize_ground(self, is_player: bool) -> None:
+        """Cube of Haniku: its caster takes the challenger's ground for the rest of this showdown,
+        overriding a Prognosis set at the temple (it wrote ``conch_tiebreak`` there; this outwrites it,
+        since the Wu is fielded after). Both duelists fielding one cancels to the priority default —
+        neither holds a ground they both grabbed, the way two initiative powers contest (no
+        last-writer-wins). ``ground_seized`` remembers who seized so a second seize is a clash, not a
+        temple Prognosis being legitimately overridden."""
+        if self.state.ground_seized is not None and self.state.ground_seized != is_player:
+            self.state.conch_tiebreak = None  # both seized — back to who leads
+        else:
+            self.state.ground_seized = is_player
+            self.state.conch_tiebreak = is_player
 
     def _resolve_bot(self, current: Round, card: Card) -> None:
         stat = bot.choose_stat(current, self._ground(), card) if names_a_stat(card.power) else None
         self._apply_elemental(
-            resolve_played_power(current, card, is_player=False, element=self.duel.background or "", stat=stat)
+            resolve_played_power(
+                current, card, is_player=False, element=self.duel.background or "", stat=stat,
+                display_name=self._summon_display(card, is_player=False),
+            )
+        )
+
+    def _summon_display(self, card: Card, *, is_player: bool) -> str | None:
+        """A summon Wu enters the board as the thing it calls up — a clone, a horde — not as itself; the
+        hand still shows the Wu. ``{caster}`` fills with the fielding duelist's character. Flavour only:
+        the stats are the Wu's own. ``None`` for an ordinary Wu (its own name stands)."""
+        template = card.power.summon
+        if not template:
+            return None
+        caster = display_name(self.state.duelist(is_player).character.name, short=True)
+        arena = self.duel.background or ""
+        return (
+            template.replace("{caster}", caster)
+            .replace("{beast}", _BEASTS.get(arena, ""))
+            .replace("{drawing}", _DRAWINGS.get(arena, ""))
         )
 
     def _ground(self) -> Ground:
@@ -465,6 +644,8 @@ class Duel:
         else:
             margin = sum(r.score for r in self.duel.rounds)
             self.duel.winner = margin > 0 if margin else bool(self.duel.player_priority)
+        if self.duel.auto_winner is not None:
+            self.duel.winner = self.duel.auto_winner  # a Treasurebox wins outright, whatever the battles said
 
         self._award_prize()
 
@@ -478,6 +659,7 @@ class Duel:
         self.state.forced_priority = None  # the Conch's answer was for this showdown, and is spent
         self.state.locked_challenge = None  # the Prognosis pin was for this showdown too
         self.state.conch_tiebreak = None
+        self.state.ground_seized = None  # a Cube's grab was for this showdown, and is spent with it
         self.state.initiative_contested = False  # the contest, if any, was settled by this showdown's coin
         if not self.state.card_deck:
             self.state.has_ended = True
@@ -492,6 +674,13 @@ class Duel:
         # losing teaches: the loser's training bar gains one (see logic/training.py). The bot
         # cashes a full bar on the spot; the raised stat is kept for the screen to report.
         self.duel.bot_trained = record_showdown(self.state, player_won=bool(self.duel.winner))
+
+        # A Treasurebox is exiled by its wish: gone from the winner's hand for good, before wear could
+        # vault it for points and before any recovery power (Luck, Refresh, Witchcraft) could reach it.
+        if self.duel.auto_winner is not None:
+            champion = self.state.duelist(self.duel.auto_winner)
+            for card in [c for c in champion.hand if mechanic_of(c.power) is Mechanic.WISH]:
+                champion.remove_card(card)
 
         # wear: every Wu committed this showdown and still held wears by one, and the worn-out are
         # vaulted for their points on the spot (see logic/wear.py). Kept for the screen to report.

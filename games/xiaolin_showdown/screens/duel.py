@@ -22,7 +22,7 @@ from textual.widgets import Footer, Header, Static
 
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
 
-from ..logic.duel import COMMITMENT, END, SETUP, Duel, DuelChoices, DuelState
+from ..logic.duel import COMMITMENT, END, SETUP, Amend, AmendOptions, Duel, DuelChoices, DuelState
 from ..logic.constants import ELEMENTS, TOURNAMENT
 from ..logic.models import Card
 from ..logic.settings import XiaolinSettings
@@ -266,6 +266,7 @@ class DuelScreen(XiaolinScreen):
             card=self._pick_card,
             element=self._pick_element,
             stat=self._pick_stat,
+            amend=self._pick_amend,
         )
 
     async def _pick_challenge(self, options: list[str]) -> str:
@@ -315,6 +316,45 @@ class DuelScreen(XiaolinScreen):
         if self._duel is not None:
             self._show_board(self._duel)
         return await self.choose("Play a card", card_options(cards, suffix_stats=True), title="CARD")
+
+    async def _pick_amend(self, options: AmendOptions) -> Amend | None:
+        """A Hodoku Mouse was fielded: rewrite one term of this round, or leave it. Two steps — which
+        term, then its new value — and the reveal is already on the board behind the modal."""
+        kinds: list[tuple[str, str]] = []
+        if options.stats:
+            kinds.append(("Contest a different stat", "challenge"))
+        if options.elements:
+            kinds.append(("Change the arena element", "background"))
+        if options.can_take_ground:
+            kinds.append(("Take the challenger's ground", "initiative"))
+        if options.wagers:
+            kinds.append(("Raise the wager", "wager"))
+        if options.swap_out and options.swap_in:
+            kinds.append(("Swap a fielded Wu", "swap"))
+        kinds.append(("Change nothing", ""))
+
+        kind = await self.choose("Hodoku Mouse —  fix one thing.", kinds, title="AMEND")
+        if not kind:
+            return None
+        if kind == "initiative":
+            return Amend("initiative")
+        if kind == "challenge":
+            return Amend("challenge", await self.choose(
+                "Contest which stat instead?", _stat_options(options.stats), title="AMEND"))
+        if kind == "background":
+            return Amend("background", await self.choose(
+                "Which arena element instead?", _element_options(options.elements), title="AMEND"))
+        if kind == "wager":
+            return Amend("wager", await self.choose(
+                "Raise the wager to how many Wu?",
+                [(_wager_label(n), str(n)) for n in options.wagers], title="AMEND"))
+        out = await self.choose(
+            "Pull which fielded Wu back to hand?",
+            card_options(options.swap_out, suffix_stats=True), title="AMEND")
+        into = await self.choose(
+            "Field which Wu in its place?",
+            card_options(options.swap_in, suffix_stats=True), title="AMEND")
+        return Amend("swap", swap_out=out, swap_in=into)
 
 
 def _stat_options(values: list[str]) -> list[tuple[str, str]]:
