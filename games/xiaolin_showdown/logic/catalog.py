@@ -115,8 +115,10 @@ def _power(row: tuple) -> Power:
 
     ``initiative_bonus`` is its own column.
     """
-    pid, name, mechanic, description, initiative_bonus, summon = row
-    return Power(pid, name, Mechanic(mechanic), description, initiative_bonus or 0, summon or None)
+    pid, name, mechanic, description, initiative_bonus, summon, train_step = row
+    return Power(
+        pid, name, Mechanic(mechanic), description, initiative_bonus or 0, summon or None, train_step or 0
+    )
 
 
 def _card(row: tuple, resolve_power: ResolvePower) -> Card:

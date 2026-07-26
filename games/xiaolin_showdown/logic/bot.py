@@ -21,7 +21,7 @@ from termcade.core.rng import Rng
 
 from .battle import Ground, Round, score_battle
 from .constants import OPPOSITES, TOURNAMENT
-from .mechanics.powers import Mechanic, mechanic_of, names_a_stat
+from .mechanics.powers import Mechanic, is_uncontrolled, mechanic_of, names_a_stat
 from .mechanics.resolve import as_boost, resolve_played_power
 from .models import Card, Player
 from .turn import duel_value
@@ -174,6 +174,12 @@ def choose_card(
     """
     if not playable:
         raise ValueError("nothing to field")
+
+    # The Sapphire Dragon loses the showdown for whoever fields it — hold it back unless it is the only
+    # Wu left to answer with. Its instant level is a temple play; the bot never throws a duel on it.
+    safe = [card for card in playable if not is_uncontrolled(card.power)]
+    if safe:
+        playable = safe
 
     # A Treasurebox of the Blind Swordsman wins the showdown outright — field it over anything scored
     # on stats. The bot keeps it for exactly this: pick_deposit never banks it away.

@@ -46,6 +46,8 @@ def initiative_sources(player: Player, bot: Player) -> tuple[list[Card], list[Ca
 
 def element_score(element: str, background: str) -> int:
     """+1 for a card whose element matches the background, −1 against it, else 0."""
+    if not element:  # an elementless Wu (the Sapphire Dragon) stands outside the arena — never lifted, never dragged
+        return 0
     if background == "metal":
         return 1 if element == "metal" else -1
     if element == background:

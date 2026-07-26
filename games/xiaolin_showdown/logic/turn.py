@@ -15,11 +15,13 @@ from termcade.core.rng import Rng
 from termcade.core.settings import Difficulty
 
 from .mechanics.powers import (
+    ANIMATE_STAT,
     MORPH_ASIDE,
     MORPH_CONTESTED,
     NAMED_STAT_VALUE,
     Mechanic,
     is_gamble,
+    is_uncontrolled,
     mechanic_of,
     roll_gamble,
 )
@@ -161,6 +163,10 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     # there is. The bot has no policy to field or wish it; this only keeps it from banking the strongest
     # Wu in the pool as junk. (Deposited it is worth its 10 printed points, counted the ordinary way.)
     Mechanic.WISH: 10,
+    # Heart of Jong prints ? ? ? but in the boost slot comes alive as a flat ANIMATE_STAT form — priced
+    # off that so retuning the form re-prices the bot, and it is never banked as junk. Fielded alone it
+    # does nothing, but the bot reads its worth from the boost it can be, not the blank it looks like.
+    Mechanic.ANIMATE: ANIMATE_STAT * 3,
 }
 
 # (Witchcraft is a CHARACTER power — no card carries it, so its table price is moot; it sits in
@@ -253,6 +259,11 @@ def duel_value(card: Card) -> int:
     mechanic does, through :data:`_MECHANIC_VALUE`. Without that, every card that reads `? ? ?` is
     worth nothing to the opponent, and it will cheerfully bank an Emperor Scorpion for two points.
     """
+    # The Sapphire Dragon prints no stats and LOSES the showdown if fielded — its whole worth is the
+    # temple level it grants. Priced so the bot holds it over junk rather than banking it away; like the
+    # WISH above, temple_ai has no policy to actually spend it. (Deposited, it is its printed points.)
+    if is_uncontrolled(card.power):
+        return 8
     stats = sum(abs(v) for v in card.stats.values() if v is not None)
     mechanic = mechanic_of(card.power)
     premium = BOOSTER_PREMIUM if mechanic is Mechanic.BOOST else 0

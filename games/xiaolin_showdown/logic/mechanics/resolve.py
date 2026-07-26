@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING
 
 from ..models import Card, Mechanic, Power
 from .cards import index_of
-from .powers import MORPH_ASIDE, MORPH_BOOST, MORPH_CONTESTED, NAMED_STAT_VALUE, mechanic_of
+from .powers import ANIMATE_STAT, MORPH_ASIDE, MORPH_BOOST, MORPH_CONTESTED, NAMED_STAT_VALUE, mechanic_of
 
 if TYPE_CHECKING:
     from ..battle import Round, Side
@@ -95,6 +95,12 @@ def as_boost(card: Card, element: str, contested: str | None = None) -> Card:
     queued = deepcopy(card)
     if mechanic_of(card.power) is Mechanic.MORPH:
         queued.stats = {name: 0 if name == contested else MORPH_BOOST for name in queued.stats}
+        queued.element = element
+    elif mechanic_of(card.power) is Mechanic.ANIMATE:
+        # The Heart of Jong comes alive: a flat ANIMATE_STAT form in the arena's own element (the
+        # caller passes the background — the Heart never chooses). Its board name is set by the duel,
+        # which owns the element→form list. Fielded as a plain Wu instead, it never reaches here.
+        queued.stats = {name: ANIMATE_STAT for name in queued.stats}
         queued.element = element
     return queued
 
@@ -172,6 +178,12 @@ def _apply_mechanic(
     if mechanic is Mechanic.MORPH:
         played.stats = _morphed(card, contested)
         played.element = element
+        return False
+    if mechanic is Mechanic.ANIMATE:
+        # Heart of Jong fielded as a card: a flat ANIMATE_STAT construct, keeping its own name and its
+        # resting metal. In the boost slot it wakes to the arena's element and a named form instead
+        # (see `as_boost`) — but here it is simply itself, come to life.
+        played.stats = {name: ANIMATE_STAT for name in card.stats}
         return False
     if mechanic in (Mechanic.BUFF, Mechanic.MISFORTUNE):
         played.stats = _poured(card, mechanic, _named(card, stat))

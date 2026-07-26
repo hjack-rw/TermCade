@@ -44,9 +44,12 @@ class DetailScreen(EngineScreen):
             if isinstance(target, Card):
                 if alias := _ALIASES.get(target.id):
                     yield Static(Text(f'aka "{alias}"', style="dim italic"))
-                line = Text("Element: ")
-                line.append_text(element_text(target.element))
-                line.append(f"    Type: {target.type.capitalize()}    Points: {points_label(target)}")
+                line = Text()
+                if target.element:  # the Sapphire Dragon has none — no slot rather than an empty one
+                    line.append("Element: ")
+                    line.append_text(element_text(target.element))
+                    line.append("    ")
+                line.append(f"Type: {target.type.capitalize()}    Points: {points_label(target)}")
                 yield Static(line)
                 yield Static(f"Stats (F/A/I): {stats_line(target.stats)}")
             else:

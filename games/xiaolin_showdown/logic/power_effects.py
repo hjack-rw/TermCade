@@ -338,9 +338,11 @@ def _amend(spend: _Spend) -> _Fill | None:
 def _train_boost(spend: _Spend) -> _Fill | None:
     """A summon Wu (Tongue of Saiping and kin) spent at the temple: shove ``TRAIN_BOOST_STEP`` into the
     caster's training bar at once. ``usable_powers`` only offers it while a stat can still climb, so the
-    fill is always real — it never fizzles."""
-    add_progress(spend.me, TRAIN_BOOST_STEP)
-    return {"step": TRAIN_BOOST_STEP}
+    fill is always real — it never fizzles. A higher-tier Wu carries its own ``train_step``; 0 means the
+    base."""
+    step = spend.card.power.train_step or TRAIN_BOOST_STEP
+    add_progress(spend.me, step)
+    return {"step": step}
 
 
 def _restore(spend: _Spend) -> _Fill | None:

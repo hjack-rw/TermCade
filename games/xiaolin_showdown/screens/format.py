@@ -16,10 +16,12 @@ from rich.text import Text
 from ..logic.catalog import load_catalog
 from ..logic.duel import BEAST_BOOST
 from ..logic.mechanics.powers import (
+    ANIMATE_STAT,
     NAMED_STAT_VALUE,
     SCOPE_DEPTH,
     Mechanic,
     is_gamble,
+    is_uncontrolled,
     mechanic_of,
     trigger_of,
 )
@@ -267,7 +269,8 @@ EFFECTS = {
     Mechanic.SEIZE_GROUND: "You hold the tiebreak all Showdown, overriding a Prognosis.",
     Mechanic.AMEND: "Take back your previous action this turn (boss runs only).",
     Mechanic.WISH: "One wish, then gone: deposit for points, restore a Vaulted Wu, or field to win the Showdown.",
-    Mechanic.TRAIN_BOOST: f"Spend it to summon help to train against: +{TRAIN_BOOST_STEP} to your training bar, once.",
+    # TRAIN_BOOST is not here: its number is the card's own ``train_step``, filled in by `effect_line`,
+    # so a higher-tier Wu never shows the base tier's "+3".
     Mechanic.BUFF: f"You name one stat. It takes +{NAMED_STAT_VALUE} in the battle.",
     Mechanic.MISFORTUNE: f"You name one stat. Your opponent takes −{NAMED_STAT_VALUE} in the battle.",
     Mechanic.FETCH: "Pull any one Wu from your own Deck into your hand.",
@@ -277,6 +280,8 @@ EFFECTS = {
     Mechanic.NULLIFY_CURSE: "In battle: the curses laid on you count nothing.",
     Mechanic.NULLIFY_WU: "In battle: every Wu they played counts nothing.",
     Mechanic.TREASURE: "Worth a bunch of points on deposit.",
+    Mechanic.ANIMATE: f"A {ANIMATE_STAT}/{ANIMATE_STAT}/{ANIMATE_STAT} construct; in the boost slot it "
+    f"wakes to the arena's own element as a summoned form.",
     Mechanic.REFRESH: "Bring the Wu you last used back into your hand.",
     Mechanic.DOUBLE_TRAINING: "While held: the training you gain counts double.",
     Mechanic.STAT_SHIELD: "In battle: no curse can debuff the stat it boosts.",
@@ -309,6 +314,11 @@ def effect_line(power: Power, *, is_card: bool = True) -> str | None:
             # it is the ordinary Wu-play win that gifts one away (`duel._award_prize`), and that is
             # the whole reason the mode is a choice worth making rather than a trap.
             return f"Takes Beast Form for +{BEAST_BOOST}, but wields no Wu; keeps the prize he wins."
+    if is_uncontrolled(power):  # the Sapphire Dragon: a temple play only — fielded, it turns on you
+        return "Temple only: train a whole level at once. Fielded, it loses the Showdown for you."
+    if mechanic is Mechanic.TRAIN_BOOST:  # the number is the card's own, not one baked per mechanic
+        step = power.train_step or TRAIN_BOOST_STEP
+        return f"Spend it to summon help to train against: +{step} to your training bar, once."
     return EFFECTS.get(mechanic)
 
 

@@ -34,6 +34,7 @@ CREATE TABLE "power" (
 	"description"	TEXT,
 	"initiative_bonus"	INTEGER NOT NULL DEFAULT 0,
 	"summon"	TEXT,
+	"train_step"	INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY("id")
 );
 
@@ -81,7 +82,7 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (34, 'Blinding Glare', 'initiative', 'Throws up a glittering sphere of light that nobody can look away from and nobody can see past', -2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (35, 'Tongue Twister', 'initiative', 'Makes the user''s enemies babble nonsense non stop. The effect prevents them of taking coherent actions', -2);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (36, 'Stupefaction', 'initiative', 'Releases a purple gas that leaves its victims confused and foolish, or drops them into a deep sleep outright', -2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (37, 'Efiáltiskinesis', 'initiative', 'Walks into a sleeping mind and gives its worst fear a body. It has no hold on anyone awake', -2);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (37, 'Efiáltiskinesis', 'initiative', 'Walks into a sleeping mind and gives its worst fear a body. It has no hold on anyone awake', -2, '{fear}');
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (38, 'Euthymia', 'luck', 'Your good spirits turn fortune your way and a lost Wu finds its way back to you', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (39, 'Polymorphia', 'dragon', 'Transforms into any weapon the user requires', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (40, 'Allomorphia', 'morph', 'Allows the user to change their appearance into anything they choose - including the appearance of other beings', 0);
@@ -108,9 +109,13 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (61, 'Seismokinesis', 'seize_ground', 'Grants the user seismic sense, and the power to open earthquakes or fissures at will - taking the ground itself, and the advantage of the one who called the challenge.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (62, 'Retrokinesis', 'amend', 'Winds a recent moment back a heartbeat, undoing the user''s last action so a mistake can be taken back and made afresh.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (63, 'Wish', 'wish', 'A mystical chest housing the spirit of a powerful yet blind swordsman in the guise of a genie; it grants a single wish to whoever holds it, and is spent forever in the granting.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (64, 'Zooglossia', 'train_boost', 'Grants the user the ability to talk to and understand animals, and to call a host of them to their side.', 0, '{beast}');
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (65, 'Empsychosis', 'train_boost', 'With just a look it could bring drawings to life, sketching a creature into being to fight at your side.', 0, '{drawing}');
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (66, 'Nekrokinesis', 'train_boost', 'Turns targets into mindless, obedient zombies, raising a shambling horde to do the user''s bidding.', 0, 'a Horde of Zombies');
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (64, 'Zooglossia', 'train_boost', 'Grants the user the ability to talk to and understand animals, and to call a host of them to their side.', 0, '{beast}', 3);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (65, 'Empsychosis', 'train_boost', 'With just a look it could bring drawings to life, sketching a creature into being to fight at your side.', 0, '{drawing}', 3);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (66, 'Nekrokinesis', 'train_boost', 'Turns targets into mindless, obedient zombies, raising a shambling horde to do the user''s bidding.', 0, 'a Horde of Zombies', 3);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (67, 'Ensomatosis', 'train_boost', 'Calls spirits back from the Yin-Yang World and clothes them in temporary physical bodies, free to roam the Earth without possessing the living.', 0, '{spirit}', 6);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (68, 'Phantopoeia', 'train_boost', 'Turns the real unreal and the unreal real, shaping whatever the wielder imagines into being to fight at their side.', 0, '{desire}', 6);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (69, 'Agalmatosis', 'train_boost', 'Becomes a living sapphire dragon whose breath turns everyone - good, evil or indifferent - into sapphire statues, then raises them as its army. The most dangerous of all Shen Gong Wu, a last resort.', 0, 'the Sapphire Dragon', 10);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (70, 'Anthropomorphism', 'animate', 'Brings inanimate or dead objects to life - but only while it is active, a life on loan so to speak. Used to create powerful constructs like Mala Mala Jong.', 0);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE card (id INTEGER, name TEXT, force INTEGER, agility INTEGER, intellect INTEGER, power_id INTEGER NOT NULL REFERENCES power (id), element TEXT, type TEXT, points INTEGER, PRIMARY KEY (id AUTOINCREMENT));
@@ -186,6 +191,10 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (68, 'Tongue of Saiping', 2, 0, 2, 64, 'metal', 'item', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (69, 'Imo Gazer', 1, 1, 1, 65, 'metal', 'item', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (70, 'Zing Zom-Bone', 0, -2, -1, 66, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (71, 'Monarch Wings', 2, 2, -1, 67, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (72, 'Moonstone Cat''s Eye', 1, -1, 3, 68, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (73, 'Sapphire Dragon', NULL, NULL, NULL, 69, '', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (74, 'Heart of Jong', NULL, NULL, NULL, 70, 'metal', 'item', 5);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (

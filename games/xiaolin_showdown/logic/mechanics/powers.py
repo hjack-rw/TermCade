@@ -87,6 +87,12 @@ MORPH_CONTESTED = 1
 # and laid as a boost) takes, since the inalienable slot can only ever boost.
 MORPH_BOOST = 1
 
+# What the Heart of Jong's animated form takes in every stat when it comes alive in the boost slot — a
+# flat shape, no Morpher dip, always in the arena's own element (so the elemental bonus stands it up on
+# the contested stat). Only the NAME changes with the background; the numbers do not. Set above the
+# Morpher's 2/2/1: this form is a payoff for a Wu that does nothing alone. Measured, not guessed.
+ANIMATE_STAT = 3
+
 
 # Keyed by the mechanic itself — which is what the card DB stores. Nothing here is an integer, so
 # nothing here can be a Wu that quietly does nothing because somebody picked a number twice.
@@ -242,6 +248,13 @@ RULES: dict[Mechanic, Rule] = {
         f"Becomes {MORPH_ASIDE} in the two stats the battle is not fought over and "
         f"{MORPH_CONTESTED} in the one it is — and you choose the element it counts as.",
     ),
+    Mechanic.ANIMATE: Rule(
+        Mechanic.ANIMATE,
+        "play",
+        Timing.IN_DUEL,
+        f"Fielded, a {ANIMATE_STAT}/{ANIMATE_STAT}/{ANIMATE_STAT} construct. Laid in the boost slot it "
+        f"wakes to the arena's own element instead, a summoned form the background names.",
+    ),
     Mechanic.BUFF: Rule(
         Mechanic.BUFF,
         "play",
@@ -394,6 +407,16 @@ def is_gamble(power: Power) -> bool:
     return mechanic_of(power) is Mechanic.GAMBLE
 
 
+SAPPHIRE_DRAGON = 69  # Agalmatosis — the one Wu a duelist cannot command; fielded, it loses the showdown
+
+
+def is_uncontrolled(power: Power) -> bool:
+    """The Sapphire Dragon. Fielded, it turns on its own summoner — that side loses the showdown outright,
+    the inverse of the Treasurebox — and its stats never count, so they read ``?`` like the Gamble's.
+    Keyed to the power *id*: the name is flavour and has changed more than once, the id is stable."""
+    return power.id == SAPPHIRE_DRAGON
+
+
 def roll_gamble(rng: Rng) -> int:
     """What a GAMBLE Wu actually pays. The only roll in the game the player cannot see coming."""
     low, high = GAMBLE_SPREAD
@@ -416,4 +439,4 @@ def is_boost_slot(power: Power) -> bool:
     "boost". The Morpher is dual-mode — fielded it takes its 2/2/1 shape, but it may also be spent as a
     boost (a 1/1/1 of its chosen element), which is the only mode open to it in the wudai slot.
     """
-    return trigger_of(power) == "boost" or mechanic_of(power) is Mechanic.MORPH
+    return trigger_of(power) == "boost" or mechanic_of(power) in (Mechanic.MORPH, Mechanic.ANIMATE)

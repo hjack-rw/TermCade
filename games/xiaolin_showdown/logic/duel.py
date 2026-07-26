@@ -40,7 +40,7 @@ from . import bot
 from .constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from .battle import Duelist, Ground, Round, score_battle
 from .mechanics.cards import excluding, is_one_of
-from .mechanics.powers import Mechanic, is_boost_slot, mechanic_of, names_a_stat
+from .mechanics.powers import Mechanic, is_boost_slot, is_uncontrolled, mechanic_of, names_a_stat
 from .mechanics.prize import PrizeRoute, claim_route
 from .mechanics.resolve import as_boost, resolve_played_power, stand_in
 from .mechanics.scoring import initiative
@@ -79,6 +79,57 @@ _DRAWINGS = {
     "earth": "the Qilin",
     "metal": "the White Tiger",
 }
+
+# Moonstone Cat's Eye ({desire}) conjures whatever the caster most wants made real — keyed to the
+# duelist, not the arena, one per character. Flavour, the user's own picks; reword freely. A caster with
+# no entry (a construct, say) falls back to a plain figment.
+_DESIRES = {
+    "Omi": "his Long Lost Parents",
+    "Kimiko": "a Wave of Space Invaders",
+    "Raimundo": "a Carnival of Revelers",
+    "Clay": "a Herd of Texan Longhorns",
+    "Tubbimura": "a Sumo Wrestler",
+    "Katnappé": "a Litter of Kittens",
+    "Salvador_Cumo": "a Komodo Dragon",
+    "Vlad": "a Set of Matryoshka Dolls",
+    "Le_Mime": "an Invisible Impenetrable Box",
+    "PandaBubba": "a Mob of Goons",
+    "Hannibal_Roy_Bean": "a Towering Suit of Armor",
+    "Wuya": "an Army of Rock Golems",
+    "Chase_Young": "an Evil Omi",
+}
+_A_FIGMENT = "a Figment of the Imagination"
+
+# Heart of Jong (ANIMATE): the character its life leaps into in the boost slot, one per background
+# element. Metal waits on a face not yet in the roster — Jack Spicer's form is the Dude-Bot; until he
+# is a playable, everyone's metal form is the T-Rex. Flavour, the user's own; reword freely.
+_JONG_FORMS = {
+    "water": "Raksha",
+    "fire": "Cyclops",
+    "wind": "Bird of Paradise",
+    "earth": "Gigi",
+    "metal": "T-Rex",
+}
+
+# Shadow of Fear ({fear}) gives a body to the worst fear of the duelist it is used ON — the target, not
+# the caster. Keyed to the victim's character. The Heylin bosses fear the one who bound them, Grand
+# Master Dashi. The minions' fears are still to come; until then they meet a nameless dread. His picks.
+_FEARS = {
+    "Omi": "a Squirrel",
+    "Kimiko": "a Melted Tamochika Doll",
+    "Raimundo": "a Jellyfish Monster",
+    "Clay": "Clay's Granny Lily",
+    "Tubbimura": "an Empty Rice Bowl",
+    "Katnappé": "a Dog",
+    "Salvador_Cumo": "an Angry Wuya",
+    "Vlad": "a Swimming Pool",
+    "Le_Mime": "a Booing Crowd",
+    "PandaBubba": "a Jail Cell",
+    "Hannibal_Roy_Bean": "a Vision of Grand Master Dashi",
+    "Wuya": "a Vision of Grand Master Dashi",
+    "Chase_Young": "a Vision of Grand Master Dashi",
+}
+_A_NAMELESS_DREAD = "a Nameless Dread"
 
 # Chase Young's Beast Form: +1 on the contested stat, in exchange for his Wu. One, not two: the beast
 # KEEPS its prize now (see `_award_prize`), and at +2 that was worth so much it crushed the whole
@@ -466,6 +517,13 @@ class Duel:
             self.duel.auto_winner = True
         if bot_card is not None and mechanic_of(bot_card.power) is Mechanic.WISH:
             self.duel.auto_winner = False
+        # The Sapphire Dragon: fielded, it turns on its own summoner — that side LOSES the showdown
+        # outright, the inverse of the Treasurebox. A wish outranks it: an auto-win already set stands,
+        # since the Treasurebox was played to seize the showdown and the dragon only forfeits it.
+        if player_card is not None and is_uncontrolled(player_card.power) and self.duel.auto_winner is None:
+            self.duel.auto_winner = False
+        if bot_card is not None and is_uncontrolled(bot_card.power) and self.duel.auto_winner is None:
+            self.duel.auto_winner = True
         # Hodoku Mouse (AMEND): fielded, after the reveal, it lets its player rewrite ONE term of
         # THIS round before it is weighed — the contested stat, the arena, or the challenger's ground.
         # It fights as its own 1/1/1 too (resolved above like any Wu). The bot never amends.
@@ -586,7 +644,29 @@ class Duel:
             template.replace("{caster}", caster)
             .replace("{beast}", _BEASTS.get(arena, ""))
             .replace("{drawing}", _DRAWINGS.get(arena, ""))
+            .replace("{spirit}", self._spirit(is_player))
+            .replace("{desire}", self._desire(is_player))
+            .replace("{fear}", self._fear(is_player))
         )
+
+    def _spirit(self, is_player: bool) -> str:
+        """Monarch Wings ({spirit}) calls a spirit chosen by the caster's side, not the arena: a Chi
+        Creature for the Xiaolin, Sibini for the Heylin — but Hannibal, a Yin-Yang world native, draws
+        no Sibini and gets the Ying-Yang Bird. Flavour, the user's own picks."""
+        character = self.state.duelist(is_player).character
+        if character.name == "Hannibal_Roy_Bean":
+            return "Ying-Yang Bird"
+        return "Chi Creature" if character.affiliation == "xiaolin" else "Sibini"
+
+    def _desire(self, is_player: bool) -> str:
+        """Moonstone Cat's Eye ({desire}) conjures what the caster most wants — keyed to the character."""
+        return _DESIRES.get(self.state.duelist(is_player).character.name, _A_FIGMENT)
+
+    def _fear(self, is_player: bool) -> str:
+        """Shadow of Fear ({fear}) gives a body to the TARGET's worst fear — the duelist it lands on, the
+        caster's opponent, not the caster. Keyed to that character."""
+        target = self.state.duelist(not is_player).character
+        return _FEARS.get(target.name) or _A_NAMELESS_DREAD  # an unfilled entry meets the dread too
 
     def _ground(self) -> Ground:
         """The terms this battle is fought under — what the scorer and the bot both read."""
@@ -767,7 +847,18 @@ class Duel:
         # A dragon/amplifier keeps its unresolved slot — what it lends is not known until it sees the
         # Wu it lifts. A Morpher resolves here instead: 0 on the contested stat, MORPH_BOOST on the
         # rest, so in tune it NETS 1/1/1 (see `as_boost`).
-        mine.queue.append(as_boost(card, element, self._stat_of(self.duel.round_number - 1)))
+        boosted = as_boost(card, element, self._stat_of(self.duel.round_number - 1))
+        if mechanic_of(card.power) is Mechanic.ANIMATE:  # the board shows the form the background called up
+            boosted.name = self._jong_form(element, is_player)
+        mine.queue.append(boosted)
+
+    def _jong_form(self, element: str, is_player: bool) -> str:
+        """Which animated form the Heart of Jong wakes, by the arena element — and, on metal, by who cast
+        it: Jack Spicer's own construct is the Dude-Bot, not the T-Rex. Dormant until Jack joins the
+        roster (there is no such character yet), so the branch waits with him."""
+        if element == "metal" and self.state.duelist(is_player).character.name == "Jack_Spicer":
+            return "Dude-Bot"
+        return _JONG_FORMS.get(element, "")
 
     @staticmethod
     def _is_chase(player: Player) -> bool:

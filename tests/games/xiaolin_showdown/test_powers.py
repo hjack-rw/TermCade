@@ -105,7 +105,10 @@ def test_every_mechanic_a_player_can_meet_has_a_blurb():
     from xiaolin_showdown.screens.format import EFFECTS
 
     silent = {Mechanic.FILLER, Mechanic.INITIATIVE, Mechanic.INNATE, Mechanic.GAMBLE}
-    printed = set(Mechanic) - UNPRINTED - silent
+    # TRAIN_BOOST's line is not baked here: its "+N" is the card's own ``train_step``, so `effect_line`
+    # builds it per card (guarded by the effect_line-over-every-power test below), never a static row.
+    computed = {Mechanic.TRAIN_BOOST}
+    printed = set(Mechanic) - UNPRINTED - silent - computed
     missing = printed - set(EFFECTS)
     assert not missing, "a mechanic a player can meet has no card blurb: " + ", ".join(
         m.name for m in missing
@@ -212,14 +215,15 @@ def test_a_showdown_without_intangibility_keeps_the_bonus(card):
 
 
 def test_only_boost_slot_wu_may_take_the_boost_slot(catalog):
-    """The dragon and the amplifier trigger on "boost"; the Morpher is dual-mode and may also boost.
+    """The dragon and the amplifier trigger on "boost"; the Morpher and the Heart of Jong are dual-mode
+    and may also boost — the Heart does nothing else, waking only from that slot.
 
     The question is about CARDS — which Wu may be fielded into the boost slot — so it reads the
     powers a card carries, not the character-only powers (Chase's Beast Form reads "On Boost" on
     his sheet but is never a Wu played from a hand)."""
     eligible = {mechanic_of(card.power) for card in catalog.cards if is_boost_slot(card.power)}
 
-    assert eligible == {Mechanic.DRAGON, Mechanic.BOOST, Mechanic.MORPH}
+    assert eligible == {Mechanic.DRAGON, Mechanic.BOOST, Mechanic.MORPH, Mechanic.ANIMATE}
 
 
 def test_a_morpher_spent_as_a_boost_is_one_one_one_of_its_chosen_element(catalog):

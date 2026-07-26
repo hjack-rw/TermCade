@@ -62,6 +62,7 @@ class Mechanic(StrEnum):
     AMEND = "amend"  # Hodoku Mouse — spent at the temple, it puts the board back the way it was before your last action
     WISH = "wish"  # Treasurebox of the Blind Swordsman — one wish, chosen by where it is used, then gone for good: deposit for points, spend to restore a Wu from the Vault, or field to win the showdown outright
     TRAIN_BOOST = "train_boost"  # a summon Wu spent at the temple — one-time shove of TRAIN_BOOST_STEP into the training bar
+    ANIMATE = "animate"  # Heart of Jong — nothing fielded alone; in the boost slot it morphs (Moby Morpher shape, arena element) into an animated form the background names. The seed of Mala Mala Jong's deferred assembly
 
 
 @dataclass
@@ -85,6 +86,9 @@ class Power:
     # on the board instead of the Wu's own name (the hand still shows the Wu). ``{caster}`` fills with the
     # duelist's character. Purely cosmetic — stats never change. ``None`` for an ordinary Wu.
     summon: str | None = None
+    # A TRAIN_BOOST Wu's shove into the training bar. 0 means the base ``TRAIN_BOOST_STEP``; a positive
+    # value is a higher-tier boost that overrides it. Ignored by every other mechanic.
+    train_step: int = 0
 
 
 @dataclass
