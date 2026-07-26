@@ -121,7 +121,12 @@ def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[s
             "The Challenge can be one stat, or a Tournament across all three.",
             f"Name a stat and your opponent names the stakes, up to {settings.max_wager} Wu each.",
             f"A Tournament costs {settings.max_wager} Wu, and can only be called when you both hold {settings.max_wager}.",
-            "You can never pick the same Challenge or Background two showdowns in a row.",
+            (
+                "The arena is a random element, revealed once the stakes are set — nobody chooses it. "
+                "You can never call the same Challenge two showdowns in a row."
+                if settings.random_background
+                else "You can never pick the same Challenge or Background two showdowns in a row."
+            ),
             "You can Return before the first Continue. After it, there is no retreat.",
         ],
         "In the Showdown": [

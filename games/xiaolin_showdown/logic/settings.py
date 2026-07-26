@@ -64,6 +64,10 @@ class XiaolinSettings:
     # or their -2 plus your +1. Lower it and the showdown stops being how Wu change hands.
     early_bird_gap: int = 3
     max_wager: int = 3  # the most Wu either duelist may be made to stake in one showdown
+    # The arena element is a random roll neither duelist chose (1), revealed after the wager, in tune
+    # with the show — rather than the non-challenger's pick (0), whose compensation the wager now
+    # carries. Measured balance-neutral on the hard tier (see BALANCE.md). A 0/1 toggle on Settings.
+    random_background: int = 1
 
     def __post_init__(self) -> None:
         """Clamp player-entered values to a playable range, so an edited Settings screen can never
@@ -80,6 +84,7 @@ class XiaolinSettings:
         )
         clamp(self, "prize_threshold", max(0, self.prize_threshold))
         clamp(self, "max_wager", max(1, self.max_wager))
+        clamp(self, "random_background", 1 if self.random_background else 0)  # a 0/1 toggle
         clamp(self, "early_bird_gap", max(1, self.early_bird_gap))
         for limit in ("actions_per_turn", "empty_draw_limit"):
             clamp(self, limit, max(1, getattr(self, limit)))

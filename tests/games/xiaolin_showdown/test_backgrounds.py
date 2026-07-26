@@ -13,7 +13,13 @@ from termcade.core.rng import Rng
 from xiaolin_showdown.logic.constants import ELEMENTS
 from xiaolin_showdown.logic.duel import Duel, DuelChoices, DuelState
 from xiaolin_showdown.logic.models import Background
+from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
+
+
+def _chosen_background() -> XiaolinSettings:
+    """A duelist names the arena, so no roll off the main stream competes with the place draw."""
+    return XiaolinSettings(**{**XiaolinSettings().__dict__, "random_background": 0})
 
 
 def _choices() -> DuelChoices:
@@ -123,7 +129,7 @@ async def test_drawing_the_place_does_not_disturb_the_duel_rng(catalog):
     """
     state = new_game(catalog, Rng(5), catalog.character(1))
     rng = Rng(5)
-    duel = Duel(state, rng, _choices())
+    duel = Duel(state, rng, _choices(), _chosen_background())
     await duel.advance()  # Commitment
 
     before = rng.get_state()

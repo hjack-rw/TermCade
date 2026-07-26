@@ -4,7 +4,8 @@ A duel is a *loop of showdowns* over the shared draw pile until it runs dry. One
 stages 1→6 then a closing stage 0:
 
     1 Commitment   → draw the prize card; a tied initiative is settled by a coin toss here
-    2 Setup        → the challenger names the stat (or a tournament); the other the element and wager
+    2 Setup        → the challenger names the stat (or a tournament); the other the wager; the arena is
+                     a random element by default (settings.random_background), or the other's pick if off
     3 Boost        → each duelist may lay a boost Wu ahead of the Wu they are about to field
     4 Card         → both field one Wu, blind to each other; :mod:`.mechanics.resolve` resolves both
     5 Resolvement  → weigh the battles, decide the winner, maybe award the prize card
@@ -323,23 +324,31 @@ class Duel:
             )
 
     async def _setup(self) -> None:
+        # The arena is either a random roll neither duelist chose (revealed after the wager, the show's
+        # own way) or the non-challenger's pick — settings.random_background decides, and the wager is
+        # named the same either way.
+        random_bg = bool(self.settings.random_background)
         if self.duel.player_priority:
             self.duel.challenge = await self.choices.challenge(self._challenge_options())
-            self.duel.background = bot.choose_background(
-                self.state.bot.character.stats,
-                self._background_options(),
-                (self.state.bot.whole_hand, self.state.player.whole_hand),
-                self.state.player.character.stats,
-                self.rng,
-            )
+            if not random_bg:
+                self.duel.background = bot.choose_background(
+                    self.state.bot.character.stats,
+                    self._background_options(),
+                    (self.state.bot.whole_hand, self.state.player.whole_hand),
+                    self.state.player.character.stats,
+                    self.rng,
+                )
             if not self._is_tournament():
                 self.duel.wager = bot.choose_wager(
                     self._wager_options(), self.state.bot.whole_hand, self.state.player.whole_hand,
                 )
-        else:  # the bot led and chose the challenge at stage 1; the player answers the background
-            self.duel.background = await self.choices.background(self._background_options())
+        else:  # the bot led and chose the challenge at stage 1; the player answers the terms
+            if not random_bg:
+                self.duel.background = await self.choices.background(self._background_options())
             if not self._is_tournament():
                 self.duel.wager = await self.choices.wager(self._wager_options())
+        if random_bg:  # the arena is a roll neither duelist chose, revealed once the wager is set
+            self.duel.background = self.rng.choice(list(ELEMENTS))
         self.duel.background_name = self._draw_place(self.duel.background)
         # Chase Young decides now, the challenge known: go Beast Form (BEAST_BOOST on one stat, his
         # Wu all dead, and he KEEPS what he wins) or field his Wu as an ordinary duelist — who gifts
@@ -480,9 +489,11 @@ class Duel:
         swap_out = [] if self._is_tournament() else [
             wu for wu in self.duel.player.stakes if mechanic_of(wu.power) is not Mechanic.AMEND
         ]
+        # A random arena is nobody's to set, so the Mouse cannot amend it — offer no elements then.
+        elements = [] if self.settings.random_background else [e for e in ELEMENTS if e != self.duel.background]
         return AmendOptions(
             stats=[s for s in self._stat_names() if s != self.duel.round.stat],
-            elements=[e for e in ELEMENTS if e != self.duel.background],
+            elements=elements,
             can_take_ground=self._ground().challenger_is_player is not True,
             wagers=raises,
             swap_out=swap_out,
