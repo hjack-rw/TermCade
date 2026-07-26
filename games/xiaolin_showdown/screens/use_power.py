@@ -11,8 +11,10 @@ from termcade.ui.screens.menu import MenuItem
 from termcade.ui.work import work
 
 from ..logic.actions import (
+    can_construct,
     can_early_bird,
     coming_wu,
+    construct_jong,
     early_bird,
     early_bird_options,
     usable_powers,
@@ -26,6 +28,7 @@ from .base import XiaolinMenu
 from .format import card_headline, card_options, power_headline, prompt, your_move
 
 NOTHING_COMING = "The pile is empty — nothing is coming."
+CONSTRUCT = "Construct Mala Mala Jong"
 
 
 class UsePowerScreen(XiaolinMenu):
@@ -52,11 +55,18 @@ class UsePowerScreen(XiaolinMenu):
         ]
         if can_early_bird(self.state, self.rules):
             items.append(MenuItem(id="early-bird", label=EARLY_BIRD))
+        # The set is complete: offer the transform. Its own entry, not a Wu spend — it consumes the
+        # whole hand's worth, not one card, so it reads as the momentous thing it is.
+        if can_construct(self.state, player_actions(self.state, self.rules)):
+            items.append(MenuItem(id="construct", label=CONSTRUCT))
         return items
 
     def on_select(self, item_id: str) -> None:
         if item_id == "early-bird":
             self._fly()
+            return
+        if item_id == "construct":
+            self._construct()
             return
         self._spend(self._usable[self.index_of(item_id, "pow")])
 
@@ -77,6 +87,21 @@ class UsePowerScreen(XiaolinMenu):
         self.ctx.journal.add(
             f"You used Early Bird to take {taken.name}, giving up {surrendered.name}.",
             title=your_move(EARLY_BIRD),
+        )
+
+    @work
+    async def _construct(self) -> None:
+        """Become Mala Mala Jong: keep the body and the wudai, exile the Heart, bank the rest."""
+        purged = construct_jong(self.state, is_player=True)
+        self.app.pop_screen()
+        banked = f" {len(purged)} Wu banked." if purged else ""
+        self.engine_app.notify(
+            f"You assembled Mala Mala Jong.{banked}", title=your_move(POWER), log=False
+        )
+        self.ctx.journal.add(
+            "You constructed Mala Mala Jong — a 6/6/6 body of Shen Gong Wu.\n"
+            "Reach the end of the game in the form to win outright.",
+            title=your_move(POWER),
         )
 
     @work

@@ -40,13 +40,16 @@ from . import bot
 from .constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from .battle import Duelist, Ground, Round, score_battle
 from .mechanics.cards import excluding, is_one_of
-from .mechanics.powers import Mechanic, is_boost_slot, is_uncontrolled, mechanic_of, names_a_stat
+from .mechanics.powers import (
+    Mechanic, is_boost_slot, is_jong_bane, is_uncontrolled, mechanic_of, names_a_stat,
+)
 from .mechanics.prize import PrizeRoute, claim_route
 from .mechanics.resolve import as_boost, resolve_played_power, stand_in
 from .mechanics.scoring import initiative
 from .models import Card, Player
 from .settings import XiaolinSettings
 from .summons import jong_form, summon_name
+from . import jong
 from .state import XiaolinState
 from .training import record_showdown
 from . import wear
@@ -167,6 +170,11 @@ async def _decline_amend(_: AmendOptions) -> Amend | None:
     return None
 
 
+async def _decline_counter(_: list[Card]) -> Card | None:
+    # The default balance answerer (headless callers): field no extra Wu against a boosted Heart of Jong.
+    return None
+
+
 def _is_plain_fighter(card: Card) -> bool:
     """A Wu the Mouse may swap into the field cleanly: real printed stats, none negative (no curse to
     mirror onto the opponent) and not a boost-only Wu. Its stats are the whole of it, so it simply
@@ -193,6 +201,9 @@ class DuelChoices:
     # A fielded Hodoku Mouse: rewrite one term of the round, or ``None`` to decline. Defaulted so only
     # the duel screen — the one caller with a Mouse to play — must supply it.
     amend: Callable[[AmendOptions], Awaitable["Amend | None"]] = _decline_amend
+    # A boosted Heart of Jong on the far side: field one extra Wu to answer its summon, or ``None`` to
+    # pass. Off-wager — it scores but is never staked. Defaulted, like amend, so only the duel screen cares.
+    counter: Callable[[list[Card]], Awaitable[Card | None]] = _decline_counter
 
 
 class Duel:
@@ -299,10 +310,10 @@ class Duel:
             # A Prognosis Conch already pinned the bot's challenge when it was spent — read, and set
             # in stone. Otherwise the bot names it fresh from its hand now.
             self.duel.challenge = self.state.locked_challenge or bot.choose_challenge(
-                self.state.bot.character.stats,
+                jong.battle_stats(self.state.bot),
                 self._challenge_options(),
                 self.state.bot.whole_hand,
-                self.state.player.character.stats,
+                jong.battle_stats(self.state.player),
                 self.rng,
             )
 
@@ -315,10 +326,10 @@ class Duel:
             self.duel.challenge = await self.choices.challenge(self._challenge_options())
             if not random_bg:
                 self.duel.background = bot.choose_background(
-                    self.state.bot.character.stats,
+                    jong.battle_stats(self.state.bot),
                     self._background_options(),
                     (self.state.bot.whole_hand, self.state.player.whole_hand),
-                    self.state.player.character.stats,
+                    jong.battle_stats(self.state.player),
                     self.rng,
                 )
             if not self._is_tournament():
@@ -337,7 +348,9 @@ class Duel:
         # Wu all dead, and he KEEPS what he wins) or field his Wu as an ordinary duelist — who gifts
         # the prize on a win, see `_award_prize`. Chase ALONE.
         # Beast Form is once a fight — in a tournament he still boosts only one of the three stats.
-        if self._is_chase(self.state.bot) and self.duel.challenge:
+        # A construct skips Chase's Beast Form as it skips the wudai: Mala Mala Jong fights as the 6/6/6
+        # body it is, not through his character power.
+        if self._is_chase(self.state.bot) and self.duel.challenge and not jong.is_jong(self.state.bot):
             contested = self._stat_names() if self._is_tournament() else [self.duel.challenge]
             self.duel.beast_stat = bot.choose_beast_form(
                 self.state.bot, self.state.player, contested
@@ -456,6 +469,12 @@ class Duel:
             self.duel.auto_winner = False
         if bot_card is not None and is_uncontrolled(bot_card.power) and self.duel.auto_winner is None:
             self.duel.auto_winner = True
+        # Emperor Scorpion on Mala Mala Jong: it disassembles the construct, taking THIS battle (a
+        # tournament leg, not the whole showdown — so it sets the round, not auto_winner).
+        if player_card is not None and is_jong_bane(player_card.power) and jong.is_jong(self.state.bot):
+            current.bane_winner = True
+        if bot_card is not None and is_jong_bane(bot_card.power) and jong.is_jong(self.state.player):
+            current.bane_winner = False
         # Hodoku Mouse (AMEND): fielded, after the reveal, it lets its player rewrite ONE term of
         # THIS round before it is weighed — the contested stat, the arena, or the challenger's ground.
         # It fights as its own 1/1/1 too (resolved above like any Wu). The bot never amends.
@@ -463,7 +482,39 @@ class Duel:
             await self._offer_amend()
         # Score only once the battle is full — a wagered field is weighed as a whole, not per Wu.
         if current.fielded >= self._wu_per_battle():
+            if current.heart_summoner is not None:  # a Heart woke a summon; the far side may answer it
+                await self._offer_balance(current)
             self._score_round(current)
+
+    async def _offer_balance(self, current: Round) -> None:
+        """A Heart of Jong summoned an extra fighter on ``heart_summoner``'s side. The OTHER side may
+        field one OFF-WAGER Wu here to answer it: it scores like any Wu, but it is never staked (it
+        cannot be lost) and it does not count against the wager. Optional, and only if they have one."""
+        answerer = not current.heart_summoner
+        options = self._playable(self.state.duelist(answerer), is_player=answerer)
+        if not options:
+            return
+        if answerer:  # the player answers a bot's Heart — the screen asks
+            card = await self.choices.counter(options)
+        else:  # the bot answers the player's Heart
+            card = bot.choose_card(deepcopy(current), self._ground(), options, self.rng)
+        if card is None:
+            return
+        # Resolved into the queue so it scores, but held on off_wager, not stakes: it wears through the
+        # same record_showdown path as every Wu (uses += 1, deposited at the limit), yet is never
+        # forfeited to the winner — off the wager, only worn out.
+        self.duel.duelist(answerer).off_wager.append(card)
+        element = await self._element_for(card)
+        stat = await self._stat_for(card)
+        if answerer:
+            self._apply_elemental(
+                resolve_played_power(
+                    current, card, is_player=True, element=element, stat=stat,
+                    display_name=self._summon_display(card, is_player=True),
+                )
+            )
+        else:
+            self._resolve_bot(current, card)
 
     async def _offer_amend(self) -> None:
         """Let the player rewrite one term of the current round. Declining changes nothing."""
@@ -570,11 +621,14 @@ class Duel:
         template = card.power.summon
         if not template:
             return None
+        caster, target = self.state.duelist(is_player), self.state.duelist(not is_player)
         return summon_name(
             template,
-            caster=self.state.duelist(is_player).character,
-            target=self.state.duelist(not is_player).character,
+            caster=caster.character,
+            target=target.character,
             arena=self.duel.background or "",
+            caster_is_jong=jong.is_jong(caster),
+            target_is_jong=jong.is_jong(target),
         )
 
     def _ground(self) -> Ground:
@@ -582,7 +636,7 @@ class Duel:
         return Ground(
             stats=list(self.duel.stakes.stats.keys()) if self.duel.stakes else [],
             background=self.duel.background or "",
-            player_stats=self.state.player.character.stats,
+            player_stats=jong.battle_stats(self.state.player),
             bot_stats=self._bot_base(),
             bonus_cancelled=self.duel.elemental_bonus_cancelled,
             bonus_reversed=self.duel.elemental_bonus_reversed,
@@ -604,7 +658,7 @@ class Duel:
         On the BASE, so it is element-free by nature: it earns no arena bonus and no elemental counter
         can touch it (they act on the elemental bonus, which a base stat never carries).
         """
-        base = dict(self.state.bot.character.stats)
+        base = dict(jong.battle_stats(self.state.bot))
         contested = self.duel.round.stat if self.duel.rounds else self.duel.challenge
         if self.duel.beast_stat is not None and self.duel.beast_stat == contested:
             base[self.duel.beast_stat] += BEAST_BOOST
@@ -612,6 +666,8 @@ class Duel:
 
     def _score_round(self, current: Round) -> None:
         score_battle(current, self._ground())
+        if current.bane_winner is not None:  # Emperor Scorpion took this battle from the construct
+            current.winner = current.bane_winner
 
     async def _element_for(self, card: Card) -> str:
         """Some Wu let the player name an element: the Morpher its shape, the Eye its own colour, the
@@ -669,7 +725,21 @@ class Duel:
         winner, loser = self._winner_and_loser()
         for card in self.duel.duelist(not self.duel.winner).stakes:
             loser.remove_card(card)
-            winner.hand.append(hand_over(card))
+            if jong.is_jong(winner):
+                jong.deposit_won(winner, card)  # the locked hand takes no new Wu — bank it
+            else:
+                winner.hand.append(hand_over(card))
+
+        # Mala Mala Jong losing a showdown drops the form: it always wagers parts, so a loss always
+        # breaks the set. The winner already took the wagered parts above; the Heart now comes out of
+        # exile into their hands too (banked if they are a construct themselves), and the loser reverts.
+        if jong.is_jong(loser):
+            heart = jong.revert(loser)
+            if heart is not None:
+                if jong.is_jong(winner):
+                    jong.deposit_won(winner, heart)
+                else:
+                    winner.hand.append(heart)
 
         # losing teaches: the loser's training bar gains one (see logic/training.py). The bot
         # cashes a full bar on the spot; the raised stat is kept for the screen to report.
@@ -686,10 +756,15 @@ class Duel:
         # vaulted for their points on the spot (see logic/wear.py). Kept for the screen to report.
         for is_player in (True, False):
             side = self.duel.duelist(is_player)
-            vaulted = wear.record_showdown(
-                self.state.duelist(is_player), side.stakes + side.boosts_spent, rng=self.rng
-            )
+            # The exiled Heart boosts from out of play — it never wears and is never vaulted, so it is
+            # kept out of the wear tally even though it rode the boost slot this showdown.
+            heart = self.state.duelist(is_player).jong_heart
+            committed = [c for c in side.stakes + side.boosts_spent + side.off_wager if c is not heart]
+            vaulted = wear.record_showdown(self.state.duelist(is_player), committed, rng=self.rng)
             self.duel.worn_out += [(card.name, is_player, paid) for card, paid in vaulted]
+            # A part worn out and vaulted breaks the set — the form drops here too, the Heart coming
+            # home (the lost-showdown drop above already handled the loser; this catches the winner).
+            jong.drop_if_broken(self.state.duelist(is_player))
 
     _STAGES: dict[int, Callable[["Duel"], Awaitable[None]]] = {
         END: _end,
@@ -728,6 +803,13 @@ class Duel:
         is gone, and cannot come back to boost the next one.
         """
         duelist = self.duel.duelist(is_player)
+        # Mala Mala Jong boosts only with the Heart it exiled — never a part, never a wudai — and only
+        # once, so it is gone from the offer the moment it has been spent this showdown.
+        if jong.is_jong(player):
+            heart = player.jong_heart
+            if heart is None or any(c is heart for c in duelist.boosts_spent):
+                return []
+            return [heart]
         unused = excluding(player.whole_hand, duelist.boosts_spent + duelist.stakes)
         available = [card for card in unused if is_boost_slot(card.power)]
 
@@ -750,15 +832,24 @@ class Duel:
         # What cannot be lost is what sits in the inalienable slot — *not* every Wu that boosts. A
         # wudai weapon found in the pile boosts exactly like the one a character was born holding,
         # and is staked like anything else you carry: win it, lose it, bank it.
-        if not is_one_of(card, player.inalienable_hand):
+        # What cannot be staked: the inalienable slot, and the Heart Mala Mala Jong exiled — it is out
+        # of play powering the form, so a boost can never lose it.
+        is_jong_heart = card is player.jong_heart
+        if not is_one_of(card, player.inalienable_hand) and not is_jong_heart:
             duelist.stakes.append(card)
         duelist.boosts_spent.append(card)  # one showdown, one use — even a dragon
-        # A dragon/amplifier keeps its unresolved slot — what it lends is not known until it sees the
-        # Wu it lifts. A Morpher resolves here instead: 0 on the contested stat, MORPH_BOOST on the
-        # rest, so in tune it NETS 1/1/1 (see `as_boost`).
         boosted = as_boost(card, element, self._stat_of(self.duel.round_number - 1))
-        if mechanic_of(card.power) is Mechanic.ANIMATE:  # the board shows the form the background called up
+        if is_jong_heart:
+            # As Jong's boost the Heart fights as ITSELF: a flat JONG_BOOST_STAT, metal, no summoned
+            # form and no opponent's off-wager answer — the amplified construct, not the ANIMATE beast.
+            boosted.stats = {stat: jong.JONG_BOOST_STAT for stat in boosted.stats}
+            boosted.element = "metal"
+            boosted.name = card.name
+        elif mechanic_of(card.power) is Mechanic.ANIMATE:
+            # A separate summoned fighter, named by the arena — and it entitles the OTHER side to one
+            # off-wager Wu in this battle (see `_offer_balance`), so the extra body is answered.
             boosted.name = jong_form(element, self.state.duelist(is_player).character)
+            self.duel.round.heart_summoner = is_player
         mine.queue.append(boosted)
 
     @staticmethod
@@ -805,7 +896,10 @@ class Duel:
             gifts = self._is_chase(winner) and self.duel.beast_stat is None
             self.duel.prize_gifted = gifts
             takes_prize = loser if gifts else winner
-            takes_prize.hand.append(self.duel.stakes)
+            if jong.is_jong(takes_prize):
+                jong.deposit_won(takes_prize, self.duel.stakes)  # the locked hand takes no prize
+            else:
+                takes_prize.hand.append(self.duel.stakes)
         else:
             # Lost, not destroyed. It leaves play, and one day it can surface again — which is what
             # the Rooster Booster reaches for. Until that card exists, nothing reads this pile.

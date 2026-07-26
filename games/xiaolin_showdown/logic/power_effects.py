@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from termcade.core.rng import Rng
 
+from . import jong
 from .mechanics.cards import index_of, is_one_of
 from .mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of
 from .training import TRAIN_BOOST_STEP, add_progress
@@ -321,6 +322,8 @@ def _swap_souls(spend: _Spend) -> _Fill | None:
     theirs = list(spend.them.hand)
     spend.me.hand[:] = [spend.card] + [hand_over(card) for card in theirs]
     spend.them.hand[:] = [hand_over(card) for card in mine]
+    jong.drop_if_broken(spend.me)  # a swap that takes a construct's parts drops its form
+    jong.drop_if_broken(spend.them)
     return {"count": len(theirs)}
 
 
@@ -374,6 +377,7 @@ def _shove(spend: _Spend) -> _Fill | None:
         raise ValueError("Repulsion moves a Wu that may need a roll or a shuffle — pass the rng")
     shoved = spend.wu()
     them.hand.pop(index_of(them.hand, shoved))
+    jong.drop_if_broken(them)  # a part shoved out of a construct's hand breaks the set
     if spend.to_deck:
         shelve(them, shoved, rng=spend.rng)
         return {"name": shoved.name}

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from termcade.core.rng import Rng
 
+from . import jong
 from .constants import WEAR_LIMIT
 from .mechanics.scoring import initiative
 from .mechanics.powers import Mechanic, mechanic_of, trigger_of
@@ -94,6 +95,8 @@ def draw_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | None:
     A full hand no longer blocks it: instead of growing the hand, Draw *swaps* — you shelve a Wu and
     take one back (see :func:`swap_from_hand`), so a stuck hand can still cycle.
     """
+    if jong.is_jong(state.player):
+        return "Mala Mala Jong draws nothing — the hand is locked while the form holds."
     if spent := spent_gate(state, player_actions(state, settings)):
         return spent
     if not state.player.deck:
@@ -245,6 +248,10 @@ def early_bird_options(state: XiaolinState, *, is_player: bool = True) -> list[C
 
 def early_bird_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | None:
     """Why the Early Bird cannot be flown right now, or ``None`` when it can."""
+    if jong.is_jong(state.player):
+        # The construct is out for the fight, not to skip it — and the Wu it would give up is a part,
+        # which would break the set and drop the form. Mala Mala Jong never flies the Early Bird.
+        return "Mala Mala Jong does not flee a fight."
     if spent := spent_gate(state, player_actions(state, settings)):
         return spent
     if not state.card_deck:
@@ -390,3 +397,24 @@ def use_power(
     spend.me.remove_card(card)  # spent, no points
     state.used.append(card)  # into the shared used pile for a Refresh Wu to call back
     return message
+
+
+def can_construct(state: XiaolinState, actions_per_turn: int, *, is_player: bool = True) -> bool:
+    """May this duelist assemble Mala Mala Jong right now — a full set in hand, and an action to spend.
+
+    The transform costs the turn's one action, like any temple verb, so a spent turn cannot also build
+    the construct (see :func:`~.jong.can_construct` for the hand gate itself)."""
+    return state.actions_spent(is_player) < actions_per_turn and jong.can_construct(
+        state.duelist(is_player)
+    )
+
+
+def construct_jong(state: XiaolinState, *, is_player: bool = True) -> list[Card]:
+    """Assemble Mala Mala Jong: the duelist becomes the construct, spending the turn's action.
+
+    Returns the Wu the purge deposited (see :func:`~.jong.construct`) so the screen can name them. Not
+    undoable — no board is stashed — because the exiled Heart and the purge are the point of no return.
+    """
+    purged = jong.construct(state.duelist(is_player))
+    state.spend_action(is_player)
+    return purged

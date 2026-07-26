@@ -157,7 +157,7 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (34, 'Emperor Scorpion', 0, 0, 0, 29, 'metal', 'item', 4);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (35, 'Raijin''s Flip Coin', 0, 4, 0, 30, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (36, 'Winged Feet', 1, 3, 0, 31, 'metal', 'boots', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (37, 'Shroud of Shadows', 0, 2, 2, 32, 'metal', 'amulet', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (37, 'Shroud of Shadows', 0, 2, 2, 32, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (38, 'Golden Tiger Claws', 2, 2, 0, 33, 'metal', 'arms', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (39, 'Culver Crystal', -2, -2, 0, 34, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (40, 'Wushan Geyser', 0, 0, -5, 14, 'metal', 'head', 3);

@@ -267,6 +267,7 @@ class DuelScreen(XiaolinScreen):
             element=self._pick_element,
             stat=self._pick_stat,
             amend=self._pick_amend,
+            counter=self._pick_counter,
         )
 
     async def _pick_challenge(self, options: list[str]) -> str:
@@ -310,6 +311,21 @@ class DuelScreen(XiaolinScreen):
             ("Don't play", None),
         ]
         return await self.choose("Play a boost Wu?", options, title="BOOST")
+
+    async def _pick_counter(self, cards: list[Card]) -> Card | None:
+        """A Heart of Jong woke a summon on the far side. Field one extra Wu to answer it — off the
+        wager, so it scores but can never be lost — or pass."""
+        if self._duel is not None:
+            self._show_board(self._duel)
+        options: list[tuple[ContentText, Card | None]] = [
+            *card_options(cards, suffix_stats=True),
+            ("Pass", None),
+        ]
+        return await self.choose(
+            "Their Heart of Jong summoned a fighter. Field an extra Wu to answer? (free — it can't be lost)",
+            options,
+            title="ANSWER THE SUMMON",
+        )
 
     async def _pick_card(self, cards: list[Card]) -> Card:
         """Field a Wu, blind. Your opponent is choosing theirs against the same board you see."""

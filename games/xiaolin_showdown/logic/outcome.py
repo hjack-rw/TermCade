@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from termcade.core.rng import Rng
 
+from . import jong
 from .models import Character
 from .state import XiaolinState
 from .turn import bank_value
@@ -37,6 +38,14 @@ def final_score(state: XiaolinState, rng: Rng) -> Outcome:
         # the same bet as banking it, made blind. It is a gamble to even keep it.
         player_points = max(0, player_points + sum(bank_value(c, rng) for c in state.player.hand))
         bot_points = max(0, bot_points + sum(bank_value(c, rng) for c in state.bot.hand))
+
+    # Mala Mala Jong: to reach the end of the game still in the form is to win it outright, whatever
+    # the points say — the whole reason to assemble the construct and race the pile down (see
+    # logic/jong.py). If somehow both wear it, neither claim stands and the points decide as usual.
+    if jong.is_jong(state.player) and not jong.is_jong(state.bot):
+        return Outcome(player_points, bot_points, state.player.character)
+    if jong.is_jong(state.bot) and not jong.is_jong(state.player):
+        return Outcome(player_points, bot_points, state.bot.character)
 
     if player_points == bot_points:
         winner: Character | None = None

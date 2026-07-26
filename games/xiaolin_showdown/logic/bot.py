@@ -209,7 +209,13 @@ def choose_boost(
     A boost is only worth playing if it improves the best Wu the bot could then field, so each option
     is judged by what it makes reachable — and declining is judged the same way. A boost taken out of
     hand costs the Wu it would have been, which is why it is dropped from what remains playable.
+
+    The Heart of Jong is never boosted here: its summon hands the far side a free off-wager Wu that
+    answers it, so the extra body nets out — the naive reach-score would over-count it, blind to that
+    cost. The bot fields the Heart as a plain 2/2/2 instead. (A construct's own 1/1/1 Heart boost has
+    no such cost, but the bot ~never assembles, so the simple exclusion is worth more than the nuance.)
     """
+    options = [o for o in options if mechanic_of(o.power) is not Mechanic.ANIMATE]
     if not options:
         return None
 

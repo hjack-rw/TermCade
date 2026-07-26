@@ -115,6 +115,12 @@ class Round:
     fielded: int = 0  # Wu each duelist has laid down here (boosts ride along, they do not count)
     score: int = 0  # from the player's side: +2 the contested stat, +1 each other
     winner: bool | None = None  # True player, False bot, None a dead heat
+    # A Heart of Jong boosted here summons a separate fighter; the side that did NOT boost it may field one
+    # extra OFF-WAGER Wu to answer (it scores but is never staked). This records who boosted it.
+    heart_summoner: bool | None = None
+    # An Emperor Scorpion fielded against Mala Mala Jong wins this battle outright — the side it hands
+    # the leg to, overriding the score (see logic/jong.py; the whole showdown still needs the rounds).
+    bane_winner: bool | None = None
 
     def sides(self, is_player: bool) -> tuple[Side, Side]:
         """``(mine, theirs)`` — where "which duelist" becomes "which half"."""
@@ -129,6 +135,9 @@ class Duelist:
     stakes: list[Card] = field(default_factory=list)  # Wu fielded — the loser forfeits every one
     # A boost Wu is spent once a showdown, not once a battle: you choose which Wu to lift.
     boosts_spent: list[Card] = field(default_factory=list)
+    # An off-wager balance Wu (answering a boosted Heart of Jong): it scores and it WEARS like any Wu,
+    # but it is never staked — it cannot be lost, only worn out after three showdowns and deposited.
+    off_wager: list[Card] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

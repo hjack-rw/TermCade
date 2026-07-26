@@ -12,11 +12,12 @@ from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 
+from ..logic import jong
 from ..logic.battle import Round, Side
 from ..logic.constants import TOURNAMENT, TOURNAMENT_BATTLES
 from ..logic.duel import BEAST_BOOST, BOOST, CARD, COMMITMENT, END, RESOLVEMENT, SETUP, DuelState
 from ..logic.mechanics.cards import is_one_of
-from ..logic.mechanics.powers import is_boost_slot
+from ..logic.mechanics.powers import Mechanic, is_boost_slot, mechanic_of
 from ..logic.mechanics.scoring import contributing, element_score
 from ..logic.models import Card, Player
 from ..logic.state import XiaolinState
@@ -200,7 +201,7 @@ def _side_line(
     background: str | None,
     beast: str | None = None,
 ) -> Group:
-    name = display_name(player.character.name)
+    name = display_name(jong.shown_name(player))
 
     header = Text()
     header.append(f"{label}: ", style="dim")
@@ -213,7 +214,7 @@ def _side_line(
     if side.base_negated:
         header.append_text(absent_stats_text(challenge))
     else:
-        header.append_text(card_stats_text(player.character.stats, challenge))
+        header.append_text(card_stats_text(jong.battle_stats(player), challenge))
     header.append(")", style="dim")
     if side.result:  # score appears once scoring has run; joined to its arrow so they wrap as one unit
         header.append("   ")
@@ -464,9 +465,14 @@ def _cards_line(
     entries: list[Text] = []
     joiners: list[Text] = []
     for index, card in enumerate(cards):
-        # a booster and the Wu it lifts are one play: "Bracelet + Fist", not two entries
-        joined = _from_the_boost_slot(cards[index - 1], amplifiers) if index else False
-        joiners.append(Text(" + " if joined else ", ", style="dim"))
+        # a booster and the Wu it lifts are one play: "Bracelet + Fist", not two entries. The Heart of
+        # Jong's summon is NOT an amplifier — a separate fighter — so it joins with " & ", not " + ".
+        prev = cards[index - 1] if index else None
+        if prev is not None and _from_the_boost_slot(prev, amplifiers):
+            joiner = " & " if mechanic_of(prev.power) is Mechanic.ANIMATE else " + "
+        else:
+            joiner = ", "
+        joiners.append(Text(joiner, style="dim"))
 
         # A Wu that no longer moves a stat earns no elemental bonus, so it must not be drawn one.
         earns = not negated and (earning is None or is_one_of(card, earning))

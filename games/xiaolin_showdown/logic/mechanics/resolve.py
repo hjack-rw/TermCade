@@ -28,7 +28,15 @@ from typing import TYPE_CHECKING
 
 from ..models import Card, Mechanic, Power
 from .cards import index_of
-from .powers import ANIMATE_STAT, MORPH_ASIDE, MORPH_BOOST, MORPH_CONTESTED, NAMED_STAT_VALUE, mechanic_of
+from .powers import (
+    ANIMATE_FIELD_STAT,
+    ANIMATE_STAT,
+    MORPH_ASIDE,
+    MORPH_BOOST,
+    MORPH_CONTESTED,
+    NAMED_STAT_VALUE,
+    mechanic_of,
+)
 
 if TYPE_CHECKING:
     from ..battle import Round, Side
@@ -180,10 +188,10 @@ def _apply_mechanic(
         played.element = element
         return False
     if mechanic is Mechanic.ANIMATE:
-        # Heart of Jong fielded as a card: a flat ANIMATE_STAT construct, keeping its own name and its
-        # resting metal. In the boost slot it wakes to the arena's element and a named form instead
-        # (see `as_boost`) — but here it is simply itself, come to life.
-        played.stats = {name: ANIMATE_STAT for name in card.stats}
+        # Heart of Jong fielded as a plain Wu: a middling ANIMATE_FIELD_STAT body, keeping its own name
+        # and its resting metal. The stronger arena-element summon (ANIMATE_STAT) belongs to the boost
+        # slot (see `as_boost`); fielded, it is just itself, come to life.
+        played.stats = {name: ANIMATE_FIELD_STAT for name in card.stats}
         return False
     if mechanic in (Mechanic.BUFF, Mechanic.MISFORTUNE):
         played.stats = _poured(card, mechanic, _named(card, stat))

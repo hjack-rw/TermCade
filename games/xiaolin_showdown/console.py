@@ -22,6 +22,8 @@ from termcade.ui.screens.console import Command
 
 from .logic.catalog import load_catalog
 from .logic.turn import shelve
+from .logic.jong import PART_TYPES
+from .logic.mechanics.powers import Mechanic, mechanic_of
 from .logic.models import Card
 from .logic.state import XiaolinState
 
@@ -146,6 +148,26 @@ def fill(ctx: GameContext, args: Sequence[str]) -> str:
     return "their bar is full" if who in _THEM else "your bar is full — Train (5) picks the stat"
 
 
+def jong(ctx: GameContext, args: Sequence[str]) -> str:
+    """Deal a full Mala Mala Jong set — one Wu of each slot plus the Heart — so Construct is one temple
+    turn away. The assembly is exodia-rare by design, so the console is the only way to reach it on
+    demand. ``jong them`` stacks the opponent's hand instead; the Construct itself still runs by the
+    real rules (temple power, hand purge, the locked form)."""
+    state = _state(ctx)
+    who = args[0] if args and args[0] in (*_ME, *_THEM) else "me"
+    player = state.bot if who in _THEM else state.player
+    catalog = load_catalog()
+    picks: dict[str, Card] = {}
+    for card in catalog.cards:
+        if card.type in PART_TYPES and card.type not in picks:
+            picks[card.type] = card
+    heart = next(card for card in catalog.cards if mechanic_of(card.power) is Mechanic.ANIMATE)
+    dealt = [deepcopy(picks[slot]) for slot in PART_TYPES] + [deepcopy(heart)]
+    player.hand.extend(dealt)
+    whose = "them" if who in _THEM else "you"
+    return f"dealt {whose} a Jong set: {_named(dealt)} — Construct at the temple"
+
+
 def clear(ctx: GameContext, args: Sequence[str]) -> str:
     """Empty a hand, so what you deal into it next is the only thing in it."""
     state = _state(ctx)
@@ -196,6 +218,7 @@ COMMANDS: dict[str, Command] = {
     "lose": Command(lose, "lose <id>... — put a Wu on the lost pile"),
     "points": Command(points, "points <yours> [theirs] — set the banked score"),
     "fill": Command(fill, "fill [me|them] — fill a training bar, to test the payout"),
+    "jong": Command(jong, "jong [me|them] — deal a full Mala Mala Jong set (5 slots + the Heart)"),
     "clear": Command(clear, "clear me | clear them — empty a hand"),
     "refresh": Command(
         refresh, "refresh [me|them|both] — give the turn's action back, to spend another power"

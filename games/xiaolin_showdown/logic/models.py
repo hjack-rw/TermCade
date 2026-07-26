@@ -155,6 +155,11 @@ class Player:
     # payout was just taken — the bar shows full until the turn turns over, then resets to climb.
     training: int = 0
     just_trained: bool = False
+    # Mala Mala Jong (see logic/jong.py): whether this duelist is wearing the construct, and the Heart
+    # of Jong it exiled to power the form. The costume is an overlay — ``character`` stays the real
+    # duelist underneath — so a revert needs nothing but to clear these two.
+    jong_form: bool = False
+    jong_heart: Card | None = None
 
     @property
     def initiative(self) -> list[int]:

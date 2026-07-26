@@ -87,11 +87,13 @@ MORPH_CONTESTED = 1
 # and laid as a boost) takes, since the inalienable slot can only ever boost.
 MORPH_BOOST = 1
 
-# What the Heart of Jong's animated form takes in every stat when it comes alive in the boost slot — a
-# flat shape, no Morpher dip, always in the arena's own element (so the elemental bonus stands it up on
-# the contested stat). Only the NAME changes with the background; the numbers do not. Set above the
-# Morpher's 2/2/1: this form is a payoff for a Wu that does nothing alone. Measured, not guessed.
+# What the Heart of Jong's animated form takes in every stat when it comes alive **in the boost slot** —
+# a flat shape, no Morpher dip, always the arena's own element (so the elemental bonus stands it up). Set
+# above the Morpher's 2/2/1: a self-scoring extra fighter (see the opponent's balance Wu). Measured.
 ANIMATE_STAT = 3
+# Fielded as a plain Wu instead of boosted, the Heart is a weaker middling body — no summon, no arena
+# element (it rests metal). The boost is the point; the field is a fallback.
+ANIMATE_FIELD_STAT = 2
 
 
 # Keyed by the mechanic itself — which is what the card DB stores. Nothing here is an integer, so
@@ -252,8 +254,9 @@ RULES: dict[Mechanic, Rule] = {
         Mechanic.ANIMATE,
         "play",
         Timing.IN_DUEL,
-        f"Fielded, a {ANIMATE_STAT}/{ANIMATE_STAT}/{ANIMATE_STAT} construct. Laid in the boost slot it "
-        f"wakes to the arena's own element instead, a summoned form the background names.",
+        f"Fielded, a middling {ANIMATE_FIELD_STAT}/{ANIMATE_FIELD_STAT}/{ANIMATE_FIELD_STAT} body. Laid in "
+        f"the boost slot it wakes a separate {ANIMATE_STAT}/{ANIMATE_STAT}/{ANIMATE_STAT} summon in the "
+        f"arena's element — and the opponent may field one extra Wu to answer it.",
     ),
     Mechanic.BUFF: Rule(
         Mechanic.BUFF,
@@ -415,6 +418,15 @@ def is_uncontrolled(power: Power) -> bool:
     the inverse of the Treasurebox — and its stats never count, so they read ``?`` like the Gamble's.
     Keyed to the power *id*: the name is flavour and has changed more than once, the id is stable."""
     return power.id == SAPPHIRE_DRAGON
+
+
+EMPEROR_SCORPION = 29  # Subjugation — Mala Mala Jong's bane, and its DB text already names the construct
+
+
+def is_jong_bane(power: Power) -> bool:
+    """Emperor Scorpion. Fielded against Mala Mala Jong it disassembles the construct — that BATTLE is
+    won outright (a tournament leg, not the whole showdown). Id-keyed, like the Sapphire Dragon."""
+    return power.id == EMPEROR_SCORPION
 
 
 def roll_gamble(rng: Rng) -> int:

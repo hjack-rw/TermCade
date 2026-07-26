@@ -236,6 +236,11 @@ def _player_dict(p: Player) -> dict[str, Any]:
         # The catalog knows only printed stats — training raises them, so the current values are
         # the save's to keep.
         "stats": p.character.stats,
+        # Mala Mala Jong (logic/jong.py): the form persists between turns, so a save taken in it must
+        # remember it AND the Heart it exiled — the character stays the real one (the form is an
+        # overlay), so only these two ride along.
+        "jong_form": p.jong_form,
+        "jong_heart": p.jong_heart.id if p.jong_heart else None,
     }
 
 
@@ -252,6 +257,10 @@ def _player_from_dict(data: dict[str, Any], catalog: Catalog) -> Player:
     )
     # The catalog knows only printed stats — training raised these past them.
     player.character.stats.update(data.get("stats", {}))
+    # Mala Mala Jong: absent in a save from before the form — an ordinary duelist, no exiled Heart.
+    player.jong_form = data.get("jong_form", False)
+    heart_id = data.get("jong_heart")
+    player.jong_heart = _fresh_card(catalog, heart_id) if heart_id is not None else None
     for card, uses in zip(player.hand, data.get("hand_uses", ())):
         card.uses = uses
     for card, uses in zip(player.deck, data.get("deck_uses", ())):

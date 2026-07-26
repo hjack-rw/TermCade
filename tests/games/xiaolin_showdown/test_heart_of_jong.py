@@ -11,12 +11,13 @@ from copy import deepcopy
 
 from termcade.core.rng import Rng
 
+from xiaolin_showdown.logic import wear
 from xiaolin_showdown.logic.battle import Round
 from xiaolin_showdown.logic.catalog import load_catalog
 from xiaolin_showdown.logic.constants import ELEMENTS
 from xiaolin_showdown.logic.duel import Duel, DuelChoices
 from xiaolin_showdown.logic.summons import _JONG_FORMS
-from xiaolin_showdown.logic.mechanics.powers import ANIMATE_STAT, is_boost_slot
+from xiaolin_showdown.logic.mechanics.powers import ANIMATE_FIELD_STAT, ANIMATE_STAT, is_boost_slot
 from xiaolin_showdown.logic.mechanics.resolve import as_boost, resolve_played_power
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.turn import duel_value
@@ -55,13 +56,13 @@ def test_it_prints_no_stats_of_its_own():
     assert all(value is None for value in heart.stats.values())
 
 
-def test_fielded_as_a_card_it_is_a_flat_metal_construct():
-    """Not in the boost slot: it keeps its own name and its resting metal, a flat ANIMATE_STAT Wu — the
-    summon (a named form in the arena's element) belongs to the boost slot alone."""
+def test_fielded_as_a_card_it_is_a_middling_metal_body():
+    """Not in the boost slot: it keeps its own name and its resting metal, a flat ANIMATE_FIELD_STAT body
+    — weaker than the boosted summon (a named form in the arena's element), which belongs to the boost."""
     battle = Round(stat="force")
     resolve_played_power(battle, deepcopy(load_catalog().card(HEART)), is_player=True, element="metal")
     stood = battle.player.queue[0]
-    assert set(stood.stats.values()) == {ANIMATE_STAT}
+    assert set(stood.stats.values()) == {ANIMATE_FIELD_STAT}
     assert stood.name == "Heart of Jong"
     assert stood.element == "metal"
 
@@ -85,6 +86,35 @@ def test_the_form_is_named_by_the_background():
 
 def test_every_arena_element_has_a_form():
     assert set(_JONG_FORMS) == set(ELEMENTS)
+
+
+def test_boosting_the_heart_flags_the_summoner():
+    duel = _duel_on("metal")
+    duel._commit_boost(deepcopy(duel.state.catalog.card(HEART)), is_player=True, element="metal")
+    assert duel.duel.round.heart_summoner is True  # the far side is now owed a balance Wu
+
+
+async def test_a_boosted_heart_lets_the_opponent_field_an_off_wager_wu():
+    """The counter: the side that did NOT boost may field one extra Wu — it scores, but is never staked."""
+    duel = _duel_on("metal")
+    duel.duel.round.heart_summoner = True  # the player boosted the Heart; the bot answers
+    before_queue = len(duel.duel.round.bot.queue)
+    before_stakes = len(duel.duel.bot.stakes)
+    await duel._offer_balance(duel.duel.round)
+    assert len(duel.duel.round.bot.queue) == before_queue + 1  # a fighter joined the bot's side
+    assert len(duel.duel.bot.stakes) == before_stakes  # ...off the wager — it cannot be lost
+    assert len(duel.duel.bot.off_wager) == 1  # ...but held for wear, so it cannot be spammed
+
+
+async def test_the_off_wager_wu_still_wears():
+    """It is never lost, but it is used: it rides the same wear count as any Wu, so it deposits out."""
+    duel = _duel_on("metal")
+    duel.duel.round.heart_summoner = True
+    await duel._offer_balance(duel.duel.round)
+    answered = duel.duel.bot.off_wager[0]
+    before = answered.uses
+    wear.record_showdown(duel.state.bot, duel.duel.bot.off_wager, rng=duel.rng)
+    assert answered.uses == before + 1  # one showdown answered, one use spent
 
 
 def test_a_metal_arena_calls_the_t_rex_for_anyone():

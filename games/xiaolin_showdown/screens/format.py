@@ -16,6 +16,7 @@ from rich.text import Text
 from ..logic.catalog import load_catalog
 from ..logic.duel import BEAST_BOOST
 from ..logic.mechanics.powers import (
+    ANIMATE_FIELD_STAT,
     ANIMATE_STAT,
     NAMED_STAT_VALUE,
     SCOPE_DEPTH,
@@ -280,8 +281,9 @@ EFFECTS = {
     Mechanic.NULLIFY_CURSE: "In battle: the curses laid on you count nothing.",
     Mechanic.NULLIFY_WU: "In battle: every Wu they played counts nothing.",
     Mechanic.TREASURE: "Worth a bunch of points on deposit.",
-    Mechanic.ANIMATE: f"A {ANIMATE_STAT}/{ANIMATE_STAT}/{ANIMATE_STAT} construct; in the boost slot it "
-    f"wakes to the arena's own element as a summoned form.",
+    Mechanic.ANIMATE: f"A {ANIMATE_FIELD_STAT}/{ANIMATE_FIELD_STAT}/{ANIMATE_FIELD_STAT} body fielded; "
+    f"boosted, a separate {ANIMATE_STAT}/{ANIMATE_STAT}/{ANIMATE_STAT} summon in the arena's element — and "
+    f"your opponent may field one more Wu.",
     Mechanic.REFRESH: "Bring the Wu you last used back into your hand.",
     Mechanic.DOUBLE_TRAINING: "While held: the training you gain counts double.",
     Mechanic.STAT_SHIELD: "In battle: no curse can debuff the stat it boosts.",
@@ -462,9 +464,24 @@ def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list
     return rows
 
 
+# The order a temple hand is shown in — by slot, so an assembling Mala Mala Jong set reads down the
+# body head-to-boots and a missing part is a visible gap. Wudai leads (it is always held), item trails.
+_SLOT_ORDER = ("wudai", "head", "torso", "amulet", "arms", "boots", "item")
+
+
+def _by_slot(card: Card) -> tuple[int, str]:
+    """Sort key: the slot's place in the body, then the Wu's name to break ties within a slot."""
+    place = _SLOT_ORDER.index(card.type) if card.type in _SLOT_ORDER else len(_SLOT_ORDER)
+    return (place, card.name)
+
+
 def hands_lines(hand_a: list[Card], hand_b: list[Card]) -> tuple[list[Text], list[Text]]:
     """Format both hands with *shared* name and per-column widths, so the two panels come out
-    the same size and every name / ``/`` separator / icon lines up down and across the columns."""
+    the same size and every name / ``/`` separator / icon lines up down and across the columns.
+
+    Each hand is shown slot-ordered (:data:`_SLOT_ORDER`), not draw-ordered — so the parts of a Jong
+    set line up in body order and a gap in the set is plain to see."""
+    hand_a, hand_b = sorted(hand_a, key=_by_slot), sorted(hand_b, key=_by_slot)
     both = hand_a + hand_b
     name_width = max((len(card.name) for card in both), default=0)
     col_width = {

@@ -97,13 +97,24 @@ def _spirit(caster: Character) -> str:
     return "Chi Creature" if caster.affiliation == "xiaolin" else "Sibini"
 
 
-def _desire(caster: Character) -> str:
-    """Moonstone Cat's Eye ({desire}) conjures what the caster most wants — keyed to the character."""
+# Mala Mala Jong wears its own fear and desire over the duelist underneath (see logic/jong.py): it
+# dreads the Vault it could be disassembled into, and it wants what its real side wants.
+_JONG_FEAR = "the Shen Gong Wu Vault"
+
+
+def _desire(caster: Character, *, is_jong: bool = False) -> str:
+    """Moonstone Cat's Eye ({desire}) conjures what the caster most wants — keyed to the character, or
+    to the construct's side when Mala Mala Jong casts it (peace for the Xiaolin under it, else dominion)."""
+    if is_jong:
+        return "World Peace" if caster.affiliation == "xiaolin" else "World Domination"
     return _DESIRES.get(caster.name, _A_FIGMENT)
 
 
-def _fear(target: Character) -> str:
-    """Shadow of Fear ({fear}) gives a body to the TARGET's worst fear — the duelist it lands on."""
+def _fear(target: Character, *, is_jong: bool = False) -> str:
+    """Shadow of Fear ({fear}) gives a body to the TARGET's worst fear — the duelist it lands on, or the
+    construct's own dread of the Vault when Mala Mala Jong is the target."""
+    if is_jong:
+        return _JONG_FEAR
     return _FEARS.get(target.name) or _A_NAMELESS_DREAD  # an unfilled entry meets the dread too
 
 
@@ -115,15 +126,24 @@ def jong_form(element: str, caster: Character) -> str:
     return _JONG_FORMS.get(element, "")
 
 
-def summon_name(template: str, *, caster: Character, target: Character, arena: str) -> str:
+def summon_name(
+    template: str,
+    *,
+    caster: Character,
+    target: Character,
+    arena: str,
+    caster_is_jong: bool = False,
+    target_is_jong: bool = False,
+) -> str:
     """Fill a Wu's ``summon`` template with the form it calls up. ``{caster}`` is the short name of the
     duelist fielding it; ``{fear}`` is the *target's* (their opponent's); the rest key off the arena or
-    the caster. Unused placeholders in a template are simply left untouched."""
+    the caster. The ``*_is_jong`` flags swap ``{desire}``/``{fear}`` to the construct's own when that
+    side wears the form. Unused placeholders in a template are simply left untouched."""
     return (
         template.replace("{caster}", display_name(caster.name, short=True))
         .replace("{beast}", _BEASTS.get(arena, ""))
         .replace("{drawing}", _DRAWINGS.get(arena, ""))
         .replace("{spirit}", _spirit(caster))
-        .replace("{desire}", _desire(caster))
-        .replace("{fear}", _fear(target))
+        .replace("{desire}", _desire(caster, is_jong=caster_is_jong))
+        .replace("{fear}", _fear(target, is_jong=target_is_jong))
     )

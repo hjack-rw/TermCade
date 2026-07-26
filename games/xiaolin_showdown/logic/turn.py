@@ -25,6 +25,7 @@ from .mechanics.powers import (
     mechanic_of,
     roll_gamble,
 )
+from . import jong
 from .constants import WEAR_LIMIT
 from .mechanics.cards import hand_over
 from .models import Card, Player
@@ -494,16 +495,30 @@ def _play_power(
     return None
 
 
+def _construct_jong(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """Assemble Mala Mala Jong the moment the full set is in hand. The construct races the game to its
+    close for an outright win, so it outranks every other temple move — take it and lock the hand."""
+    from .actions import can_construct, construct_jong
+
+    if not can_construct(state, settings.actions_per_turn, is_player=False):
+        return None
+    construct_jong(state, is_player=False)
+    return BotMove(POWER, f"{name} assembled Mala Mala Jong — race it to the end.")
+
+
 # The boss temple order: bank the surplus AHEAD of any power. A boss wins showdowns on its stats, so
 # the temple is a race to the point target — keep a hand big enough to field a full wager, snatch
 # cheap Wu off the pile, and BANK. A power is not taken here; it falls through to the generic path,
 # which fires one only once the surplus is gone. That is the whole fix: banking outranks a power for
 # a boss, so a reusable witchcraft power stops being an every-turn substitute for reaching the target.
-_BOSS_ORDER = (_draw_thin_hand, _fly_early_bird, _recall_witchcraft, _bank_surplus)
+_BOSS_ORDER = (_construct_jong, _draw_thin_hand, _fly_early_bird, _recall_witchcraft, _bank_surplus)
 
 # The generic order: a power first (when one beats banking), then the pile raid, the recall, the
 # training cash-in, a thin-hand draw, and banking last.
 _GENERIC_ORDER = (
+    _construct_jong,
     _play_power,
     _fly_early_bird,
     _recall_witchcraft,
@@ -544,6 +559,13 @@ def _bot_acts(
     the generic order, which is where its power finally fires. Chase runs a stripped order that spends
     no powers at all.
     """
+    # A construct's hand is locked: it draws nothing, banks nothing, recalls nothing (Wuya's witchcraft
+    # would otherwise pull a Wu into the sealed hand, and banking could deposit a part and silently
+    # break the set). It only races — so once in form the bot passes every temple turn. Construct itself
+    # still fires below, because a duelist is not yet in form when it decides to assemble.
+    if jong.is_jong(state.bot):
+        return None
+
     chase = mechanic_of(state.bot.character.power) is Mechanic.BEAST_FORM
 
     if state.bot.character.tier == "boss" and not chase:

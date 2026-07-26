@@ -27,7 +27,9 @@ from termcade.ui.screens.log import GameLogScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic, render_bar
 
+from ..logic import jong
 from ..logic.actions import (
+    can_construct,
     can_deposit,
     can_draw,
     can_early_bird,
@@ -170,8 +172,8 @@ class TempleScreen(XiaolinScreen):
 
         player_rows, bot_rows = hands_lines(player.whole_hand, bot.whole_hand)
         with Horizontal(id="hands"):
-            yield _hand_panel(player.character.name, player_rows)
-            yield _hand_panel(bot.character.name, bot_rows)
+            yield _hand_panel(jong.shown_name(player), player_rows)
+            yield _hand_panel(jong.shown_name(bot), bot_rows)
 
         # Keyed by the shown number, so the greying and the hover reason come from one source.
         # "4" opens on the Early Bird alone: it is a power, and a fast duelist has one to spend even
@@ -183,7 +185,7 @@ class TempleScreen(XiaolinScreen):
             "3": deposit_blocked(state, budget),
             "4": (
                 None
-                if can_early_bird(state, rules)
+                if can_early_bird(state, rules) or can_construct(state, budget)
                 else use_power_blocked(state, budget)
             ),
             "5": train_blocked(state, budget),
@@ -263,7 +265,8 @@ class TempleScreen(XiaolinScreen):
 
     def action_use_power(self) -> None:
         state, rules = self.state, self.rules
-        if usable_powers(state, player_actions(state, rules)) or can_early_bird(state, rules):
+        budget = player_actions(state, rules)
+        if usable_powers(state, budget) or can_early_bird(state, rules) or can_construct(state, budget):
             self.app.push_screen(UsePowerScreen())
 
     def action_deposit(self) -> None:
