@@ -10,11 +10,13 @@ from copy import deepcopy
 
 from termcade.core.rng import Rng
 
-from factories import run_showdown
+from dataclasses import replace
+
+from factories import auto_choices, run_showdown
 
 from xiaolin_showdown.logic.battle import Round
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel, DuelChoices
+from xiaolin_showdown.logic.duel import Duel
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.settings import XiaolinSettings
@@ -23,23 +25,10 @@ RING = 60  # Ring of Nine Xing — summon "Clone of {caster}"
 FIST = 6  # Fist of Tebigong — a plain Wu, no summon
 
 
-async def _first(options):
-    return options[0]
-
-
-async def _no_boost(_options):
-    return None
-
-
-async def _one_wu(_options):
-    return 1
-
-
 def _duel(character_id=1):
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(character_id))
-    choices = DuelChoices(_first, _first, _one_wu, _no_boost, _first, _first, _first)
-    return state, Duel(state, Rng(1), choices)
+    return state, Duel(state, Rng(1), auto_choices())
 
 
 def test_summon_display_names_a_clone_of_the_caster():
@@ -85,7 +74,7 @@ async def test_fielding_the_ring_shows_a_clone_of_omi_on_the_board():
     async def _play_the_ring(playable):
         return next((c for c in playable if c.id == RING), playable[0])
 
-    choices = DuelChoices(_first, _first, _one_wu, _no_boost, _play_the_ring, _first, _first)
+    choices = replace(auto_choices(), card=_play_the_ring)
     duel = Duel(state, rng, choices)
 
     await run_showdown(duel, XiaolinSettings())

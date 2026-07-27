@@ -24,7 +24,18 @@ from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.turn import refill_hands
-from factories import STATS, run_showdown, wu
+from factories import (
+    STATS,
+    auto_choices as _auto_choices,
+    first as _first,
+    first as _first_stat,
+    first_card as _first_card,
+    no_boost as _no_boost,
+    one_wu as _one_wu,
+    run_showdown,
+    water as _water,
+    wu,
+)
 
 
 def _card(force, agility, intellect, *, element="water", mechanic=Mechanic.INITIATIVE) -> Card:
@@ -131,38 +142,8 @@ def test_a_mirrored_booster_cannot_boost_the_duelist_it_lands_on():
 
 
 # --- the stage machine (scripted, headless) ----------------------------------------------
-# The stage machine awaits its choices, so the scripted "player" supplies async callbacks that
-# always take the first legal option and never boost — enough to drive a full showdown.
-async def _first(options: list[str]) -> str:
-    return options[0]
-
-
-async def _first_card(playable: list[Card]) -> Card:
-    return playable[0]
-
-
-async def _no_boost(_options: list[Card]) -> Card | None:
-    return None
-
-
-async def _one_wu(options: list[int]) -> int:
-    return options[0]  # the smallest legal stake
-
-
-async def _water(_background: str) -> str:
-    return "water"
-
-
-async def _first_stat(options: list[str]) -> str:
-    """Where an Orb of Tornami or a Kaijin's Curse pours itself, when nobody is choosing on purpose."""
-    return options[0]
-
-
-def _auto_choices() -> DuelChoices:
-    return DuelChoices(
-        challenge=_first, background=_first, wager=_one_wu,
-        boost=_no_boost, card=_first_card, element=_water, stat=_first_stat,
-    )
+# The scripted-choice callables and `_auto_choices` now live in factories.py (imported above), since
+# seven test files each grew their own copy of them.
 
 
 async def test_a_scripted_showdown_walks_all_six_stages():

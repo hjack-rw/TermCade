@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from xiaolin_showdown.logic.battle import Ground
 from xiaolin_showdown.logic.constants import TOURNAMENT_BATTLES
-from xiaolin_showdown.logic.duel import END
+from xiaolin_showdown.logic.duel import END, DuelChoices
 from xiaolin_showdown.logic.models import Card, Character, Mechanic, Player, Power
 from xiaolin_showdown.logic.settings import XiaolinSettings
 
@@ -82,3 +82,36 @@ def character(
 
 def duelist(*, hand: list[Card] | None = None, deck: list[Card] | None = None, **char) -> Player:
     return Player(character=character(**char), hand=list(hand or []), deck=list(deck or []))
+
+
+# --- scripted duel choices ----------------------------------------------------------------------
+# The stage machine awaits its choices; these async callbacks take the first legal option and never
+# boost — enough to drive a headless showdown. `auto_choices()` assembles them; a test overrides one
+# with `dataclasses.replace(auto_choices(), card=my_picker)`. Seven files each grew their own copies.
+
+
+async def first(options):
+    return options[0]  # challenge / background / stat: the first legal option
+
+
+async def first_card(playable):
+    return playable[0]
+
+
+async def no_boost(_options):
+    return None
+
+
+async def one_wu(options):
+    return options[0]  # the smallest legal stake
+
+
+async def water(_background):
+    return "water"
+
+
+def auto_choices() -> DuelChoices:
+    return DuelChoices(
+        challenge=first, background=first, wager=one_wu,
+        boost=no_boost, card=first_card, element=water, stat=first,
+    )

@@ -7,14 +7,15 @@ outright — and after any of the three it is exiled: no pile holds it, no power
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 
 from termcade.core.rng import Rng
 
-from factories import run_showdown
+from factories import auto_choices, run_showdown
 
 from xiaolin_showdown.logic.actions import deposit, usable_powers, use_power
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel, DuelChoices
+from xiaolin_showdown.logic.duel import Duel
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.settings import XiaolinSettings
@@ -97,18 +98,6 @@ def test_the_treasurebox_is_hidden_with_an_empty_vault(state):
 # --- the duel wish: field it to win -----------------------------------------------
 
 
-async def _first(options):
-    return options[0]
-
-
-async def _no_boost(_options):
-    return None
-
-
-async def _one_wu(_options):
-    return 1
-
-
 def _duel_where_the_player_fields_the_box():
     cat = load_catalog()
     rng = Rng(1)
@@ -119,7 +108,7 @@ def _duel_where_the_player_fields_the_box():
     async def _play_the_box(playable):
         return next((c for c in playable if c.id == BOX), playable[0])
 
-    choices = DuelChoices(_first, _first, _one_wu, _no_boost, _play_the_box, _first, _first)
+    choices = replace(auto_choices(), card=_play_the_box)
     return state, Duel(state, rng, choices)
 
 

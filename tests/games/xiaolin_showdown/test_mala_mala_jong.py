@@ -11,11 +11,13 @@ from copy import deepcopy
 
 from termcade.core.rng import Rng
 
+from factories import auto_choices
+
 from xiaolin_showdown.logic import jong
 from xiaolin_showdown.logic.actions import can_construct, construct_jong
 from xiaolin_showdown.logic.battle import Round
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel, DuelChoices
+from xiaolin_showdown.logic.duel import Duel
 from xiaolin_showdown.logic.outcome import final_score
 from xiaolin_showdown.logic.actions import draw_blocked
 from xiaolin_showdown.logic.models import Mechanic, Player
@@ -167,18 +169,13 @@ def test_the_form_locks_drawing():
 
 # --- winning and losing in the form --------------------------------------------------------------
 
-async def _dummy(options):  # the drop path never consults a choice, so any callable will do
-    return options[0] if options else None
-
-
 def _duel_with_jong_player():
     """A duel whose player has assembled the construct — ready to force its End."""
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
     state.player.hand = _full_builder().hand
     construct_jong(state, is_player=True)
-    choices = DuelChoices(_dummy, _dummy, _dummy, _dummy, _dummy, _dummy, _dummy)
-    return Duel(state, Rng(1), choices, XiaolinSettings())
+    return Duel(state, Rng(1), auto_choices(), XiaolinSettings())  # the drop path consults no choice
 
 
 def test_reaching_the_end_in_form_wins_outright_against_the_points():

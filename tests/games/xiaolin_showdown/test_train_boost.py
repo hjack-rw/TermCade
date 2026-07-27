@@ -8,12 +8,14 @@ from copy import deepcopy
 
 from termcade.core.rng import Rng
 
-from factories import run_showdown
+from dataclasses import replace
+
+from factories import auto_choices, run_showdown
 
 from xiaolin_showdown.logic.actions import usable_powers, use_power
 from xiaolin_showdown.logic.battle import Round
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel, DuelChoices
+from xiaolin_showdown.logic.duel import Duel
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
 from xiaolin_showdown.logic.settings import XiaolinSettings
 from xiaolin_showdown.logic.setup import new_game
@@ -26,7 +28,7 @@ IMO = 69  # Imo Gazer — summon "a Drawing of {beast}"
 ZING = 70  # Zing Zom-Bone — summon "a Horde of Zombies" (fixed), and a curse
 MONARCH = 71  # Monarch Wings — +6 tier, summon "{spirit}" (keyed to the caster's side)
 MOONSTONE = 72  # Moonstone Cat's Eye — +6 tier, summon "{desire}" (keyed to the character)
-SAPPHIRE = 73  # Sapphire Dragon — a full bar in one shove (instant level), and no element at all
+SAPPHIRE = 73  # Sapphire Dragon — a full bar in one shove (instant level); rests metal, scores nothing
 SHADOW_OF_FEAR = 42  # summon "{fear}" — keyed to the TARGET (the caster's opponent), not the caster
 
 
@@ -92,22 +94,10 @@ def test_a_summon_is_hidden_once_every_stat_is_capped(state):
 # --- the board side: the summon follows the arena --------------------------------
 
 
-async def _first(options):
-    return options[0]
-
-
-async def _no_boost(_options):
-    return None
-
-
-async def _one_wu(_options):
-    return 1
-
-
 def _duel_on(background):
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))  # Omi
-    duel = Duel(state, Rng(1), DuelChoices(_first, _first, _one_wu, _no_boost, _first, _first, _first))
+    duel = Duel(state, Rng(1), auto_choices())
     duel.duel.background = background
     return duel
 
@@ -140,7 +130,7 @@ def test_the_zombies_are_fixed_whatever_the_arena():
 def _duel_as(char_id):
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(char_id))
-    duel = Duel(state, Rng(1), DuelChoices(_first, _first, _one_wu, _no_boost, _first, _first, _first))
+    duel = Duel(state, Rng(1), auto_choices())
     duel.duel.background = "metal"  # set, to prove it plays no part in these
     return duel
 
@@ -206,7 +196,7 @@ def _duel_where_the_player_fields_the_dragon():
     async def _play_dragon(playable):
         return next((c for c in playable if c.id == SAPPHIRE), playable[0])
 
-    choices = DuelChoices(_first, _first, _one_wu, _no_boost, _play_dragon, _first, _first)
+    choices = replace(auto_choices(), card=_play_dragon)
     return state, Duel(state, rng, choices)
 
 
@@ -234,7 +224,7 @@ def _duel_targeting(bot_char_id: int) -> Duel:
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))  # the player is Omi
     state.bot.character = cat.character(bot_char_id)
-    duel = Duel(state, Rng(1), DuelChoices(_first, _first, _one_wu, _no_boost, _first, _first, _first))
+    duel = Duel(state, Rng(1), auto_choices())
     duel.duel.rounds.append(Round(stat="force"))
     return duel
 

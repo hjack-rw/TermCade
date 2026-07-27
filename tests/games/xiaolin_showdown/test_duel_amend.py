@@ -10,11 +10,13 @@ from copy import deepcopy
 
 from termcade.core.rng import Rng
 
-from factories import run_showdown
+from dataclasses import replace
+
+from factories import auto_choices, run_showdown
 
 from xiaolin_showdown.logic.battle import Round
 from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Amend, Duel, DuelChoices
+from xiaolin_showdown.logic.duel import Amend, Duel
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.logic.settings import XiaolinSettings
@@ -24,24 +26,12 @@ FIST = 6  # Fist of Tebigong — a plain Wu, no power of its own
 BRAS = 16  # Bras Finger — a plain 1/1/1, to swap in
 
 
-async def _first(options):
-    return options[0]
-
-
-async def _no_boost(_options):
-    return None
-
-
-async def _one_wu(_options):
-    return 1
-
-
 def _duel_with_a_round(stat="force", background="metal"):
     """A Duel parked on one open round with known terms — for exercising ``_apply_amend`` directly."""
     cat = load_catalog()
     rng = Rng(1)
     state = new_game(cat, rng, cat.character(1))
-    duel = Duel(state, rng, DuelChoices(_first, _first, _one_wu, _no_boost, _first, _first, _first))
+    duel = Duel(state, rng, auto_choices())
     duel.duel.challenge = stat
     duel.duel.background = background
     duel.duel.rounds.append(Round(stat=stat))
@@ -79,7 +69,7 @@ def test_amend_swaps_a_fielded_wu_for_one_in_hand():
     cat = load_catalog()
     rng = Rng(1)
     state = new_game(cat, rng, cat.character(1))
-    duel = Duel(state, rng, DuelChoices(_first, _first, _one_wu, _no_boost, _first, _first, _first))
+    duel = Duel(state, rng, auto_choices())
     duel.duel.rounds.append(Round(stat="force"))
 
     fielded = deepcopy(cat.card(FIST))  # already down this battle
@@ -126,10 +116,7 @@ async def test_a_fielded_mouse_rewrites_the_round_it_is_played_in():
     async def _amend(_options):
         return Amend("challenge", "agility")
 
-    choices = DuelChoices(
-        challenge=_challenge, background=_first, wager=_one_wu, boost=_no_boost,
-        card=_play_the_mouse, element=_first, stat=_first, amend=_amend,
-    )
+    choices = replace(auto_choices(), challenge=_challenge, card=_play_the_mouse, amend=_amend)
     duel = Duel(state, rng, choices)
 
     await run_showdown(duel, XiaolinSettings())
