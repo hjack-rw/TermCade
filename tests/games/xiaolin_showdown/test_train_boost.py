@@ -73,14 +73,12 @@ def test_the_sapphire_dragon_fills_the_whole_bar_from_empty(state):
     assert payout_ready(state.player)  # a level waits, from an empty bar
 
 
-def test_the_sapphire_dragon_has_no_element_to_drag(state):
-    """No element means the arena never touches it — not even a metal arena, which drags everything else."""
-    from xiaolin_showdown.logic.mechanics.scoring import element_score
-
+def test_the_sapphire_dragon_rests_metal_but_scores_nothing(state):
+    """It rests metal, but its ?/?/? stats give the arena bonus nothing to land on — and fielding it
+    loses the showdown outright anyway (is_uncontrolled), so the element is cosmetic."""
     sapphire = state.catalog.card(SAPPHIRE)
-    assert sapphire.element == ""
-    for arena in ("metal", "water", "fire", "wind", "earth"):
-        assert element_score(sapphire.element, arena) == 0
+    assert sapphire.element == "metal"
+    assert all(value is None for value in sapphire.stats.values())
 
 
 def test_a_summon_is_hidden_once_every_stat_is_capped(state):
