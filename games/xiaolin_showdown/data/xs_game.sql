@@ -189,7 +189,7 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (66, 'Hodoku Mouse', 1, 1, 1, 62, 'metal', 'item', 5);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (67, 'Treasurebox of the Blind Swordsman', 0, 0, 0, 63, 'metal', 'item', 10);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (68, 'Tongue of Saiping', 2, 0, 2, 64, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (69, 'Imo Gazer', 1, 1, 1, 65, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (69, 'Imo Gazer', -1, 3, 1, 65, 'metal', 'item', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (70, 'Zing Zom-Bone', 0, -2, -1, 66, 'metal', 'item', 3);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (71, 'Monarch Wings', 2, 2, -1, 67, 'metal', 'item', 4);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (72, 'Moonstone Cat''s Eye', 1, -1, 3, 68, 'metal', 'item', 4);
