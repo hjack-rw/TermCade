@@ -277,6 +277,21 @@ def _worth_reaching_for(state: XiaolinState, is_player: bool = False) -> bool:
 # --- The Early Bird: a Wu off the pile, taken by being faster ----------------------
 
 
+# Wuya's Witchcraft senses the Shen Gong Wu: she flies the Early Bird on a shorter initiative lead
+# than anyone else needs — her bond feels the moment to snatch the pile rather than outrunning them to
+# it. This is her tempo edge now that the flat +1 initiative is gone; the value is a balance knob.
+WITCH_EARLY_BIRD_GAP = 2
+
+
+def early_bird_gap(state: XiaolinState, settings: XiaolinSettings, *, is_player: bool) -> int:
+    """The initiative lead needed to fly the Early Bird — shortened for Wuya, whose sense finds the
+    moment for her. Everyone else pays the settings gap in full."""
+    me = state.duelist(is_player)
+    if mechanic_of(me.character.power) is Mechanic.WITCHCRAFT:
+        return min(settings.early_bird_gap, WITCH_EARLY_BIRD_GAP)
+    return settings.early_bird_gap
+
+
 def choose_early_bird(
     state: XiaolinState, settings: XiaolinSettings, *, is_player: bool = False
 ) -> Card | None:
@@ -294,7 +309,7 @@ def choose_early_bird(
     budget = player_actions(state, settings) if is_player else settings.actions_per_turn
     if spent >= budget or not state.card_deck:
         return None
-    if initiative_lead(state, is_player=is_player) < settings.early_bird_gap:
+    if initiative_lead(state, is_player=is_player) < early_bird_gap(state, settings, is_player=is_player):
         return None
     if me.points >= them.points:
         return None  # ahead, or level: bank the points and keep the speed that names the challenge

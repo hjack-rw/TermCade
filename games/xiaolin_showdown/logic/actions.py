@@ -256,10 +256,12 @@ def early_bird_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | 
         return spent
     if not state.card_deck:
         return "No Wu left on the pile."
+    from .temple_ai import early_bird_gap  # local: temple_ai imports this module
     lead = initiative_lead(state, is_player=True)
-    if lead < settings.early_bird_gap:
+    gap = early_bird_gap(state, settings, is_player=True)
+    if lead < gap:
         return (
-            f"Your initiative lead is {lead}. You need {settings.early_bird_gap} "
+            f"Your initiative lead is {lead}. You need {gap} "
             f"to take the next Wu without a duel."
         )
     if not early_bird_options(state):
