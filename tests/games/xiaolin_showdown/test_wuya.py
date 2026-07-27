@@ -49,14 +49,15 @@ def test_the_third_witchery_vaults_the_wu():
     assert state.player.points == chrono.points  # banked by the wear rule, not lost
 
 
-def test_her_action_calls_the_oldest_lost_wu_back():
-    # Worth the action: read off the margin, so retuning what she stoops for retunes the test.
-    prize = wu(WITCH_RECALL_MARGIN, name="Oldest")
-    state = _state(duelist(), _wuya(hand=[wu(1)]), lost=[prize, wu(WITCH_RECALL_MARGIN, name="Newer")])
+def test_her_action_calls_the_most_valuable_lost_wu_back():
+    # Worth read off the margin, so retuning what she stoops for retunes the test. Her bond finds the
+    # best Wu, not the oldest: a scrap sits ahead of the prize in the pile and is left behind.
+    prize = wu(WITCH_RECALL_MARGIN + 2, name="Prize")
+    state = _state(duelist(), _wuya(hand=[wu(1)]), lost=[wu(WITCH_RECALL_MARGIN, name="Scrap"), prize])
     moves = bot_turn(state, XiaolinSettings(actions_per_turn=1), rng=Rng(0))
     assert [m.action for m in moves] == [RECALL]
     assert prize in state.bot.hand
-    assert [c.name for c in state.lost] == ["Newer"]
+    assert [c.name for c in state.lost] == ["Scrap"]
 
 
 def test_the_witchcraft_runs_out_of_recalls():

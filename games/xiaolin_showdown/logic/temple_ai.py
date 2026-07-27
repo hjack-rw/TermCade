@@ -125,14 +125,23 @@ def _worth_summoning_to_train(state: XiaolinState, card: Card, is_player: bool =
     return me.training + step >= TRAIN_LENGTH
 
 
+def recall_index(state: XiaolinState) -> int:
+    """Which lost Wu Wuya's witchcraft calls back — the most valuable, the one her bond finds first.
+
+    The single source of truth for the pick: :func:`worth_recalling` reads it to gate the action and
+    ``turn._recall_witchcraft`` pops it. Index-based, so the same Wu is judged and taken by identity.
+    """
+    return max(range(len(state.lost)), key=lambda i: duel_value(state.lost[i]))
+
+
 def worth_recalling(state: XiaolinState) -> bool:
-    """Wuya's recall: the lost pile's OLDEST (Euthymia's rule), against the action it costs.
+    """Wuya's recall: the most valuable Wu in the lost pile, against the action it costs.
 
     Spent, not owned — ``WITCH_RECALL_LIMIT`` of them in a run, and the run is the whole allowance.
     """
     if state.witch_recalls >= WITCH_RECALL_LIMIT:
         return False
-    return bool(state.lost) and duel_value(state.lost[0]) >= WITCH_RECALL_MARGIN
+    return bool(state.lost) and duel_value(state.lost[recall_index(state)]) >= WITCH_RECALL_MARGIN
 
 
 def _worth_swapping(state: XiaolinState, is_player: bool = False) -> bool:

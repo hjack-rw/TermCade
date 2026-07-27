@@ -404,12 +404,12 @@ def _fly_early_bird(
 def _recall_witchcraft(
     state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
 ) -> BotMove | None:
-    """Wuya's temple action: call the OLDEST lost Wu back, paying no Wu for it. A known weapon from
-    the lost beats a blind draw."""
-    from .temple_ai import worth_recalling
+    """Wuya's temple action: call the most valuable lost Wu back, paying no Wu for it. A known weapon
+    from the lost beats a blind draw, and her bond finds the best one, not merely the oldest."""
+    from .temple_ai import recall_index, worth_recalling
 
     if mechanic_of(state.bot.character.power) is Mechanic.WITCHCRAFT and worth_recalling(state):
-        revived = state.lost.pop(0)
+        revived = state.lost.pop(recall_index(state))
         state.bot.hand.append(hand_over(revived))
         state.bot_actions_taken += 1
         state.witch_recalls += 1
