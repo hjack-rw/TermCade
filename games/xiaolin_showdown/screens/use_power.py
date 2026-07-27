@@ -70,6 +70,14 @@ class UsePowerScreen(XiaolinMenu):
             return
         self._spend(self._usable[self.index_of(item_id, "pow")])
 
+    def _return_to_temple(self, toast: str, log_line: str, action: str) -> None:
+        """Every power-worker ends the same way: pop back to the temple, flash a toast that must NOT
+        self-log (``log=False`` — the journal owns the log's shape), then journal the outcome. One
+        place, so a forgotten ``log=False`` cannot double-log a mangled toast into the Game Log."""
+        self.app.pop_screen()
+        self.engine_app.notify(toast, log=False)
+        self.ctx.journal.add(log_line, title=your_move(action))
+
     @work
     async def _fly(self) -> None:
         """The Early Bird: take the next Wu with no duel, paying one of your fastest for it."""
@@ -82,26 +90,22 @@ class UsePowerScreen(XiaolinMenu):
             return
         taken = self.state.card_deck[0]  # the Wu the Early Bird takes, off the top of the pile
         message = early_bird(self.state, surrendered, rng=self.ctx.rng)  # rng lets a Mouse undo it
-        self.app.pop_screen()
-        self.engine_app.notify(message, log=False)  # the log gets the move's own shape, below
-        self.ctx.journal.add(
+        self._return_to_temple(
+            message,
             f"You used Early Bird to take {taken.name}, giving up {surrendered.name}.",
-            title=your_move(EARLY_BIRD),
+            EARLY_BIRD,
         )
 
     @work
     async def _construct(self) -> None:
         """Become Mala Mala Jong: keep the body and the wudai, exile the Heart, bank the rest."""
         purged = construct_jong(self.state, is_player=True)
-        self.app.pop_screen()
         banked = f" {len(purged)} Wu banked." if purged else ""
-        self.engine_app.notify(
-            f"You assembled Mala Mala Jong.{banked}", title=your_move(POWER), log=False
-        )
-        self.ctx.journal.add(
+        self._return_to_temple(
+            f"You assembled Mala Mala Jong.{banked}",
             "You constructed Mala Mala Jong — a 6/6/6 body of Shen Gong Wu.\n"
             "Reach the end of the game in the form to win outright.",
-            title=your_move(POWER),
+            POWER,
         )
 
     @work
@@ -114,12 +118,9 @@ class UsePowerScreen(XiaolinMenu):
         report = use_power(
             self.state, card, priority=priority, target=target, to_deck=to_deck, rng=self.ctx.rng
         )
-        self.app.pop_screen()
-        self.engine_app.notify(report.toast, log=False)  # the toast names the power and sets the scene
-        self.ctx.journal.add(
-            # the log drops the power name — the line here already gives it — and keeps only the outcome
-            f"You played {card.power.name} from the {card.name}.\n{report.log}",
-            title=your_move(POWER),
+        # the log drops the power name — the line here already gives it — and keeps only the outcome
+        self._return_to_temple(
+            report.toast, f"You played {card.power.name} from the {card.name}.\n{report.log}", POWER
         )
 
     async def _ask_target(self, mechanic: Mechanic) -> Card | None:
