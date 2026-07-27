@@ -175,7 +175,7 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
 
 # Mechanics whose printed stats are the whole value, declared rather than assumed. The two sets must
 # cover every `Mechanic` — `test_every_mechanic_is_priced` enforces it. An unpriced `? ? ?` Wu reads as
-# zero: the bot banks the strongest card in the game for 2 points. That cost 16 points of win rate once.
+# zero: the bot banks the strongest card in the game for 2 points.
 #
 # Two of them are excused for a *different* reason: they are worth nothing on the table at all, and
 # that is deliberate. Kept apart from the rest because "its stats say what it is worth" and "it is
@@ -296,18 +296,12 @@ def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
 
 
 def bank_value(card: Card, rng: Rng) -> int:
-    """What depositing this Wu pays. Its printed points — unless it is the gamble, which is rolled.
+    """What depositing this Wu pays: its printed points, unless it is the gamble, which is rolled.
 
-    The bot banks on the same terms as the player. Neither is told what the gamble is worth, and
-    neither finds out until it is spent: the bot picks it by the expected value in the card DB (see
-    ``GAMBLE_SPREAD``), the same way a player eyeing a ``?`` has only the odds to go on.
-
-    No duelist banks at a different rate. A "Shen Gong Wu hunger" that halved Wuya's deposits was
-    built and reverted the same day: it did not make her score less so much as stop her CLOSING, and
-    her runs went 7.7 showdowns to 13.8. Long runs feed the player's training bar — the one legal
-    asymmetry in a boss run — so the player took 2.04 stat raises to 1.03 and out-trained her. It
-    took her from 8.8% to 20.8% player win, the easiest boss in the tier. Run LENGTH predicts a
-    boss's difficulty better than its scoring; shortening her runs is what makes her hard.
+    Both duelists bank on the same terms and neither is told the gamble's worth — the bot picks it by
+    the DB expected value (``GAMBLE_SPREAD``), blind like a player eyeing a ``?``. A boss is made hard
+    by SHORTENING its runs, not cutting its scoring: long runs feed the player's training bar, the one
+    legal boss-run asymmetry, so run length predicts a boss's difficulty better than its stats do.
     """
     return roll_gamble(rng) if is_gamble(card.power) else card.points
 
@@ -369,10 +363,8 @@ def bot_turn(
 
 
 # The bot's temple actions, each a self-contained attempt that either DOES the thing and returns its
-# log line, or returns ``None`` to say "not now, try the next". They used to be inlined twice —
-# once in the boss policy and once in the generic one — verbatim, down to the pluralised "pt". A
-# policy is now just an ORDER over these: change how the bot banks, and it changes for every duelist
-# that banks, because there is one place that banks.
+# log line, or returns ``None`` to say "not now, try the next". A policy is just an ORDER over these,
+# so a change to how the bot banks changes it for every duelist that banks — one place banks.
 
 
 def _draw_thin_hand(

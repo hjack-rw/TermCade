@@ -66,10 +66,8 @@ _CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET
 # resolvers live in :mod:`.summons`; the duel passes the two characters and the arena, and shows the
 # name they return in place of the Wu's own.
 
-# Chase Young's Beast Form: +1 on the contested stat, in exchange for his Wu. One, not two: the beast
-# KEEPS its prize now (see `_award_prize`), and at +2 that was worth so much it crushed the whole
-# `bot.BEAST_MARGIN` curve flat (margin 5 read 2.0% player win). At +1 the margin spans 5.5-10.9% and
-# is a real dial again — the boost had to come down for when-to-beast to mean anything.
+# Chase Young's Beast Form: +1 on the contested stat, in exchange for his Wu (the beast keeps its
+# prize, see `_award_prize`). +1 not +2: at +2 the `bot.BEAST_MARGIN` when-to-beast dial reads flat.
 BEAST_BOOST = 1
 
 
@@ -877,16 +875,9 @@ class Duel:
         )
         self.duel.card_won = self.duel.prize_route is not None
         if self.duel.card_won:
-            # "The Good Guys Finish Last": a WU-PLAY win gives the prize to the duelist Chase beat —
-            # he fought them as a duelist and hands the trophy back. A Beast-Form win keeps it: in
-            # the beast his Wu are dead weight, so a Wu he takes is one he cannot wield, banked and
-            # denied rather than wielded. He could spend them at the temple; he simply never wants to.
-            # `card_won` stays true — a route was earned — so the log still reads a win; only the
-            # taker changes.
-            #
-            # This way round because the beast was paying twice: it deadens his Wu AND forfeited the
-            # prize, so it was never the right call and beasting more only made him weaker (margin 0
-            # 1.5% player win, always-beast 8.5%). A mode that is always wrong is not a choice.
+            # "The Good Guys Finish Last": a WU-PLAY win gifts the prize to the duelist Chase beat; a
+            # Beast-Form win keeps it (in the beast his Wu are dead weight either way). `card_won` stays
+            # true — a route was earned, the log reads a win — only the taker changes.
             gifts = self._is_chase(winner) and self.duel.beast_stat is None
             self.duel.prize_gifted = gifts
             takes_prize = loser if gifts else winner
