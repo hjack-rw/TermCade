@@ -383,9 +383,11 @@ def test_a_wudai_reads_as_possession_on_its_owner_and_as_the_weapons_rule_on_the
         if mechanic_of(c.power) is Mechanic.DRAGON and c.id >= FIRST_DECK_CARD
     )
 
-    # The character possesses a weapon; Hannibal's is his one immutable Morpher.
+    # The character possesses a weapon; Hannibal's is his one immutable Morpher, plus his Deflection.
     assert "Wudai weapon" in (effect_line(omi.power, is_card=False) or "")
-    assert effect_line(hannibal.power, is_card=False) == "Immutable Moby Morpher."
+    assert effect_line(hannibal.power, is_card=False) == (
+        "Immutable Moby Morpher; deflects the elements — his drag and the foe's lift, metal aside."
+    )
     # And a possessed wudai reads "On Boost" on its owner, whatever the Wu's own trigger.
     assert trigger_label(hannibal.power, is_card=False) == "On Boost"
     # On the Wu itself, the weapon states its own rule.

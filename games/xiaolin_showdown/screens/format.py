@@ -306,6 +306,11 @@ def effect_line(power: Power, *, is_card: bool = True) -> str | None:
     if not is_card:
         # Hannibal's Morpher is his one wudai, held unlosably; a dragon is a generic born weapon.
         if mechanic is Mechanic.MORPH:
+            # His Elemental Manipulation (power −5) is two things on one line: the Morpher, and the
+            # Deflection — his Wu shrug off the elements' drag, and the foe's elemental lift is turned
+            # aside (metal, which he cannot deflect, is spared). A passive; it only shows here.
+            if power.id == -5:
+                return "Immutable Moby Morpher; deflects the elements — his drag and the foe's lift, metal aside."
             return "Immutable Moby Morpher."
         if mechanic is Mechanic.DRAGON:
             return "Possesses a personal Wudai weapon."

@@ -15,7 +15,17 @@ from rich.text import Text
 from ..logic import jong
 from ..logic.battle import Round, Side
 from ..logic.constants import TOURNAMENT, TOURNAMENT_BATTLES
-from ..logic.duel import BEAST_BOOST, BOOST, CARD, COMMITMENT, END, RESOLVEMENT, SETUP, DuelState
+from ..logic.duel import (
+    BEAST_BOOST,
+    BOOST,
+    CARD,
+    COMMITMENT,
+    DEFLECTED_ELEMENTS,
+    END,
+    RESOLVEMENT,
+    SETUP,
+    DuelState,
+)
 from ..logic.mechanics.cards import is_one_of
 from ..logic.mechanics.powers import Mechanic, is_boost_slot, mechanic_of
 from ..logic.mechanics.scoring import contributing, element_score
@@ -80,6 +90,10 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
     # board a pure function of the state rather than a special case at every line.
     live = duel.rounds[-1] if duel.rounds else Round()
 
+    # Hannibal's Elemental Deflection: the scorer turns aside the elements (metal aside), so the board
+    # must not strike a shift it never took. The opponent is always P2 (the bot).
+    _bot_deflects = state.bot.character.name == "Hannibal_Roy_Bean"
+
     prize_line = _prize_line(duel)
 
     # The prize is not in play. A drawn rule sets it apart from the cards that are — an underline would
@@ -140,6 +154,8 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             "P1", state.player, live.player,
             leads=duel.player_priority is True,
             challenge=live.stat or None, background=_resonant_background(duel),
+            # Against Hannibal the player's elemental lift is turned aside — the board must not strike it.
+            deflect="lift" if _bot_deflects else None,
         ),
         "",  # the two duelists' blocks are three lines each; a gap keeps them from reading as one
         _side_line(
@@ -147,6 +163,8 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             leads=duel.player_priority is False,
             challenge=live.stat or None, background=_resonant_background(duel),
             beast=_beast_for(duel, live),
+            # Hannibal himself: his own Wu shrug off the arena's drag, so no strike either.
+            deflect="ward" if _bot_deflects else None,
         ),
     ]
     if duel.winner_character:
@@ -200,6 +218,7 @@ def _side_line(
     challenge: str | None,
     background: str | None,
     beast: str | None = None,
+    deflect: str | None = None,
 ) -> Group:
     name = display_name(jong.shown_name(player))
 
@@ -235,7 +254,7 @@ def _side_line(
         if beast
         else _cards_line(
             "Offensive", side.mine(), side.amplifiers, challenge, background,
-            earning=side.contributors(), negated=side.offence_negated,
+            earning=side.contributors(), negated=side.offence_negated, deflect=deflect,
         )
     )
     return Group(
@@ -451,6 +470,7 @@ def _cards_line(
     earning: list[Card] | None = None,
     sign: int = 1,
     negated: bool = False,
+    deflect: str | None = None,
 ) -> _CardsLine:
     """One line of the board. ``negated`` means a Sphere, Scorpion or Mirror has taken it for this
     battle: the Wu are still named — you must see what was turned off — but they read ``-/-/-`` and
@@ -487,7 +507,7 @@ def _cards_line(
             entry.append_text(absent_stats_text(challenge))
         else:
             entry.append_text(
-                _played_stats_text(card, challenge, background if earns else None, sign)
+                _played_stats_text(card, challenge, background if earns else None, sign, deflect)
             )
         entry.append(")", style="dim")
         entries.append(entry)
@@ -495,14 +515,22 @@ def _cards_line(
 
 
 def _played_stats_text(
-    card: Card, challenge: str | None, background: str | None, sign: int = 1
+    card: Card, challenge: str | None, background: str | None, sign: int = 1,
+    deflect: str | None = None,
 ) -> Text:
     """The stats as they will SCORE: the elemental shift is invisible in the printed triple, so a Wu
     could read ``0/0/4`` and score 3. Where it bites, the printed value is struck and the effective one
     follows. ``sign`` is -1 on the Defensive line — a resonant curse harms you more.
+
+    ``deflect`` is Hannibal's Elemental Deflection, so the board strikes only what the scorer does:
+    ``"ward"`` (his own Wu) turns aside a drag, ``"lift"`` (the foe's) a lift — the four elements only,
+    never metal. Without it the strike would claim a shift the score never took.
     """
     text = Text()
     shift = sign * _elemental_shift(card, challenge, background)
+    if deflect and card.element in DEFLECTED_ELEMENTS:
+        if (deflect == "ward" and shift < 0) or (deflect == "lift" and shift > 0):
+            shift = 0
     for index, stat in enumerate(STAT_ORDER):
         if index:
             text.append("/", style="dim")

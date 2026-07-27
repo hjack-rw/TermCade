@@ -6,7 +6,7 @@ who won, the bot scores a hypothetical one to find what to play, and there is on
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from .mechanics.cards import excluding, is_one_of
@@ -150,6 +150,11 @@ class Ground:
     bot_stats: Mapping[str, int]
     bonus_cancelled: bool = False  # a Serpent's Tail is on the table — nothing resonates
     bonus_reversed: bool = False  # a Celestial Dial is on the table — resonance and opposition swap
+    # Hannibal's Elemental Deflection, both halves — the elements only, never metal. Empty otherwise.
+    #   bot_ward: his OWN Wu ignore the arena's drag (−1 -> 0), keeping the lift — a ward on his side.
+    #   player_deflect: the foe's arena LIFT (+1 -> 0) is turned aside — the attacking half.
+    bot_ward: frozenset[str] = frozenset()
+    player_deflect: frozenset[str] = frozenset()
     # Who holds priority. The last word on a battle nothing else can separate — the same rule the
     # showdown itself ends on, so a duelist who sets the terms holds the ground at every level.
     challenger_is_player: bool = True
@@ -175,9 +180,13 @@ def score_battle(battle: Round, ground: Ground) -> None:
         elif ground.bonus_reversed:
             elemental_bonus = -elemental_bonus  # resonance now costs, opposition now pays
         player_end = end_stat(
-            stat, elemental_bonus, battle.player, ground.player_stats, ground.background
+            stat, elemental_bonus, battle.player, ground.player_stats, ground.background,
+            deflect_lift=ground.player_deflect,
         )
-        bot_end = end_stat(stat, elemental_bonus, battle.bot, ground.bot_stats, ground.background)
+        bot_end = end_stat(
+            stat, elemental_bonus, battle.bot, ground.bot_stats, ground.background,
+            also_ward=ground.bot_ward,
+        )
         battle.player.result.append(player_end)
         battle.bot.result.append(bot_end)
         score += 0 if player_end == bot_end else point if player_end > bot_end else -point
@@ -192,6 +201,8 @@ def end_stat(
     side: Side,
     character: Mapping[str, int],
     background: str,
+    also_ward: Collection[str] = (),
+    deflect_lift: Collection[str] = (),
 ) -> int:
     """One duelist's final value for one stat: their own, their Wu, and what was done to them.
 
@@ -208,6 +219,7 @@ def end_stat(
         earns_bonus=side.contributors(),
         suffers_bonus=side.curses(),
         element_as=side.element_as,
-        ward=side.ward,
+        ward=side.ward | set(also_ward),
+        deflect_lift=deflect_lift,
         shielded=stat in side.shielded,
     )

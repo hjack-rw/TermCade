@@ -79,6 +79,7 @@ def count_end_stats(
     suffers_bonus: Sequence[Card] = (),
     element_as: str | None = None,
     ward: Collection[str] = (),
+    deflect_lift: Collection[str] = (),
     shielded: bool = False,
 ) -> int:
     """A duelist's end value for one stat: base + queued card stats + elemental bonus.
@@ -116,6 +117,10 @@ def count_end_stats(
         for card in bonus_cards:
             score = element_score(element_as or card.element, background)
             if (element_as or card.element) in ward and score < 0:
+                score = 0
+            # Hannibal's Elemental Deflection, the attacking half: the foe's arena LIFT for these
+            # elements is turned aside, +1 -> 0 (metal, which he cannot deflect, is never in the set).
+            if score > 0 and (element_as or card.element) in deflect_lift:
                 score = 0
             if card.power.mechanic is Mechanic.DOUBLE_ELEMENT:  # Blade of the Nebula — its bonus counts double
                 score *= 2

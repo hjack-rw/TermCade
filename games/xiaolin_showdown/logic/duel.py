@@ -70,6 +70,11 @@ _CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET
 # prize, see `_award_prize`). +1 not +2: at +2 the `bot.BEAST_MARGIN` when-to-beast dial reads flat.
 BEAST_BOOST = 1
 
+# Hannibal's Elemental Deflection covers the four elements — never metal, which he cannot deflect.
+# Two halves: his own Wu of these ignore the arena's DRAG (−1 -> 0, the lift kept), and the foe's Wu
+# of these lose their arena LIFT (+1 -> 0). Set on both sides in `_ground`.
+DEFLECTED_ELEMENTS = frozenset({"water", "fire", "wind", "earth"})
+
 
 @dataclass
 class DuelState:
@@ -638,6 +643,10 @@ class Duel:
             bot_stats=self._bot_base(),
             bonus_cancelled=self.duel.elemental_bonus_cancelled,
             bonus_reversed=self.duel.elemental_bonus_reversed,
+            # Hannibal's Elemental Deflection (both halves, elements only): his own Wu shrug off the
+            # arena's drag, and the foe's arena lift is turned aside. Empty for any other opponent.
+            bot_ward=DEFLECTED_ELEMENTS if self._is_hannibal(self.state.bot) else frozenset(),
+            player_deflect=DEFLECTED_ELEMENTS if self._is_hannibal(self.state.bot) else frozenset(),
             # Priority is the last word on a battle nothing else can separate — held by whoever called
             # the challenge (settled by initiative, or the coin on a tie). A Prognosis Conch splits
             # the two: the opponent leads and names the stat, but its caster keeps the ground.
@@ -848,6 +857,13 @@ class Duel:
     def _is_chase(player: Player) -> bool:
         """Whether this duelist gifts a won prize — Chase Young, the boss who refuses the Wu."""
         return mechanic_of(player.character.power) is Mechanic.BEAST_FORM
+
+    @staticmethod
+    def _is_hannibal(player: Player) -> bool:
+        """Whether this duelist deflects the elements — Hannibal, bare-handed. His Elemental
+        Manipulation rides on his character (his shown power stays the Morpher), so it keys off the
+        character, the way summons do, not a mechanic he can hold only one of."""
+        return player.character.name == "Hannibal_Roy_Bean"
 
     def _winner_and_loser(self) -> tuple[Player, Player]:
         if self.duel.winner:
