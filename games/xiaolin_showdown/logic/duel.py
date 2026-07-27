@@ -725,21 +725,15 @@ class Duel:
         winner, loser = self._winner_and_loser()
         for card in self.duel.duelist(not self.duel.winner).stakes:
             loser.remove_card(card)
-            if jong.is_jong(winner):
-                jong.deposit_won(winner, card)  # the locked hand takes no new Wu — bank it
-            else:
-                winner.hand.append(hand_over(card))
+            jong.take_won(winner, hand_over(card))  # into the hand, or banked if the winner is locked
 
         # Mala Mala Jong losing a showdown drops the form: it always wagers parts, so a loss always
         # breaks the set. The winner already took the wagered parts above; the Heart now comes out of
-        # exile into their hands too (banked if they are a construct themselves), and the loser reverts.
+        # exile to them too, and the loser reverts.
         if jong.is_jong(loser):
             heart = jong.revert(loser)
             if heart is not None:
-                if jong.is_jong(winner):
-                    jong.deposit_won(winner, heart)
-                else:
-                    winner.hand.append(heart)
+                jong.take_won(winner, heart)
 
         # losing teaches: the loser's training bar gains one (see logic/training.py). The bot
         # cashes a full bar on the spot; the raised stat is kept for the screen to report.
@@ -896,10 +890,7 @@ class Duel:
             gifts = self._is_chase(winner) and self.duel.beast_stat is None
             self.duel.prize_gifted = gifts
             takes_prize = loser if gifts else winner
-            if jong.is_jong(takes_prize):
-                jong.deposit_won(takes_prize, self.duel.stakes)  # the locked hand takes no prize
-            else:
-                takes_prize.hand.append(self.duel.stakes)
+            jong.take_won(takes_prize, self.duel.stakes)  # into the hand, or banked if locked
         else:
             # Lost, not destroyed. It leaves play, and one day it can surface again — which is what
             # the Rooster Booster reaches for. Until that card exists, nothing reads this pile.

@@ -44,22 +44,16 @@ def _is_heart(card: Card) -> bool:
 
 
 def battle_stats(player: Player) -> dict[str, int]:
-    """The base stats a battle scores for this duelist: a flat 6/6/6 in the form, else their own.
-
-    The real ``character.stats`` are never touched (training may have raised them, and a revert must
-    give them back), so the construct's 6/6/6 is minted fresh over the same stat keys.
-    """
+    """The base stats a battle scores: a flat 6/6/6 in the form, else the real ones — minted fresh, so
+    a revert restores the training-raised originals ``character.stats`` still holds."""
     if player.jong_form:
         return {stat: JONG_STAT for stat in player.character.stats}
     return player.character.stats
 
 
 def shown_name(player: Player) -> str:
-    """The character name a screen prints — the construct's while in form, the real one otherwise.
-
-    Game logic must NOT call this: the summon pools and boss rules read ``player.character.name``, so
-    they keep seeing the real duelist under the costume.
-    """
+    """The character name a screen prints — the construct's in form, else the real one. Logic reads
+    ``player.character.name``, never this, so summon pools and boss rules see the real duelist."""
     return JONG_NAME if player.jong_form else player.character.name
 
 
@@ -118,13 +112,19 @@ def construct(player: Player) -> list[Card]:
 
 
 def deposit_won(player: Player, card: Card) -> None:
-    """A Wu won while in form never enters the locked hand — it is banked for points and vaulted.
-
-    Vaulted, not lost: still recoverable by a Treasurebox, exactly like a Wu the duelist chose to
-    deposit. The hand only ever shrinks while the construct holds.
-    """
+    """Bank a won Wu for its points and vault it (still Treasurebox-recoverable) — the construct's
+    locked hand only ever shrinks, so a won Wu is never held."""
     player.points += card.points
     player.vault.append(card)
+
+
+def take_won(player: Player, card: Card) -> None:
+    """Give a won Wu to ``player``: into the hand, or banked (:func:`deposit_won`) if the hand is a
+    locked construct. The caller that resets wear passes ``hand_over(card)``."""
+    if player.jong_form:
+        deposit_won(player, card)
+    else:
+        player.hand.append(card)
 
 
 def set_intact(player: Player) -> bool:
@@ -133,12 +133,8 @@ def set_intact(player: Player) -> bool:
 
 
 def drop_if_broken(player: Player) -> Card | None:
-    """The form holds only while the set is whole. If a part has left the hand — a steal, a Bounce, a
-    Transfer, a discard, a wear-out — drop the form and hand the exiled Heart back to this duelist.
-
-    This is NOT the lost-showdown drop (that hands the Heart to the winner, in duel._end); this is the
-    set breaking any other way, where the Heart simply comes home. Returns the Heart if it dropped.
-    """
+    """A part left the hand (steal, Bounce, Transfer, discard, wear-out) → drop the form, Heart back to
+    this duelist. NOT the lost-showdown drop (that gives the Heart to the winner, in duel._end)."""
     if not player.jong_form or set_intact(player):
         return None
     heart = revert(player)
@@ -148,11 +144,8 @@ def drop_if_broken(player: Player) -> Card | None:
 
 
 def revert(player: Player) -> Card | None:
-    """Drop the form back to the real duelist. Returns the exiled Heart, released from out-of-play.
-
-    The caller decides where the Heart goes — back to this duelist's hand on a set-break, or into the
-    winner's hand on a lost showdown — so this only lets it out of exile; it does not place it.
-    """
+    """Drop the form; return the exiled Heart, unplaced — the caller puts it in the right hand (this
+    duelist's on a set-break, the winner's on a lost showdown)."""
     player.jong_form = False
     heart = player.jong_heart
     player.jong_heart = None
