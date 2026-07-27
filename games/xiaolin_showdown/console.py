@@ -172,10 +172,10 @@ def clear(ctx: GameContext, args: Sequence[str]) -> str:
     """Empty a hand, so what you deal into it next is the only thing in it."""
     state = _state(ctx)
     who = args[0] if args else "me"
-    if who in ("me", "player", "mine"):
+    if who in _ME:
         state.player.hand.clear()
         return "your hand is empty"
-    if who in ("them", "bot", "theirs"):
+    if who in _THEM:
         state.bot.hand.clear()
         return "their hand is empty"
     raise ValueError("clear me | clear them")
@@ -191,16 +191,13 @@ def refresh(ctx: GameContext, args: Sequence[str]) -> str:
     So this hands the action back and does nothing else. The powers still fire by the real rules; you
     simply get to fire more than one before the showdown. `refresh them` does the same for the opponent,
     for a card that only shows what it is when it is used against you.
-
-    (This replaced a `debug` command that printed the board. The console floats *over* the board — it
-    was reading out what was already on screen behind it.)
     """
     state = _state(ctx)
     who = args[0] if args else "me"
-    if who in ("me", "player", "mine"):
+    if who in _ME:
         state.actions_taken = 0
         return "your action is yours again"
-    if who in ("them", "bot", "theirs"):
+    if who in _THEM:
         state.bot_actions_taken = 0
         return "their action is theirs again"
     if who in ("both", "all"):
