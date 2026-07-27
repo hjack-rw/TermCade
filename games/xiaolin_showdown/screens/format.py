@@ -469,10 +469,14 @@ def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list
 _SLOT_ORDER = ("wudai", "head", "torso", "amulet", "arms", "boots", "item")
 
 
-def _by_slot(card: Card) -> tuple[int, str]:
-    """Sort key: the slot's place in the body, then the Wu's name to break ties within a slot."""
+def _by_slot(card: Card) -> tuple[int, bool, str]:
+    """Sort key: the slot's place in the body, then the Wu's name to break ties within a slot.
+
+    Within the wudai slot the elemental dragon weapons always rank above the metal one (the Shimo
+    Staff) — metal is the tax element, favoured on no arena, so the dragons read first."""
     place = _SLOT_ORDER.index(card.type) if card.type in _SLOT_ORDER else len(_SLOT_ORDER)
-    return (place, card.name)
+    metal_wudai = card.type == "wudai" and card.element == "metal"
+    return (place, metal_wudai, card.name)
 
 
 def hands_lines(hand_a: list[Card], hand_b: list[Card]) -> tuple[list[Text], list[Text]]:
