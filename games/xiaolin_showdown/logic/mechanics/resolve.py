@@ -13,9 +13,11 @@ applies is looked up once, by :func:`~.powers.mechanic_of`:
   the *showdown*, not of one round, so this reports it and the stage machine holds the flag.
 - anything else — the printed stats.
 
-Orthogonal to all of that: a **negative Wu** (any card whose lowest stat is below zero) curses the
-opponent. A mirror lands on their queue and the caster's copy is spent. That is a property of the
-card's stats, not of its power, so it is checked separately.
+Orthogonal to all of that: a **pure-debuff Wu** (every printed stat non-positive, at least one below
+zero) curses the opponent. A mirror lands on their queue and the caster's copy is spent. A Wu with any
+positive stat is NOT a curse — it is fielded on the caster's own side, positives buffing them and
+negatives costing them, so a mixed ``-1/3/1`` never hands the opponent its +3. That is a property of
+the card's stats, not of its power, so it is checked separately (see :func:`_is_negative`).
 
 Pure: no rendering, no I/O. The Morpher's element is resolved by the caller and passed in (a human's
 choice, or the background for the bot).
@@ -294,9 +296,12 @@ def stand_in(card: Card, display_name: str | None = None) -> Card:
 
 
 def _is_negative(card: Card) -> bool:
-    """Does the card curse the opponent? True when any printed stat is below zero.
+    """Does the card curse the opponent? True only for a PURE debuff — every printed stat non-positive
+    and at least one below zero. A card with any positive stat is a Wu you field on YOUR side (the
+    positives buff you, the negatives cost you); it never lands on the opponent, or its positives would
+    buff them. All-negative curses them, all-positive buffs you, mixed is a buff-with-a-drawback.
 
     ``None`` stats are absent, not zero: a null-stat Wu is non-combat and never reads as negative.
     """
     values = [value for value in card.stats.values() if value is not None]
-    return bool(values) and min(values) < 0
+    return bool(values) and max(values) <= 0 and min(values) < 0

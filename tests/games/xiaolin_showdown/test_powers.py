@@ -174,6 +174,26 @@ def test_a_negative_wu_is_spent_on_the_casters_side(card):
     assert duel.player.queue[0].stats["force"] == 0
 
 
+def test_a_mixed_wu_is_a_self_buff_with_a_drawback_not_a_curse():
+    """Any positive stat means it is fielded on the caster's OWN side — the opponent never gets its
+    +stats. Only an all-negative Wu (a pure debuff) mirrors onto them."""
+    from factories import wu
+
+    duel = Round()
+    resolve_played_power(duel, wu(-1, 3, 1), is_player=True, element="metal")
+    assert not duel.bot.queue  # the opponent is untouched — no mirror, no free +3
+    assert duel.player.queue[0].stats == {"force": -1, "agility": 3, "intellect": 1}  # ours, entire
+
+
+def test_an_all_negative_wu_still_curses_the_opponent():
+    from factories import wu
+
+    duel = Round()
+    resolve_played_power(duel, wu(-2, -1, 0), is_player=True, element="metal")
+    assert duel.bot.queue[0].stats["force"] == -2  # the wound lands on them
+    assert duel.player.queue[0].stats["force"] == 0  # and is spent on the caster's side
+
+
 def test_a_booster_amplifies_the_card_played_after_it(card):
     duel = Round(player=Side(queue=[card(WUSHU_BRACELET)]))  # queued at the power stage
     resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
