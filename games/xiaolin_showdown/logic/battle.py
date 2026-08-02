@@ -112,7 +112,12 @@ class Round:
     stat: str = ""  # the stat this battle contests — the whole challenge, or one leg of a tournament
     player: Side = field(default_factory=Side)
     bot: Side = field(default_factory=Side)
-    fielded: int = 0  # Wu each duelist has laid down here (boosts ride along, they do not count)
+    # Wu each side has laid down here (boosts ride along, they do not count). Split rather than one
+    # shared count so a duelist can be asked for a different number than their opponent — symmetric
+    # (the two always match) for every showdown except Jack-bots Attack!, the one place a duelist may
+    # wager zero while the other still owes.
+    player_fielded: int = 0
+    bot_fielded: int = 0
     score: int = 0  # from the player's side: +2 the contested stat, +1 each other
     winner: bool | None = None  # True player, False bot, None a dead heat
     # A Heart of Jong boosted here summons a separate fighter; the side that did NOT boost it may field one

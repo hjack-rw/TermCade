@@ -173,7 +173,10 @@ async def test_a_scripted_showdown_walks_all_six_stages():
         assert await duel.advance() == 4  # Card — each fields one Wu
         assert duel.duel.round_number == (nth_wu - 1) // wu_per_battle + 1
         assert duel.duel.round.player.queue and duel.duel.round.bot.queue
-        full = duel.duel.round.fielded == wu_per_battle
+        full = (
+            duel.duel.round.player_fielded == wu_per_battle
+            and duel.duel.round.bot_fielded == wu_per_battle
+        )
         assert len(duel.duel.round.player.result) == (3 if full else 0)
 
     assert await duel.advance() == 5  # Resolvement — the showdown is weighed
@@ -577,7 +580,8 @@ async def test_a_wagered_stat_challenge_is_one_battle_fielding_every_wu_at_once(
 
     assert duel.duel.challenge == "force"
     assert len(duel.duel.rounds) == 1, "a wager bought extra battles — it must only widen the one"
-    assert duel.duel.round.fielded == duel.duel.wager
+    assert duel.duel.round.player_fielded == duel.duel.wager
+    assert duel.duel.round.bot_fielded == duel.duel.wager
     assert duel.duel.round.stat == "force"
 
 
@@ -591,7 +595,9 @@ async def test_a_tournament_is_three_battles_contesting_each_stat_left_to_right(
         pytest.skip("a tournament was not on the table for this seed (a hand held under three Wu)")
 
     assert [battle.stat for battle in duel.duel.rounds] == list(STATS)
-    assert all(battle.fielded == 1 for battle in duel.duel.rounds), "a tournament fields one Wu a battle"
+    assert all(
+        battle.player_fielded == 1 and battle.bot_fielded == 1 for battle in duel.duel.rounds
+    ), "a tournament fields one Wu a battle"
     assert len(duel.duel.player.stakes) <= TOURNAMENT_BATTLES + 1  # three Wu, plus a boost at most
 
 
@@ -615,7 +621,7 @@ async def test_neither_duelist_can_see_the_wu_the_other_fields():
         battle = ref[0].duel.round
         # `fielded` counts the exchanges already closed, so the opponent may have that many Wu down
         # and no more. One more would be the Wu of THIS exchange — an answer to a card not yet played.
-        ahead.append(_fielded(battle.bot) > battle.fielded)
+        ahead.append(_fielded(battle.bot) > battle.bot_fielded)
         return playable[0]
 
     for seed in range(1, 30):

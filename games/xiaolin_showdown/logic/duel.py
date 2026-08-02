@@ -273,12 +273,28 @@ class Duel:
         """A tournament fields one Wu a battle. A stat challenge fields the whole wager, at once."""
         return 1 if self._is_tournament() else self.duel.wager
 
-    def _total_wu(self) -> int:
-        """Everything this showdown will cost you. Three, at the very most, either way."""
-        return self._battles() * self._wu_per_battle()
+    def _wager_targets(self) -> tuple[int, int]:
+        """How many Wu each side must field this round — (player, bot).
 
-    def _fielded(self) -> int:
-        return sum(battle.fielded for battle in self.duel.rounds)
+        Symmetric today, both reading the single ``_wu_per_battle()`` value — the pair exists only
+        because Jack-bots Attack! (a later phase) is the one showdown where the two diverge, one side
+        possibly owing zero while the other still owes three.
+        """
+        per_side = self._wu_per_battle()
+        return per_side, per_side
+
+    def _total_wu(self) -> tuple[int, int]:
+        """Everything this showdown will cost each side, across every battle. Three, at most, either way."""
+        battles = self._battles()
+        player_target, bot_target = self._wager_targets()
+        return battles * player_target, battles * bot_target
+
+    def _fielded(self) -> tuple[int, int]:
+        """Wu each side has fielded so far this showdown, summed across every battle fought."""
+        return (
+            sum(battle.player_fielded for battle in self.duel.rounds),
+            sum(battle.bot_fielded for battle in self.duel.rounds),
+        )
 
     def _stat_of(self, battle_index: int) -> str:
         """What the battle at ``battle_index`` contests.
@@ -299,8 +315,11 @@ class Duel:
         nothing is left to field does Resolvement weigh it.
         """
         stage = self.duel.stage
-        if stage == CARD and self._fielded() < self._total_wu():
-            return BOOST
+        if stage == CARD:
+            player_fielded, bot_fielded = self._fielded()
+            player_total, bot_total = self._total_wu()
+            if player_fielded < player_total or bot_fielded < bot_total:
+                return BOOST
         return 0 if stage >= LAST_STAGE else stage + 1
 
     # --- stages ---------------------------------------------------------------------------
@@ -388,7 +407,10 @@ class Duel:
     async def _boost(self) -> None:
         # A battle opens only when there is no room left in the last one: a wagered stat challenge
         # lays all its Wu into a single battle, a tournament opens a fresh one for each.
-        if not self.duel.rounds or self.duel.round.fielded >= self._wu_per_battle():
+        player_target, bot_target = self._wager_targets()
+        if not self.duel.rounds or (
+            self.duel.round.player_fielded >= player_target and self.duel.round.bot_fielded >= bot_target
+        ):
             self.duel.rounds.append(Round(stat=self._stat_of(len(self.duel.rounds))))
             # Beast Form: Chase's fielded Wu score nothing — he wagers them, never wields them. The
             # existing offence-negated path zeroes his played Wu and strikes them on the board.
@@ -425,18 +447,27 @@ class Duel:
         """
         current = self.duel.round
         blind = deepcopy(current)
+        player_target, bot_target = self._wager_targets()
 
+        # Gated on what's still OWED, not on what's playable: a duelist out of cards still owes the
+        # cycle (they "stand on their base stats", per above) and must still be counted as fielded, or
+        # the loop above never sees them catch up. Jack-bots Attack! is the only showdown where the two
+        # targets can differ at all — everywhere else this is exactly the old shared-counter behaviour.
         player_card: Card | None = None
         player_playable = self._playable(self.state.player, is_player=True)
-        if player_playable:
-            player_card = await self.choices.card(player_playable)
-            self.duel.player.stakes.append(player_card)
+        if current.player_fielded < player_target:
+            if player_playable:
+                player_card = await self.choices.card(player_playable)
+                self.duel.player.stakes.append(player_card)
+            current.player_fielded += 1
 
         bot_card: Card | None = None
         bot_playable = self._playable(self.state.bot, is_player=False)
-        if bot_playable:
-            bot_card = bot.choose_card(blind, self._ground(), bot_playable, self.rng)
-            self.duel.bot.stakes.append(bot_card)
+        if current.bot_fielded < bot_target:
+            if bot_playable:
+                bot_card = bot.choose_card(blind, self._ground(), bot_playable, self.rng)
+                self.duel.bot.stakes.append(bot_card)
+            current.bot_fielded += 1
 
         if player_card is not None:
             element = await self._element_for(player_card)
@@ -457,7 +488,6 @@ class Duel:
                 # nothing, and casts no curse: he meets the wager but wields none of it.
                 current.bot.queue.append(stand_in(bot_card))
 
-        current.fielded += 1
         # Treasurebox of the Blind Swordsman (WISH): fielded, it wins the showdown outright — the ground
         # is overridden at Resolvement, and it is exiled at the End. Either duelist's win it (the bot
         # never fields it by policy, but the rule is written for whoever does).
@@ -484,7 +514,7 @@ class Duel:
         if player_card is not None and mechanic_of(player_card.power) is Mechanic.AMEND:
             await self._offer_amend()
         # Score only once the battle is full — a wagered field is weighed as a whole, not per Wu.
-        if current.fielded >= self._wu_per_battle():
+        if current.player_fielded >= player_target and current.bot_fielded >= bot_target:
             if current.heart_summoner is not None:  # a Heart woke a summon; the far side may answer it
                 await self._offer_balance(current)
             self._score_round(current)
@@ -817,7 +847,8 @@ class Duel:
         # You still owe a Wu for every one not yet fielded. Boosting with one out of HAND spends a Wu
         # you would have put down, so it is only offered while you can still cover what you owe. A Wu
         # in the inalienable slot is never fieldable as a card, so it always costs you nothing.
-        owed = self._total_wu() - self._fielded()
+        side = 0 if is_player else 1
+        owed = self._total_wu()[side] - self._fielded()[side]
         if len(self._playable(player, is_player=is_player)) > owed:
             return available
         return excluding(available, player.hand)

@@ -74,7 +74,8 @@ def _assert_invariants(duel, state, before_hand: list) -> None:
     assert len(d.rounds) == battles, f"{d.challenge}: wanted {battles} battles, fought {len(d.rounds)}"
     assert battles * wu_each <= SETTINGS.max_wager, "a showdown cost more than three Wu"
     for battle in d.rounds:
-        assert battle.fielded == wu_each, f"battle on {battle.stat} fielded {battle.fielded} Wu"
+        assert battle.player_fielded == wu_each, f"battle on {battle.stat} fielded {battle.player_fielded} player Wu"
+        assert battle.bot_fielded == wu_each, f"battle on {battle.stat} fielded {battle.bot_fielded} bot Wu"
 
     # a tournament contests each stat once, left to right; a stat challenge contests only its own
     fought = [battle.stat for battle in d.rounds]
