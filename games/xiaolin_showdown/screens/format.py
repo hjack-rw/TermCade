@@ -165,13 +165,31 @@ def points_label(card: Card) -> str:
     return str(card.points)
 
 
+# Every ``type == "wudai"`` card, closed — Jack is the last boss, so this set does not grow further:
+#   * The four playable dragons (power id -1..-4) and Jack-Bot (power id -8) are BORN wudai: granted
+#     inalienably, printed wudai from the start, never in the pool, never banked.
+#   * Hannibal's Moby Morpher is wudai only in the one hand it can never leave (`held_as_wudai`
+#     converts the granted copy from its printed ``arms``); any other copy stays ``arms`` in the pool,
+#     an ordinary Wu. Its MORPH mechanic is what marks the born copy, since its power id (40) is
+#     positive — it was never going to fit the negative-id rule the dragons and Jack-Bot use.
+#   * The Shimo Staff is wudai printed, but ownerless: found, staked, lost and banked like any Wu. It
+#     reads boost-only (`is_boost_slot`) without ever being *born* to anyone.
 def _is_born_wudai(card: Card) -> bool:
     """A signature wudai a duelist holds from the start, never banked — as opposed to one won off the
-    pile. A dragon born in the hand carries a negative power id; Hannibal's Morpher is a wudai-typed
-    Morph. The Shimo Staff is a dragon *found* in the pile (positive id), so it is not born."""
+    pile (the Shimo Staff) or held only by convention (a Morpher drawn from the pool by anyone else)."""
     if card.type != "wudai":
         return False
     return card.power.id < 0 or mechanic_of(card.power) is Mechanic.MORPH
+
+
+def display_type(card: Card) -> str:
+    """The type word a player reads, and the ``ICONS`` key it's drawn from — ``card.type`` itself for
+    every wudai above except Jack-Bot: a robot reading "Wudai" is a costuming mismatch, so it borrows
+    the ``construct`` icon Mala Mala Jong already prints rather than adding a new one.
+    """
+    if mechanic_of(card.power) is Mechanic.BOT:
+        return "construct"
+    return card.type
 
 
 def power_name_text(power: Power) -> Text:
@@ -249,6 +267,7 @@ EFFECTS = {
     Mechanic.HAND_SIZE: "Hand limit: +1",
     Mechanic.DRAW: "Draw a Wu from the incoming Wu pile.",
     Mechanic.DRAGON: "Boosts only. Can't be staked, lost or banked.",
+    Mechanic.BOT: "Boosts only. Can't be staked, lost or banked.",
     Mechanic.BOOST: "Enhances the played Wu by 1 per stat it holds.",
     Mechanic.MORPH: "You choose its Element.",
     Mechanic.NULLIFY_ELEMENT: "No Elemental bonus for either duelist all Showdown.",
@@ -293,7 +312,7 @@ EFFECTS = {
 
 # A wudai weapon is boost-only and unlosable — but a *character* whose power is one does not print the
 # weapon's own rules; they possess it. So the same mechanic reads one way on the Wu, another on its owner.
-_WUDAI_MECHANICS = frozenset({Mechanic.DRAGON, Mechanic.MORPH})
+_WUDAI_MECHANICS = frozenset({Mechanic.DRAGON, Mechanic.MORPH, Mechanic.BOT})
 
 
 def effect_line(power: Power, *, is_card: bool = True) -> str | None:
@@ -314,6 +333,8 @@ def effect_line(power: Power, *, is_card: bool = True) -> str | None:
             return "Immutable Moby Morpher."
         if mechanic is Mechanic.DRAGON:
             return "Possesses a personal Wudai weapon."
+        if mechanic is Mechanic.BOT:
+            return "Commands a personal construct."
         if mechanic is Mechanic.WITCHCRAFT:
             return "Her spent Wu return to her; the lost answer her call."
         if mechanic is Mechanic.BEAST_FORM:
@@ -453,7 +474,7 @@ def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list
     rows = []
     for index, card in enumerate(cards, 1):
         colour = COLORS.get(card.element, "white")
-        icon = ICONS.get(card.type, "")
+        icon = ICONS.get(display_type(card), "")
         name = card.name.rjust(name_width)
         stats = "/".join(stat_str(card.stats[key]).rjust(col_width[key]) for key in STAT_ORDER)
         # Built as styled Text (not markup) so the element colour renders reliably in a Static:

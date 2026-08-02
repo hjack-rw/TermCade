@@ -26,6 +26,7 @@ from xiaolin_showdown.logic.battle import Ground, Round
 from xiaolin_showdown.logic.bot import choose_background, choose_boost, choose_card, choose_challenge
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.catalog import load_catalog
+from xiaolin_showdown.logic.constants import FIRST_DECK_CARD
 from xiaolin_showdown.logic.mechanics.scoring import count_end_stats, initiative
 from xiaolin_showdown.logic.models import Card, Mechanic, Player, Power
 from xiaolin_showdown.logic.outcome import final_score
@@ -48,7 +49,7 @@ def _player_with_initiative(*bonuses: int) -> Player:
 def test_catalog_loads_all_tables():
     cat = load_catalog()
     assert cat.powers and cat.cards
-    assert len(cat.characters) == 13  # 4 playable + easy 3 + hard 3 + boss 3
+    assert len(cat.characters) == 14  # 4 playable + easy 3 + hard 3 + boss 4
     assert cat.character(1).name == "Omi"
     assert cat.opponent_characters  # the bot must have someone to be
 
@@ -67,13 +68,25 @@ def test_settings_defaults_match_the_card_pool():
     assert shipped.point_limit == point_limit_for(cards)
 
 
-def test_card_ids_are_contiguous_from_zero():
-    """``new_game`` deals the pile by indexing the card list with an id. A gap deals the wrong Wu,
-    and a beginning Wu is found by ``id == abs(power_id)`` — so a hole is silent corruption, not a
-    missing card. Guards the seed, where a new Wu is written by hand."""
+def test_every_card_id_is_unique():
+    """``Catalog.card(id)`` is a dict keyed by id — a repeated id silently drops one card, and the
+    wrong Wu is granted or dealt in its place. Guards the seed, where a new Wu is written by hand."""
     cat = load_catalog()
+    ids = [card.id for card in cat.cards]
 
-    assert [card.id for card in cat.cards] == list(range(len(cat.cards)))
+    assert len(ids) == len(set(ids))
+
+
+def test_pool_card_ids_are_contiguous_from_first_deck_card():
+    """``new_game``/``_weighted_game`` filter the pool by ``card.id >= FIRST_DECK_CARD`` (not by
+    position — a signature Wu's id can be negative, or a gap below the line, and still resolve
+    correctly through ``Catalog.card``). But a gap *inside* the pool is silent corruption: nothing
+    notices a missing id, it just deals one Wu fewer every game. So the pool itself, not the whole
+    table, is what must stay contiguous. Guards the seed, where a new Wu is written by hand."""
+    cat = load_catalog()
+    pool_ids = sorted(card.id for card in cat.cards if card.id >= FIRST_DECK_CARD)
+
+    assert pool_ids == list(range(FIRST_DECK_CARD, FIRST_DECK_CARD + len(pool_ids)))
 
 
 def test_new_game_is_deterministic_for_a_seed():

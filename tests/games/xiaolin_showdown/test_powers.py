@@ -243,7 +243,7 @@ def test_only_boost_slot_wu_may_take_the_boost_slot(catalog):
     his sheet but is never a Wu played from a hand)."""
     eligible = {mechanic_of(card.power) for card in catalog.cards if is_boost_slot(card.power)}
 
-    assert eligible == {Mechanic.DRAGON, Mechanic.BOOST, Mechanic.MORPH, Mechanic.ANIMATE}
+    assert eligible == {Mechanic.DRAGON, Mechanic.BOOST, Mechanic.MORPH, Mechanic.ANIMATE, Mechanic.BOT}
 
 
 def test_a_morpher_spent_as_a_boost_is_one_one_one_of_its_chosen_element(catalog):

@@ -242,6 +242,13 @@ RULES: dict[Mechanic, Rule] = {
         "Lends no stats of its own; amplifies the card you play after it by 1 per stat that card "
         "contributes.",
     ),
+    Mechanic.BOT: Rule(
+        Mechanic.BOT,
+        "boost",
+        Timing.IN_DUEL,
+        "A construct: it lends its stats every showdown from the boost slot, and is never fielded "
+        "as a Wu. Jack built it himself, so it can never be staked or lost.",
+    ),
     Mechanic.INNATE: Rule(Mechanic.INNATE, "play", Timing.IN_DUEL, "Contributes its printed stats."),
     Mechanic.MORPH: Rule(
         Mechanic.MORPH,

@@ -78,12 +78,13 @@ def new_game(
     if pile > 0 and not _player_set_their_own_deal(settings, cards):
         return _weighted_game(catalog, rng, player_character, settings, roster, opponent, pile)
 
-    # Draw pile = the pool (ids FIRST_DECK_CARD..N), padded with blanks (card 0) to full size.
-    card_order = list(range(FIRST_DECK_CARD, len(cards)))
+    # Draw pile = the pool (every card whose id is >= FIRST_DECK_CARD — a signature Wu's id sits
+    # below it, whatever sign it carries), padded with blanks (card 0) to full size.
+    card_order = [card.id for card in cards if card.id >= FIRST_DECK_CARD]
     card_order += [0] * (settings.max_deck_size - len(card_order))
     rng.shuffle(card_order)  # RNG call 1 — must precede the bot pick
 
-    draw_pile = [deepcopy(cards[i]) for i in card_order[: settings.max_deck_size]]
+    draw_pile = [deepcopy(catalog.card(i)) for i in card_order[: settings.max_deck_size]]
 
     # Pick the opponent right after the shuffle (RNG call 2). Dealing consumes no RNG, so knowing both
     # duelists before any hand is dealt does not disturb the call order — and it must be known, so a
@@ -108,17 +109,27 @@ def new_game(
     return XiaolinState(catalog=catalog, player=player_duelist, bot=bot_duelist, card_deck=draw_pile)
 
 
-def _reserve_signature(draw_pile: list[Card], character: Character) -> int | None:
-    """A signature power (id −5..−1) ties a character to the Wu ``abs(id)``, which is theirs by right.
+# Wuya's Witchcraft (-6) and Chase's Beast Form (-7) are boss powers that grant no Wu at all — the
+# two carve-outs to the otherwise-uniform rule that a negative power id reserves a card.
+_NO_SIGNATURE_WU = frozenset({-6, -7})
 
-    Pull that Wu out of the pool so it can never be drawn by anyone: ids 1-4 (the playable signatures)
-    never ride in the pool, but id 5 (Moby Morpher, Hannibal's) does by default. Returns the Wu's id,
-    or ``None`` when the character carries no signature. Wuya's Witchcraft sits at −6 ON PURPOSE:
-    a character power that grants no Wu lives outside the signature range.
+
+def _reserve_signature(draw_pile: list[Card], character: Character) -> int | None:
+    """A signature power ties a character to one Wu, theirs by right — granted inalienably in `_deal`.
+
+    Pull that Wu out of the pool so it can never be drawn by anyone. The Wu's id is `abs(power_id)`
+    for the five characters built with one (ids -1..-5, cards 1..5 — those cards were free to be
+    numbered to match); Jack's card was not, since it appends after them (xs_game.sql never fills a
+    hole or renumbers a neighbour), so his card carries his power's id directly instead (-8, -8).
+    Either way the card sits below `FIRST_DECK_CARD` and never rides the pool on its own.
+
+    Returns the Wu's id, or ``None`` when the character carries no signature (a positive power id, or
+    one of ``_NO_SIGNATURE_WU``).
     """
-    if not -6 < character.power.id < 0:
+    power_id = character.power.id
+    if power_id >= 0 or power_id in _NO_SIGNATURE_WU:
         return None
-    signature = abs(character.power.id)
+    signature = abs(power_id) if power_id >= -5 else power_id
     for index, card in enumerate(draw_pile):
         if card.id == signature:
             del draw_pile[index]
@@ -162,7 +173,7 @@ def _weighted_game(
     subset (a smaller deck banks a nearer target). RNG call order matches :func:`new_game` — the deal
     consumes randomness (call 1), then the bot is picked (call 2) — so seeds line up across both paths.
     """
-    poolable = [deepcopy(catalog.cards[i]) for i in range(FIRST_DECK_CARD, len(catalog.cards))]
+    poolable = [deepcopy(card) for card in catalog.cards if card.id >= FIRST_DECK_CARD]
     wanted = pile_size + settings.starting_hand_player + settings.starting_hand_bot
     # A scenario needs the opponent known before the deal; that holds only for a CHOSEN opponent, which
     # bosses always are. A randomly dealt roster (opponent is None) has no scenario and takes the default.

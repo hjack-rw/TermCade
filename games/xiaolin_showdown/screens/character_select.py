@@ -25,6 +25,7 @@ _BOSS_ARCHETYPE: dict[Mechanic, str] = {
     Mechanic.MORPH: "Elemental Boss",
     Mechanic.WITCHCRAFT: "Shen Gong Wu Boss",
     Mechanic.BEAST_FORM: "Stat Boss",
+    Mechanic.BOT: "Bots Boss",
 }
 
 

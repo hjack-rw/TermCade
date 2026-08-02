@@ -14,6 +14,7 @@ from ..logic.mechanics.powers import is_gamble
 from .format import (
     char_stats,
     display_name,
+    display_type,
     effect_line,
     element_text,
     points_label,
@@ -49,7 +50,7 @@ class DetailScreen(EngineScreen):
                     line.append("Element: ")
                     line.append_text(element_text(target.element))
                     line.append("    ")
-                line.append(f"Type: {target.type.capitalize()}    Points: {points_label(target)}")
+                line.append(f"Type: {display_type(target).capitalize()}    Points: {points_label(target)}")
                 yield Static(line)
                 yield Static(f"Stats (F/A/I): {stats_line(target.stats)}")
             else:

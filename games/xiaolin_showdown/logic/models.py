@@ -30,6 +30,7 @@ class Mechanic(StrEnum):
     LUCK = "luck"
     DRAGON = "dragon"
     BOOST = "boost"
+    BOT = "bot"  # Jack Spicer's Jack-Bot — a dragon in a mechanical way, kept distinct so it can grow its own rules later without dragging the four playable dragons with it
     INNATE = "innate"
     MORPH = "morph"
     NULLIFY_ELEMENT = "nullify_element"

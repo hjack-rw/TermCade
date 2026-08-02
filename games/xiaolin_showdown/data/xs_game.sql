@@ -38,6 +38,7 @@ CREATE TABLE "power" (
 	PRIMARY KEY("id")
 );
 
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-8, 'Jack-Bot', 'bot', 'Jack Spicer, evil boy genius, built himself a robotic army to fight his battles for him. Versatile and ALMOST infallible.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-7, 'Beast Form', 'beast_form', 'Going over to the dark side, Chase became infused with the power of a Heylin Demon. He refuses however to meddle in mere mortal affairs.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-6, 'Witchcraft', 'witchcraft', 'Wuya''s connection to the Shen Gong Wu runs both ways. She can call the lost Wu back into her hand, three times in a run, and a Wu she spends on its power returns to her hand. But the hunger that finds them is never fed.', 1);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-5, 'Elemental Manipulation', 'morph', 'Given his condition of being a literal Heylin Bean, Hannibal took a hold of Moby Morpher and never let it go - so he wields it as a free Wu. He is also capable of Elemental Deflection.', 0);
@@ -195,6 +196,7 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (72, 'Moonstone Cat''s Eye', 1, -1, 3, 68, 'metal', 'item', 4);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (73, 'Sapphire Dragon', NULL, NULL, NULL, 69, 'metal', 'item', 5);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (74, 'Heart of Jong', NULL, NULL, NULL, 70, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (-8, 'Jack-Bot', 1, 1, 1, -8, 'metal', 'wudai', 0);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (
@@ -224,6 +226,7 @@ INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id"
 INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (11, 'Hannibal_Roy_Bean', 5, 5, 5, -5, 'heylin', 0, 'boss');
 INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (12, 'Wuya', 6, 6, 6, -6, 'heylin', 0, 'boss');
 INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (13, 'Chase_Young', 7, 7, 7, -7, 'heylin', 0, 'boss');
+INSERT INTO character ("id", "name", "force", "agility", "intellect", "power_id", "affiliation", "is_playable", "tier") VALUES (14, 'Jack_Spicer', 3, 3, 7, -8, 'heylin', 0, 'boss');
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "background" (

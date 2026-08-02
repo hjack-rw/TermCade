@@ -42,23 +42,24 @@ _DRAWINGS = {
 _DESIRES = {
     "Omi": "his Long Lost Parents",
     "Raimundo": "a Carnival of Revelers",
-    "Kimiko": "a Wave of Space Invaders",
+    "Kimiko": "an Armada of Space Invaders",
     "Clay": "a Herd of Texan Longhorns",
     "Tubbimura": "a Sumo Wrestler",
     "Katnappé": "a Litter of Kittens",
     "Salvador_Cumo": "a Komodo Dragon",
-    "Vlad": "a Set of Matryoshka Dolls",
+    "Vlad": "a Set of Giant Matryoshka Dolls",
     "Le_Mime": "an Invisible Impenetrable Box",
     "PandaBubba": "a Mob of Goons",
     "Hannibal_Roy_Bean": "a Towering Suit of Armor",
     "Wuya": "an Army of Rock Golems",
     "Chase_Young": "an Evil Omi",
+    "Jack_Spicer": "the Throne of Darkness",
 }
 _A_FIGMENT = "a Figment of the Imagination"
 
-# Heart of Jong: the character its life leaps into in the boost slot, one per background element. Metal
-# waits on a face not yet in the roster — Jack Spicer's form is the Dude-Bot; until he is a playable,
-# everyone's metal form is the T-Rex.
+# Heart of Jong: the character its life leaps into in the boost slot, one per background element.
+# Metal is Jack Spicer's own Dude-Bot when he is the caster (see `jong_form` below); every other
+# caster's metal form is the T-Rex.
 _JONG_FORMS = {
     "water": "Raksha",
     "fire": "Cyclops",
@@ -84,6 +85,7 @@ _FEARS = {
     "Hannibal_Roy_Bean": "a Vision of Grand Master Dashi",
     "Wuya": "a Vision of Grand Master Dashi",
     "Chase_Young": "a Vision of Grand Master Dashi",
+    "Jack_Spicer": "a Giant Toilet",
 }
 _A_NAMELESS_DREAD = "a Nameless Dread"
 
@@ -119,8 +121,8 @@ def _fear(target: Character, *, is_jong: bool = False) -> str:
 
 
 def jong_form(element: str, caster: Character) -> str:
-    """Which animated form the Heart of Jong wakes, by the arena element — and, on metal, by who cast it:
-    Jack Spicer's own construct is the Dude-Bot, not the T-Rex. Dormant until Jack joins the roster."""
+    """Which animated form the Heart of Jong wakes, by the arena element — and, on metal, by who cast
+    it: Jack Spicer's own construct is the Dude-Bot, not the T-Rex."""
     if element == "metal" and caster.name == "Jack_Spicer":
         return "Dude-Bot"
     return _JONG_FORMS.get(element, "")
