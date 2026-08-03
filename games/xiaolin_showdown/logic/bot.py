@@ -79,25 +79,51 @@ def choose_jack_bot(opponent: Side) -> bool:
     return not opponent.defence_negated
 
 
-ATTACK_CHANCE = 4  # 1 in ATTACK_CHANCE — see choose_jack_mode
+ATTACK_BASE_CHANCE = 15  # percent, at showdown 0 of a run — beat 20% (48.3% vs 51.0% player win,
+# n=300 diagnostic runs each) and dropped straight from the flat 25% Attack! shipped with; see BOSSES.md
+ATTACK_MIN_CHANCE = 5  # a floor: it never fully vanishes, only fades — still "unpredictable by design"
+ATTACK_DECAY_PER_SHOWDOWN = 1  # percentage points shed per showdown already fought this run
+
+# Chamelon-Bot only earns its keep when the opponent's stats actually beat his own on the whole —
+# otherwise the mirror trades his one real edge (the 7 intellect, a SIDE stat every time force or
+# agility is what's actually contested) for a coin-flip on the contested stat alone. Measured: a
+# blind "always mirror when the player leads" scored WORSE than fighting as himself (11.9% vs 22.4%
+# player-leads win rate, n=300 runs) — this margin is the fix, not a threshold tuned in a vacuum.
+CHAMELON_MARGIN = 4
 
 
-def choose_jack_mode(player_has_priority: bool, can_swap: bool, rng: Rng) -> str | None:
+def _attack_chance(showdowns_played: int) -> int:
+    """Attack!'s own percentage this showdown — decays as the run goes on, never below the floor."""
+    return max(ATTACK_MIN_CHANCE, ATTACK_BASE_CHANCE - ATTACK_DECAY_PER_SHOWDOWN * showdowns_played)
+
+
+def choose_jack_mode(
+    player_has_priority: bool,
+    can_swap: bool,
+    jack_stats: Mapping[str, int],
+    opponent_stats: Mapping[str, int],
+    showdowns_played: int,
+    rng: Rng,
+) -> str | None:
     """Jack's identity swap, decided once at commitment: Attack!, a stand-in, or himself.
 
-    v1, swept later like every other boss knob. Attack! rolls first, a flat 1-in-ATTACK_CHANCE —
-    unpredictable by design, and it neither costs nor grants `can_swap`, so it never disrupts the
-    pattern underneath it. Missing that roll: no stand-in without `can_swap` (he cannot use one two
-    showdowns running — see `state.jack_can_swap`), and between the two stand-ins, priority alone
-    decides — Chamelon-Bot when the player is about to name the challenge (his weak force/agility
-    are exactly what they would pick, and mirroring their stats denies it), AI Jack when HE leads
-    (he already picks intellect there, so a steal is pure upside if anything is worth taking).
+    v1, swept later like every other boss knob. Attack! rolls first, a percentage that fades over
+    the run (`_attack_chance`) — unpredictable by design, and it neither reads nor writes `can_swap`,
+    so it never disrupts the pattern underneath it.
+
+    Missing that roll, priority decides which stand-in is even on the table — the two never compete:
+    Chamelon-Bot when the player is about to name the challenge, but only when mirroring the
+    opponent's stats is actually worth it (`CHAMELON_MARGIN`, not `can_swap` — he may take it every
+    single time the player leads, whenever it clears the bar); AI Jack when HE leads instead (he
+    already picks intellect there, so a steal is pure upside), gated by `can_swap` alone — the
+    "cannot spam a stand-in" rule is his, not Chamelon-Bot's.
     """
-    if rng.randint(1, ATTACK_CHANCE) == 1:
+    if rng.randint(1, 100) <= _attack_chance(showdowns_played):
         return jack.ATTACK_NAME
-    if not can_swap:
-        return None
-    return jack.CHAMELON_NAME if player_has_priority else jack.AI_JACK_NAME
+    if player_has_priority:
+        worth_it = sum(opponent_stats.values()) - sum(jack_stats.values()) >= CHAMELON_MARGIN
+        return jack.CHAMELON_NAME if worth_it else None
+    return jack.AI_JACK_NAME if can_swap else None
 
 
 def steal_target(hand: Sequence[Card], deck: Sequence[Card], rng: Rng) -> Card | None:

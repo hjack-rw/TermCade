@@ -97,10 +97,19 @@ def test_attack_awards_the_prize_outright_no_ladder():
 
 
 async def test_commitment_sets_the_brawl_challenge_and_never_a_tournament():
-    duel = _jack_duel(rng_seed=2)  # seed 2's first randint(1, ATTACK_CHANCE) rolls Attack!
+    duel = _jack_duel(rng_seed=2)  # seed 2's first randint(1, 100) rolls under ATTACK_BASE_CHANCE
     duel.duel.jack_mode = None  # let _commitment decide it fresh
     duel.duel.player_priority = False
     await duel._commitment()
     assert duel.duel.jack_mode == jack.ATTACK_NAME
     assert duel.duel.challenge == BRAWL
     assert not duel._is_tournament()
+
+
+async def test_setup_brawl_takes_metal_directly_when_jack_picks_the_background():
+    # Jack always plays metal for his own free swing rather than running the generic heuristic —
+    # a real gap found via the win-rate diagnostic, not a design choice.
+    duel = _jack_duel()
+    duel.duel.player_priority = True  # player leads, so Jack (the non-challenger) picks the background
+    await duel._setup_brawl()
+    assert duel.duel.background == "metal"

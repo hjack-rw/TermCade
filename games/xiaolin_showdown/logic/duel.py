@@ -414,8 +414,12 @@ class Duel:
         nobody's wager sets the terms for anybody else's.
         """
         if self.duel.player_priority:
-            self.duel.background = bot.choose_background(
-                self._jack_base(), self._background_options(),
+            # The generic heuristic weighs Wu elements in hand — it has no way to know picking metal
+            # is worth a guaranteed +1 on all three of HIS OWN stats (see `_jack_base`), a far bigger
+            # lever than any hand it could be holding. Take it directly rather than asking.
+            options = self._background_options()
+            self.duel.background = "metal" if "metal" in options else bot.choose_background(
+                self._jack_base(), options,
                 (self.state.bot.whole_hand, self.state.player.whole_hand),
                 jong.battle_stats(self.state.player), self.rng,
             )
@@ -832,6 +836,7 @@ class Duel:
         self._award_prize()
 
     async def _end(self) -> None:
+        self.state.showdowns_played += 1
         self.state.previous_challenge = [self.duel.challenge] if self.duel.challenge else []
         self.state.previous_background = [self.duel.background] if self.duel.background else []
         # The action counters are NOT reset here. A turn turns over in `turn.refill_hands`, which runs
@@ -956,19 +961,24 @@ class Duel:
         if not self._is_jack(self.state.bot):
             return
         mode = bot.choose_jack_mode(
-            bool(self.duel.player_priority), self.state.jack_can_swap, self.rng,
+            bool(self.duel.player_priority), self.state.jack_can_swap,
+            jong.battle_stats(self.state.bot), jong.battle_stats(self.state.player),
+            self.state.showdowns_played, self.rng,
         )
         self.duel.jack_mode = mode
         if mode == jack.ATTACK_NAME:
             # Never named, never a tournament — see `_challenge_options`/`_commitment`'s guard below.
-            # `jack_can_swap` is untouched: Attack! neither costs nor grants it (see `choose_jack_mode`).
+            # `jack_can_swap` is untouched: Attack! neither reads nor writes it (see `choose_jack_mode`).
             self.duel.challenge = BRAWL
             pool = [n for n in jack.ATTACK_BOT_NAMES if n != self.state.last_attack_bot_name]
             picked = self.rng.spawn("attack_bot_name").choice(pool)  # decoration; see jack_bot_name
             self.duel.attack_bot_name = picked
             self.state.last_attack_bot_name = picked
             return
-        self.state.jack_can_swap = mode is None  # a stand-in forces himself next; himself frees it
+        if not self.duel.player_priority:
+            # Only AI Jack's branch touches the alternation — Chamelon-Bot may fire every time the
+            # player leads, whenever CHAMELON_MARGIN says it's worth it; "cannot spam" is his alone.
+            self.state.jack_can_swap = mode is None
         if mode != jack.AI_JACK_NAME:
             return
         target = bot.steal_target(self.state.player.hand, self.state.player.deck, self.rng)

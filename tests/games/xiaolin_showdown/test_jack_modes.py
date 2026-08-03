@@ -24,24 +24,39 @@ def _jack_duel(*, player_priority: bool) -> Duel:
     return duel
 
 
+JACK_STATS = {"force": 3, "agility": 3, "intellect": 7}
+WEAK_OPPONENT = {"force": 3, "agility": 3, "intellect": 7}  # margin 0 — below CHAMELON_MARGIN
+STRONG_OPPONENT = {"force": 7, "agility": 7, "intellect": 6}  # margin 7 — clears CHAMELON_MARGIN
+
+
 def test_choose_jack_mode_rolls_attack_first_regardless_of_state():
-    # seed 2's first randint(1, ATTACK_CHANCE) is 1 — verified once, not re-derived per test.
-    assert bot.choose_jack_mode(True, False, Rng(2)) == jack.ATTACK_NAME
-    assert bot.choose_jack_mode(False, False, Rng(2)) == jack.ATTACK_NAME
+    # seed 2's first randint(1, 100) is 8, under ATTACK_BASE_CHANCE (15) — verified once.
+    assert bot.choose_jack_mode(True, False, JACK_STATS, WEAK_OPPONENT, 0, Rng(2)) == jack.ATTACK_NAME
+    assert bot.choose_jack_mode(False, False, JACK_STATS, WEAK_OPPONENT, 0, Rng(2)) == jack.ATTACK_NAME
 
 
-def test_choose_jack_mode_mirrors_when_the_player_leads_and_can_swap():
-    # seed 0 never rolls Attack! on the first call — verified once, not re-derived per test.
-    assert bot.choose_jack_mode(True, True, Rng(0)) == jack.CHAMELON_NAME
+def test_choose_jack_mode_mirrors_when_the_player_leads_and_clears_the_margin():
+    # seed 0's first randint(1, 100) is 50, over ATTACK_BASE_CHANCE — never rolls Attack! here.
+    assert bot.choose_jack_mode(True, True, JACK_STATS, STRONG_OPPONENT, 0, Rng(0)) == jack.CHAMELON_NAME
+
+
+def test_choose_jack_mode_stays_himself_when_the_player_leads_but_margin_is_too_thin():
+    assert bot.choose_jack_mode(True, True, JACK_STATS, WEAK_OPPONENT, 0, Rng(0)) is None
 
 
 def test_choose_jack_mode_steals_when_jack_leads_and_can_swap():
-    assert bot.choose_jack_mode(False, True, Rng(0)) == jack.AI_JACK_NAME
+    assert bot.choose_jack_mode(False, True, JACK_STATS, WEAK_OPPONENT, 0, Rng(0)) == jack.AI_JACK_NAME
 
 
 def test_choose_jack_mode_stays_himself_when_it_cannot_swap():
-    assert bot.choose_jack_mode(True, False, Rng(0)) is None
-    assert bot.choose_jack_mode(False, False, Rng(0)) is None
+    assert bot.choose_jack_mode(True, False, JACK_STATS, WEAK_OPPONENT, 0, Rng(0)) is None
+    assert bot.choose_jack_mode(False, False, JACK_STATS, WEAK_OPPONENT, 0, Rng(0)) is None
+
+
+def test_attack_chance_decays_per_showdown_but_never_below_the_floor():
+    assert bot._attack_chance(0) == bot.ATTACK_BASE_CHANCE
+    assert bot._attack_chance(5) == bot.ATTACK_BASE_CHANCE - 5
+    assert bot._attack_chance(50) == bot.ATTACK_MIN_CHANCE
 
 
 def test_steal_target_takes_the_strongest_hand_card():
@@ -59,11 +74,19 @@ def test_steal_target_is_none_when_nothing_is_available():
     assert bot.steal_target([], [], Rng(0)) is None
 
 
-async def test_commitment_picks_chamelon_bot_when_the_player_leads():
+async def test_commitment_picks_chamelon_bot_when_the_player_leads_and_clears_the_margin():
+    duel = _jack_duel(player_priority=True)  # seed 1 never rolls Attack! on the first call
+    duel.state.jack_can_swap = True
+    duel.state.player.character.stats = dict(STRONG_OPPONENT)
+    await duel._commitment()
+    assert duel.duel.jack_mode == jack.CHAMELON_NAME
+
+
+async def test_commitment_stays_himself_when_the_player_leads_but_margin_is_too_thin():
     duel = _jack_duel(player_priority=True)  # seed 1 never rolls Attack! on the first call
     duel.state.jack_can_swap = True
     await duel._commitment()
-    assert duel.duel.jack_mode == jack.CHAMELON_NAME
+    assert duel.duel.jack_mode is None
 
 
 async def test_commitment_picks_ai_jack_and_steals_when_jack_leads():
@@ -74,6 +97,24 @@ async def test_commitment_picks_ai_jack_and_steals_when_jack_leads():
     assert duel.duel.jack_mode == jack.AI_JACK_NAME
     assert len(duel.state.player.hand) == player_before - 1
     assert len(duel.state.bot.hand) == bot_before + 1
+
+
+async def test_commitment_swap_alternation_belongs_to_ai_jack_alone():
+    # AI Jack firing flips jack_can_swap to False — the "cannot spam a stand-in" rule is his.
+    duel = _jack_duel(player_priority=False)  # seed 1 never rolls Attack! on the first call
+    duel.state.jack_can_swap = True
+    await duel._commitment()
+    assert duel.duel.jack_mode == jack.AI_JACK_NAME
+    assert duel.state.jack_can_swap is False
+
+    # Chamelon-Bot firing (player leads) must never touch it — he may fire every time he clears
+    # the margin, whatever jack_can_swap already reads.
+    duel2 = _jack_duel(player_priority=True)
+    duel2.state.jack_can_swap = False
+    duel2.state.player.character.stats = dict(STRONG_OPPONENT)
+    await duel2._commitment()
+    assert duel2.duel.jack_mode == jack.CHAMELON_NAME
+    assert duel2.state.jack_can_swap is False
 
 
 def test_jack_base_mirrors_the_opponent_in_chamelon_bot():

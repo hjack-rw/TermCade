@@ -97,6 +97,10 @@ class XiaolinState:
     # Starts `False` so the very first showdown is himself. Attack! rolls independently and does not
     # touch this — it neither costs nor grants eligibility, so the pattern resumes where it left off.
     jack_can_swap: bool = False
+    # How many showdowns THIS RUN has fought — Attack!'s own chance decays with it (see
+    # `bot.choose_jack_mode`), so a long run doesn't keep eating a 1-in-N surprise at the same rate
+    # forever. Per-run, incremented once a showdown ends (`duel._end`).
+    showdowns_played: int = 0
     # Wu that surfaced, were fought over, and that nobody won hard enough to keep. They are **lost**,
     # not destroyed: out of play, and one day recoverable (the Rooster Booster reaches for the oldest).
     # Shared — a Wu dies to a showdown, not to a duelist.
@@ -172,6 +176,7 @@ class XiaolinState:
             "previous_challenge": list(self.previous_challenge),
             "previous_background": list(self.previous_background),
             "has_ended": self.has_ended,
+            "showdowns_played": self.showdowns_played,
             "actions_taken": self.actions_taken,
             "bot_actions_taken": self.bot_actions_taken,
             "deposits_taken": self.deposits_taken,
@@ -202,6 +207,7 @@ class XiaolinState:
             previous_challenge=list(data["previous_challenge"]),
             previous_background=list(data["previous_background"]),
             has_ended=data["has_ended"],
+            showdowns_played=data.get("showdowns_played", 0),  # absent before Attack!'s decay
             # A save from before the one-action turn counted a deposit and a draw separately. Both
             # were spends of the turn, so the sum is what the turn had already cost.
             actions_taken=data.get(
