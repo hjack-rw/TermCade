@@ -26,6 +26,8 @@ class Side:
     queue: list[Card] = field(default_factory=list)  # what scores on this side
     suffered: list[Card] = field(default_factory=list)  # curse mirrors the opponent landed here
     amplifiers: list[Card] = field(default_factory=list)  # which of those mirrors a booster doubled
+    jack_bot: list[Card] = field(default_factory=list)  # which of those mirrors came from Jack-Bot's
+    # boost-slot curse rather than a played card — joins "&" on the board like Jong's Heart, never "+"
     spent: list[Card] = field(default_factory=list)  # own copies emptied onto a curse, shown opposite
     result: list[int] = field(default_factory=list)  # per-stat end values
 
@@ -54,6 +56,10 @@ class Side:
     # A stat-shield Wu (Mikado Arms and kin) fielded here: its caster takes no curse on these stats —
     # a debuff landed on a shielded stat counts nothing. One entry per shield Wu fielded.
     shielded: set[str] = field(default_factory=set)
+    # Whether this duelist fights this battle as a construct — Mala Mala Jong, or Jack in any of his
+    # three identity swaps (see `duel.Duel._is_construct`). No mechanic reads this yet; it exists so
+    # a future auto-win-vs-construct Wu has a flag to key off, instead of re-deriving the question.
+    is_construct: bool = False
 
     def mine(self) -> list[Card]:
         """Every Wu *this* duelist put on the table — what the board owes them a line for.
@@ -198,6 +204,40 @@ def score_battle(battle: Round, ground: Ground) -> None:
 
     battle.score = score
     battle.winner = score > 0 if score else ground.challenger_is_player
+
+
+def score_brawl(battle: Round, ground: Ground) -> None:
+    """Weigh a Jack-bots Attack! battle in place — a **Brawl**, not a contested-stat duel.
+
+    No stat is named, so none is weighted: all three carry the arena's swing equally (nothing is
+    singled out as "the challenge" to gate it to), and the winner is whoever leads more of the three
+    individual comparisons — **2 of 3**, not the summed margin ``score_battle`` reads. A stalemate —
+    the count itself ties, e.g. 1-1 with one draw — goes to the challenger, the same tiebreak an
+    ordinary level battle already uses.
+    """
+    battle.player.result.clear()
+    battle.bot.result.clear()
+    won = 0  # positive: the player leads more stats; negative: the bot does
+    for stat in ground.stats:
+        elemental_bonus = 1
+        if ground.bonus_cancelled:
+            elemental_bonus = 0
+        elif ground.bonus_reversed:
+            elemental_bonus = -elemental_bonus
+        player_end = end_stat(
+            stat, elemental_bonus, battle.player, ground.player_stats, ground.background,
+            deflect_lift=ground.player_deflect,
+        )
+        bot_end = end_stat(
+            stat, elemental_bonus, battle.bot, ground.bot_stats, ground.background,
+            also_ward=ground.bot_ward,
+        )
+        battle.player.result.append(player_end)
+        battle.bot.result.append(bot_end)
+        won += 0 if player_end == bot_end else (1 if player_end > bot_end else -1)
+
+    battle.score = won
+    battle.winner = won > 0 if won else ground.challenger_is_player
 
 
 def end_stat(

@@ -19,8 +19,9 @@ from dataclasses import replace
 
 from termcade.core.rng import Rng
 
-from .battle import Ground, Round, score_battle
+from .battle import Ground, Round, Side, score_battle
 from .constants import OPPOSITES, TOURNAMENT
+from . import jack
 from .mechanics.powers import Mechanic, is_uncontrolled, mechanic_of, names_a_stat
 from .mechanics.resolve import as_boost, resolve_played_power
 from .models import Card, Player
@@ -64,6 +65,50 @@ def choose_beast_form(chase: Player, opponent: Player, stats: Sequence[str]) -> 
 
     tightest = min(stats, key=lead)
     return tightest if lead(tightest) < BEAST_MARGIN else None
+
+
+def choose_jack_bot(opponent: Side) -> bool:
+    """Jack's per-boost call: deploy Jack-Bot to curse the opponent (``True``), or hold it back for
+    a normal Wu self-buff instead (``False``) — Jack-Bot itself never buffs, only curses.
+
+    v1, swept later like every other boss knob: deploy it unless the opponent already can't be
+    cursed this battle (a Reversing Mirror is up), where a self-buff never can be blocked. Excluded
+    from the generic ``choose_boost`` comparison (see there) because that machinery only knows how
+    to weigh a boost against the caster's *own* reach — never one that lands on the opponent instead.
+    """
+    return not opponent.defence_negated
+
+
+ATTACK_CHANCE = 4  # 1 in ATTACK_CHANCE — see choose_jack_mode
+
+
+def choose_jack_mode(player_has_priority: bool, can_swap: bool, rng: Rng) -> str | None:
+    """Jack's identity swap, decided once at commitment: Attack!, a stand-in, or himself.
+
+    v1, swept later like every other boss knob. Attack! rolls first, a flat 1-in-ATTACK_CHANCE —
+    unpredictable by design, and it neither costs nor grants `can_swap`, so it never disrupts the
+    pattern underneath it. Missing that roll: no stand-in without `can_swap` (he cannot use one two
+    showdowns running — see `state.jack_can_swap`), and between the two stand-ins, priority alone
+    decides — Chamelon-Bot when the player is about to name the challenge (his weak force/agility
+    are exactly what they would pick, and mirroring their stats denies it), AI Jack when HE leads
+    (he already picks intellect there, so a steal is pure upside if anything is worth taking).
+    """
+    if rng.randint(1, ATTACK_CHANCE) == 1:
+        return jack.ATTACK_NAME
+    if not can_swap:
+        return None
+    return jack.CHAMELON_NAME if player_has_priority else jack.AI_JACK_NAME
+
+
+def steal_target(hand: Sequence[Card], deck: Sequence[Card], rng: Rng) -> Card | None:
+    """AI Jack's steal: the strongest Wu in the opponent's hand — fully known, so judged like any
+    other bot decision. An empty hand falls back to a random deck card: nothing is known about it
+    (see the deferred reveal-memory note in ``docs/PLAN.md``), so there is nothing to rank it by."""
+    if hand:
+        return max(hand, key=duel_value)
+    if deck:
+        return rng.choice(list(deck))
+    return None
 
 
 def choose_challenge(
@@ -214,8 +259,12 @@ def choose_boost(
     answers it, so the extra body nets out — the naive reach-score would over-count it, blind to that
     cost. The bot fields the Heart as a plain 2/2/2 instead. (A construct's own 1/1/1 Heart boost has
     no such cost, but the bot ~never assembles, so the simple exclusion is worth more than the nuance.)
+
+    Jack-Bot is never boosted here either: it curses the *opponent*, and "what it makes reachable"
+    only ever measures the caster's own side. See `choose_jack_bot`, decided separately before this
+    is even called.
     """
-    options = [o for o in options if mechanic_of(o.power) is not Mechanic.ANIMATE]
+    options = [o for o in options if mechanic_of(o.power) not in (Mechanic.ANIMATE, Mechanic.BOT)]
     if not options:
         return None
 

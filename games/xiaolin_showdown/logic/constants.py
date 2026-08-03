@@ -17,6 +17,11 @@ ELEMENTS = ("water", "fire", "wind", "earth", "metal")
 TOURNAMENT = "tournament"
 TOURNAMENT_BATTLES = 3
 
+# Jack-bots Attack!'s own challenge (see logic/jack.py): never named, never a tournament — one
+# battle, all three stats weighed at once, majority wins. A sentinel in `DuelState.challenge` the
+# same way TOURNAMENT is, not a real stat.
+BRAWL = "brawl"
+
 # "Three Times in a Row": the showdown that brings a Wu's wear here vaults it, free (see wear.py).
 # Lives HERE rather than in wear.py so the bot's deposit policy (turn.py, which wear imports) can
 # read it without a cycle.

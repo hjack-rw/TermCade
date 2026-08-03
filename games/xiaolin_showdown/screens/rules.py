@@ -174,6 +174,8 @@ def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[s
             "side than against it. Nullifying the elemental bonus voids this way to win it.",
             "Meet none of them and the Wu is LOST: nobody takes it. It is not destroyed, though – "
             "a way exists that calls the oldest lost Wu back into your hand.",
+            f"Jack-bots Attack! is the one exception: {_route(PrizeRoute.BRAWL_WON)} claims the prize "
+            "outright, no ladder — but it can never be lost there either.",
         ],
         "When the Pile Runs Dry": [
             "The run ends. There is no Showdown left to call.",

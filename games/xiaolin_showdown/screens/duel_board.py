@@ -12,9 +12,9 @@ from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 
-from ..logic import jong
+from ..logic import jack, jong
 from ..logic.battle import Round, Side
-from ..logic.constants import TOURNAMENT, TOURNAMENT_BATTLES
+from ..logic.constants import BRAWL, TOURNAMENT, TOURNAMENT_BATTLES
 from ..logic.duel import (
     BEAST_BOOST,
     BOOST,
@@ -106,17 +106,25 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         "─" * max(_DIVIDER_MIN, prize_line.cell_len), style="dim", justify="center"
     )
 
+    # Jack-bots Attack!'s Brawl is not a regular duel, and its meta row says so: no named stat, no
+    # named place — the "Element" label alone, so a player never reads it as a background that just
+    # never changed.
+    is_brawl = duel.challenge == BRAWL
     meta = Table.grid(padding=(0, 8))  # initiative / challenge / background, grouped, not spread
     meta.add_column(justify="left")
     meta.add_column(justify="center")
     meta.add_column(justify="right")
     meta.add_row(
-        labelled("Challenge", (duel.challenge or "—").upper(), strong=bool(duel.challenge)),
         labelled(
-            "Background",
+            "Challenge", "BRAWL!" if is_brawl else (duel.challenge or "—").upper(),
+            strong=bool(duel.challenge),
+        ),
+        labelled(
+            "Element" if is_brawl else "Background",
             # The place, not the element — but coloured by the element, which is what scores. A place
             # can serve two pools, so the same name may read green today and red tomorrow.
-            (duel.background_name or duel.background or "—").upper(),
+            (duel.background or "—").upper() if is_brawl
+            else (duel.background_name or duel.background or "—").upper(),
             strong=bool(duel.background),
             style=COLORS.get(duel.background or "", ""),
         ),
@@ -135,6 +143,12 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         line.append("      ")
         line.append("Battles won: ", style="dim")
         line.append(f"P1: {won_player}  P2: {won_bot}")
+        tally = [line, ""]
+    elif is_brawl:
+        # Neither side's count answers the other's here — say both, since "wager" alone would imply
+        # the shared number every other showdown has.
+        line = Text(justify="center")
+        line.append(f"P1 wagers: {duel.player_wager or 0}   P2 wagers: {duel.bot_wager or 0}", style="bold")
         tally = [line, ""]
     elif duel.wager > 1:
         line = Text(justify="center")
@@ -165,6 +179,11 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             beast=_beast_for(duel, live),
             # Hannibal himself: his own Wu shrug off the arena's drag, so no strike either.
             deflect="ward" if _bot_deflects else None,
+            # Jack's identity swap: `jack_mode` IS the shown name for AI Jack / Chamelon-Bot, but
+            # Attack!'s own rotates through `attack_bot_name` instead — see `DuelState.jack_mode`.
+            # Chamelon-Bot's header must also read what it actually scores as, not his own printed stats.
+            shown_name=duel.attack_bot_name if duel.jack_mode == jack.ATTACK_NAME else duel.jack_mode,
+            shown_stats=_jack_stats(duel, state.player),
         ),
     ]
     if duel.winner_character:
@@ -183,6 +202,23 @@ def _beast_for(duel: DuelState, live: Round) -> str | None:
     """The stat Chase's Beast Form boosts on the table right now — set only in the battle that
     contests it (a tournament's other legs see the plain stats), so the board shows it once."""
     return duel.beast_stat if duel.beast_stat and live.stat == duel.beast_stat else None
+
+
+def _jack_stats(duel: DuelState, opponent: Player) -> dict[str, int] | None:
+    """His shown stats when they diverge from his own printed 3/3/7, exactly as they score — `None`
+    for AI Jack or plain Jack, where the header reads his own printed stats like anyone else's.
+
+    Chamelon-Bot mirrors the opponent. Attack! is his flat ATTACK_STAT plus the same metal
+    resonance/suffer swing `duel.Duel._jack_base` adds for real — duplicated here rather than
+    shared, same as `_beast_for` already duplicates a `duel.py` check: this module only ever reads
+    `DuelState`, never a live `Duel`.
+    """
+    if duel.jack_mode == jack.CHAMELON_NAME:
+        return jong.battle_stats(opponent)
+    if duel.jack_mode == jack.ATTACK_NAME:
+        swing = element_score("metal", duel.background) if duel.background else 0
+        return {stat: jack.ATTACK_STAT + swing for stat in jong.battle_stats(opponent)}
+    return None
 
 
 def _beast_offensive(stat: str, cards: list[Card], challenge: str | None) -> _CardsLine:
@@ -219,8 +255,10 @@ def _side_line(
     background: str | None,
     beast: str | None = None,
     deflect: str | None = None,
+    shown_name: str | None = None,
+    shown_stats: dict[str, int] | None = None,
 ) -> Group:
-    name = display_name(jong.shown_name(player))
+    name = display_name(shown_name or jong.shown_name(player))
 
     header = Text()
     header.append(f"{label}: ", style="dim")
@@ -233,7 +271,7 @@ def _side_line(
     if side.base_negated:
         header.append_text(absent_stats_text(challenge))
     else:
-        header.append_text(card_stats_text(jong.battle_stats(player), challenge))
+        header.append_text(card_stats_text(shown_stats or jong.battle_stats(player), challenge))
     header.append(")", style="dim")
     if side.result:  # score appears once scoring has run; joined to its arrow so they wrap as one unit
         header.append("   ")
@@ -263,6 +301,7 @@ def _side_line(
         _cards_line(
             "Defensive", contributing(side.suffered), side.amplifiers, challenge, background,
             earning=contributing(side.suffered), sign=-1, negated=side.defence_negated,
+            jack_bot=side.jack_bot,
         ),
     )
 
@@ -471,6 +510,7 @@ def _cards_line(
     sign: int = 1,
     negated: bool = False,
     deflect: str | None = None,
+    jack_bot: list[Card] | None = None,
 ) -> _CardsLine:
     """One line of the board. ``negated`` means a Sphere, Scorpion or Mirror has taken it for this
     battle: the Wu are still named — you must see what was turned off — but they read ``-/-/-`` and
@@ -487,9 +527,11 @@ def _cards_line(
     for index, card in enumerate(cards):
         # a booster and the Wu it lifts are one play: "Bracelet + Fist", not two entries. The Heart of
         # Jong's summon is NOT an amplifier — a separate fighter — so it joins with " & ", not " + ".
+        # Jack-Bot's curse reads the same way: a construct that showed up, not stats blended in.
         prev = cards[index - 1] if index else None
-        if prev is not None and _from_the_boost_slot(prev, amplifiers):
-            joiner = " & " if mechanic_of(prev.power) is Mechanic.ANIMATE else " + "
+        if prev is not None and _from_the_boost_slot(prev, amplifiers, jack_bot):
+            is_construct = mechanic_of(prev.power) is Mechanic.ANIMATE or is_one_of(prev, jack_bot or ())
+            joiner = " & " if is_construct else " + "
         else:
             joiner = ", "
         joiners.append(Text(joiner, style="dim"))
@@ -563,12 +605,13 @@ def _elemental_shift(card: Card, challenge: str | None, background: str | None) 
     return element_score(card.element, background)
 
 
-def _from_the_boost_slot(card: Card, amplifiers: list[Card]) -> bool:
+def _from_the_boost_slot(card: Card, amplifiers: list[Card], jack_bot: list[Card] | None = None) -> bool:
     """Was ``card`` played at the power stage, ahead of the card the board prints next to it?
 
-    Both boost Wu qualify — the dragon (``boost``/0, lends a flat 1/1/1) and the amplifier
-    (``boost``/+1, lends 1 per stat the next card moves). They differ in what they lend, not in
-    when they land, and the ``+`` is about the slot. A mirrored amplifier is inert, its power
-    stripped, so only the duel remembers what it was.
+    Three boost Wu qualify — the dragon (``boost``/0, lends a flat 1/1/1), the amplifier
+    (``boost``/+1, lends 1 per stat the next card moves), and Jack-Bot's curse (lands on the
+    opponent, never the caster). They differ in what they lend and who it lands on, not in when
+    they land, and the joiner is about the slot. A mirror is inert, its power stripped, so identity
+    — tracked in ``amplifiers``/``jack_bot`` — is the only way left to tell.
     """
-    return is_one_of(card, amplifiers) or is_boost_slot(card.power)
+    return is_one_of(card, amplifiers) or is_one_of(card, jack_bot or ()) or is_boost_slot(card.power)

@@ -121,6 +121,30 @@ def _curse(victim: "Side", mirror: Card) -> None:
     victim.suffered.append(mirror)
 
 
+def curse_from_boost(victim: "Side", mirror: Card) -> None:
+    """Land Jack-Bot's boost-slot curse on the opponent — his construct, never his own reach.
+
+    A played card's curse always lands on an untouched queue; a boost's does not — the victim's OWN
+    boost may have committed to this very queue moments earlier this same cycle, sitting at its tail
+    as a live ``Mechanic.BOOST`` amplifier waiting for the card they are about to field.
+    ``_booster_at_head`` reads exactly that slot, so a plain append would bury it under the mirror and
+    silently swallow it. Insert ahead of a live boost instead of appending after it — same idea as
+    ``_amplify``, a different reason to reach for it.
+
+    Registered into ``jack_bot`` too, alongside ``suffered`` — a mirror is inert, its power stripped,
+    so that identity list is the only way the board can still tell this apart from any other curse
+    landing the same cycle and join it "&", the way it joins a doubled amplifier's share "+".
+    """
+    inert = _inert(mirror)
+    booster = _booster_at_head(victim.queue)
+    if booster is not None:
+        victim.queue.insert(index_of(victim.queue, booster), inert)
+    else:
+        victim.queue.append(inert)
+    victim.suffered.append(mirror)
+    victim.jack_bot.append(mirror)
+
+
 def _amplify(victim: "Side", mirror: Card) -> None:
     """A booster's share of the curse it just doubled.
 

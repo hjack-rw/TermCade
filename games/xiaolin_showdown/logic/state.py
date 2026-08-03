@@ -85,6 +85,18 @@ class XiaolinState:
     # Per-run, never reset by the turn: the allowance is the whole run, which is what makes the recall
     # a resource to spend rather than an answer she always has.
     witch_recalls: int = 0
+    # The flavour Jack-Bot last cursed under (`jack.JACK_BOT_NAMES`), so the next curse can rule it
+    # out — the whole point being it never repeats back to back. Per-run, not per-showdown: it must
+    # survive the temple between fights, and a reload should not let the same name land twice in a row.
+    last_jack_bot_name: str | None = None
+    # Same idea, Attack!'s own pool (`jack.ATTACK_BOT_NAMES`) — a separate counter, since the two
+    # swaps never repeat against each other, only within their own pool.
+    last_attack_bot_name: str | None = None
+    # Jack cannot spam a stand-in (AI Jack/Chamelon-Bot): one forces himself next, and himself makes
+    # the next one eligible again — a showdown-to-showdown alternation, not a random pick each time.
+    # Starts `False` so the very first showdown is himself. Attack! rolls independently and does not
+    # touch this — it neither costs nor grants eligibility, so the pattern resumes where it left off.
+    jack_can_swap: bool = False
     # Wu that surfaced, were fought over, and that nobody won hard enough to keep. They are **lost**,
     # not destroyed: out of play, and one day recoverable (the Rooster Booster reaches for the oldest).
     # Shared — a Wu dies to a showdown, not to a duelist.
@@ -165,6 +177,9 @@ class XiaolinState:
             "deposits_taken": self.deposits_taken,
             "bot_deposits_taken": self.bot_deposits_taken,
             "witch_recalls": self.witch_recalls,
+            "last_jack_bot_name": self.last_jack_bot_name,
+            "last_attack_bot_name": self.last_attack_bot_name,
+            "jack_can_swap": self.jack_can_swap,
             "bot_turn_done": self.bot_turn_done,
             "forced_priority": self.forced_priority,
             "locked_challenge": self.locked_challenge,
@@ -200,6 +215,9 @@ class XiaolinState:
             # Absent in a save from before the recall cap — that run spent them uncounted, so it
             # loads with its whole allowance. Generous, and it errs toward the boss, not the player.
             witch_recalls=data.get("witch_recalls", 0),
+            last_jack_bot_name=data.get("last_jack_bot_name"),  # absent in a save from before Jack
+            last_attack_bot_name=data.get("last_attack_bot_name"),  # absent before Attack!
+            jack_can_swap=data.get("jack_can_swap", False),
             bot_turn_done=data.get("bot_turn_done", False),
             forced_priority=data.get("forced_priority"),  # absent in a save from before the Conch
             locked_challenge=data.get("locked_challenge"),

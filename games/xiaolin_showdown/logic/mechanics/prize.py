@@ -41,6 +41,9 @@ class PrizeRoute(StrEnum):
     BROAD_WIN = "a win on two fronts"
     TOTAL_COMMAND = "total command"
     IN_TUNE = "being in tune with the arena"
+    # Jack-bots Attack! alone: winning the Brawl claims the Wu outright, no ladder — set directly by
+    # `duel.Duel._award_prize`, never returned by `claim_route`.
+    BRAWL_WON = "winning the Brawl outright"
 
 
 def claim_route(

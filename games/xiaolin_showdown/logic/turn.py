@@ -210,8 +210,9 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         # BOOSTER_PREMIUM in `duel_value` rather than here, which is the older seam.
         Mechanic.DRAGON,
         Mechanic.BOOST,
-        # Jack-Bot prints 0/0/0 — its whole value is the metal resonance/suffer swing every metal
-        # card already gets from `_element_score`, nothing mechanic-specific to price here.
+        # Jack-Bot is an inalienable boss fixture, never pooled or bought — its -1/-1/-1 lands on the
+        # opponent (`resolve.curse_from_boost`), not scored as its own printed stats, so there is
+        # nothing here for a points-vs-stats check to weigh in the first place.
         Mechanic.BOT,
         # The Serpent's Tail voids the elemental bonus for both duelists all showdown, and vetoes the
         # prize's elemental route with it. That is plainly worth more than the stats it prints — and it
