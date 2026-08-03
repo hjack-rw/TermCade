@@ -7,9 +7,11 @@ start climbing toward the next raise. Nothing ever trains past the stat cap.
 from __future__ import annotations
 
 from xiaolin_showdown.logic.actions import train, train_blocked
-from xiaolin_showdown.logic.models import Player
+from xiaolin_showdown.logic.models import Mechanic, Player, Power
 from xiaolin_showdown.logic.state import XiaolinState
 from xiaolin_showdown.logic.training import (
+    JACK_FORCE_CAP,
+    JACK_LOSS_FILL,
     STAT_CAP,
     TRAIN_LENGTH,
     add_progress,
@@ -111,6 +113,38 @@ def test_the_bots_loss_payout_is_taken_on_the_spot():
     state.bot.training = TRAIN_LENGTH - 1
     assert record_showdown(state, player_won=True) == "force"
     assert state.bot.character.stats["force"] == 2
+
+
+def _jack(stats: dict[str, int]) -> Player:
+    player = duelist(stats=stats, tier="boss")
+    player.character.power = Power(-8, "Jack-Bot", Mechanic.BOT, "")
+    return player
+
+
+def test_jacks_own_loss_teaches_him_the_whole_bar_at_once():
+    # JACK_LOSS_FILL == TRAIN_LENGTH: one defeat is a full bar, not a partial fill — the only boss
+    # for whom a single loss ever pays out on the spot from empty.
+    state = _state(duelist(), _jack({"force": 3, "agility": 3, "intellect": 7}))
+    assert record_showdown(state, player_won=True) == "force"
+    assert state.bot.character.stats["force"] == 4
+
+
+def test_a_normal_boss_still_uses_the_shared_boss_rate_not_jacks():
+    # Same tier="boss", same starting bar — a non-Jack boss's own power keeps him off this constant
+    # entirely; the standard BOSS_LOSS_FILL (2) still gates him.
+    state = _state(duelist(), duelist(stats={"force": 3, "agility": 3, "intellect": 3}, tier="boss"))
+    assert record_showdown(state, player_won=True) is None
+    assert state.bot.training < JACK_LOSS_FILL
+
+
+def test_jacks_force_caps_below_stat_cap_while_agility_does_not():
+    # "Stronger is the acceptable gap" — force stops at JACK_FORCE_CAP even though STAT_CAP is
+    # higher; agility trains all the way to STAT_CAP, same as any dragon.
+    jack = _jack({"force": JACK_FORCE_CAP, "agility": STAT_CAP - 1, "intellect": 7})
+    assert trainable_stats(jack) == ["agility"]
+    jack.training = TRAIN_LENGTH
+    raise_stat(jack, pick_stat(jack))
+    assert jack.character.stats == {"force": JACK_FORCE_CAP, "agility": STAT_CAP, "intellect": 7}
 
 
 def test_the_players_loss_payout_waits_for_their_choice():

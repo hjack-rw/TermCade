@@ -145,6 +145,16 @@ class DuelScreen(XiaolinScreen):
             log=False,
         )
 
+    def _announce_jack_steal(self, duel: DuelState) -> None:
+        """AI Jack strikes before you choose a Wu, not after — so the toast fires the moment it
+        happens. A card gone from your options a beat later is explained already, not a fresh
+        surprise stacked on the one that took it."""
+        self.engine_app.notify(
+            f"Jack Spicer stole your {duel.jack_stolen} before you could field it!",
+            title="AI Jack",
+            log=False,
+        )
+
     def _announce_end_surprises(self, duel: DuelState) -> None:
         """Two outcomes the board shows without explaining, so only a toast can account for them."""
         if duel.prize_gifted:
@@ -187,6 +197,8 @@ class DuelScreen(XiaolinScreen):
             stage = await duel.advance()  # one phase; a choice phase raises its modal inline
             self._show_board(duel)
             tied = duel.duel.player.initiative == duel.duel.bot.initiative
+            if stage == COMMITMENT and duel.duel.jack_stolen:
+                self._announce_jack_steal(duel.duel)
             if stage == COMMITMENT and (tied or self.state.initiative_contested):
                 await self._reveal_coin_toss(duel.duel.player_priority is True)
             # They set the price only if you called a *stat*. A tournament prices itself — three

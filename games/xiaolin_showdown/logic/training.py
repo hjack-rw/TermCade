@@ -24,6 +24,23 @@ TRAIN_BOOST_STEP = 3  # a summon Wu spent at the temple (TRAIN_BOOST) shoves thi
 # actions — docs/design/BOSSES.md). Written as the same law for both sides; the boss sits at the
 # cap, so only the player can collect.
 BOSS_LOSS_FILL = 2
+# Jack Spicer alone: a boy genius who adapts fast, and the only boss for whom this constant does
+# anything — force/agility (3/3) sit under the cap for him, unlike the other three (already MASTER
+# on every stat), so he is the only one who can actually bank a loss into a raise. Set equal to
+# TRAIN_LENGTH on purpose, not tuned to an arbitrary number: one defeat teaches him the whole
+# lesson, an instant payout rather than a partial fill. Swept 2-25 (n=400 each) toward the owner's
+# ~20% target once stats were ruled settled — the win rate plateaus at 21.8% from 10 up (bot raises
+# also plateau at 2.50/run, a real ceiling from run length, not fill speed), so 10 is the smallest
+# value that reaches it (see docs/design/BOSSES.md).
+JACK_LOSS_FILL = TRAIN_LENGTH
+# Jack's own ceiling on FORCE alone, below the universal STAT_CAP — agility trains all the way to
+# STAT_CAP like anyone else (show-justified: he's the agile one), but a gap on raw strength is the
+# acceptable weak point that survives training. He starts 3/3/7 — fully trained to STAT_CAP on both
+# he would end 5/5/7, matching or beating every dragon on every stat at once (Omi 5/5/2, Raimundo
+# 4/4/4, Kimiko 3/4/5, Clay 5/3/4) — "the weakest boss" turning into the numerically strongest one.
+# Capping force alone keeps the payoff (losing teaches him, he comes back stronger) without ever
+# letting him close the one gap that's supposed to stay open.
+JACK_FORCE_CAP = 4
 
 
 def doubles_training(player: Player) -> bool:
@@ -37,8 +54,13 @@ def can_train(player: Player) -> bool:
 
 
 def trainable_stats(player: Player) -> list[str]:
-    """The stats a payout may raise — every base stat still under the cap."""
-    return [s for s, v in player.character.stats.items() if v < STAT_CAP]
+    """The stats a payout may raise — every base stat still under the cap. Jack Spicer's force alone
+    trains toward `JACK_FORCE_CAP` rather than the universal `STAT_CAP` — see its comment."""
+    is_jack = player.character.power.mechanic is Mechanic.BOT
+    stats = player.character.stats
+    return [
+        s for s, v in stats.items() if v < (JACK_FORCE_CAP if is_jack and s == "force" else STAT_CAP)
+    ]
 
 
 def payout_ready(player: Player) -> bool:
@@ -81,13 +103,18 @@ def pick_stat(player: Player) -> str:
 
 def record_showdown(state: XiaolinState, *, player_won: bool) -> str | None:
     """A finished showdown teaches its LOSER: their bar gains one — two, when a boss is doing the
-    teaching. The winner was paid in Wu.
+    teaching, more still for Jack Spicer alone (see :data:`JACK_LOSS_FILL`). The winner was paid in
+    Wu.
 
     The bot cashes a full bar on the spot (see :func:`pick_stat`) and the raised stat's name is
     returned, for the log. The player's payout waits instead — the temple offers them the choice.
     """
     loser = state.bot if player_won else state.player
-    fill = BOSS_LOSS_FILL if state.boss_run else LOSS_FILL
+    is_jack = state.boss_run and loser is state.bot and loser.character.power.mechanic is Mechanic.BOT
+    if is_jack:
+        fill = JACK_LOSS_FILL
+    else:
+        fill = BOSS_LOSS_FILL if state.boss_run else LOSS_FILL
     if doubles_training(loser):  # a Ring of Nine Xing still in hand after the showdown doubles the lesson
         fill *= 2
     if add_progress(loser, fill) and loser is state.bot:

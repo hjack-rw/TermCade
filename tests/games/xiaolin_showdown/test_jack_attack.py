@@ -97,7 +97,7 @@ def test_attack_awards_the_prize_outright_no_ladder():
 
 
 async def test_commitment_sets_the_brawl_challenge_and_never_a_tournament():
-    duel = _jack_duel(rng_seed=2)  # seed 2's first randint(1, 100) rolls under ATTACK_BASE_CHANCE
+    duel = _jack_duel(rng_seed=31)  # seed 31's first roll (2) is under ATTACK_CHANCE_WHEN_LEADING
     duel.duel.jack_mode = None  # let _commitment decide it fresh
     duel.duel.player_priority = False
     await duel._commitment()

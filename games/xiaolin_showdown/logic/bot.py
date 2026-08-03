@@ -79,50 +79,84 @@ def choose_jack_bot(opponent: Side) -> bool:
     return not opponent.defence_negated
 
 
-ATTACK_BASE_CHANCE = 15  # percent, at showdown 0 of a run — beat 20% (48.3% vs 51.0% player win,
-# n=300 diagnostic runs each) and dropped straight from the flat 25% Attack! shipped with; see BOSSES.md
 ATTACK_MIN_CHANCE = 5  # a floor: it never fully vanishes, only fades — still "unpredictable by design"
-ATTACK_DECAY_PER_SHOWDOWN = 1  # percentage points shed per showdown already fought this run
+ATTACK_MAX_CHANCE = 90  # a ceiling: even desperate, there is always some chance he stays himself
 
-# Chamelon-Bot only earns its keep when the opponent's stats actually beat his own on the whole —
-# otherwise the mirror trades his one real edge (the 7 intellect, a SIDE stat every time force or
-# agility is what's actually contested) for a coin-flip on the contested stat alone. Measured: a
-# blind "always mirror when the player leads" scored WORSE than fighting as himself (11.9% vs 22.4%
-# player-leads win rate, n=300 runs) — this margin is the fix, not a threshold tuned in a vacuum.
-CHAMELON_MARGIN = 4
+# Attack! always transfers the full prize outright, no partial-credit ladder (`PrizeRoute.BRAWL_WON`)
+# — so its VALUE isn't its own per-showdown win rate in isolation, it's that rate against what it
+# replaces. Once Chamelon-Bot was redesigned (below) to actually hold its own when the player leads
+# (~30% Jack win, up from the old ~15-19%), Attack! stopped being an improvement over either
+# alternative and became a pure drag: more full-prize losses with no offsetting upside. Swept 0-70
+# (n=300 each) post-redesign — the aggregate got monotonically WORSE as Attack!'s share grew in
+# EITHER branch. So both are now near-floor: rare enough to keep him "unpredictable by design"
+# without being the number that decides the run — see BOSSES.md.
+ATTACK_CHANCE_WHEN_LEADING = 2  # percent — Jack leads, "himself"/AI Jack are already strong
+
+ATTACK_CHANCE_WHEN_TRAILING = 5  # percent at momentum 0 — Chamelon-Bot now covers this spot instead
+# `jack_attack_momentum` (XiaolinState) still shifts this with the run's recent record — losing a
+# showdown reaches for Attack! harder, winning one leaves it alone — clamped to +-ATTACK_MOMENTUM_CAP,
+# a fresh run starting at 0. Kept even though the redesign made Attack! a minor lever: momentum being
+# net-neutral-to-positive here is not a reason to strip a mechanic that costs nothing to keep.
+ATTACK_MOMENTUM_STEP = 10  # percentage points shifted per showdown won/lost, applied only here
+ATTACK_MOMENTUM_CAP = 30  # how far a streak can push the trailing chance off its base, either way
+
+# A losing showdown fighting as HIMSELF (never a stand-in, never Attack! — those already have their
+# own economics) costs him twice: his own wager and, at `prize_threshold`'s usual rate, the prize
+# too. Fleeing trades a coward's escape for both: no route can claim the prize (it goes to lost,
+# never to the winner — strictly better than the ~61% of losses that hand it over outright today),
+# and his wager stays his. No downside on any single use, so it is capped instead of tuned — a scarce
+# resource he burns on his worst run of showdowns, not a standing "never actually lose" rule.
+JACK_FLEE_CAP = 3  # per run — v1, swept later like every other boss knob
 
 
-def _attack_chance(showdowns_played: int) -> int:
-    """Attack!'s own percentage this showdown — decays as the run goes on, never below the floor."""
-    return max(ATTACK_MIN_CHANCE, ATTACK_BASE_CHANCE - ATTACK_DECAY_PER_SHOWDOWN * showdowns_played)
+def choose_to_flee(flees_used: int) -> bool:
+    """Whether Jack concedes a showdown he has already lost, rather than pay the normal cost."""
+    return flees_used < JACK_FLEE_CAP
+
+
+# Chamelon-Bot used to be gated by a margin on the SUM of all three stats ("only mirror when it
+# looks worth it") — swept 0/1/2/3/4 (n=300 each) and it lost to fighting as himself at EVERY value,
+# because a full mirror traded his real intellect edge on the two UNCONTESTED stats for a coin-flip
+# on the one that mattered, and the sum told it nothing about the single stat actually in play.
+# Redesigned twice: first to raise his OWN contested stat to the opponent's and no further (never
+# touching the other two), which needed no margin since there was no longer a downside to deny — then
+# again to make that denial a BOOST (see `duel.Duel._chamelon_boost_card`), competing with a real Wu
+# for the one boost his fielded Wu gets — fed straight into `choose_boost`'s own reach-comparison
+# alongside Shimo Staff, the Heart, or anything else in hand, rather than preferred by default (it
+# targets his OWN side, unlike Jack-Bot's curse, so the same machinery can weigh it fairly). Still
+# fires unconditionally whenever the player leads — what changed is whether he SPENDS it that cycle.
+def _attack_chance(player_has_priority: bool, momentum: int) -> int:
+    """Attack!'s own percentage this showdown. Jack leading is always low, whatever his form —
+    Attack! only hurts him there. Player leading is his base rate plus momentum (his recent
+    showdown record this run), clamped to the floor and ceiling."""
+    if not player_has_priority:
+        return ATTACK_CHANCE_WHEN_LEADING
+    return max(ATTACK_MIN_CHANCE, min(ATTACK_MAX_CHANCE, ATTACK_CHANCE_WHEN_TRAILING + momentum))
 
 
 def choose_jack_mode(
     player_has_priority: bool,
     can_swap: bool,
-    jack_stats: Mapping[str, int],
-    opponent_stats: Mapping[str, int],
-    showdowns_played: int,
+    momentum: int,
     rng: Rng,
 ) -> str | None:
     """Jack's identity swap, decided once at commitment: Attack!, a stand-in, or himself.
 
-    v1, swept later like every other boss knob. Attack! rolls first, a percentage that fades over
-    the run (`_attack_chance`) — unpredictable by design, and it neither reads nor writes `can_swap`,
-    so it never disrupts the pattern underneath it.
+    v1, swept later like every other boss knob. Attack! rolls first, a priority-aware percentage
+    (`_attack_chance`) — high when it would replace Jack's weakest spot (fighting as himself while
+    the player leads), and higher still there the more he has been losing this run (`momentum`);
+    low when it would replace his strongest (himself/AI Jack while he leads), regardless of
+    momentum. It neither reads nor writes `can_swap`, so it never disrupts the pattern underneath it.
 
     Missing that roll, priority decides which stand-in is even on the table — the two never compete:
-    Chamelon-Bot when the player is about to name the challenge, but only when mirroring the
-    opponent's stats is actually worth it (`CHAMELON_MARGIN`, not `can_swap` — he may take it every
-    single time the player leads, whenever it clears the bar); AI Jack when HE leads instead (he
-    already picks intellect there, so a steal is pure upside), gated by `can_swap` alone — the
-    "cannot spam a stand-in" rule is his, not Chamelon-Bot's.
+    Chamelon-Bot when the player is about to name the challenge (unconditional — see the redesign
+    note above); AI Jack when HE leads instead (he already picks intellect there, so a steal is pure
+    upside), gated by `can_swap` alone — the "cannot spam a stand-in" rule is his, not Chamelon-Bot's.
     """
-    if rng.randint(1, 100) <= _attack_chance(showdowns_played):
+    if rng.randint(1, 100) <= _attack_chance(player_has_priority, momentum):
         return jack.ATTACK_NAME
     if player_has_priority:
-        worth_it = sum(opponent_stats.values()) - sum(jack_stats.values()) >= CHAMELON_MARGIN
-        return jack.CHAMELON_NAME if worth_it else None
+        return jack.CHAMELON_NAME
     return jack.AI_JACK_NAME if can_swap else None
 
 

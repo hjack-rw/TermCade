@@ -157,6 +157,26 @@ def test_a_tournament_asks_nobody_for_a_price(state, catalog):
     assert "requested" not in _showdown_story(duel, state).plain
 
 
+def test_a_theft_names_what_was_taken(state, catalog):
+    duel = DuelState(
+        stakes=catalog.card(6),
+        challenge="force",
+        background="water",
+        background_name="Snowy Slope",
+        wager=1,
+        player_priority=True,
+        winner=True,
+        winner_character=state.player.character.name,
+        prize_route=PrizeRoute.DECISIVE_BLOW,
+        jack_stolen="Shroud of Shadows",
+    )
+
+    story = _showdown_story(duel, state).plain
+
+    opponent = display_name(state.bot.character.name)
+    assert f"{opponent} stole Shroud of Shadows!" in story
+
+
 def test_both_sides_file_the_same_action_under_the_same_word():
     """One shape, two sides. A move of theirs titled differently from the same move of yours makes a
     reader compare shapes instead of sides.

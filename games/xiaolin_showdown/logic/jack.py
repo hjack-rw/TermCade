@@ -15,6 +15,10 @@ JACK_BOT_NAMES = ("Jack-Bot", "Tickle-Bot", "Yes-Bot", "Chef-Bot", "Soda-Bot")
 # Jack-Bot's — each is a specific gadget with its own effect, not interchangeable flavour.
 AI_JACK_NAME = "AI Jack"
 CHAMELON_NAME = "Chamelon-Bot"
+# Chamelon-Bot's denial is a boost now, not a base override — a synthetic Card built fresh each cycle
+# (see `duel.Duel._chamelon_boost_card`), never a real catalog row. Reserved, negative, and distinct
+# from every real power id and from Jack-Bot's own -8, so it can never collide with one.
+CHAMELON_BOOST_ID = -9
 
 # Jack-bots Attack! swaps to a name from THIS pool, chosen fresh each time, never twice in a row —
 # the same shape as JACK_BOT_NAMES, but its own pool: an army of bots, not one construct, and a

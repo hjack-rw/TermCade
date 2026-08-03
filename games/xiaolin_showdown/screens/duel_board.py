@@ -183,7 +183,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             # Attack!'s own rotates through `attack_bot_name` instead — see `DuelState.jack_mode`.
             # Chamelon-Bot's header must also read what it actually scores as, not his own printed stats.
             shown_name=duel.attack_bot_name if duel.jack_mode == jack.ATTACK_NAME else duel.jack_mode,
-            shown_stats=_jack_stats(duel, state.player),
+            shown_stats=_jack_stats(duel, state.bot, state.player, live),
         ),
     ]
     if duel.winner_character:
@@ -204,17 +204,24 @@ def _beast_for(duel: DuelState, live: Round) -> str | None:
     return duel.beast_stat if duel.beast_stat and live.stat == duel.beast_stat else None
 
 
-def _jack_stats(duel: DuelState, opponent: Player) -> dict[str, int] | None:
+def _jack_stats(
+    duel: DuelState, jack_player: Player, opponent: Player, live: Round
+) -> dict[str, int] | None:
     """His shown stats when they diverge from his own printed 3/3/7, exactly as they score — `None`
     for AI Jack or plain Jack, where the header reads his own printed stats like anyone else's.
 
-    Chamelon-Bot mirrors the opponent. Attack! is his flat ATTACK_STAT plus the same metal
-    resonance/suffer swing `duel.Duel._jack_base` adds for real — duplicated here rather than
-    shared, same as `_beast_for` already duplicates a `duel.py` check: this module only ever reads
-    `DuelState`, never a live `Duel`.
+    Chamelon-Bot denies the dodge on the ONE stat actually contested this battle (`live.stat` — a
+    tournament's other two legs see his plain printed stats), raising it to the opponent's, never
+    below his own — matching `duel.Duel._bot_base` exactly, not a full mirror. Attack! is his flat
+    ATTACK_STAT plus the same metal resonance/suffer swing `duel.Duel._jack_base` adds for real —
+    duplicated here rather than shared, same as `_beast_for` already duplicates a `duel.py` check:
+    this module only ever reads `DuelState`, never a live `Duel`.
     """
     if duel.jack_mode == jack.CHAMELON_NAME:
-        return jong.battle_stats(opponent)
+        own = dict(jong.battle_stats(jack_player))
+        if live.stat in own:
+            own[live.stat] = max(own[live.stat], jong.battle_stats(opponent).get(live.stat, 0))
+        return own
     if duel.jack_mode == jack.ATTACK_NAME:
         swing = element_score("metal", duel.background) if duel.background else 0
         return {stat: jack.ATTACK_STAT + swing for stat in jong.battle_stats(opponent)}
@@ -385,6 +392,11 @@ def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
         _line(story, *answer)
 
     _line(story, *_showdown_result(duel))
+    if duel.jack_stolen:
+        _line(
+            story,
+            Text(f"{display_name(state.bot.character.name)} stole {duel.jack_stolen}!"),
+        )
     _spoils(story, duel)
     if duel.bot_trained:
         _line(
