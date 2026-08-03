@@ -88,6 +88,12 @@ def resolve_played_power(
         return f"background:{element}"
     if mechanic is Mechanic.SEIZE_GROUND:  # Cube of Haniku — its caster takes the challenger's ground
         return "seize:player" if is_player else "seize:bot"
+    if mechanic is Mechanic.HACK:  # Denshi Bunny — the caller checks what it's facing and acts
+        return "hack:player" if is_player else "hack:bot"
+    if mechanic is Mechanic.STEAL:  # Sands of Time — the caller owns both hands, this module does not
+        return "steal:player" if is_player else "steal:bot"
+    if mechanic is Mechanic.CONDUCT:  # Shard of Lightning — the count is read at scoring time, live
+        return "conduct:player" if is_player else "conduct:bot"
     return None
 
 

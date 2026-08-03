@@ -153,6 +153,10 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     Mechanic.NULLIFY_STATS: 5,
     Mechanic.NULLIFY_WU: 5,
     Mechanic.NULLIFY_CURSE: 4,
+    # Prints 0/0/0; its swing is board-dependent and uncapped (see `duel.Duel._conduct_bonus`), so
+    # the bot can't know its true value at decision time. Priced level with NULLIFY_CURSE — usually
+    # good, not knowably maximal, and never banked as junk.
+    Mechanic.CONDUCT: 4,
     # A whole-hand swap swings at least as hard as a negation. The bot does not SPEND it yet
     # (temple_ai has no policy for it) — this price only keeps it from banking the strongest
     # tempo card in the pool as junk.
@@ -237,6 +241,14 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         # battles, so it is contextual — and the bot does not yet field it *for* the seize, so pricing
         # it would be a number nothing measured. Excused until the bot plays it deliberately.
         Mechanic.SEIZE_GROUND,
+        # Prints real stats; its win-vs-construct is entirely contextual — worth nothing outside a
+        # Jack fight, and even then only in two of his four states. Read by the bot's play-it-out
+        # eval, not priced here.
+        Mechanic.HACK,
+        # Prints real stats; the steal it buys is read by the bot's play-it-out eval (it already has
+        # `bot.steal_target` to weigh the hand it would take), not priced flat here — a steal against
+        # an empty hand and deck is worth nothing, and no fixed number captures that.
+        Mechanic.STEAL,
         # Prints real stats; its undo is a temple ``use`` the bot never spends (no policy), so on the
         # table it is only ever the 1/1/1 it wagers. Excused, not priced.
         Mechanic.AMEND,

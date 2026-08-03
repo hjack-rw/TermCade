@@ -118,6 +118,18 @@ def test_resolve_ai_jack_steal_takes_the_strongest_hand_card():
     assert duel.duel.jack_stolen == "Strong"
 
 
+def test_resolve_ai_jack_steal_takes_a_deck_card_when_hand_is_empty():
+    duel = _jack_duel(player_priority=False)
+    duel.duel.jack_mode = jack.AI_JACK_NAME
+    buried = wu(2, name="Buried", points=2)
+    duel.state.player.hand = []
+    duel.state.player.deck = [buried]
+    duel._resolve_ai_jack_steal()
+    assert buried not in duel.state.player.deck
+    assert buried in duel.state.bot.hand
+    assert duel.duel.jack_stolen == "Buried"
+
+
 def test_resolve_ai_jack_steal_is_a_no_op_outside_ai_jack_mode():
     duel = _jack_duel(player_priority=False)
     duel.duel.jack_mode = jack.CHAMELON_NAME

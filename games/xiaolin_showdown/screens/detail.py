@@ -26,7 +26,7 @@ from .format import (
 
 # The rare Wu that ported in under a second name — shown as `aka "..."` in the detail. One entry does
 # not earn a DB column; keyed by card id.
-_ALIASES = {64: "Sword of the Storm"}  # Blade of the Nebula
+_ALIASES = {64: "Sword of the Storm", 77: "Thorn of Thunderbolt"}  # Blade of the Nebula, Shard of Lightning
 
 
 class DetailScreen(EngineScreen):

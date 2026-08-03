@@ -118,6 +118,9 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (69, 'Agalmatosis', 'train_boost', 'Becomes a living sapphire dragon whose breath turns everyone - good, evil or indifferent - into sapphire statues, then raises them as its army. The most dangerous of all Shen Gong Wu, a last resort.', 0, 'the Sapphire Dragon', 10);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (70, 'Anthropomorphism', 'animate', 'Brings inanimate or dead objects to life - but only while it is active, a life on loan so to speak. Used to create powerful constructs like Mala Mala Jong.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (71, 'Jack-Bot', 'bot', 'Customary robots created and used by Jack. Building them comes naturally to him.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (72, 'Electrokinesis', 'hack', 'Transforms the user into electricity, meaning they can possess and control technology.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (73, 'Temporokinesis', 'steal', 'Manipulates time, allowing short-term time travel to explore outcomes not yet set in stone, or to temporarily summon oneself from another point in the timeline.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (74, 'Astrapokinesis', 'conduct', 'Shoots out thunderbolts. Can be used as a powerful energy source.', 0);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE card (id INTEGER, name TEXT, force INTEGER, agility INTEGER, intellect INTEGER, power_id INTEGER NOT NULL REFERENCES power (id), element TEXT, type TEXT, points INTEGER, PRIMARY KEY (id AUTOINCREMENT));
@@ -198,6 +201,9 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (73, 'Sapphire Dragon', NULL, NULL, NULL, 69, 'metal', 'item', 5);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (74, 'Heart of Jong', NULL, NULL, NULL, 70, 'metal', 'item', 5);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (-8, 'Jack-Bot', -1, -1, -1, 71, 'metal', 'wudai', 0);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (75, 'Denshi Bunny', 1, 0, 1, 72, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (76, 'Sands of Time', 2, 0, 2, 73, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (77, 'Shard of Lightning', 0, 0, 0, 74, 'metal', 'item', 5);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (

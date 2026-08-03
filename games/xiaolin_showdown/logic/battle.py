@@ -132,6 +132,10 @@ class Round:
     # An Emperor Scorpion fielded against Mala Mala Jong wins this battle outright — the side it hands
     # the leg to, overriding the score (see logic/jong.py; the whole showdown still needs the rounds).
     bane_winner: bool | None = None
+    # A Shard of Lightning fielded THIS battle: who cast it, so `duel.Duel._conduct_bonus` knows whose
+    # base stat to swing. Resets every battle (a tournament's other two legs never see it) — the same
+    # per-Round scope as `heart_summoner`/`bane_winner` above.
+    conduct_caster: bool | None = None
 
     def sides(self, is_player: bool) -> tuple[Side, Side]:
         """``(mine, theirs)`` — where "which duelist" becomes "which half"."""

@@ -287,6 +287,11 @@ EFFECTS = {
     Mechanic.ENHANCED_VISION: "Take or refuse the next Showdown's Initiative.",
     Mechanic.PROGNOSIS: "Your opponent leads next Showdown, but you read their challenge and hold the tiebreak.",
     Mechanic.SEIZE_GROUND: "You hold the tiebreak all Showdown, overriding a Prognosis.",
+    Mechanic.HACK: "Vs Jack shown as a bot, you win the Showdown outright; vs his own bot boost or "
+    "curse, it counts nothing instead. Never against Mala Mala Jong.",
+    Mechanic.STEAL: "Take their strongest hand Wu, or a random one from their Deck if their hand is empty.",
+    Mechanic.CONDUCT: "+1 to the contested stat for every metal Wu in this battle, either side, "
+    "boosts included; -1 for every non-metal one. The arena counts the same way. Can go negative.",
     Mechanic.AMEND: "Take back your previous action this turn (boss runs only).",
     Mechanic.WISH: "One wish, then gone: deposit for points, restore a Vaulted Wu, or field to win the Showdown.",
     # TRAIN_BOOST is not here: its number is the card's own ``train_step``, filled in by `effect_line`,

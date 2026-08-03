@@ -709,7 +709,8 @@ class Duel:
         self.duel.player.stakes[self.duel.player.stakes.index(out_wu)] = in_wu
 
     def _apply_elemental(self, effect: str | None) -> None:
-        """A played Wu's showdown-wide effect: void, reverse or re-colour the arena, or seize the ground."""
+        """A played Wu's showdown-wide effect: void, reverse or re-colour the arena, seize the
+        ground, hack a construct, steal a Wu, or charge a Shard of Lightning."""
         if effect and effect.startswith("background:"):
             self.duel.background = effect.split(":", 1)[1]
         elif effect == "cancel":
@@ -718,6 +719,84 @@ class Duel:
             self.duel.elemental_bonus_reversed = True
         elif effect and effect.startswith("seize:"):
             self._seize_ground(effect.split(":", 1)[1] == "player")
+        elif effect and effect.startswith("hack:"):
+            self._hack_construct(effect.split(":", 1)[1] == "player")
+        elif effect and effect.startswith("steal:"):
+            self._steal_wu(effect.split(":", 1)[1] == "player")
+        elif effect and effect.startswith("conduct:"):
+            self.duel.round.conduct_caster = effect.split(":", 1)[1] == "player"
+
+    def _conduct_bonus(self, is_player: bool) -> int:
+        """Shard of Lightning's swing: +1 to the contested stat per metal Wu on the table this
+        battle, -1 per non-metal Wu — either side's queue, boosts and inert curse mirrors alike
+        (only the element is read; an elementless card, e.g. Chamelon-Bot's denial, counts as
+        neither). The arena itself follows the same +1/-1 rule, once it has been decided. Zero
+        unless ``is_player`` is the side that cast it this battle.
+
+        Can go negative — a non-metal-heavy field turns the caster's own conductor against them —
+        and is uncapped either way by design: the one place a Wu is deliberately let past the
+        game's usual stat ceiling.
+
+        Read live off the queues rather than resolved once at play time, so a Wu fielded *after*
+        the Shard still counts — the same reason `boost_negated`/`defence_negated` read at scoring
+        time instead of when they were set.
+        """
+        if not self.duel.rounds or self.duel.round.conduct_caster != is_player:
+            return 0
+        net = sum(
+            1 if card.element == "metal" else (-1 if card.element else 0)
+            for card in self.duel.round.player.queue + self.duel.round.bot.queue
+        )
+        if self.duel.background:
+            net += 1 if self.duel.background == "metal" else -1
+        return net
+
+    def _player_base(self) -> dict[str, int]:
+        """The player's real current stats, plus Shard of Lightning's swing on the contested stat
+        if they cast it this battle — the player-side mirror of `_bot_base`'s own bumps."""
+        base = dict(jong.battle_stats(self.state.player))
+        contested = self.duel.round.stat if self.duel.rounds else self.duel.challenge
+        bonus = self._conduct_bonus(True)
+        if bonus and contested in base:
+            base[contested] += bonus
+        return base
+
+    def _steal_wu(self, is_player: bool) -> None:
+        """Sands of Time: takes the opponent's strongest hand Wu, or a random deck card if their
+        hand is empty — the same policy AI Jack's own steal already uses (see `bot.steal_target`),
+        just open to any duelist who plays the card, not gated to Jack."""
+        mine = self.state.player if is_player else self.state.bot
+        theirs = self.state.bot if is_player else self.state.player
+        target = bot.steal_target(theirs.hand, theirs.deck, self.rng)
+        if target is None:
+            return
+        theirs.remove_card(target)
+        jong.drop_if_broken(theirs)  # a stolen part breaks a constructed Jong
+        mine.hand.append(target)
+
+    def _hack_construct(self, is_player: bool) -> None:
+        """Denshi Bunny: vs Jack in a bot identity (never Mala Mala Jong), a stand-in (AI Jack,
+        Attack!) auto-loses outright — Jack himself was never the one fighting. A modifier instead
+        (Chamelon-Bot's boost, Jack-Bot's curse) is nullified, and the fight proceeds normally.
+
+        Zeroes the specific card, not a blanket `boost_negated`/`defence_negated` flag — those negate
+        every boost or every curse on a side, and Jack may have fielded a REAL boost Wu instead of
+        Chamelon-Bot's this cycle (it competes for the slot, see `_chamelon_boost_card`), which this
+        must leave untouched. `Side.jack_bot` already tracks exactly the one card either mechanism
+        lands, so mutating it in place is the whole fix — it is shared by reference with `queue`.
+        """
+        opponent = self.state.bot if is_player else self.state.player
+        if not self._is_jack(opponent) or jong.is_jong(opponent):
+            return
+        mine, theirs = self.duel.round.sides(is_player)
+        if self.duel.jack_mode in (jack.AI_JACK_NAME, jack.ATTACK_NAME):
+            self.duel.auto_winner = is_player
+        elif self.duel.jack_mode == jack.CHAMELON_NAME:
+            for card in theirs.jack_bot:
+                card.stats = {stat: 0 for stat in card.stats}
+        elif self.duel.jack_mode is None:
+            for card in mine.jack_bot:
+                card.stats = {stat: 0 for stat in card.stats}
 
     def _seize_ground(self, is_player: bool) -> None:
         """Cube of Haniku: its caster takes the challenger's ground for the rest of this showdown,
@@ -763,7 +842,7 @@ class Duel:
         return Ground(
             stats=list(self.duel.stakes.stats.keys()) if self.duel.stakes else [],
             background=self.duel.background or "",
-            player_stats=jong.battle_stats(self.state.player),
+            player_stats=self._player_base(),
             bot_stats=self._bot_base(),
             bonus_cancelled=self.duel.elemental_bonus_cancelled,
             bonus_reversed=self.duel.elemental_bonus_reversed,
@@ -813,6 +892,9 @@ class Duel:
         contested = self.duel.round.stat if self.duel.rounds else self.duel.challenge
         if self.duel.beast_stat is not None and self.duel.beast_stat == contested:
             base[self.duel.beast_stat] += BEAST_BOOST
+        bonus = self._conduct_bonus(False)
+        if bonus and contested in base:
+            base[contested] += bonus
         return base
 
     def _chamelon_boost_card(self) -> Card | None:

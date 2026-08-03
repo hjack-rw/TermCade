@@ -43,6 +43,11 @@ class ChoiceModal(ModalScreen[T]):
     # button; the empty string is what actually leaves the modal un-highlighted until the player tabs.
     AUTO_FOCUS = ""
 
+    # A modal is not an `EngineScreen` either, so it carries no `BACK_ALLOWED` of its own — a choice
+    # is resolved through its own buttons, never the page's physical Back button, whatever screen it
+    # was raised over (including a duel that already called `hide_back`).
+    BACK_ALLOWED = False
+
     def __init__(
         self,
         prompt: "ContentText | Text",

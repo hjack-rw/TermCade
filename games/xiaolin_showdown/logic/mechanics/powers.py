@@ -320,6 +320,28 @@ RULES: dict[Mechanic, Rule] = {
         Timing.IN_DUEL,
         "Smothers your opponent's boost for this battle: its stats count for nothing.",
     ),
+    Mechanic.HACK: Rule(
+        Mechanic.HACK,
+        "play",
+        Timing.IN_DUEL,
+        "If your opponent faces you as a robot construct, you win the showdown outright. Unless "
+        "it is Mala Mala Jong.",
+    ),
+    Mechanic.STEAL: Rule(
+        Mechanic.STEAL,
+        "play",
+        Timing.IN_DUEL,
+        "Takes your opponent's strongest hand Wu into your own hand — or a random Wu from their "
+        "Deck if their hand is empty.",
+    ),
+    Mechanic.CONDUCT: Rule(
+        Mechanic.CONDUCT,
+        "play",
+        Timing.IN_DUEL,
+        "The stat this battle contests gets +1 for every metal Wu fielded this battle — yours or "
+        "your opponent's, boosts included — and -1 for every non-metal one. The arena itself "
+        "counts the same way. Can go negative. Uncapped either way.",
+    ),
     Mechanic.CLEANSE: Rule(
         Mechanic.CLEANSE,
         "play",

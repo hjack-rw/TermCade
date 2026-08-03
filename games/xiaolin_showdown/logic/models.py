@@ -64,6 +64,9 @@ class Mechanic(StrEnum):
     WISH = "wish"  # Treasurebox of the Blind Swordsman — one wish, chosen by where it is used, then gone for good: deposit for points, spend to restore a Wu from the Vault, or field to win the showdown outright
     TRAIN_BOOST = "train_boost"  # a summon Wu spent at the temple — one-time shove of TRAIN_BOOST_STEP into the training bar
     ANIMATE = "animate"  # Heart of Jong — nothing fielded alone; in the boost slot it morphs (Moby Morpher shape, arena element) into an animated form the background names. The seed of Mala Mala Jong's deferred assembly
+    HACK = "hack"  # Denshi Bunny — vs a robot construct (Jack in any bot identity swap, never Mala Mala Jong): a stand-in (AI Jack, Attack!) auto-loses outright; a modifier (Chamelon-Bot's boost, Jack-Bot's curse) is nullified instead
+    STEAL = "steal"  # Sands of Time — takes the opponent's strongest hand Wu, or a random deck card if the hand is empty; the same policy AI Jack's own steal already uses
+    CONDUCT = "conduct"  # Shard of Lightning — +1 to the contested stat per metal Wu on the table this battle, either side, boosts included, plus +1 more if the arena itself is metal. Uncapped.
 
 
 @dataclass
@@ -176,12 +179,13 @@ class Player:
         return self.inalienable_hand + self.hand
 
     def remove_card(self, card: Card) -> None:
-        """Remove the exact ``card`` from the hand or the inalienable slot.
+        """Remove the exact ``card`` from the hand, the inalienable slot, or the deck — a steal
+        (see ``bot.steal_target``) can take from any of the three.
 
         Identity, not equality: the draw pile is padded with value-equal blank cards, so
         ``list.remove`` (which matches by value equality) can drop the wrong instance.
         """
-        for holder in (self.hand, self.inalienable_hand):
+        for holder in (self.hand, self.inalienable_hand, self.deck):
             for index, held in enumerate(holder):
                 if held is card:
                     del holder[index]
