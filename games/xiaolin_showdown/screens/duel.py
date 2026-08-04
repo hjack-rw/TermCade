@@ -155,6 +155,14 @@ class DuelScreen(XiaolinScreen):
             log=False,
         )
 
+    def _announce_yoyo_flip(self) -> None:
+        """A Yin/Yang Yo-Yo just flipped the player's own affiliation — cosmetic, but worth a beat."""
+        self.engine_app.notify(
+            "It's hard to spot the difference, isn't it?",
+            title="Yin-Yang Yo-Yo",
+            log=False,
+        )
+
     def _announce_end_surprises(self, duel: DuelState) -> None:
         """Two outcomes the board shows without explaining, so only a toast can account for them."""
         if duel.prize_gifted:
@@ -199,6 +207,11 @@ class DuelScreen(XiaolinScreen):
             tied = duel.duel.player.initiative == duel.duel.bot.initiative
             if stage == COMMITMENT and duel.duel.jack_stolen:
                 self._announce_jack_steal(duel.duel)
+            # A Yo-Yo may be played on any Card stage, not just once at commitment — checked every
+            # pass and cleared right away, unlike `jack_stolen`'s one-time COMMITMENT window.
+            if duel.duel.yoyo_flipped_announce:
+                self._announce_yoyo_flip()
+                duel.duel.yoyo_flipped_announce = False
             if stage == COMMITMENT and (tied or self.state.initiative_contested):
                 await self._reveal_coin_toss(duel.duel.player_priority is True)
             # They set the price only if you called a *stat*. A tournament prices itself — three

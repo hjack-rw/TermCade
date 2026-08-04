@@ -292,6 +292,11 @@ EFFECTS = {
     Mechanic.STEAL: "Take their strongest hand Wu, or a random one from their Deck if their hand is empty.",
     Mechanic.CONDUCT: "+1 to the contested stat for every metal Wu in this battle, either side, "
     "boosts included; -1 for every non-metal one. The arena counts the same way. Can go negative.",
+    Mechanic.STAT_SWAP: "Name a stat: swap it with your opponent's Character for the rest of the "
+    "Showdown. Also flips your affiliation for the rest of the run, until you play another Yo-Yo.",
+    Mechanic.CHI_SWAP: "Name a stat: swap it with your opponent's Character for the rest of the "
+    "Showdown. Also flips YOUR OPPONENT'S affiliation for the rest of the run. Held, it may "
+    "instead correct your own — exiled either way.",
     Mechanic.AMEND: "Take back your previous action this turn (boss runs only).",
     Mechanic.WISH: "One wish, then gone: deposit for points, restore a Vaulted Wu, or field to win the Showdown.",
     # TRAIN_BOOST is not here: its number is the card's own ``train_step``, filled in by `effect_line`,

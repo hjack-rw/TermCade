@@ -13,7 +13,7 @@ and the order this code happens to run in must never leak.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import replace
 
@@ -160,12 +160,20 @@ def choose_jack_mode(
     return jack.AI_JACK_NAME if can_swap else None
 
 
-def steal_target(hand: Sequence[Card], deck: Sequence[Card], rng: Rng) -> Card | None:
+def steal_target(
+    hand: Sequence[Card], deck: Sequence[Card], rng: Rng, *, prefer: Callable[[Card], bool] | None = None
+) -> Card | None:
     """AI Jack's steal: the strongest Wu in the opponent's hand — fully known, so judged like any
     other bot decision. An empty hand falls back to a random deck card: nothing is known about it
-    (see the deferred reveal-memory note in ``docs/PLAN.md``), so there is nothing to rank it by."""
+    (see the deferred reveal-memory note in ``docs/PLAN.md``), so there is nothing to rank it by.
+
+    ``prefer`` narrows the field before ranking, when it matches anything — Jack's own steal passes
+    ``jack.is_counter`` so a Denshi Bunny in hand is taken outright, even over a numerically stronger
+    Wu; Sands of Time (open to anyone) leaves it unset and ranks the whole hand as before.
+    """
     if hand:
-        return max(hand, key=duel_value)
+        pool = [c for c in hand if prefer(c)] if prefer is not None else []
+        return max(pool or hand, key=duel_value)
     if deck:
         return rng.choice(list(deck))
     return None
@@ -257,6 +265,54 @@ def _counter_element(
     return rng.choice(list(backgrounds))
 
 
+# STEAL/SEIZE_GROUND: their whole value is a side-effect `_after`'s battle score cannot see — the
+# opponent's own best hand card, or the challenger's seat for the rest of the showdown. A card built
+# entirely around one of these prints low or no stats, so it reads as a weak pick next to any real
+# stat stick and never gets fielded on purpose. `choose_card` reaches for one after the stat-best pick
+# is known, but only when it doesn't cost the battle — or the prize — itself.
+#
+# HACK (Denshi Bunny) is deliberately NOT here: its whole value is denying Jack a bot identity, and
+# Jack is never player-selectable (`is_playable=0` in the seed) — the bot can never face him as an
+# opponent, so a "prefer HACK against a hackable opponent" heuristic would have no live trigger to
+# fire from. Checked, not assumed.
+_SIDE_EFFECT_MECHANICS = frozenset({Mechanic.STEAL, Mechanic.SEIZE_GROUND})
+
+
+def _worth_the_side_effect(card: Card, ground: Ground, *, is_player: bool) -> bool:
+    """Whether ``card``'s side-effect is actually live this battle, not just present in hand.
+
+    STEAL is always a fair trade in isolation — it takes the opponent's own strongest hand Wu, or a
+    blind deck pull, never something picked against the stealer. SEIZE_GROUND is only worth taking
+    when the acting side doesn't already hold the ground it would seize.
+    """
+    mechanic = mechanic_of(card.power)
+    if mechanic is Mechanic.STEAL:
+        return True
+    if mechanic is Mechanic.SEIZE_GROUND:
+        return is_player != ground.challenger_is_player
+    return False
+
+
+def _costs_the_battle_or_prize(
+    key: tuple[int, int], best_key: tuple[int, int], *, prize_bar: int
+) -> bool:
+    """Whether switching from the stat-best pick to a side-effect card gives up something real.
+
+    Two ways it can: flipping a win-or-tie into a loss (``key[0]`` crosses zero), or giving up a
+    decisive-blow prize claim the stat-best pick would have made — its own blow (``-best_key[1]``)
+    clears ``prize_bar`` (``settings.prize_threshold + 1``) but the side-effect card's own blow
+    (``-key[1]``) does not. If BOTH clear it, nothing is actually given up, so switching is still free.
+    The broader prize routes (a win on two fronts, total command, being in tune) read the WHOLE
+    showdown, which a single battle's trial has no way to see — this only guards the one route a
+    single battle decides outright.
+    """
+    if best_key[0] > 0:
+        return False  # the stat-best pick was already losing; nothing left to protect
+    if key[0] > 0:
+        return True  # flips a win-or-tie into a loss
+    return -best_key[1] >= prize_bar > -key[1]
+
+
 def choose_card(
     battle: Round,
     ground: Ground,
@@ -264,6 +320,7 @@ def choose_card(
     rng: Rng,
     *,
     is_player: bool = False,
+    prize_bar: int = 8,
 ) -> Card:
     """Field the Wu that leaves the battle in the best shape.
 
@@ -276,6 +333,12 @@ def choose_card(
     Ties are broken by hitting harder, never by holding back. Only the *loser* forfeits what they
     staked, so a Wu spent on a battle you win costs nothing — and the prize is claimed only when the
     contested stat beats ``prize_threshold``, which a duelist who wins by the minimum never does.
+    ``prize_bar`` is ``prize_threshold + 1`` — the blow a decisive win must clear (default matches
+    ``XiaolinSettings``'s own default threshold, 7); the real caller passes its own settings' value.
+
+    Once the stat-best pick is known, a live STEAL/SEIZE_GROUND is taken over it instead — but only
+    when doing so doesn't flip a win-or-tie into a loss, or give up a decisive-blow prize claim the
+    stat-best pick would have made (see ``_costs_the_battle_or_prize``).
     """
     if not playable:
         raise ValueError("nothing to field")
@@ -298,7 +361,36 @@ def choose_card(
         key = _after(battle, ground, card, is_player=is_player)
         if best_key is None or key < best_key:
             best, best_key = card, key
-    return best if best is not None else rng.choice(list(playable))
+    if best is None or best_key is None:
+        return rng.choice(list(playable))
+
+    side_effect = _side_effect_pick(
+        playable, battle, ground, best, best_key, is_player=is_player, prize_bar=prize_bar
+    )
+    return side_effect if side_effect is not None else best
+
+
+def _side_effect_pick(
+    playable: Sequence[Card],
+    battle: Round,
+    ground: Ground,
+    best: Card,
+    best_key: tuple[int, int],
+    *,
+    is_player: bool,
+    prize_bar: int,
+) -> Card | None:
+    """The first live STEAL/SEIZE_GROUND in ``playable`` that doesn't cost the battle or the prize —
+    see ``choose_card``'s own docstring for why it's preferred over the stat-best pick at all."""
+    for card in playable:
+        if card is best or mechanic_of(card.power) not in _SIDE_EFFECT_MECHANICS:
+            continue
+        if not _worth_the_side_effect(card, ground, is_player=is_player):
+            continue
+        key = _after(battle, ground, card, is_player=is_player)
+        if not _costs_the_battle_or_prize(key, best_key, prize_bar=prize_bar):
+            return card
+    return None
 
 
 def choose_boost(
@@ -366,6 +458,13 @@ def _after(
 
     A Wu that names a stat is worth what its *best* stat is worth — so weighing whether to play it at
     all (``choose_card``) asks this without a stat, and gets the best line it could take.
+
+    A Monsoon Sandals or any other element-asking card is NOT played out for its own choice of
+    element here — ``element=ground.background`` below always passes the *current* arena, mirroring
+    ``Duel._resolve_bot``'s own hardcoded choice for the bot's real card resolution (it never asks
+    which element; see ``_element_for``). So a SET_ARENA card's own effect always resolves to the
+    arena it is already in — a real, separate gap (the bot has no element-choice policy at all yet),
+    not something this function could paper over without one existing upstream.
     """
     if stat is None and names_a_stat(card.power):
         return min(
@@ -382,9 +481,49 @@ def _after(
         bonus_cancelled=ground.bonus_cancelled or effect == "cancel",
         bonus_reversed=ground.bonus_reversed or effect == "reverse",
     )
+    if effect and effect.startswith("conduct:"):
+        # Conduct is newly active — `ground` carries no swing for it yet (the real Duel's own
+        # `_conduct_bonus` reads 0 while `conduct_caster` is unset), so the WHOLE current table's
+        # swing becomes the caster's bonus for the first time, this card included.
+        terms = _conduct_swing(trial, terms, is_player=is_player, net=_conduct_net(trial, terms))
+    elif trial.conduct_caster is not None:
+        # A Shard of Lightning fielded EARLIER this same battle (a multi-Wu wager) is still active,
+        # and `ground` already carries its swing so far (`Duel._ground` re-bakes it every cycle) —
+        # only THIS candidate's own marginal element shifts it further, not the whole net again.
+        delta = 1 if card.element == "metal" else (-1 if card.element else 0)
+        terms = _conduct_swing(trial, terms, is_player=trial.conduct_caster, net=delta)
     score_battle(trial, terms)
     sign = -1 if is_player else 1
     return sign * trial.score, -_blow(trial, terms, is_player=is_player)
+
+
+def _conduct_net(trial: Round, terms: Ground) -> int:
+    """The whole table's metal swing, read fresh — every Wu on either side plus the arena, the same
+    count `duel.Duel._conduct_bonus` makes when Shard of Lightning first goes active."""
+    net = sum(
+        1 if card.element == "metal" else (-1 if card.element else 0)
+        for card in trial.player.queue + trial.bot.queue
+    )
+    if terms.background:
+        net += 1 if terms.background == "metal" else -1
+    return net
+
+
+def _conduct_swing(trial: Round, terms: Ground, *, is_player: bool, net: int) -> Ground:
+    """Add ``net`` to whoever cast Shard of Lightning's own base on the trial's contested stat —
+    ``is_player`` is whoever CAST it, not necessarily who just played the candidate card being
+    weighed, so the swing lands on the right side's base stats whichever of them cast it."""
+    if not trial.stat or not net:
+        return terms
+    if is_player:
+        base = dict(terms.player_stats)
+        if trial.stat in base:
+            base[trial.stat] += net
+        return replace(terms, player_stats=base)
+    base = dict(terms.bot_stats)
+    if trial.stat in base:
+        base[trial.stat] += net
+    return replace(terms, bot_stats=base)
 
 
 def _blow(battle: Round, ground: Ground, *, is_player: bool) -> int:

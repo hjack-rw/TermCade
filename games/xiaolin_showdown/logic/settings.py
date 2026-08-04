@@ -3,8 +3,8 @@
 These rule constants are player-editable on the Settings screen and frozen into each save (the
 engine persists settings in the save state). The engine
 owns *how* settings are stored and modified; the game owns *which* knobs exist and their
-defaults. ``FIRST_DECK_CARD`` stays a structural constant — tied to the card-data layout, not a
-player choice.
+defaults. Which cards are even in the pool (``constants.in_pool``) stays a structural fact — tied
+to the card-data layout, not a player choice.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Any
 from termcade.app.game import SaveNote
 from termcade.core.settings import Difficulty, Settings
 
-from .constants import FIRST_DECK_CARD
+from .constants import in_pool
 from .models import Card
 
 # A duelist wins by banking this share of the points left in the *pile* — see `point_limit_for`, which
@@ -35,8 +35,8 @@ class XiaolinSettings:
     starting_hand_bot: int = 5
     # Derived from the pool (see `pool_fingerprint`), but written out so a bare `XiaolinSettings()`
     # still deals a real game. `test_settings_defaults_match_the_card_pool` fails when they fall stale.
-    max_deck_size: int = 73
-    point_limit: int = 58
+    max_deck_size: int = 75
+    point_limit: int = 61
     starting_points_player: int = 0
     starting_points_bot: int = 0
     # One temple turn, one action: deposit, spend a power, or draw. One budget, so a hand is a resource
@@ -154,7 +154,7 @@ def point_limit_for(cards: Iterable[Card], *, dealt: int | None = None) -> int:
     sets a bar against cards nobody can win. Scaled by the pile's *average* card, so a rich opening
     deal shortens the run — that variance is real and unmodelled.
     """
-    pile = [card for card in cards if card.id >= FIRST_DECK_CARD]
+    pile = [card for card in cards if in_pool(card.id)]
     if not pile:
         return 2
     if dealt is None:
@@ -168,7 +168,7 @@ def point_limit_for(cards: Iterable[Card], *, dealt: int | None = None) -> int:
 def deck_size_for(cards: Iterable[Card]) -> int:
     """How many Wu a run deals — every card in the draw pool. Derived, not fixed, for the reason
     :func:`pool_fingerprint` spells out: a hardcoded deck would leave newly printed Wu out of the run."""
-    return sum(1 for card in cards if card.id >= FIRST_DECK_CARD)
+    return sum(1 for card in cards if in_pool(card.id))
 
 
 def pool_fingerprint(cards: Iterable[Card]) -> int:
@@ -183,7 +183,7 @@ def pool_fingerprint(cards: Iterable[Card]) -> int:
     **half the pool at random** (`new_game` shuffles, then truncates) and ended on a target meant for a
     game half this size. Every Wu printed after that file was written could simply fail to appear.
     """
-    pile = [card for card in cards if card.id >= FIRST_DECK_CARD]
+    pile = [card for card in cards if in_pool(card.id)]
     return len(pile) * 1000 + sum(card.points for card in pile)
 
 

@@ -29,10 +29,12 @@ from termcade.ui.widgets import BoxedPanel, TooltipStatic, render_bar
 
 from ..logic import jong
 from ..logic.actions import (
+    can_combine_yoyo,
     can_construct,
     can_deposit,
     can_draw,
     can_early_bird,
+    can_self_correct_yoyo,
     deposit_blocked,
     draw,
     draw_blocked,
@@ -185,7 +187,12 @@ class TempleScreen(XiaolinScreen):
             "3": deposit_blocked(state, budget),
             "4": (
                 None
-                if can_early_bird(state, rules) or can_construct(state, budget)
+                if (
+                    can_early_bird(state, rules)
+                    or can_construct(state, budget)
+                    or can_combine_yoyo(state, budget)
+                    or can_self_correct_yoyo(state, budget)
+                )
                 else use_power_blocked(state, budget)
             ),
             "5": train_blocked(state, budget),
@@ -266,7 +273,13 @@ class TempleScreen(XiaolinScreen):
     def action_use_power(self) -> None:
         state, rules = self.state, self.rules
         budget = player_actions(state, rules)
-        if usable_powers(state, budget) or can_early_bird(state, rules) or can_construct(state, budget):
+        if (
+            usable_powers(state, budget)
+            or can_early_bird(state, rules)
+            or can_construct(state, budget)
+            or can_combine_yoyo(state, budget)
+            or can_self_correct_yoyo(state, budget)
+        ):
             self.app.push_screen(UsePowerScreen())
 
     def action_deposit(self) -> None:

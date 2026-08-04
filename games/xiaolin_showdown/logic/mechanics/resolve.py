@@ -94,6 +94,10 @@ def resolve_played_power(
         return "steal:player" if is_player else "steal:bot"
     if mechanic is Mechanic.CONDUCT:  # Shard of Lightning — the count is read at scoring time, live
         return "conduct:player" if is_player else "conduct:bot"
+    if mechanic is Mechanic.STAT_SWAP:  # Yin/Yang Yo-Yo — the caller owns both Characters, not this module
+        return f"swap:{'player' if is_player else 'bot'}:{stat}"
+    if mechanic is Mechanic.CHI_SWAP:  # Ying-Yang Yo-Yo, combined — flips the OPPONENT, not the caster
+        return f"chiswap:{'player' if is_player else 'bot'}:{stat}"
     return None
 
 

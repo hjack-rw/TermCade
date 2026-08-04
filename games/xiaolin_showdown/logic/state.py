@@ -271,6 +271,10 @@ def _player_dict(p: Player) -> dict[str, Any]:
         # overlay), so only these two ride along.
         "jong_form": p.jong_form,
         "jong_heart": p.jong_heart.id if p.jong_heart else None,
+        # Yin/Yang Yo-Yo (logic/jack.py): the affiliation flip (Good Jack, for Jack specifically)
+        # persists across showdowns too, and Good Jack's own separately trained intellect with it.
+        "yoyo_flipped": p.yoyo_flipped,
+        "good_jack_intellect": p.good_jack_intellect,
     }
 
 
@@ -291,6 +295,9 @@ def _player_from_dict(data: dict[str, Any], catalog: Catalog) -> Player:
     player.jong_form = data.get("jong_form", False)
     heart_id = data.get("jong_heart")
     player.jong_heart = _fresh_card(catalog, heart_id) if heart_id is not None else None
+    # Yin/Yang Yo-Yo: absent in a save from before it — never flipped, Good Jack's intellect untrained.
+    player.yoyo_flipped = data.get("yoyo_flipped", False)
+    player.good_jack_intellect = data.get("good_jack_intellect", 4)
     for card, uses in zip(player.hand, data.get("hand_uses", ())):
         card.uses = uses
     for card, uses in zip(player.deck, data.get("deck_uses", ())):

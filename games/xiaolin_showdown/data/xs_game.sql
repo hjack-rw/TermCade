@@ -121,6 +121,8 @@ INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") 
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (72, 'Electrokinesis', 'hack', 'Transforms the user into electricity, meaning they can possess and control technology.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (73, 'Temporokinesis', 'steal', 'Manipulates time, allowing short-term time travel to explore outcomes not yet set in stone, or to temporarily summon oneself from another point in the timeline.', 0);
 INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (74, 'Astrapokinesis', 'conduct', 'Shoots out thunderbolts. Can be used as a powerful energy source.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (75, 'Personality Reversal', 'stat_swap', 'When the Yo-Yo is broken into two parts, the user is still able to travel to the Yin-Yang World, but upon their return they will lose their predominant Chi and undergo a personality reversal.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (76, 'Chi Exchange', 'chi_swap', 'Allows the user to travel into the Yin-Yang World. Can change someone else''s Chi at will.', 0);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE card (id INTEGER, name TEXT, force INTEGER, agility INTEGER, intellect INTEGER, power_id INTEGER NOT NULL REFERENCES power (id), element TEXT, type TEXT, points INTEGER, PRIMARY KEY (id AUTOINCREMENT));
@@ -201,9 +203,12 @@ INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "el
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (73, 'Sapphire Dragon', NULL, NULL, NULL, 69, 'metal', 'item', 5);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (74, 'Heart of Jong', NULL, NULL, NULL, 70, 'metal', 'item', 5);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (-8, 'Jack-Bot', -1, -1, -1, 71, 'metal', 'wudai', 0);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (75, 'Denshi Bunny', 1, 0, 1, 72, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (76, 'Sands of Time', 2, 0, 2, 73, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (75, 'Denshi Bunny', 1, 0, 1, 72, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (76, 'Sands of Time', 2, 0, 2, 73, 'metal', 'item', 5);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (77, 'Shard of Lightning', 0, 0, 0, 74, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (78, 'Ying Yo-Yo', NULL, NULL, NULL, 75, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (79, 'Yang Yo-Yo', NULL, NULL, NULL, 75, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (80, 'Ying-Yang Yo-Yo', NULL, NULL, NULL, 76, 'metal', 'item', 7);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (

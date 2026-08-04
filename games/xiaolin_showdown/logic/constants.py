@@ -51,3 +51,21 @@ OPPOSITES = {
 #         `setup._reserve_signature`).
 # So the shuffled draw pile starts at card 5 (Moby Morpher included).
 FIRST_DECK_CARD = 5
+
+# The Yin/Yang Yo-Yo halves and their combined form (see logic/actions.combine_yoyo /
+# self_correct_yoyo) — matched by id, not `Mechanic.STAT_SWAP`/`CHI_SWAP` alone, since a mechanic
+# check can't tell "held a half" apart from "held the combined card" or from a future third Wu.
+YING_YOYO_ID = 78
+YANG_YOYO_ID = 79
+YIN_YANG_YOYO_ID = 80
+
+
+def in_pool(card_id: int) -> bool:
+    """Whether a card is dealt into a run's draw pile at all.
+
+    Every card at or above `FIRST_DECK_CARD`, except the combined Ying-Yang Yo-Yo: "change two
+    Yo-Yos cards into this one card" means it is built only by combining its two halves (see
+    `actions.combine_yoyo`), never drawn — the same reason a signature Wu never rides the pool on
+    its own, a different mechanism for it.
+    """
+    return card_id >= FIRST_DECK_CARD and card_id != YIN_YANG_YOYO_ID

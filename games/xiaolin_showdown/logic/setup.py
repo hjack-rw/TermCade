@@ -15,7 +15,7 @@ from dataclasses import dataclass, replace
 from termcade.core.rng import Rng
 
 from .catalog import Catalog
-from .constants import FIRST_DECK_CARD
+from .constants import in_pool
 from .mechanics.cards import held_as_wudai
 from .models import Card, Character, Player
 from .settings import XiaolinSettings, deck_size_for, point_limit_for
@@ -80,7 +80,7 @@ def new_game(
 
     # Draw pile = the pool (every card whose id is >= FIRST_DECK_CARD — a signature Wu's id sits
     # below it, whatever sign it carries), padded with blanks (card 0) to full size.
-    card_order = [card.id for card in cards if card.id >= FIRST_DECK_CARD]
+    card_order = [card.id for card in cards if in_pool(card.id)]
     card_order += [0] * (settings.max_deck_size - len(card_order))
     rng.shuffle(card_order)  # RNG call 1 — must precede the bot pick
 
@@ -173,7 +173,7 @@ def _weighted_game(
     subset (a smaller deck banks a nearer target). RNG call order matches :func:`new_game` — the deal
     consumes randomness (call 1), then the bot is picked (call 2) — so seeds line up across both paths.
     """
-    poolable = [deepcopy(card) for card in catalog.cards if card.id >= FIRST_DECK_CARD]
+    poolable = [deepcopy(card) for card in catalog.cards if in_pool(card.id)]
     wanted = pile_size + settings.starting_hand_player + settings.starting_hand_bot
     # A scenario needs the opponent known before the deal; that holds only for a CHOSEN opponent, which
     # bosses always are. A randomly dealt roster (opponent is None) has no scenario and takes the default.

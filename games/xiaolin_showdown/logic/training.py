@@ -55,8 +55,15 @@ def can_train(player: Player) -> bool:
 
 def trainable_stats(player: Player) -> list[str]:
     """The stats a payout may raise — every base stat still under the cap. Jack Spicer's force alone
-    trains toward `JACK_FORCE_CAP` rather than the universal `STAT_CAP` — see its comment."""
+    trains toward `JACK_FORCE_CAP` rather than the universal `STAT_CAP` — see its comment.
+
+    Good Jack (a Yin/Yang Yo-Yo away, see `Player.yoyo_flipped`) trains neither: while worn, only
+    his own separate intellect can train (see `Player.good_jack_intellect`) — force/agility only
+    ever move in Evil Jack form, mirrored onto Good Jack's afterward (`duel.Duel._jack_base`).
+    """
     is_jack = player.character.power.mechanic is Mechanic.BOT
+    if is_jack and player.yoyo_flipped:
+        return ["intellect"] if player.good_jack_intellect < STAT_CAP else []
     stats = player.character.stats
     return [
         s for s, v in stats.items() if v < (JACK_FORCE_CAP if is_jack and s == "force" else STAT_CAP)
@@ -83,8 +90,16 @@ def add_progress(player: Player, amount: int = 1) -> bool:
 
 def raise_stat(player: Player, stat: str) -> None:
     """The payout: the chosen base stat rises by one. The bar stays full for the rest of the turn —
-    the turnover resets it to climb again (see :func:`turn_over`)."""
-    player.character.stats[stat] += 1
+    the turnover resets it to climb again (see :func:`turn_over`).
+
+    Good Jack's intellect gain also raises Evil Jack's real one, permanently — training banks onto
+    the shared duelist no matter which form earned it (see `trainable_stats`)."""
+    is_jack = player.character.power.mechanic is Mechanic.BOT
+    if is_jack and player.yoyo_flipped:
+        player.good_jack_intellect += 1
+        player.character.stats["intellect"] += 1
+    else:
+        player.character.stats[stat] += 1
     player.just_trained = True
 
 

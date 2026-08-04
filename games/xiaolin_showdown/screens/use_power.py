@@ -6,20 +6,27 @@ layer cannot ask, it takes the answer as an argument.
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 from rich.text import Text
 from termcade.ui.screens.menu import MenuItem
 from termcade.ui.work import work
 
 from ..logic.actions import (
+    can_combine_yoyo,
     can_construct,
     can_early_bird,
+    can_self_correct_yoyo,
     coming_wu,
+    combine_yoyo,
     construct_jong,
     early_bird,
     early_bird_options,
+    self_correct_yoyo,
     usable_powers,
     use_power,
 )
+from ..logic.constants import YIN_YANG_YOYO_ID
 from ..logic.mechanics.powers import Mechanic, mechanic_of
 from ..logic.models import Card
 from ..logic.settings import player_actions
@@ -29,6 +36,8 @@ from .format import card_headline, card_options, power_headline, prompt, your_mo
 
 NOTHING_COMING = "The pile is empty — nothing is coming."
 CONSTRUCT = "Construct Mala Mala Jong"
+COMBINE_YOYO = "Combine into Yin-Yang Yo-Yo"
+SELF_CORRECT_YOYO = "Correct Your Own Alignment"
 
 
 class UsePowerScreen(XiaolinMenu):
@@ -59,6 +68,11 @@ class UsePowerScreen(XiaolinMenu):
         # whole hand's worth, not one card, so it reads as the momentous thing it is.
         if can_construct(self.state, player_actions(self.state, self.rules)):
             items.append(MenuItem(id="construct", label=CONSTRUCT))
+        budget = player_actions(self.state, self.rules)
+        if can_combine_yoyo(self.state, budget):
+            items.append(MenuItem(id="combine-yoyo", label=COMBINE_YOYO))
+        if can_self_correct_yoyo(self.state, budget):
+            items.append(MenuItem(id="self-correct-yoyo", label=SELF_CORRECT_YOYO))
         return items
 
     def on_select(self, item_id: str) -> None:
@@ -67,6 +81,12 @@ class UsePowerScreen(XiaolinMenu):
             return
         if item_id == "construct":
             self._construct()
+            return
+        if item_id == "combine-yoyo":
+            self._combine_yoyo()
+            return
+        if item_id == "self-correct-yoyo":
+            self._self_correct_yoyo()
             return
         self._spend(self._usable[self.index_of(item_id, "pow")])
 
@@ -105,6 +125,29 @@ class UsePowerScreen(XiaolinMenu):
             f"You assembled Mala Mala Jong.{banked}",
             "You constructed Mala Mala Jong — a 6/6/6 body of Shen Gong Wu.\n"
             "Reach the end of the game in the form to win outright.",
+            POWER,
+        )
+
+    @work
+    async def _combine_yoyo(self) -> None:
+        """Fuse the two Yo-Yo halves into the Ying-Yang Yo-Yo — never drawn on its own, only ever
+        built this way (see `logic.constants.in_pool`)."""
+        combined = deepcopy(self.state.catalog.card(YIN_YANG_YOYO_ID))
+        combine_yoyo(self.state, combined, is_player=True)
+        self._return_to_temple(
+            "You combined your Yo-Yo halves into the Ying-Yang Yo-Yo.",
+            "You combined Ying Yo-Yo and Yang Yo-Yo into the Ying-Yang Yo-Yo.",
+            POWER,
+        )
+
+    @work
+    async def _self_correct_yoyo(self) -> None:
+        """Spend the combined Ying-Yang Yo-Yo to flip your own affiliation back — exiled for good,
+        the same as a Treasurebox's wish."""
+        self_correct_yoyo(self.state, is_player=True)
+        self._return_to_temple(
+            "It's hard to spot the difference, isn't it?",
+            "You spent the Ying-Yang Yo-Yo to correct your own alignment.",
             POWER,
         )
 

@@ -654,9 +654,9 @@ async def test_the_opponent_chooses_against_the_board_before_you_moved():
 
     real = duel_module.bot.choose_card
 
-    def spy(battle, ground, playable, rng, *, is_player=False):
+    def spy(battle, ground, playable, rng, *, is_player=False, prize_bar=8):
         boards.append(sum(1 for c in battle.player.queue if c.power.mechanic is Mechanic.FILLER))
-        return real(battle, ground, playable, rng, is_player=is_player)
+        return real(battle, ground, playable, rng, is_player=is_player, prize_bar=prize_bar)
 
     duel_module.bot.choose_card = spy
     try:

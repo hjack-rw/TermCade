@@ -342,6 +342,22 @@ RULES: dict[Mechanic, Rule] = {
         "your opponent's, boosts included — and -1 for every non-metal one. The arena itself "
         "counts the same way. Can go negative. Uncapped either way.",
     ),
+    Mechanic.STAT_SWAP: Rule(
+        Mechanic.STAT_SWAP,
+        "play",
+        Timing.IN_DUEL,
+        "Names a stat: swaps it between your Character and your opponent's for the rest of this "
+        "Showdown. Also flips your shown affiliation for the rest of the run, until you play "
+        "another Yo-Yo.",
+    ),
+    Mechanic.CHI_SWAP: Rule(
+        Mechanic.CHI_SWAP,
+        "play",
+        Timing.IN_DUEL,
+        "Names a stat: swaps it between your Character and your opponent's for the rest of this "
+        "Showdown. Also flips your OPPONENT'S shown affiliation for the rest of the run. Held at "
+        "the temple, it may instead correct your own affiliation back — exiled either way, for good.",
+    ),
     Mechanic.CLEANSE: Rule(
         Mechanic.CLEANSE,
         "play",
@@ -468,9 +484,10 @@ def names_a_stat(power: Power) -> bool:
     """Does this Wu ask its caster which stat to pour itself into?
 
     Both do — the Orb pours a gain, the Curse pours a wound. What they aim at is the same question,
-    asked of whoever plays them, so the duel asks it in one place.
+    asked of whoever plays them, so the duel asks it in one place. Both Yo-Yo forms ask the same
+    question for a third reason — which stat to swap with the opponent's Character.
     """
-    return mechanic_of(power) in (Mechanic.BUFF, Mechanic.MISFORTUNE)
+    return mechanic_of(power) in (Mechanic.BUFF, Mechanic.MISFORTUNE, Mechanic.STAT_SWAP, Mechanic.CHI_SWAP)
 
 
 def is_boost_slot(power: Power) -> bool:

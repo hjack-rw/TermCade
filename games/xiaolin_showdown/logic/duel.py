@@ -146,6 +146,15 @@ class DuelState:
     # Attack!'s flavour name for this showdown — one of `jack.ATTACK_BOT_NAMES`, never twice in a
     # row (see `state.last_attack_bot_name`). `None` unless `jack_mode is jack.ATTACK_NAME`.
     attack_bot_name: str | None = None
+    # The Yin/Yang Yo-Yo (Mechanic.STAT_SWAP): which Character stats are currently exchanged between
+    # the two duelists, this showdown only — read live in `Duel._swapped_bases`, not applied once at
+    # play time, the same reason `boost_negated`/`conduct_caster` read live too. Resets every
+    # showdown; the affiliation flip it also causes outlives this (see `Player.yoyo_flipped`).
+    swapped_stats: set[str] = field(default_factory=set)
+    # The PLAYER'S OWN affiliation just flipped this stage — for the toast (see
+    # `screens/duel._announce_yoyo_flip`), the same one-shot shape as `jack_stolen`. Never set for
+    # the bot's own flip (including Jack becoming Good Jack) — nothing to say text for yet.
+    yoyo_flipped_announce: bool = False
 
     def duelist(self, is_player: bool) -> Duelist:
         return self.player if is_player else self.bot
@@ -510,7 +519,9 @@ class Duel:
             # Jack-Bot is his own permanent boost, not one of the three he swaps INTO — while he's
             # sent AI Jack, Chamelon-Bot or the Attack! construct instead, it stays undeployed.
             jack_bot = None
-            if not self._is_construct(self.state.bot):
+            # Good Jack can't deploy Jack-Bot either — `_is_construct` alone misses this: he sets no
+            # `jack_mode` while worn, so he never reads as a construct, correctly (see `_jack_base`).
+            if not self._is_construct(self.state.bot) and not self.state.bot.yoyo_flipped:
                 jack_bot = next((c for c in bot_boosts if mechanic_of(c.power) is Mechanic.BOT), None)
             # Chamelon-Bot's denial: a boost like the curse above, not a base override — see
             # `_chamelon_boost_card`. `None` when he isn't sent as Chamelon-Bot this showdown, or
@@ -559,7 +570,13 @@ class Duel:
         bot_playable = self._playable(self.state.bot, is_player=False)
         if current.bot_fielded < bot_target:
             if bot_playable:
-                bot_card = bot.choose_card(blind, self._ground(), bot_playable, self.rng)
+                bot_card = bot.choose_card(
+                    blind,
+                    self._ground(),
+                    bot_playable,
+                    self.rng,
+                    prize_bar=self.settings.prize_threshold + 1,
+                )
                 self.duel.bot.stakes.append(bot_card)
             current.bot_fielded += 1
 
@@ -624,7 +641,13 @@ class Duel:
         if answerer:  # the player answers a bot's Heart — the screen asks
             card = await self.choices.counter(options)
         else:  # the bot answers the player's Heart
-            card = bot.choose_card(deepcopy(current), self._ground(), options, self.rng)
+            card = bot.choose_card(
+                deepcopy(current),
+                self._ground(),
+                options,
+                self.rng,
+                prize_bar=self.settings.prize_threshold + 1,
+            )
         if card is None:
             return
         # Resolved into the queue so it scores, but held on off_wager, not stakes: it wears through the
@@ -710,7 +733,9 @@ class Duel:
 
     def _apply_elemental(self, effect: str | None) -> None:
         """A played Wu's showdown-wide effect: void, reverse or re-colour the arena, seize the
-        ground, hack a construct, steal a Wu, or charge a Shard of Lightning."""
+        ground, hack a construct, steal a Wu, charge a Shard of Lightning, or swap a stat with a
+        Yin/Yang Yo-Yo (either half flips the caster's own affiliation, the combined one flips the
+        opponent's)."""
         if effect and effect.startswith("background:"):
             self.duel.background = effect.split(":", 1)[1]
         elif effect == "cancel":
@@ -725,6 +750,34 @@ class Duel:
             self._steal_wu(effect.split(":", 1)[1] == "player")
         elif effect and effect.startswith("conduct:"):
             self.duel.round.conduct_caster = effect.split(":", 1)[1] == "player"
+        elif effect and effect.startswith("swap:"):
+            _, who, stat = effect.split(":", 2)
+            self._swap_stat_and_flip(who == "player", stat, flip_self=True)
+        elif effect and effect.startswith("chiswap:"):
+            _, who, stat = effect.split(":", 2)
+            self._swap_stat_and_flip(who == "player", stat, flip_self=False)
+
+    def _swap_stat_and_flip(self, is_player: bool, stat: str, *, flip_self: bool) -> None:
+        """Yin/Yang Yo-Yo: names a stat, toggling it into (or out of) `swapped_stats` — read live at
+        `_swapped_bases`, the same reason `conduct_caster` reads live rather than resolving once at
+        play time, so it stays correct whichever order the effects fire in.
+
+        Also flips an affiliation for the rest of the RUN, not just this showdown
+        (`Player.yoyo_flipped`) — Jack alone reads this as Good Jack (`jack.GOOD_JACK_STAT`) rather
+        than a plain Xiaolin<->Heylin flip. ``flip_self`` is which side: True for either half (the
+        caster's own — "it's hard to spot the difference"), False for the combined Ying-Yang Yo-Yo
+        (the OPPONENT's — "you change Jack, not Jack changes himself").
+        """
+        if stat in self.duel.swapped_stats:
+            self.duel.swapped_stats.discard(stat)
+        else:
+            self.duel.swapped_stats.add(stat)
+        caster = self.state.player if is_player else self.state.bot
+        opponent = self.state.bot if is_player else self.state.player
+        target = caster if flip_self else opponent
+        target.yoyo_flipped = not target.yoyo_flipped
+        if is_player and flip_self:
+            self.duel.yoyo_flipped_announce = True
 
     def _conduct_bonus(self, is_player: bool) -> int:
         """Shard of Lightning's swing: +1 to the contested stat per metal Wu on the table this
@@ -752,9 +805,10 @@ class Duel:
         return net
 
     def _player_base(self) -> dict[str, int]:
-        """The player's real current stats, plus Shard of Lightning's swing on the contested stat
-        if they cast it this battle — the player-side mirror of `_bot_base`'s own bumps."""
-        base = dict(jong.battle_stats(self.state.player))
+        """The player's current stats — a Yin/Yang Yo-Yo's cross-swap already resolved — plus Shard
+        of Lightning's swing on the contested stat if they cast it this battle — the player-side
+        mirror of `_bot_base`'s own bumps."""
+        base, _ = self._swapped_bases()
         contested = self.duel.round.stat if self.duel.rounds else self.duel.challenge
         bonus = self._conduct_bonus(True)
         if bonus and contested in base:
@@ -869,14 +923,37 @@ class Duel:
         metal Wu already gets for free — `Character` carries no element of its own, so this is where
         it has to be added, same shape as `BEAST_BOOST`. The swing needs a decided ground; it reads
         as neutral (0) while one is still being picked (see `_setup_brawl`, which calls this to
-        choose it). Otherwise his own printed stats — Chamelon-Bot included, here.
+        choose it). Good Jack (a Yin/Yang Yo-Yo away, see `Player.yoyo_flipped`) is a flat
+        GOOD_JACK_STAT on force/agility PLUS whatever training delta Evil Jack has already banked on
+        them — "stupider by design" only touches intellect, which is Good Jack's own separately
+        trained value (`Player.good_jack_intellect`), never derived from Evil's frozen real one.
+        Otherwise his plain printed stats — Chamelon-Bot included, here.
 
         The one seam every bot-stats read of him passes through, so all three are real, not cosmetic.
         """
         if self.duel.jack_mode == jack.ATTACK_NAME:
             swing = element_score("metal", self.duel.background) if self.duel.background else 0
             return {stat: jack.ATTACK_STAT + swing for stat in jong.battle_stats(self.state.bot)}
+        if self._is_jack(self.state.bot) and self.state.bot.yoyo_flipped:
+            real = self.state.bot.character.stats
+            return {
+                "force": jack.GOOD_JACK_STAT + (real["force"] - jack.JACK_PRINTED_PHYSICAL),
+                "agility": jack.GOOD_JACK_STAT + (real["agility"] - jack.JACK_PRINTED_PHYSICAL),
+                "intellect": self.state.bot.good_jack_intellect,
+            }
         return jong.battle_stats(self.state.bot)
+
+    def _swapped_bases(self) -> tuple[dict[str, int], dict[str, int]]:
+        """Both sides' own current stats — Good Jack's override already resolved — after the
+        Yin/Yang Yo-Yo's cross-swap (`DuelState.swapped_stats`). Computed together: a swap needs the
+        OTHER side's own value, and each side's own override must resolve before the exchange, not
+        after — else swapping into Good Jack's intellect could read Evil Jack's real one instead."""
+        player_base = dict(jong.battle_stats(self.state.player))
+        bot_base = dict(self._jack_base())
+        for stat in self.duel.swapped_stats:
+            if stat in player_base and stat in bot_base:
+                player_base[stat], bot_base[stat] = bot_base[stat], player_base[stat]
+        return player_base, bot_base
 
     def _bot_base(self) -> dict[str, int]:
         """The bot's base stats for the CURRENT battle. Beast Form adds BEAST_BOOST to the stat it
@@ -888,7 +965,7 @@ class Duel:
         On the BASE, so it is element-free by nature: it earns no arena bonus and no elemental counter
         can touch it (they act on the elemental bonus, which a base stat never carries).
         """
-        base = dict(self._jack_base())
+        _, base = self._swapped_bases()
         contested = self.duel.round.stat if self.duel.rounds else self.duel.challenge
         if self.duel.beast_stat is not None and self.duel.beast_stat == contested:
             base[self.duel.beast_stat] += BEAST_BOOST
@@ -1117,6 +1194,9 @@ class Duel:
         """
         if not self._is_jack(self.state.bot):
             return
+        if self.state.bot.yoyo_flipped:  # Good Jack: no bot form this fight, see `_jack_base`
+            self.duel.jack_mode = None
+            return
         mode = bot.choose_jack_mode(
             bool(self.duel.player_priority), self.state.jack_can_swap,
             self.state.jack_attack_momentum, self.rng,
@@ -1141,10 +1221,15 @@ class Duel:
         """AI Jack's theft: the strongest Wu in the opponent's hand, or a random deck card if the
         hand is empty — fires the moment his mode is picked, before either side has chosen a Wu, so
         it can take away the answer the player was about to reach for. A no-op if nothing qualifies,
-        or Jack isn't in AI Jack mode this showdown."""
+        or Jack isn't in AI Jack mode this showdown.
+
+        A counter Wu (`jack.is_counter`) is taken outright, ahead of a stronger ordinary one — Jack
+        is wary of exactly these, whatever else is in reach."""
         if self.duel.jack_mode != jack.AI_JACK_NAME:
             return
-        target = bot.steal_target(self.state.player.hand, self.state.player.deck, self.rng)
+        target = bot.steal_target(
+            self.state.player.hand, self.state.player.deck, self.rng, prefer=jack.is_counter
+        )
         if target is None:
             return
         self.state.player.remove_card(target)

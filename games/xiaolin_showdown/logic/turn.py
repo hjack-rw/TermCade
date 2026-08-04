@@ -25,10 +25,10 @@ from .mechanics.powers import (
     mechanic_of,
     roll_gamble,
 )
-from . import jong
+from . import jack, jong
 from .constants import WEAR_LIMIT
 from .mechanics.cards import hand_over
-from .models import Card, Player
+from .models import Card, Character, Player
 from .settings import XiaolinSettings, deposit_limit, player_actions, plays_keen
 from .state import XiaolinState
 from .training import TRAIN_LENGTH, add_progress, can_train, pick_stat, raise_stat, turn_over
@@ -172,6 +172,14 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     # off that so retuning the form re-prices the bot, and it is never banked as junk. Fielded alone it
     # does nothing, but the bot reads its worth from the boost it can be, not the blank it looks like.
     Mechanic.ANIMATE: ANIMATE_STAT * 3,
+    # Prints ? ? ?; the swap lasts the whole showdown and the affiliation flip it also causes
+    # outlives it entirely (see `duel.Duel._swap_stat_and_flip`) — level with TRANSFER, the other
+    # mechanic the bot has no deliberate policy for yet. Never banked as junk.
+    Mechanic.STAT_SWAP: 5,
+    # Never dealt (see `constants.in_pool`) — only ever reached by combining both halves — but still
+    # needs a price so a bot holding one never banks it as junk. Same swap as STAT_SWAP, flips the
+    # OPPONENT instead of the caster, and offers a temple self-correct on top: priced a step above.
+    Mechanic.CHI_SWAP: 6,
 }
 
 # (Witchcraft is a CHARACTER power — no card carries it, so its table price is moot; it sits in
@@ -309,6 +317,52 @@ def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
     if plays_keen(difficulty):
         return max(candidates, key=lambda c: c.points)
     return min(candidates, key=lambda c: (duel_value(c), -c.points))
+
+
+# Hannibal's own five, measured (see docs/design/BOSSES.md): alone each is weak (Star Hanabi's
+# boost-negate: 6.7%), but the full set held every showdown takes him 0.7% -> 49%. Every mechanic
+# maps to exactly one of his five named counters — Star Hanabi (NULLIFY_BOOST), Celestial Dial
+# Locket (REVERSE_ELEMENT), Kuzusu Atom (CLEANSE), Eye of Dashi (SET_ELEMENT), Monsoon Sandals
+# (SET_ARENA) — verified against the seed, not guessed.
+_HANNIBAL_COUNTERS = frozenset(
+    {
+        Mechanic.NULLIFY_BOOST,
+        Mechanic.REVERSE_ELEMENT,
+        Mechanic.CLEANSE,
+        Mechanic.SET_ELEMENT,
+        Mechanic.SET_ARENA,
+    }
+)
+
+
+def counters_against(character: Character) -> frozenset[Mechanic]:
+    """The keyed counter mechanics that specifically answer ``character`` — empty for a boss with
+    none built yet (Wuya). Every one of them is an ordinary pool Wu any duelist can hold and
+    play against anyone; a boss is simply the one meant to be wary of its own answers."""
+    if mechanic_of(character.power) is Mechanic.BOT:
+        return jack.COUNTER_MECHANICS
+    if character.name == "Hannibal_Roy_Bean":
+        return _HANNIBAL_COUNTERS
+    if character.name == "Chase_Young":
+        return frozenset({Mechanic.NULLIFY_STATS})
+    return frozenset()
+
+
+def _priority_deposit(bot: Player) -> Card | None:
+    """Any boss with a keyed counter set (`counters_against`) banks one the instant they hold it —
+    stolen, or simply drawn, since these are ordinary pool Wu picked up like anyone else's — ahead
+    of `pick_deposit`'s own points-first rule. Getting it out of the player's reach matters more
+    than its bank value; the same wear-free exception `pick_deposit` grants everything else applies
+    here too. ``None`` when there is none held (or none to be wary of), so the caller falls through
+    to the normal policy."""
+    wary_of = counters_against(bot.character)
+    if not wary_of:
+        return None
+    counters = [card for card in bot.hand if mechanic_of(card.power) in wary_of]
+    if not counters:
+        return None
+    fresh = [card for card in counters if card.uses < WEAR_LIMIT - 1]
+    return max(fresh or counters, key=lambda c: c.points)
 
 
 def bank_value(card: Card, rng: Rng) -> int:
@@ -462,7 +516,7 @@ def _bank_surplus(
     if len(bot.hand) > DUEL_FLOOR and state.bot_deposits_taken < deposit_limit(
         settings.actions_per_turn
     ):
-        banked = pick_deposit(bot.hand, difficulty)
+        banked = _priority_deposit(bot) or pick_deposit(bot.hand, difficulty)
         if banked is not None:
             points = bank_value(banked, rng)
             bot.points = max(0, bot.points + points)  # a bad gamble cannot go below zero
@@ -516,12 +570,38 @@ def _construct_jong(
     return BotMove(POWER, f"{name} assembled Mala Mala Jong — race it to the end.")
 
 
+def _self_correct_good_jack(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """Jack alone: the moment the combined Ying-Yang Yo-Yo is in hand and he's worn as Good Jack,
+    flip back to himself. Good Jack forfeits every one of his bot forms while worn (`Duel._boost`'s
+    gate on `Player.yoyo_flipped`) — his whole archetype — so there is no strategic reason to stay a
+    moment longer than the Yo-Yo makes him; unconditional, not a margin call (v1, swept later like
+    every other boss knob if a nuance ever turns up worth keeping him worn for)."""
+    from .actions import can_self_correct_yoyo, self_correct_yoyo
+
+    bot = state.bot
+    if mechanic_of(bot.character.power) is not Mechanic.BOT or not bot.yoyo_flipped:
+        return None
+    if not can_self_correct_yoyo(state, settings.actions_per_turn, is_player=False):
+        return None
+    self_correct_yoyo(state, is_player=False)
+    return BotMove(POWER, f"{name} corrected {jack.GOOD_JACK_NAME} back to himself.")
+
+
 # The boss temple order: bank the surplus AHEAD of any power. A boss wins showdowns on its stats, so
 # the temple is a race to the point target — keep a hand big enough to field a full wager, snatch
 # cheap Wu off the pile, and BANK. A power is not taken here; it falls through to the generic path,
 # which fires one only once the surplus is gone. That is the whole fix: banking outranks a power for
 # a boss, so a reusable witchcraft power stops being an every-turn substitute for reaching the target.
-_BOSS_ORDER = (_construct_jong, _draw_thin_hand, _fly_early_bird, _recall_witchcraft, _bank_surplus)
+_BOSS_ORDER = (
+    _construct_jong,
+    _self_correct_good_jack,
+    _draw_thin_hand,
+    _fly_early_bird,
+    _recall_witchcraft,
+    _bank_surplus,
+)
 
 # The generic order: a power first (when one beats banking), then the pile raid, the recall, the
 # training cash-in, a thin-hand draw, and banking last.

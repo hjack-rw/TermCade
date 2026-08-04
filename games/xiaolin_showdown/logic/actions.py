@@ -10,7 +10,7 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 
 from . import jong
-from .constants import WEAR_LIMIT
+from .constants import WEAR_LIMIT, YANG_YOYO_ID, YIN_YANG_YOYO_ID, YING_YOYO_ID
 from .mechanics.scoring import initiative
 from .mechanics.powers import Mechanic, mechanic_of, trigger_of
 from .models import Card, Player
@@ -420,3 +420,43 @@ def construct_jong(state: XiaolinState, *, is_player: bool = True) -> list[Card]
     purged = jong.construct(state.duelist(is_player))
     state.spend_action(is_player)
     return purged
+
+
+def can_combine_yoyo(state: XiaolinState, actions_per_turn: int, *, is_player: bool = True) -> bool:
+    """May this duelist combine their Yin/Yang Yo-Yo halves right now — both in hand, and an action
+    to spend."""
+    if state.actions_spent(is_player) >= actions_per_turn:
+        return False
+    ids = {card.id for card in state.duelist(is_player).hand}
+    return YING_YOYO_ID in ids and YANG_YOYO_ID in ids
+
+
+def combine_yoyo(state: XiaolinState, combined: Card, *, is_player: bool = True) -> None:
+    """Combine the two Yo-Yo halves into ``combined`` — a fresh Ying-Yang Yo-Yo the caller already
+    holds (catalog access is the screen's job, not this pure module's) — spending the turn's action.
+    Assumes :func:`can_combine_yoyo`. Not reversible: the two halves are simply gone, the same as any
+    other Wu spent on a power."""
+    me = state.duelist(is_player)
+    me.remove_card(next(c for c in me.hand if c.id == YING_YOYO_ID))
+    me.remove_card(next(c for c in me.hand if c.id == YANG_YOYO_ID))
+    me.hand.append(combined)
+    state.spend_action(is_player)
+
+
+def can_self_correct_yoyo(
+    state: XiaolinState, actions_per_turn: int, *, is_player: bool = True
+) -> bool:
+    """May this duelist spend the combined Ying-Yang Yo-Yo to correct their own affiliation right
+    now — held in hand, and an action to spend."""
+    if state.actions_spent(is_player) >= actions_per_turn:
+        return False
+    return any(card.id == YIN_YANG_YOYO_ID for card in state.duelist(is_player).hand)
+
+
+def self_correct_yoyo(state: XiaolinState, *, is_player: bool = True) -> None:
+    """Spend the combined Ying-Yang Yo-Yo to flip the caster's OWN affiliation back — exiled for
+    good afterward, like a Treasurebox's wish: there is no Yo-Yo left to ever flip it again."""
+    me = state.duelist(is_player)
+    me.remove_card(next(card for card in me.hand if card.id == YIN_YANG_YOYO_ID))
+    me.yoyo_flipped = not me.yoyo_flipped
+    state.spend_action(is_player)

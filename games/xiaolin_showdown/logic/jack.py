@@ -7,6 +7,9 @@ from the arena or the duelist facing him.
 
 from __future__ import annotations
 
+from .mechanics.powers import mechanic_of
+from .models import Card, Mechanic
+
 # Jack-Bot's curse flavour (see logic/bot.choose_jack_bot): singular, joke-shaped constructs, unlike
 # the Attack! pool's swarms and heavy-hitters — the owner's own split, not a balance one.
 JACK_BOT_NAMES = ("Jack-Bot", "Tickle-Bot", "Yes-Bot", "Chef-Bot", "Soda-Bot")
@@ -30,3 +33,27 @@ ATTACK_BOT_NAMES = (
     "Blade-Bots", "Gun-Bots", "Hound-Bots", "Giant Jack-Bot", "Wuya-Bot", "Chase-Bot", "Hannibal-Bot",
     "Winged-Bots", "Regenerating Jack-Bots", "Cheerleader-Bots", "Junk-Bots", "U-Bots", "Guard-Bots",
 )
+
+# A Yin/Yang Yo-Yo away (see `Player.yoyo_flipped`, `duel.Duel._jack_base`), not a bot swap: he still
+# fights as himself. Force/agility are GOOD_JACK_STAT plus whatever training delta Evil Jack has
+# already banked on them (fully trained, that reads 5/6) — JACK_PRINTED_PHYSICAL (3) is Evil Jack's
+# own printed force/agility, the baseline that delta is measured against. Intellect is his own,
+# separately trained value (`Player.good_jack_intellect`) — "stupider by design," never derived from
+# Evil's frozen real 7. Can't deploy any bot form while worn (see `duel.Duel._choose_jack_mode`).
+GOOD_JACK_NAME = "Good Jack"
+GOOD_JACK_STAT = 4
+JACK_PRINTED_PHYSICAL = 3
+
+# Denshi Bunny, Sands of Time, Shard of Lightning, either Yo-Yo half, and the combined Yo-Yo — built
+# specifically because they answer him well (see docs/design/BOSSES.md's "Counters" section), even
+# though most of them are ordinary pool Wu any duelist can hold and play against anyone. Jack is meant
+# to be wary of them (see `bot.steal_target`'s ``prefer`` and `turn._priority_deposit`) — the same
+# wariness every boss with a keyed set gets, via `turn.counters_against`.
+COUNTER_MECHANICS = frozenset(
+    {Mechanic.HACK, Mechanic.STEAL, Mechanic.CONDUCT, Mechanic.STAT_SWAP, Mechanic.CHI_SWAP}
+)
+
+
+def is_counter(card: Card) -> bool:
+    """Whether ``card`` is one of Jack's keyed counters."""
+    return mechanic_of(card.power) in COUNTER_MECHANICS

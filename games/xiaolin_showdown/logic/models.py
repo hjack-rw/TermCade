@@ -67,6 +67,8 @@ class Mechanic(StrEnum):
     HACK = "hack"  # Denshi Bunny — vs a robot construct (Jack in any bot identity swap, never Mala Mala Jong): a stand-in (AI Jack, Attack!) auto-loses outright; a modifier (Chamelon-Bot's boost, Jack-Bot's curse) is nullified instead
     STEAL = "steal"  # Sands of Time — takes the opponent's strongest hand Wu, or a random deck card if the hand is empty; the same policy AI Jack's own steal already uses
     CONDUCT = "conduct"  # Shard of Lightning — +1 to the contested stat per metal Wu on the table this battle, either side, boosts included, plus +1 more if the arena itself is metal. Uncapped.
+    STAT_SWAP = "stat_swap"  # Ying Yo-Yo / Yang Yo-Yo — names a stat, swapped with the opponent's Character for the rest of the showdown; also flips the caster's shown affiliation for the rest of the run (Good Jack, for Jack specifically)
+    CHI_SWAP = "chi_swap"  # Ying-Yang Yo-Yo (combined) — same stat swap as the halves, but flips the OPPONENT's affiliation instead of the caster's own; a separate temple power lets the caster correct their own, exiling the card for good
 
 
 @dataclass
@@ -164,6 +166,15 @@ class Player:
     # duelist underneath — so a revert needs nothing but to clear these two.
     jong_form: bool = False
     jong_heart: Card | None = None
+    # The Yin/Yang Yo-Yo (logic/jack.py, Mechanic.STAT_SWAP): whether this duelist's shown
+    # affiliation currently reads flipped — Xiaolin<->Heylin, cosmetic, persists across showdowns
+    # until a Yo-Yo flips it back. Jack Spicer alone reads this as Good Jack instead (see
+    # `jack.GOOD_JACK_STAT`), not a plain flip.
+    yoyo_flipped: bool = False
+    # Good Jack's own intellect — deliberately dumber than Evil Jack's real one, trained
+    # independently while the form is worn (see logic/training.py); a gain here also raises the
+    # real `character.stats["intellect"]` permanently. Meaningless off of Jack.
+    good_jack_intellect: int = 4
 
     @property
     def initiative(self) -> list[int]:
