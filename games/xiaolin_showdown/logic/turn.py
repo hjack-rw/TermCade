@@ -570,38 +570,12 @@ def _construct_jong(
     return BotMove(POWER, f"{name} assembled Mala Mala Jong — race it to the end.")
 
 
-def _self_correct_good_jack(
-    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
-) -> BotMove | None:
-    """Jack alone: the moment the combined Ying-Yang Yo-Yo is in hand and he's worn as Good Jack,
-    flip back to himself. Good Jack forfeits every one of his bot forms while worn (`Duel._boost`'s
-    gate on `Player.yoyo_flipped`) — his whole archetype — so there is no strategic reason to stay a
-    moment longer than the Yo-Yo makes him; unconditional, not a margin call (v1, swept later like
-    every other boss knob if a nuance ever turns up worth keeping him worn for)."""
-    from .actions import can_self_correct_yoyo, self_correct_yoyo
-
-    bot = state.bot
-    if mechanic_of(bot.character.power) is not Mechanic.BOT or not bot.yoyo_flipped:
-        return None
-    if not can_self_correct_yoyo(state, settings.actions_per_turn, is_player=False):
-        return None
-    self_correct_yoyo(state, is_player=False)
-    return BotMove(POWER, f"{name} corrected {jack.GOOD_JACK_NAME} back to himself.")
-
-
 # The boss temple order: bank the surplus AHEAD of any power. A boss wins showdowns on its stats, so
 # the temple is a race to the point target — keep a hand big enough to field a full wager, snatch
 # cheap Wu off the pile, and BANK. A power is not taken here; it falls through to the generic path,
 # which fires one only once the surplus is gone. That is the whole fix: banking outranks a power for
 # a boss, so a reusable witchcraft power stops being an every-turn substitute for reaching the target.
-_BOSS_ORDER = (
-    _construct_jong,
-    _self_correct_good_jack,
-    _draw_thin_hand,
-    _fly_early_bird,
-    _recall_witchcraft,
-    _bank_surplus,
-)
+_BOSS_ORDER = (_construct_jong, _draw_thin_hand, _fly_early_bird, _recall_witchcraft, _bank_surplus)
 
 # The generic order: a power first (when one beats banking), then the pile raid, the recall, the
 # training cash-in, a thin-hand draw, and banking last.
