@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from xiaolin_showdown.logic.battle import Round
+from xiaolin_showdown.logic.flow.battle import Round
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute, claim_route
-from xiaolin_showdown.logic.models import Card
-from xiaolin_showdown.logic.settings import XiaolinSettings
+from xiaolin_showdown.logic.schema.models import Card
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from factories import run_showdown, wu
 
 THRESHOLD = XiaolinSettings().prize_threshold  # the shipped bar; a decisive blow must reach one past it
@@ -202,8 +202,8 @@ async def test_a_prize_nobody_claims_goes_to_the_lost_pile(catalog, settings):
     """
     from termcade.core.rng import Rng
 
-    from xiaolin_showdown.logic.duel import Duel, DuelChoices
-    from xiaolin_showdown.logic.setup import new_game
+    from xiaolin_showdown.logic.flow.duel import Duel, DuelChoices
+    from xiaolin_showdown.logic.flow.setup import new_game
 
     async def first(options):
         return options[0]
@@ -235,8 +235,8 @@ async def test_a_prize_that_is_claimed_never_reaches_the_lost_pile(catalog, sett
     """Guards the test above: winning the Wu must not also file it under lost."""
     from termcade.core.rng import Rng
 
-    from xiaolin_showdown.logic.duel import Duel, DuelChoices
-    from xiaolin_showdown.logic.setup import new_game
+    from xiaolin_showdown.logic.flow.duel import Duel, DuelChoices
+    from xiaolin_showdown.logic.flow.setup import new_game
 
     async def first(options):
         return options[0]

@@ -6,10 +6,10 @@ start climbing toward the next raise. Nothing ever trains past the stat cap.
 
 from __future__ import annotations
 
-from xiaolin_showdown.logic.actions import train, train_blocked
-from xiaolin_showdown.logic.models import Mechanic, Player, Power
-from xiaolin_showdown.logic.state import XiaolinState
-from xiaolin_showdown.logic.training import (
+from xiaolin_showdown.logic.flow.actions import train, train_blocked
+from xiaolin_showdown.logic.schema.models import Mechanic, Player, Power
+from xiaolin_showdown.logic.schema.state import XiaolinState
+from xiaolin_showdown.logic.flow.training import (
     JACK_FORCE_CAP,
     JACK_LOSS_FILL,
     STAT_CAP,
@@ -194,8 +194,8 @@ def test_a_wu_never_unlocks_training():
 
 def test_the_bot_spends_its_temple_turn_on_a_nearly_full_bar():
     from termcade.core.rng import Rng
-    from xiaolin_showdown.logic.settings import XiaolinSettings
-    from xiaolin_showdown.logic.turn import TRAIN, bot_turn
+    from xiaolin_showdown.logic.config.settings import XiaolinSettings
+    from xiaolin_showdown.logic.flow.turn import TRAIN, bot_turn
 
     state = _state(duelist(), duelist(stats={"force": 1, "agility": 3, "intellect": 3}))
     state.bot.hand = [wu(1), wu(1)]
@@ -208,8 +208,8 @@ def test_the_bot_spends_its_temple_turn_on_a_nearly_full_bar():
 
 def test_the_turnover_resets_a_cashed_bar():
     from termcade.core.rng import Rng
-    from xiaolin_showdown.logic.settings import XiaolinSettings
-    from xiaolin_showdown.logic.turn import refill_hands
+    from xiaolin_showdown.logic.config.settings import XiaolinSettings
+    from xiaolin_showdown.logic.flow.turn import refill_hands
 
     state = _state(duelist(stats={"force": 2}, hand=[wu(1), wu(1)]), duelist(hand=[wu(1), wu(1)]))
     state.player.training = TRAIN_LENGTH
@@ -219,7 +219,7 @@ def test_the_turnover_resets_a_cashed_bar():
 
 
 def test_a_loss_to_a_boss_teaches_double():
-    from xiaolin_showdown.logic.training import BOSS_LOSS_FILL
+    from xiaolin_showdown.logic.flow.training import BOSS_LOSS_FILL
 
     state = _state(duelist(stats={"force": 2}), duelist(tier="boss"))
     record_showdown(state, player_won=False)
@@ -227,7 +227,7 @@ def test_a_loss_to_a_boss_teaches_double():
 
 
 def test_a_boss_run_gives_the_player_three_actions():
-    from xiaolin_showdown.logic.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings, player_actions
+    from xiaolin_showdown.logic.config.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings, player_actions
 
     boss_run = _state(duelist(), duelist(tier="boss"))
     plain_run = _state(duelist(), duelist())
@@ -238,8 +238,8 @@ def test_a_boss_run_gives_the_player_three_actions():
 def test_the_boss_itself_gets_no_extra_actions():
     # The budget is the PLAYER's; the opponent loop reads the settings' own count.
     from termcade.core.rng import Rng
-    from xiaolin_showdown.logic.settings import XiaolinSettings
-    from xiaolin_showdown.logic.turn import bot_turn
+    from xiaolin_showdown.logic.config.settings import XiaolinSettings
+    from xiaolin_showdown.logic.flow.turn import bot_turn
 
     state = _state(duelist(), duelist(tier="boss", stats={"force": 5}, hand=[wu(1)], deck=[wu(1)]))
     bot_turn(state, XiaolinSettings(actions_per_turn=1), rng=Rng(0))

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from xiaolin_showdown.logic.battle import Round, Side
-from xiaolin_showdown.logic.constants import FIRST_DECK_CARD
+from xiaolin_showdown.logic.flow.battle import Round, Side
+from xiaolin_showdown.logic.schema.constants import FIRST_DECK_CARD
 from xiaolin_showdown.logic.mechanics.powers import (
     MORPH_ASIDE,
     MORPH_CONTESTED,
@@ -23,7 +23,7 @@ from xiaolin_showdown.logic.mechanics.powers import (
     trigger_of,
 )
 from xiaolin_showdown.logic.mechanics.resolve import as_boost, resolve_played_power
-from xiaolin_showdown.logic.models import Power
+from xiaolin_showdown.logic.schema.models import Power
 
 
 def test_every_power_in_the_card_db_has_a_mechanic(catalog):
@@ -91,7 +91,7 @@ def test_every_temple_power_has_a_handler_and_a_report():
     """A ``use`` Wu is spent at the temple to DO something — that something is a ``_FIRE`` handler,
     and what it tells the player is its ``REPORTS`` row. The one exception is the Gamble, which is
     not *acted*: it is banked for a random score it never announces, so it has neither."""
-    from xiaolin_showdown.logic.power_effects import REPORTS, _FIRE
+    from xiaolin_showdown.logic.flow.power_effects import REPORTS, _FIRE
 
     acted = _triggering("use") - {Mechanic.GAMBLE}
     assert set(_FIRE) == acted, "a temple power has no handler (or a handler outlived its mechanic)"
@@ -102,7 +102,7 @@ def test_every_mechanic_a_player_can_meet_has_a_blurb():
     """``EFFECTS`` is the one-line the card face shows. Everything printed needs one except the four
     with nothing to say: FILLER does nothing, INITIATIVE and INNATE are read straight off the stats,
     and the GAMBLE deliberately shows ``?`` rather than name its own odds."""
-    from xiaolin_showdown.screens.format import EFFECTS
+    from xiaolin_showdown.screens.display.format import EFFECTS
 
     silent = {Mechanic.FILLER, Mechanic.INITIATIVE, Mechanic.INNATE, Mechanic.GAMBLE}
     # TRAIN_BOOST's line is not baked here: its "+N" is the card's own ``train_step``, so `effect_line`
@@ -293,7 +293,7 @@ def test_a_deposit_trigger_never_says_deposit(catalog):
 
     So "On Deposit" names the one action that guarantees the power never fires. It fires on Use.
     """
-    from xiaolin_showdown.screens.format import trigger_label
+    from xiaolin_showdown.screens.display.format import trigger_label
 
     labels = {trigger_label(p) for p in catalog.powers if trigger_of(p) == "use"}
 
@@ -303,7 +303,7 @@ def test_a_deposit_trigger_never_says_deposit(catalog):
 
 def test_a_hand_trigger_says_it_is_passive(catalog):
     """`hand` powers do not fire on anything — they apply for as long as the Wu is held."""
-    from xiaolin_showdown.screens.format import trigger_label
+    from xiaolin_showdown.screens.display.format import trigger_label
 
     assert {trigger_label(p) for p in catalog.powers if trigger_of(p) == "hand"} == {"While Held"}
 
@@ -320,7 +320,7 @@ def test_every_mechanic_either_explains_itself_or_is_deliberately_silent(catalog
     Four say nothing on purpose: deck filler has no power, a plain Wu's stats are the whole of it,
     an initiative Wu already prints its bonus, and the joke Wu tells you nothing by design.
     """
-    from xiaolin_showdown.screens.format import effect_line
+    from xiaolin_showdown.screens.display.format import effect_line
 
     for power in catalog.powers:
         mechanic = mechanic_of(power)
@@ -332,7 +332,7 @@ def test_every_mechanic_either_explains_itself_or_is_deliberately_silent(catalog
 
 def test_a_hidden_power_still_states_its_rule(catalog):
     """A character's dragon keeps its *name* to itself. The rule it plays by is not a secret."""
-    from xiaolin_showdown.screens.format import effect_line
+    from xiaolin_showdown.screens.display.format import effect_line
 
     born_holding = [
         c
@@ -352,7 +352,7 @@ def test_a_wudai_weapon_can_be_found_rather_than_inherited(catalog):
     The negative power id marks the Wu a character was born holding; a wudai weapon printed into the
     draw pile is the same mechanic with none of the birthright — it can be staked, won and lost.
     """
-    from xiaolin_showdown.screens.format import effect_line
+    from xiaolin_showdown.screens.display.format import effect_line
 
     found = [
         c
@@ -374,7 +374,7 @@ def test_a_wudai_reads_as_possession_on_its_owner_and_as_the_weapons_rule_on_the
     from copy import deepcopy
 
     from xiaolin_showdown.logic.mechanics.cards import held_as_wudai
-    from xiaolin_showdown.screens.format import effect_line, points_label, trigger_label
+    from xiaolin_showdown.screens.display.format import effect_line, points_label, trigger_label
 
     omi = catalog.character(1)  # a dragon character
     hannibal = catalog.character(11)  # holds Moby Morpher as his wudai

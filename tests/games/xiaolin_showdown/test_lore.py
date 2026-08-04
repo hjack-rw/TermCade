@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from xiaolin_showdown.logic.lore import (
+from xiaolin_showdown.logic.content.lore import (
     PAGE_COLS,
     PAGE_ROWS,
     _sections,

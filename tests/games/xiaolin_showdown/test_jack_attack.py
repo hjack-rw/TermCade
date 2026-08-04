@@ -6,13 +6,13 @@ from termcade.core.rng import Rng
 
 from factories import auto_choices, ground, wu
 
-from xiaolin_showdown.logic import jack
-from xiaolin_showdown.logic.battle import Round, score_brawl
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.constants import BRAWL
-from xiaolin_showdown.logic.duel import Duel
+from xiaolin_showdown.logic.characters import jack
+from xiaolin_showdown.logic.flow.battle import Round, score_brawl
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.schema.constants import BRAWL
+from xiaolin_showdown.logic.flow.duel import Duel
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute
-from xiaolin_showdown.logic.setup import new_game
+from xiaolin_showdown.logic.flow.setup import new_game
 
 
 def _jack_duel(rng_seed: int = 1) -> Duel:

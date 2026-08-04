@@ -2,8 +2,8 @@
 
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 
-from ..constants import OPPOSITES
-from ..models import Card, Mechanic, Player
+from ..schema.constants import OPPOSITES
+from ..schema.models import Card, Mechanic, Player
 from .cards import is_one_of
 
 

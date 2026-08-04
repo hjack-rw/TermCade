@@ -8,12 +8,12 @@ from termcade.core.rng import Rng
 
 from factories import auto_choices, wu
 
-from xiaolin_showdown.logic import bot, jack
-from xiaolin_showdown.logic.battle import Round, Side
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel
+from xiaolin_showdown.logic.characters import jack
+from xiaolin_showdown.logic.flow.battle import Round, Side
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.flow.duel import Duel
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute
-from xiaolin_showdown.logic.setup import new_game
+from xiaolin_showdown.logic.flow.setup import new_game
 
 
 def _jack_duel(rng_seed: int = 1) -> Duel:
@@ -24,9 +24,9 @@ def _jack_duel(rng_seed: int = 1) -> Duel:
 
 
 def test_choose_to_flee_stops_at_the_cap():
-    assert bot.choose_to_flee(0) is True
-    assert bot.choose_to_flee(bot.JACK_FLEE_CAP - 1) is True
-    assert bot.choose_to_flee(bot.JACK_FLEE_CAP) is False
+    assert jack.choose_to_flee(0) is True
+    assert jack.choose_to_flee(jack.JACK_FLEE_CAP - 1) is True
+    assert jack.choose_to_flee(jack.JACK_FLEE_CAP) is False
 
 
 async def test_resolvement_flees_when_jack_loses_fighting_as_himself():
@@ -42,7 +42,7 @@ async def test_resolvement_flees_when_jack_loses_fighting_as_himself():
 async def test_resolvement_never_flees_past_the_cap():
     duel = _jack_duel()
     duel.duel.jack_mode = None
-    duel.state.jack_flees_used = bot.JACK_FLEE_CAP
+    duel.state.jack_flees_used = jack.JACK_FLEE_CAP
     duel.duel.rounds = [Round(stat="", score=1)]
     await duel._resolvement()
     assert duel.duel.jack_fled is False

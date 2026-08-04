@@ -57,7 +57,7 @@ def _drawn() -> set[int]:
     empty set — which is exactly what this test used to do while reporting green. They are imported
     from the game instead, which is the only way to read what it actually draws.
     """
-    from xiaolin_showdown.screens.format import ICONS
+    from xiaolin_showdown.screens.display.format import ICONS
 
     literal = {
         ord(ch)
@@ -81,7 +81,7 @@ def test_the_bundled_fonts_cover_every_character_the_games_draw() -> None:
 def test_the_cover_check_actually_sees_the_card_icons() -> None:
     """Guards the test above against the bug it used to have — a source scan finds no icon at all,
     so the check passed on an empty set while every icon went unverified."""
-    from xiaolin_showdown.screens.format import ICONS
+    from xiaolin_showdown.screens.display.format import ICONS
 
     assert ord("\U0001f580") in _drawn(), "the icons are escaped in source and must be imported"
     assert len([icon for icon in ICONS.values() if icon]) >= 8

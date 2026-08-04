@@ -12,10 +12,10 @@ import pytest
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.constants import TOURNAMENT, TOURNAMENT_BATTLES
-from xiaolin_showdown.logic.duel import END, Duel, DuelChoices
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.logic.setup import new_game
+from xiaolin_showdown.logic.schema.constants import TOURNAMENT, TOURNAMENT_BATTLES
+from xiaolin_showdown.logic.flow.duel import END, Duel, DuelChoices
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.setup import new_game
 from factories import run_showdown
 
 SETTINGS = XiaolinSettings()

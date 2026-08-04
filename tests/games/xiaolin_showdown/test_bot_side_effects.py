@@ -20,9 +20,9 @@ from termcade.core.rng import Rng
 
 from factories import ground, wu
 
-from xiaolin_showdown.logic import bot as bot_module
-from xiaolin_showdown.logic.battle import Round
-from xiaolin_showdown.logic.bot import choose_card
+from xiaolin_showdown.logic.flow import bot as bot_module
+from xiaolin_showdown.logic.flow.battle import Round
+from xiaolin_showdown.logic.flow.bot import choose_card
 from xiaolin_showdown.logic.mechanics.powers import Mechanic
 
 FULL = {"force": 0, "agility": 0, "intellect": 0}

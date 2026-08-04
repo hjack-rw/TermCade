@@ -12,7 +12,7 @@ import pytest
 from termcade.ui.app import BANNER, EngineApp
 
 from xiaolin_showdown.game import build_game
-from xiaolin_showdown.screens._logo import TITLE_ART, TITLE_ART_STACKED
+from xiaolin_showdown.screens.display._logo import TITLE_ART, TITLE_ART_STACKED
 
 pytestmark = pytest.mark.slow
 

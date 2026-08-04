@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.state import XiaolinState
-from xiaolin_showdown.logic.wear import WEAR_LIMIT, hand_over, record_showdown
+from xiaolin_showdown.logic.schema.state import XiaolinState
+from xiaolin_showdown.logic.flow.wear import WEAR_LIMIT, hand_over, record_showdown
 
 from factories import duelist, wu
 

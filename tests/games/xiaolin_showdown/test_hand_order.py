@@ -1,4 +1,4 @@
-"""The temple hand is shown slot-ordered (screens/format._by_slot).
+"""The temple hand is shown slot-ordered (screens/display/temple_render._by_slot).
 
 Two rules ride on that order: an assembling Mala Mala Jong set reads down the body head-to-boots (a
 missing part is a visible gap), and within the wudai slot the elemental dragon weapons always outrank
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from factories import wu
 
-from xiaolin_showdown.screens.format import _by_slot
+from xiaolin_showdown.screens.display.temple_render import _by_slot
 
 
 def test_the_hand_shows_wudai_first_then_the_body_head_to_boots():

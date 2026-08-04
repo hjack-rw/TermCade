@@ -11,11 +11,11 @@ import pytest
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.actions import coming_wu, usable_powers, use_power
-from xiaolin_showdown.logic.duel import Duel, DuelChoices
+from xiaolin_showdown.logic.flow.actions import coming_wu, usable_powers, use_power
+from xiaolin_showdown.logic.flow.duel import Duel, DuelChoices
 from xiaolin_showdown.logic.mechanics.powers import SCOPE_DEPTH
 from xiaolin_showdown.logic.mechanics.cards import is_one_of
-from xiaolin_showdown.logic.settings import XiaolinSettings
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
 FALCONS_EYE = 25
 EAGLE_SCOPE = 26

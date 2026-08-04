@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.bot import BEAST_MARGIN, choose_beast_form
-from xiaolin_showdown.logic.duel import BEAST_BOOST, Duel, DuelChoices
-from xiaolin_showdown.logic.models import Character, Mechanic, Power
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.logic.state import XiaolinState
+from xiaolin_showdown.logic.characters.chase import BEAST_MARGIN, choose_beast_form
+from xiaolin_showdown.logic.flow.duel import BEAST_BOOST, Duel, DuelChoices
+from xiaolin_showdown.logic.schema.models import Character, Mechanic, Power
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.schema.state import XiaolinState
 
 from factories import duelist, wu
 
@@ -67,7 +67,7 @@ def _choices() -> DuelChoices:
 
 
 async def _run(duel: Duel) -> None:
-    from xiaolin_showdown.logic.duel import END
+    from xiaolin_showdown.logic.flow.duel import END
 
     for _ in range(12):
         if await duel.advance() == END:
@@ -141,9 +141,9 @@ async def test_a_plain_opponent_never_takes_beast_form():
 
 def test_beast_form_boosts_only_the_battle_that_contests_its_stat():
     # A tournament leg that contests a DIFFERENT stat sees the plain 7/7/7 — the +2 is once a fight.
-    from xiaolin_showdown.logic.battle import Round
-    from xiaolin_showdown.screens.duel_board import _beast_for
-    from xiaolin_showdown.logic.duel import DuelState
+    from xiaolin_showdown.logic.flow.battle import Round
+    from xiaolin_showdown.screens.display.duel_board import _beast_for
+    from xiaolin_showdown.logic.flow.duel import DuelState
 
     duel = DuelState()
     duel.beast_stat = "force"
@@ -152,7 +152,7 @@ def test_beast_form_boosts_only_the_battle_that_contests_its_stat():
 
 
 def test_the_beast_boost_rides_the_offensive_line_joined_to_its_wu():
-    from xiaolin_showdown.screens.duel_board import _beast_offensive
+    from xiaolin_showdown.screens.display.duel_board import _beast_offensive
 
     line = _beast_offensive("agility", [wu(2, 2, 1, name="Dead", element="metal")], "agility")
     plain = line.renderables[0].plain
@@ -161,7 +161,7 @@ def test_the_beast_boost_rides_the_offensive_line_joined_to_its_wu():
 
 
 def test_neither_dampening_nor_subjugation_nullifies_beast_form():
-    from xiaolin_showdown.logic.battle import Side, end_stat
+    from xiaolin_showdown.logic.flow.battle import Side, end_stat
 
     # Chase's base carries the +2 (force 7+2=9). A Star Hanabi (boost_negated) drops boost cards and
     # an Emperor Scorpion (offence_negated) drops played Wu — both act on the QUEUE, so the base-borne
@@ -185,7 +185,7 @@ def test_the_boost_is_element_free():
     That is what puts it out of reach of every elemental counter: they act on the elemental bonus,
     and the beast never earns one. (A player CURSE still bites, which is the test below.)
     """
-    from xiaolin_showdown.logic.battle import Side, end_stat
+    from xiaolin_showdown.logic.flow.battle import Side, end_stat
 
     beast_base = {"force": 7 + BEAST_BOOST, "agility": 7, "intellect": 7}
     on_metal = end_stat("force", 1, Side(), beast_base, "metal")
@@ -196,7 +196,7 @@ def test_the_boost_is_element_free():
 
 
 def test_a_player_curse_still_bites_beast_form():
-    from xiaolin_showdown.logic.battle import Round
+    from xiaolin_showdown.logic.flow.battle import Round
     from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 
     # Player fields a -3 force curse against Chase; in Beast Form his own Wu die but the curse does

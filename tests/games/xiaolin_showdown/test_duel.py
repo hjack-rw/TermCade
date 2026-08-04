@@ -13,17 +13,17 @@ import pytest
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.battle import Round
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.flow.battle import Round
 from xiaolin_showdown.logic.mechanics.cards import excluding
 from xiaolin_showdown.logic.mechanics.powers import MORPH_ASIDE, MORPH_CONTESTED
-from xiaolin_showdown.logic.duel import Duel, DuelChoices
-from xiaolin_showdown.logic.constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
-from xiaolin_showdown.logic.models import Card, Mechanic, Power
+from xiaolin_showdown.logic.flow.duel import Duel, DuelChoices
+from xiaolin_showdown.logic.schema.constants import ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
+from xiaolin_showdown.logic.schema.models import Card, Mechanic, Power
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.logic.turn import refill_hands
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.logic.flow.turn import refill_hands
 from factories import (
     STATS,
     auto_choices as _auto_choices,
@@ -650,7 +650,7 @@ async def test_the_opponent_chooses_against_the_board_before_you_moved():
     cat = load_catalog()
     boards: list[int] = []
 
-    import xiaolin_showdown.logic.duel as duel_module
+    import xiaolin_showdown.logic.flow.duel as duel_module
 
     real = duel_module.bot.choose_card
 

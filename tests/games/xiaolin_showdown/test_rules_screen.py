@@ -13,10 +13,10 @@ from contextlib import asynccontextmanager
 import pytest
 from textual.widgets import Input, ListItem, ListView
 
-from xiaolin_showdown.logic.battle import Round
+from xiaolin_showdown.logic.flow.battle import Round
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute, claim_route
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.screens.rules import (
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.screens.reference.rules import (
     HOW_TO_PLAY,
     PRIMER,
     RulesScreen,
@@ -190,7 +190,7 @@ def book(tmp_path):
     """Open the rulebook, and hand back the app and its pilot."""
     from termcade.ui.app import EngineApp
     from xiaolin_showdown.game import build_game
-    from xiaolin_showdown.screens.rules import RulesScreen
+    from xiaolin_showdown.screens.reference.rules import RulesScreen
 
     @asynccontextmanager
     async def _book():

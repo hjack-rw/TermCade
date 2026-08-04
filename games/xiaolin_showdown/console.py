@@ -21,13 +21,13 @@ from typing import cast
 from termcade.app.game import GameContext
 from termcade.ui.screens.console import Command
 
-from .logic.catalog import load_catalog
-from .logic.turn import shelve
-from .logic.jong import PART_TYPES
-from .logic.ladder import LADDER, LADDER_OPTION
+from .logic.schema.catalog import load_catalog
+from .logic.flow.turn import shelve
+from .logic.characters.jong import PART_TYPES
+from .logic.config.ladder import LADDER, LADDER_OPTION
 from .logic.mechanics.powers import Mechanic, mechanic_of
-from .logic.models import Card
-from .logic.state import XiaolinState
+from .logic.schema.models import Card
+from .logic.schema.state import XiaolinState
 
 
 def _state(ctx: GameContext) -> XiaolinState:
@@ -135,7 +135,7 @@ def fill(ctx: GameContext, args: Sequence[str]) -> str:
     Yours waits for the stat pick (the temple offers it, or Train opens it); the opponent's is
     cashed by their own turn, exactly as a real full bar would be.
     """
-    from .logic.training import TRAIN_LENGTH, add_progress, can_train
+    from .logic.flow.training import TRAIN_LENGTH, add_progress, can_train
 
     state = _state(ctx)
     who = args[0] if args else "me"

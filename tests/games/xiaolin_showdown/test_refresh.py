@@ -8,10 +8,10 @@ survives a save.
 
 from __future__ import annotations
 
-from xiaolin_showdown.logic.actions import usable_powers, use_power
+from xiaolin_showdown.logic.flow.actions import usable_powers, use_power
 from xiaolin_showdown.logic.mechanics.cards import is_one_of
-from xiaolin_showdown.logic.models import Mechanic
-from xiaolin_showdown.logic.state import XiaolinState
+from xiaolin_showdown.logic.schema.models import Mechanic
+from xiaolin_showdown.logic.schema.state import XiaolinState
 
 from factories import wu
 

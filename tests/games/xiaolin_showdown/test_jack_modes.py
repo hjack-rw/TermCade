@@ -9,13 +9,14 @@ from termcade.core.rng import Rng
 
 from factories import auto_choices, duelist, wu
 
-from xiaolin_showdown.logic import bot, jack
-from xiaolin_showdown.logic.battle import Round, Side
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel, DuelState
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.screens.duel_board import _jack_stats, _side_line
+from xiaolin_showdown.logic.flow import bot
+from xiaolin_showdown.logic.characters import jack
+from xiaolin_showdown.logic.flow.battle import Round, Side
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.flow.duel import Duel, DuelState
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.screens.display.duel_board import _jack_stats, _side_line
 
 
 def _jack_duel(*, player_priority: bool) -> Duel:
@@ -31,40 +32,40 @@ def _jack_duel(*, player_priority: bool) -> Duel:
 
 def test_choose_jack_mode_rolls_attack_first_regardless_of_state():
     # seed 31's first randint(1, 100) is 2, under ATTACK_CHANCE_WHEN_LEADING (5) — verified once.
-    assert bot.choose_jack_mode(True, False, 0, Rng(31)) == jack.ATTACK_NAME
-    assert bot.choose_jack_mode(False, False, 0, Rng(31)) == jack.ATTACK_NAME
+    assert jack.choose_jack_mode(True, False, 0, Rng(31)) == jack.ATTACK_NAME
+    assert jack.choose_jack_mode(False, False, 0, Rng(31)) == jack.ATTACK_NAME
 
 
 def test_choose_jack_mode_mirrors_whenever_the_player_leads():
     # seed 9's first randint(1, 100) is 60, over ATTACK_CHANCE_WHEN_TRAILING (50) at momentum 0.
     # Unconditional now, `can_swap` included — the redesigned effect (see BOSSES.md) never needs a
     # margin, so there is nothing left to gate it on.
-    assert bot.choose_jack_mode(True, True, 0, Rng(9)) == jack.CHAMELON_NAME
-    assert bot.choose_jack_mode(True, False, 0, Rng(9)) == jack.CHAMELON_NAME
+    assert jack.choose_jack_mode(True, True, 0, Rng(9)) == jack.CHAMELON_NAME
+    assert jack.choose_jack_mode(True, False, 0, Rng(9)) == jack.CHAMELON_NAME
 
 
 def test_choose_jack_mode_steals_when_jack_leads_and_can_swap():
-    assert bot.choose_jack_mode(False, True, 0, Rng(0)) == jack.AI_JACK_NAME
+    assert jack.choose_jack_mode(False, True, 0, Rng(0)) == jack.AI_JACK_NAME
 
 
 def test_choose_jack_mode_stays_himself_when_jack_leads_and_cannot_swap():
-    assert bot.choose_jack_mode(False, False, 0, Rng(0)) is None
+    assert jack.choose_jack_mode(False, False, 0, Rng(0)) is None
 
 
 def test_attack_chance_scales_with_momentum_only_when_the_player_leads():
-    assert bot._attack_chance(True, 0) == bot.ATTACK_CHANCE_WHEN_TRAILING
-    assert bot._attack_chance(True, 10) == bot.ATTACK_CHANCE_WHEN_TRAILING + 10
-    assert bot._attack_chance(True, 1000) == bot.ATTACK_MAX_CHANCE
-    assert bot._attack_chance(True, -1000) == bot.ATTACK_MIN_CHANCE
+    assert jack.attack_chance(True, 0) == jack.ATTACK_CHANCE_WHEN_TRAILING
+    assert jack.attack_chance(True, 10) == jack.ATTACK_CHANCE_WHEN_TRAILING + 10
+    assert jack.attack_chance(True, 1000) == jack.ATTACK_MAX_CHANCE
+    assert jack.attack_chance(True, -1000) == jack.ATTACK_MIN_CHANCE
     # Jack leading ignores momentum entirely — Attack! only ever hurts him there, whatever his form.
-    assert bot._attack_chance(False, 1000) == bot.ATTACK_CHANCE_WHEN_LEADING
-    assert bot._attack_chance(False, -1000) == bot.ATTACK_CHANCE_WHEN_LEADING
+    assert jack.attack_chance(False, 1000) == jack.ATTACK_CHANCE_WHEN_LEADING
+    assert jack.attack_chance(False, -1000) == jack.ATTACK_CHANCE_WHEN_LEADING
 
 
 def test_attack_chance_is_higher_when_the_player_leads():
     # The whole point of the priority split: replace Jack's weakest spot (himself, player leads)
     # far more than his strongest (himself/AI Jack, Jack leads) — see BOSSES.md.
-    assert bot.ATTACK_CHANCE_WHEN_TRAILING > bot.ATTACK_CHANCE_WHEN_LEADING
+    assert jack.ATTACK_CHANCE_WHEN_TRAILING > jack.ATTACK_CHANCE_WHEN_LEADING
 
 
 def test_steal_target_takes_the_strongest_hand_card():
@@ -239,7 +240,7 @@ def test_commit_boost_never_stakes_the_chamelon_card():
 
 
 def test_commit_boost_joins_the_chamelon_card_with_ampersand_not_plus():
-    from xiaolin_showdown.screens.duel_board import _cards_line
+    from xiaolin_showdown.screens.display.duel_board import _cards_line
 
     duel = _jack_duel(player_priority=True)
     duel.duel.jack_mode = jack.CHAMELON_NAME

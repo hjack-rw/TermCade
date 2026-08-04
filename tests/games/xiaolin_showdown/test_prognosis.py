@@ -6,11 +6,11 @@ from __future__ import annotations
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.actions import use_power
-from xiaolin_showdown.logic.catalog import load_catalog
+from xiaolin_showdown.logic.flow.actions import use_power
+from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.mechanics.powers import mechanic_of
-from xiaolin_showdown.logic.models import Mechanic, Power
-from xiaolin_showdown.logic.state import XiaolinState
+from xiaolin_showdown.logic.schema.models import Mechanic, Power
+from xiaolin_showdown.logic.schema.state import XiaolinState
 
 from factories import duelist, wu
 
@@ -32,8 +32,8 @@ def test_the_conch_pins_the_bots_challenge_and_hands_it_the_lead():
 
 
 def test_the_caster_keeps_the_ground_though_the_opponent_leads():
-    from xiaolin_showdown.logic.duel import Duel
-    from xiaolin_showdown.logic.settings import XiaolinSettings
+    from xiaolin_showdown.logic.flow.duel import Duel
+    from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
     # conch_tiebreak overrides priority for the level-battle tiebreak: opponent leads, caster wins ties.
     state = _state(duelist(), duelist())
@@ -45,7 +45,7 @@ def test_the_caster_keeps_the_ground_though_the_opponent_leads():
 
 
 def _choices():
-    from xiaolin_showdown.logic.duel import DuelChoices
+    from xiaolin_showdown.logic.flow.duel import DuelChoices
 
     async def _stub(*_a):
         return None

@@ -11,13 +11,14 @@ from termcade.core.settings import Difficulty
 
 from factories import auto_choices
 
-from xiaolin_showdown.logic import jack, turn
-from xiaolin_showdown.logic.battle import Round
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.constants import YIN_YANG_YOYO_ID
-from xiaolin_showdown.logic.duel import Duel
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.logic.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow import turn
+from xiaolin_showdown.logic.characters import jack
+from xiaolin_showdown.logic.flow.battle import Round
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.schema.constants import YIN_YANG_YOYO_ID
+from xiaolin_showdown.logic.flow.duel import Duel
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
 SETTINGS = XiaolinSettings()
 

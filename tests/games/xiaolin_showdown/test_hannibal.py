@@ -4,9 +4,9 @@ Elemental Deflection has two halves, both on the four elements only (never metal
 deflect): his OWN Wu ignore the arena's drag (a ward), and the FOE's Wu lose their arena lift.
 """
 
-from xiaolin_showdown.logic.duel import DEFLECTED_ELEMENTS
+from xiaolin_showdown.logic.characters.hannibal import DEFLECTED_ELEMENTS
 from xiaolin_showdown.logic.mechanics.scoring import count_end_stats
-from xiaolin_showdown.screens.duel_board import _played_stats_text
+from xiaolin_showdown.screens.display.duel_board import _played_stats_text
 
 from factories import wu
 

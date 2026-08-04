@@ -28,7 +28,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from ..models import Card, Mechanic, Power
+from ..schema.models import Card, Mechanic, Power
 from .cards import index_of
 from .powers import (
     ANIMATE_FIELD_STAT,
@@ -41,7 +41,7 @@ from .powers import (
 )
 
 if TYPE_CHECKING:
-    from ..battle import Round, Side
+    from ..flow.battle import Round, Side
 
 # A played card joins the queue wearing this, so `_booster_at_head` never mistakes a stand-in for a
 # live booster and no power re-triggers.

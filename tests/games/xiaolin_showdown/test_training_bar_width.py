@@ -12,7 +12,8 @@ from rich.cells import cell_len
 
 from termcade.ui.widgets import render_bar
 
-from xiaolin_showdown.screens.temple import TempleScreen, _training_cell
+from xiaolin_showdown.screens.run.temple import TempleScreen
+from xiaolin_showdown.screens.display.temple_render import _training_cell
 
 pytestmark = pytest.mark.slow
 

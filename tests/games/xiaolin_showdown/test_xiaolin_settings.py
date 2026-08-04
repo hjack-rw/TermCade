@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from xiaolin_showdown.logic.settings import XiaolinSettings
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
 
 def _defaults() -> dict[str, int]:

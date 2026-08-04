@@ -11,9 +11,9 @@ from termcade.ui.app import EngineApp
 from textual.widgets import Static
 
 from xiaolin_showdown.game import build_game
-from xiaolin_showdown.logic.lore import PAGE_COLS, PAGE_ROWS
-from xiaolin_showdown.screens.lore import LoreScreen
-from xiaolin_showdown.screens.start import StartScreen
+from xiaolin_showdown.logic.content.lore import PAGE_COLS, PAGE_ROWS
+from xiaolin_showdown.screens.reference.lore import LoreScreen
+from xiaolin_showdown.screens.run.start import StartScreen
 
 pytestmark = pytest.mark.slow
 

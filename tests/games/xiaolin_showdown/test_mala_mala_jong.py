@@ -1,4 +1,4 @@
-"""Mala Mala Jong — the assembly transform (logic/jong.py).
+"""Mala Mala Jong — the assembly transform (logic/characters/jong.py).
 
 The construct is a costume over the real duelist: a screen sees 6/6/6 ``Mala Mala Jong``, but every
 rule that reads *who* is playing still sees the real character underneath. These pin the pure state —
@@ -13,17 +13,18 @@ from termcade.core.rng import Rng
 
 from factories import auto_choices
 
-from xiaolin_showdown.logic import jong
-from xiaolin_showdown.logic.actions import can_construct, construct_jong
-from xiaolin_showdown.logic.battle import Round
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel
-from xiaolin_showdown.logic.outcome import final_score
-from xiaolin_showdown.logic.actions import draw_blocked
-from xiaolin_showdown.logic.models import Mechanic, Player
+from xiaolin_showdown.logic.characters import jong
+from xiaolin_showdown.logic.flow import bot
+from xiaolin_showdown.logic.flow.actions import can_construct, construct_jong
+from xiaolin_showdown.logic.flow.battle import Round
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.flow.duel import Duel
+from xiaolin_showdown.logic.flow.outcome import final_score
+from xiaolin_showdown.logic.flow.actions import draw_blocked
+from xiaolin_showdown.logic.schema.models import Mechanic, Player
 from xiaolin_showdown.logic.mechanics.powers import is_jong_bane, mechanic_of
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.logic.setup import new_game
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.setup import new_game
 
 
 def _card_of_type(cat, slot):
@@ -60,7 +61,7 @@ def test_a_missing_part_closes_the_gate():
 def test_construct_stands_up_a_six_six_six_body():
     builder = _full_builder()
     jong.construct(builder)
-    assert jong.is_jong(builder)
+    assert bot.is_jong(builder)
     assert set(jong.battle_stats(builder).values()) == {jong.JONG_STAT}
 
 
@@ -112,7 +113,7 @@ def test_revert_drops_the_form_and_releases_the_heart():
     builder = _full_builder()
     jong.construct(builder)
     heart = jong.revert(builder)
-    assert not jong.is_jong(builder)
+    assert not bot.is_jong(builder)
     assert builder.jong_heart is None
     assert mechanic_of(heart.power) is Mechanic.ANIMATE  # handed back to the caller to place
 
@@ -140,7 +141,7 @@ def test_a_spent_turn_cannot_also_construct():
 def test_constructing_spends_the_turns_action():
     state = _state_with_full_set()
     construct_jong(state, is_player=True)
-    assert jong.is_jong(state.player)
+    assert bot.is_jong(state.player)
     assert state.actions_taken == 1  # the transform cost the turn's action
 
 
@@ -197,7 +198,7 @@ async def test_losing_a_showdown_drops_the_form_and_hands_over_the_heart():
 
     await duel._end()
 
-    assert not jong.is_jong(state.player)  # the form dropped
+    assert not bot.is_jong(state.player)  # the form dropped
     assert heart in state.bot.hand  # the Heart came out of exile to the winner
     assert part in state.bot.hand  # ...along with the wagered part
     assert state.player.jong_heart is None
@@ -206,7 +207,7 @@ async def test_losing_a_showdown_drops_the_form_and_hands_over_the_heart():
 # --- the form survives a save --------------------------------------------------------------------
 
 def test_a_save_taken_in_the_form_restores_the_form_and_the_exiled_heart():
-    from xiaolin_showdown.logic.state import XiaolinState
+    from xiaolin_showdown.logic.schema.state import XiaolinState
 
     state = _state_with_full_set()
     construct_jong(state, is_player=True)
@@ -214,12 +215,12 @@ def test_a_save_taken_in_the_form_restores_the_form_and_the_exiled_heart():
 
     restored = XiaolinState.restore(state.snapshot(), None)
 
-    assert jong.is_jong(restored.player)  # the form came back
+    assert bot.is_jong(restored.player)  # the form came back
     assert restored.player.jong_heart is not None and restored.player.jong_heart.id == heart_id
 
 
 def test_an_old_save_loads_as_an_ordinary_duelist():
-    from xiaolin_showdown.logic.state import XiaolinState
+    from xiaolin_showdown.logic.schema.state import XiaolinState
 
     state = _state_with_full_set()
     snapshot = state.snapshot()
@@ -227,7 +228,7 @@ def test_an_old_save_loads_as_an_ordinary_duelist():
     del snapshot["player"]["jong_heart"]
 
     restored = XiaolinState.restore(snapshot, None)
-    assert not jong.is_jong(restored.player)
+    assert not bot.is_jong(restored.player)
     assert restored.player.jong_heart is None
 
 
@@ -269,7 +270,7 @@ def test_the_bane_wins_the_battle_whatever_the_score():
 # --- the form's own fear and desire --------------------------------------------------------------
 
 def test_the_construct_fears_the_vault():
-    from xiaolin_showdown.logic.summons import summon_name
+    from xiaolin_showdown.logic.flow.summons import summon_name
 
     omi = load_catalog().character(1)
     got = summon_name("{fear}", caster=omi, target=omi, arena="metal", target_is_jong=True)
@@ -277,7 +278,7 @@ def test_the_construct_fears_the_vault():
 
 
 def test_the_construct_desire_reads_the_real_side_beneath():
-    from xiaolin_showdown.logic.summons import summon_name
+    from xiaolin_showdown.logic.flow.summons import summon_name
 
     cat = load_catalog()
     xiaolin, heylin = cat.character(1), cat.character(5)  # Omi, Tubbimura
@@ -286,7 +287,7 @@ def test_the_construct_desire_reads_the_real_side_beneath():
 
 
 def test_out_of_form_the_fear_pool_is_unchanged():
-    from xiaolin_showdown.logic.summons import summon_name
+    from xiaolin_showdown.logic.flow.summons import summon_name
 
     omi = load_catalog().character(1)
     assert summon_name("{fear}", caster=omi, target=omi, arena="metal") == "a Squirrel"
@@ -299,7 +300,7 @@ def test_a_broken_set_drops_the_form_and_brings_the_heart_home():
     jong.construct(builder)
     builder.hand.pop()  # a part stolen / bounced / worn away
     heart = jong.drop_if_broken(builder)
-    assert not jong.is_jong(builder)
+    assert not bot.is_jong(builder)
     assert heart is not None and heart in builder.hand  # home to this duelist, not to an opponent
     assert builder.jong_heart is None
 
@@ -308,7 +309,7 @@ def test_an_intact_set_keeps_the_form():
     builder = _full_builder()
     jong.construct(builder)
     assert jong.drop_if_broken(builder) is None  # nothing left the hand
-    assert jong.is_jong(builder)
+    assert bot.is_jong(builder)
 
 
 # --- the bot policy ------------------------------------------------------------------------------
@@ -316,20 +317,20 @@ def test_an_intact_set_keeps_the_form():
 def test_the_bot_assembles_the_moment_it_holds_the_set():
     from termcade.core.settings import Difficulty
 
-    from xiaolin_showdown.logic.turn import bot_turn
+    from xiaolin_showdown.logic.flow.turn import bot_turn
 
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
     state.bot.hand = _full_builder().hand
     state.bot_actions_taken = 0
     bot_turn(state, XiaolinSettings(), rng=Rng(1), difficulty=Difficulty.HARD)
-    assert jong.is_jong(state.bot)  # construct outranks every other temple move
+    assert bot.is_jong(state.bot)  # construct outranks every other temple move
 
 
 def test_a_jong_bot_takes_no_temple_action_so_witchcraft_cannot_break_the_lock():
     from termcade.core.settings import Difficulty
 
-    from xiaolin_showdown.logic.turn import bot_turn
+    from xiaolin_showdown.logic.flow.turn import bot_turn
 
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
@@ -340,13 +341,13 @@ def test_a_jong_bot_takes_no_temple_action_so_witchcraft_cannot_break_the_lock()
     state.bot_actions_taken = 0
     before = list(state.bot.hand)
     bot_turn(state, XiaolinSettings(), rng=Rng(1), difficulty=Difficulty.BOSS)
-    assert jong.is_jong(state.bot)  # still whole
+    assert bot.is_jong(state.bot)  # still whole
     assert state.bot.hand == before  # no Wu recalled in, no part banked out — the lock held
 
 
 def test_jong_never_flies_the_early_bird():
     """It is out for the fight, and its only Wu are parts — flying would break the set."""
-    from xiaolin_showdown.logic.actions import can_early_bird
+    from xiaolin_showdown.logic.flow.actions import can_early_bird
 
     state = _state_with_full_set()
     construct_jong(state, is_player=True)
@@ -356,8 +357,8 @@ def test_jong_never_flies_the_early_bird():
 
 def test_the_bot_never_boosts_the_normal_heart():
     """Boosting the Heart hands the opponent a free off-wager Wu — the bot fields it instead of gifting."""
-    from xiaolin_showdown.logic import bot
-    from xiaolin_showdown.logic.battle import Ground, Round
+    from xiaolin_showdown.logic.flow import bot
+    from xiaolin_showdown.logic.flow.battle import Ground, Round
 
     cat = load_catalog()
     ground = Ground(stats=("force", "agility", "intellect"), background="metal", player_stats={}, bot_stats={})

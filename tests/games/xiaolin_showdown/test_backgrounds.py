@@ -10,11 +10,11 @@ import pytest
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.constants import ELEMENTS
-from xiaolin_showdown.logic.duel import Duel, DuelChoices, DuelState
-from xiaolin_showdown.logic.models import Background
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.logic.setup import new_game
+from xiaolin_showdown.logic.schema.constants import ELEMENTS
+from xiaolin_showdown.logic.flow.duel import Duel, DuelChoices, DuelState
+from xiaolin_showdown.logic.schema.models import Background
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.setup import new_game
 
 
 def _chosen_background() -> XiaolinSettings:

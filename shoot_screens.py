@@ -27,7 +27,7 @@ from playwright.sync_api import sync_playwright
 
 from termcade.ui.app import EngineApp
 from xiaolin_showdown.game import build_game
-from xiaolin_showdown.screens.start import StartScreen
+from xiaolin_showdown.screens.run.start import StartScreen
 
 OUT = Path(__file__).parent / "screenshots"
 # Per screen: the board is laid out for 140 wide (what `serve.py` auto-fits the browser to) and

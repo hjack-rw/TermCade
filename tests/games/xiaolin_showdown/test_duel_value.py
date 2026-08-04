@@ -15,7 +15,7 @@ So this file is the thing that has something to say. A new mechanic must be **pr
 from __future__ import annotations
 
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
-from xiaolin_showdown.logic.turn import (
+from xiaolin_showdown.logic.flow.turn import (
     _MECHANIC_VALUE,
     _STATS_ARE_THE_WHOLE_VALUE,
     _WORTH_NOTHING_ON_THE_TABLE,

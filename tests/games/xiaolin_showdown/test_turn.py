@@ -9,11 +9,11 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 from termcade.core.settings import Difficulty
 
-from xiaolin_showdown.logic.models import Card, Mechanic, Player
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.logic.state import XiaolinState
+from xiaolin_showdown.logic.schema.models import Card, Mechanic, Player
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.schema.state import XiaolinState
 from xiaolin_showdown.logic.mechanics.powers import GAMBLE_SPREAD
-from xiaolin_showdown.logic.turn import (
+from xiaolin_showdown.logic.flow.turn import (
     VAULT,
     DUEL_FLOOR,
     PASSED,

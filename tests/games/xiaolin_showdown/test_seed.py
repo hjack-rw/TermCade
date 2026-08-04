@@ -10,7 +10,7 @@ This is the test that makes drift loud. If it fails: `python build_cards.py`.
 
 from __future__ import annotations
 
-from xiaolin_showdown.logic.catalog import build_db, load_catalog
+from xiaolin_showdown.logic.schema.catalog import build_db, load_catalog
 
 
 def test_the_committed_db_is_what_the_seed_builds(catalog, tmp_path):

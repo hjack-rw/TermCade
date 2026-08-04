@@ -13,8 +13,8 @@ draw pile, and a Wu you found is a Wu you can lose.
 
 from __future__ import annotations
 
-from xiaolin_showdown.logic.actions import FIZZLE_MESSAGE, usable_powers, use_power
-from xiaolin_showdown.logic.battle import Ground, Round, score_battle
+from xiaolin_showdown.logic.flow.actions import FIZZLE_MESSAGE, usable_powers, use_power
+from xiaolin_showdown.logic.flow.battle import Ground, Round, score_battle
 from xiaolin_showdown.logic.mechanics.cards import is_one_of
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, is_boost_slot, mechanic_of
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power

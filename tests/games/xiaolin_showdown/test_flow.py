@@ -13,24 +13,24 @@ from textual.widgets import Button, Input, Static
 
 from xiaolin_showdown.game import build_game
 from termcade.core.rng import Rng
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.ladder import LADDER, LADDER_OPTION
-from xiaolin_showdown.logic.outcome import Outcome
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.screens.character_select import CharacterSelectScreen
-from xiaolin_showdown.screens.detail import DetailScreen
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.config.ladder import LADDER, LADDER_OPTION
+from xiaolin_showdown.logic.flow.outcome import Outcome
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.screens.run.character_select import CharacterSelectScreen
+from xiaolin_showdown.screens.actions.detail import DetailScreen
 from termcade.ui.screens.dialog import ChoiceModal
 
 from xiaolin_showdown.logic.mechanics.powers import is_gamble, trigger_of
 from xiaolin_showdown.logic.mechanics.scoring import initiative
-from xiaolin_showdown.screens.duel import DuelScreen
-from xiaolin_showdown.screens.format import card_label, points_label
-from xiaolin_showdown.screens.lookup import LookUpScreen
-from xiaolin_showdown.screens.outcome import OutcomeScreen
-from xiaolin_showdown.screens.rules import RulesScreen
-from xiaolin_showdown.screens.start import StartScreen
-from xiaolin_showdown.screens.use_power import UsePowerScreen
-from xiaolin_showdown.screens.temple import TempleScreen
+from xiaolin_showdown.screens.run.duel import DuelScreen
+from xiaolin_showdown.screens.display.format import card_label, points_label
+from xiaolin_showdown.screens.actions.lookup import LookUpScreen
+from xiaolin_showdown.screens.run.outcome import OutcomeScreen
+from xiaolin_showdown.screens.reference.rules import RulesScreen
+from xiaolin_showdown.screens.run.start import StartScreen
+from xiaolin_showdown.screens.actions.use_power import UsePowerScreen
+from xiaolin_showdown.screens.run.temple import TempleScreen
 
 
 async def _boot(app, pilot):
@@ -261,7 +261,7 @@ async def test_drawing_with_a_full_hand_swaps_a_wu_through_a_picker(tmp_path):
     async with app.run_test(size=(150, 60)) as pilot:
         await _boot(app, pilot)
         await _new_game_at_vault(app, pilot)
-        from xiaolin_showdown.logic.settings import XiaolinSettings
+        from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
         state = app.ctx.state
         cat = state.catalog
@@ -309,7 +309,7 @@ async def test_a_subset_run_ends_at_its_own_target_not_the_settings_default(tmp_
     own finish, which is exactly what two of the three win checks used to do."""
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:
-        from xiaolin_showdown.logic.settings import XiaolinSettings
+        from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
         await _boot(app, pilot)
         await _new_game_at_vault(app, pilot)
@@ -501,7 +501,7 @@ async def test_saving_hard_difficulty_deals_a_hard_opponent(tmp_path):
 
 async def test_a_boss_run_asks_which_boss(tmp_path):
     """A boss is PICKED, never dealt: the boss tier routes through its own select screen."""
-    from xiaolin_showdown.screens.character_select import BossSelectScreen
+    from xiaolin_showdown.screens.run.character_select import BossSelectScreen
 
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:
@@ -734,7 +734,7 @@ async def test_every_vault_action_says_what_it_does(tmp_path):
     """A greyed action shows why; an available one shows what it is for. Neither can be silent.
 
     """
-    from xiaolin_showdown.screens.temple import _ACTION_HELP, _ACTIONS
+    from xiaolin_showdown.screens.display.temple_render import _ACTION_HELP, _ACTIONS
 
     keys = [action.split(".")[0] for action in _ACTIONS]
 
@@ -747,8 +747,8 @@ def test_the_rulebook_prints_the_numbers_the_game_actually_uses():
     Every tunable a rule mentions is read from the settings, so changing one number changes both the
     behaviour and the page that explains it.
     """
-    from xiaolin_showdown.logic.settings import XiaolinSettings
-    from xiaolin_showdown.screens.rules import rules_for
+    from xiaolin_showdown.logic.config.settings import XiaolinSettings
+    from xiaolin_showdown.screens.reference.rules import rules_for
 
     odd = XiaolinSettings(prize_threshold=99, max_wager=2, point_limit=42)
     text = " ".join(rule for rules in rules_for(odd).values() for rule in rules)
@@ -764,8 +764,8 @@ def test_the_rulebook_states_every_wager_rule():
     The one a player will get wrong on their own is that a wager widens a *single* battle rather than
     buying more of them — so the rulebook has to say so outright, and must never call it a best-of-N.
     """
-    from xiaolin_showdown.logic.settings import XiaolinSettings
-    from xiaolin_showdown.screens.rules import rules_for
+    from xiaolin_showdown.logic.config.settings import XiaolinSettings
+    from xiaolin_showdown.screens.reference.rules import rules_for
 
     text = " ".join(rule for rules in rules_for(XiaolinSettings()).values() for rule in rules).lower()
 
@@ -824,8 +824,8 @@ def test_no_rule_leaves_a_single_word_stranded_on_its_own_line():
 
     from rich.console import Console
 
-    from xiaolin_showdown.logic.settings import XiaolinSettings
-    from xiaolin_showdown.screens.rules import _bullets, rules_for
+    from xiaolin_showdown.logic.config.settings import XiaolinSettings
+    from xiaolin_showdown.screens.reference.rules import _bullets, rules_for
 
     for width in range(40, 90, 3):
         for rules in rules_for(XiaolinSettings()).values():

@@ -11,11 +11,11 @@ from pathlib import Path
 from termcade.app.game import Game
 
 from .console import COMMANDS
-from .logic.settings import default_settings, refreshed_for_pool, save_note
-from .logic.state import XiaolinState
+from .logic.config.settings import default_settings, refreshed_for_pool, save_note
+from .logic.schema.state import XiaolinState
 from .music import XIAOLIN
-from .screens.format import wu_in_prose
-from .screens.start import StartScreen
+from .screens.display.headline import wu_in_prose
+from .screens.run.start import StartScreen
 
 THEME = Path(__file__).resolve().parent / "theme" / "xiaolin.tcss"
 
@@ -24,7 +24,7 @@ def build_game() -> Game:
     return Game(
         game_id="xiaolin_showdown",
         title="Xiaolin Showdown",
-        version="1.3 (beta)",
+        version="1.4 (beta)",
         state_cls=XiaolinState,
         default_settings=default_settings(),
         # The deck size and the win target are read off the CARD POOL, not chosen by a player, so a
@@ -35,7 +35,7 @@ def build_game() -> Game:
         # The pool fingerprint is bookkeeping, not a preference: it records which card pool this
         # settings file was written for. It must survive the prune and must NOT be shipped in the
         # defaults, or a stale file inherits it and reads as current. ``boss_ladder`` is the same
-        # kind of fact, for the boss ladder's cleared count (see logic/ladder.py) — earned, not chosen.
+        # kind of fact, for the boss ladder's cleared count (see logic/config/ladder.py) — earned, not chosen.
         private_options=frozenset({"pool", "boss_ladder"}),
         # A run saved under a smaller pool still plays by its own rules. The slot says so, rather
         # than leaving the player to wonder why the game feels different.

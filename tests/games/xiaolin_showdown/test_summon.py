@@ -14,12 +14,12 @@ from dataclasses import replace
 
 from factories import auto_choices, run_showdown
 
-from xiaolin_showdown.logic.battle import Round
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel
+from xiaolin_showdown.logic.flow.battle import Round
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.flow.duel import Duel
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.logic.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
 RING = 60  # Ring of Nine Xing — summon "Clone of {caster}"
 FIST = 6  # Fist of Tebigong — a plain Wu, no summon

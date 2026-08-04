@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from rich.style import Style
 
-from xiaolin_showdown.screens.temple import _ACTION_BY_KEY, _action_cell
+from xiaolin_showdown.screens.run.temple import _ACTION_BY_KEY
+from xiaolin_showdown.screens.display.temple_render import _action_cell
 from termcade.ui.screens.log import GameLogScreen
 
 
@@ -26,12 +27,12 @@ def test_every_numbered_action_has_a_binding_to_click(tmp_path) -> None:
 
 
 def test_a_live_action_carries_the_same_action_its_key_runs() -> None:
-    assert _click_meta(_action_cell("7. Game Log", {})) == "screen.game_log()"
+    assert _click_meta(_action_cell("7. Game Log", {}, _ACTION_BY_KEY)) == "screen.game_log()"
 
 
 def test_a_blocked_action_is_not_clickable() -> None:
     """Pressing its key does nothing, so neither should tapping it."""
-    assert _click_meta(_action_cell("2. Draw a Card", {"2": "Your deck is empty."})) is None
+    assert _click_meta(_action_cell("2. Draw a Card", {"2": "Your deck is empty."}, _ACTION_BY_KEY)) is None
 
 
 async def test_clicking_an_action_opens_its_screen(open_vault, state) -> None:
@@ -59,10 +60,10 @@ async def test_committing_a_showdown_does_not_crash_the_duel(tmp_path) -> None:
     from termcade.core.rng import Rng
     from termcade.ui.app import EngineApp
     from xiaolin_showdown.game import build_game
-    from xiaolin_showdown.logic.catalog import load_catalog
-    from xiaolin_showdown.logic.setup import new_game
-    from xiaolin_showdown.screens.duel import DuelScreen
-    from xiaolin_showdown.screens.temple import TempleScreen
+    from xiaolin_showdown.logic.schema.catalog import load_catalog
+    from xiaolin_showdown.logic.flow.setup import new_game
+    from xiaolin_showdown.screens.run.duel import DuelScreen
+    from xiaolin_showdown.screens.run.temple import TempleScreen
 
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(154, 36)) as pilot:

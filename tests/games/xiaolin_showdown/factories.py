@@ -7,11 +7,11 @@ version of this; they are all this one, with different defaults.
 
 from __future__ import annotations
 
-from xiaolin_showdown.logic.battle import Ground
-from xiaolin_showdown.logic.constants import TOURNAMENT_BATTLES
-from xiaolin_showdown.logic.duel import END, DuelChoices
-from xiaolin_showdown.logic.models import Card, Character, Mechanic, Player, Power
-from xiaolin_showdown.logic.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.battle import Ground
+from xiaolin_showdown.logic.schema.constants import TOURNAMENT_BATTLES
+from xiaolin_showdown.logic.flow.duel import END, DuelChoices
+from xiaolin_showdown.logic.schema.models import Card, Character, Mechanic, Player, Power
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
 STATS = ("force", "agility", "intellect")
 NO_STATS = dict.fromkeys(STATS, 0)

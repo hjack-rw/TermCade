@@ -16,12 +16,12 @@ import io
 from rich.console import Console, RenderableType
 from rich.text import Text
 
-from xiaolin_showdown.logic.constants import TOURNAMENT
-from xiaolin_showdown.logic.battle import Round, Side
-from xiaolin_showdown.logic.duel import DuelState
+from xiaolin_showdown.logic.schema.constants import TOURNAMENT
+from xiaolin_showdown.logic.flow.battle import Round, Side
+from xiaolin_showdown.logic.flow.duel import DuelState
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
-from xiaolin_showdown.screens.duel_board import _board_text, _cards_line
-from xiaolin_showdown.screens.format import COLORS
+from xiaolin_showdown.screens.display.duel_board import _board_text, _cards_line
+from xiaolin_showdown.screens.display.format import COLORS
 
 SILVER_MANTA_RAY = 1  # water, boost/0 — a dragon, lends 1/1/1
 LONGI_SASH = 3  # fire

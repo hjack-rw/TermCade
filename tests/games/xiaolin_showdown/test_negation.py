@@ -11,7 +11,7 @@ shows.
 
 from __future__ import annotations
 
-from xiaolin_showdown.logic.battle import Ground, Round, score_battle
+from xiaolin_showdown.logic.flow.battle import Ground, Round, score_battle
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from factories import ground
 

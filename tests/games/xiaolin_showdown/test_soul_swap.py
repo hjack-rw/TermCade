@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from xiaolin_showdown.logic.actions import use_power
-from xiaolin_showdown.logic.models import Mechanic
-from xiaolin_showdown.logic.state import XiaolinState
+from xiaolin_showdown.logic.flow.actions import use_power
+from xiaolin_showdown.logic.schema.models import Mechanic
+from xiaolin_showdown.logic.schema.state import XiaolinState
 
 from factories import duelist, wu
 
@@ -47,8 +47,8 @@ def test_wear_crosses_by_the_hand_over_rule():
 
 
 def test_the_bot_spends_the_lantern_only_from_behind():
-    from xiaolin_showdown.logic.settings import XiaolinSettings
-    from xiaolin_showdown.logic.temple_ai import choose_temple_power
+    from xiaolin_showdown.logic.config.settings import XiaolinSettings
+    from xiaolin_showdown.logic.flow.temple_ai import choose_temple_power
 
     lantern = wu(0, 0, 0, mechanic=Mechanic.TRANSFER, name="Lantern", points=5)
     behind = XiaolinState(  # type: ignore[arg-type]
@@ -65,8 +65,8 @@ def test_the_bot_spends_the_lantern_only_from_behind():
 
 def test_the_bot_leaves_a_near_worn_wu_to_bank_itself():
     from termcade.core.settings import Difficulty
-    from xiaolin_showdown.logic.constants import WEAR_LIMIT
-    from xiaolin_showdown.logic.turn import pick_deposit
+    from xiaolin_showdown.logic.schema.constants import WEAR_LIMIT
+    from xiaolin_showdown.logic.flow.turn import pick_deposit
 
     worn = wu(1, points=3)
     worn.uses = WEAR_LIMIT - 1
@@ -78,7 +78,7 @@ def test_a_background_is_still_picked_against_an_empty_hand():
     # Wear vaults and the Lantern made empty hands reachable mid-run; the background pick must not
     # read a lead card that is not there.
     from termcade.core.rng import Rng
-    from xiaolin_showdown.logic.bot import choose_background
+    from xiaolin_showdown.logic.flow.bot import choose_background
 
     stats = {"force": 1, "agility": 1, "intellect": 1}
     assert choose_background(stats, ["fire", "water"], ([], []), stats, Rng(0)) in ("fire", "water")

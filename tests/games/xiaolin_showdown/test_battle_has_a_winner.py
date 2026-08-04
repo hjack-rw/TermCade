@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-from xiaolin_showdown.logic.battle import Ground, Round, Side, score_battle
-from xiaolin_showdown.logic.models import Card, Mechanic
+from xiaolin_showdown.logic.flow.battle import Ground, Round, Side, score_battle
+from xiaolin_showdown.logic.schema.models import Card, Mechanic
 from factories import ground, wu
 
 

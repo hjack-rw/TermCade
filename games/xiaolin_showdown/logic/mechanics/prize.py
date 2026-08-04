@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from ..battle import Round
+from ..flow.battle import Round
 from .scoring import element_score
 
 

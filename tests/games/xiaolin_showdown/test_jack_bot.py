@@ -6,14 +6,15 @@ from termcade.core.rng import Rng
 
 from factories import auto_choices, ground, wu
 
-from xiaolin_showdown.logic.battle import Round, Side
-from xiaolin_showdown.logic.bot import choose_boost, choose_jack_bot
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel
+from xiaolin_showdown.logic.flow.battle import Round, Side
+from xiaolin_showdown.logic.characters.jack import choose_jack_bot
+from xiaolin_showdown.logic.flow.bot import choose_boost
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.flow.duel import Duel
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
 from xiaolin_showdown.logic.mechanics.resolve import _booster_at_head, curse_from_boost
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.screens.duel_board import _cards_line
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.screens.display.duel_board import _cards_line
 
 JACK_BOT = wu(-1, -1, -1, mechanic=Mechanic.BOT, element="metal", type="wudai", name="Jack-Bot")
 
@@ -84,7 +85,7 @@ def test_jack_bots_curse_does_not_bury_a_live_boost():
 
 
 def test_jack_bots_flavour_name_never_repeats():
-    from xiaolin_showdown.logic import jack
+    from xiaolin_showdown.logic.characters import jack
 
     for excluded in jack.JACK_BOT_NAMES:
         duel = _jack_duel()

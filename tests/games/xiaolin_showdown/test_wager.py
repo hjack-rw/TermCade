@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import pytest
 
-from xiaolin_showdown.logic.bot import choose_wager
-from xiaolin_showdown.logic.models import Card
-from xiaolin_showdown.logic.turn import duel_value
+from xiaolin_showdown.logic.flow.bot import choose_wager
+from xiaolin_showdown.logic.schema.models import Card
+from xiaolin_showdown.logic.flow.turn import duel_value
 
 from factories import wu as _built
 

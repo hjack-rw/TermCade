@@ -13,12 +13,12 @@ from termcade.core.rng import Rng
 
 from factories import auto_choices, run_showdown
 
-from xiaolin_showdown.logic.actions import deposit, usable_powers, use_power
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel
+from xiaolin_showdown.logic.flow.actions import deposit, usable_powers, use_power
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.flow.duel import Duel
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.logic.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
 BOX = 67  # Treasurebox of the Blind Sword — wish
 FIST = 6  # Fist of Tebigong — a plain Wu
@@ -75,7 +75,7 @@ def test_a_wish_steals_a_wu_from_the_opponents_vault(state):
 
 
 def test_the_treasurebox_name_runs_through_the_five_element_colours(state):
-    from xiaolin_showdown.screens.format import COLORS, card_name_text
+    from xiaolin_showdown.screens.display.format import COLORS, card_name_text
 
     text = card_name_text(deepcopy(state.catalog.card(BOX)))
     styles = " ".join(span.style for span in text.spans)
@@ -131,8 +131,8 @@ async def test_a_fielded_treasurebox_is_exiled_when_the_showdown_ends():
 def test_the_bot_fields_a_treasurebox_over_anything_scored_on_stats():
     from factories import ground
 
-    from xiaolin_showdown.logic.battle import Round
-    from xiaolin_showdown.logic.bot import choose_card
+    from xiaolin_showdown.logic.flow.battle import Round
+    from xiaolin_showdown.logic.flow.bot import choose_card
 
     cat = load_catalog()
     box = deepcopy(cat.card(BOX))
@@ -144,7 +144,7 @@ def test_the_bot_fields_a_treasurebox_over_anything_scored_on_stats():
 def test_the_bot_never_banks_a_treasurebox():
     from termcade.core.settings import Difficulty
 
-    from xiaolin_showdown.logic.turn import pick_deposit
+    from xiaolin_showdown.logic.flow.turn import pick_deposit
 
     cat = load_catalog()
     hand = [deepcopy(cat.card(BOX)), deepcopy(cat.card(16))]  # Bras Finger, worth points

@@ -12,14 +12,14 @@ from dataclasses import replace
 
 from factories import auto_choices, run_showdown
 
-from xiaolin_showdown.logic.actions import usable_powers, use_power
-from xiaolin_showdown.logic.battle import Round
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.duel import Duel
+from xiaolin_showdown.logic.flow.actions import usable_powers, use_power
+from xiaolin_showdown.logic.flow.battle import Round
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.flow.duel import Duel
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.logic.training import STAT_CAP, TRAIN_BOOST_STEP
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.logic.flow.training import STAT_CAP, TRAIN_BOOST_STEP
 
 FIST = 6  # Fist of Tebigong — a plain Wu that fights on its stats, to stand against the dragon
 
@@ -66,7 +66,7 @@ def test_a_higher_tier_summon_shoves_its_own_step(state):
 def test_the_sapphire_dragon_fills_the_whole_bar_from_empty(state):
     """Its boost is as big as the bar, so from any progress it tops out — one level, on the spot. Read
     off the card: the moment TRAIN_LENGTH outgrows its step, this fails and points here."""
-    from xiaolin_showdown.logic.training import TRAIN_LENGTH, payout_ready
+    from xiaolin_showdown.logic.flow.training import TRAIN_LENGTH, payout_ready
 
     sapphire = _seed(state, SAPPHIRE)
     assert sapphire.power.train_step >= TRAIN_LENGTH  # a full-bar boost, and the card says so
@@ -169,7 +169,7 @@ def _bot_temple_state(cards, bar):
 
 def test_the_bot_spends_the_sapphire_dragon_to_train():
     """It can never field it, so the temple is the only use — and its full-bar boost is a free level."""
-    from xiaolin_showdown.logic.temple_ai import choose_temple_power
+    from xiaolin_showdown.logic.flow.temple_ai import choose_temple_power
 
     play = choose_temple_power(_bot_temple_state([SAPPHIRE, FIST], 0), XiaolinSettings(), is_player=False)
     assert play is not None and play.card.id == SAPPHIRE
@@ -177,7 +177,7 @@ def test_the_bot_spends_the_sapphire_dragon_to_train():
 
 def test_the_bot_feeds_a_summon_only_when_it_completes_a_level():
     """A +3 is worth more fielded than fed to a low bar; near the top, it finishes a level and pays out."""
-    from xiaolin_showdown.logic.temple_ai import choose_temple_power
+    from xiaolin_showdown.logic.flow.temple_ai import choose_temple_power
 
     settings = XiaolinSettings()
     low = choose_temple_power(_bot_temple_state([TONGUE, FIST], 2), settings, is_player=False)
@@ -211,7 +211,7 @@ def test_the_bot_holds_the_sapphire_dragon_back():
     """The bot never throws a showdown on it: given anything else that can fight, it fields that."""
     from factories import ground
 
-    from xiaolin_showdown.logic.bot import choose_card
+    from xiaolin_showdown.logic.flow.bot import choose_card
 
     cat = load_catalog()
     dragon = deepcopy(cat.card(SAPPHIRE))
@@ -231,7 +231,7 @@ def _duel_targeting(bot_char_id: int) -> Duel:
 
 def test_the_fear_is_the_targets_not_the_casters():
     """Shadow of Fear gives a body to the worst fear of whoever it lands on — the caster's opponent."""
-    from xiaolin_showdown.logic.summons import _FEARS
+    from xiaolin_showdown.logic.flow.summons import _FEARS
 
     duel = _duel_targeting(13)  # the bot is Chase Young
     fear = deepcopy(load_catalog().card(SHADOW_OF_FEAR))
@@ -240,7 +240,7 @@ def test_the_fear_is_the_targets_not_the_casters():
 
 
 def test_a_target_with_no_fear_named_meets_a_nameless_dread():
-    from xiaolin_showdown.logic.summons import _A_NAMELESS_DREAD
+    from xiaolin_showdown.logic.flow.summons import _A_NAMELESS_DREAD
 
     duel = _duel_targeting(1)
     nameless = deepcopy(duel.state.bot.character)
@@ -252,7 +252,7 @@ def test_a_target_with_no_fear_named_meets_a_nameless_dread():
 def test_every_duelist_has_a_desire():
     """Moonstone conjures per character, so a fighter added to the roster needs its own entry — without
     one it silently falls back to a plain figment. This is the guard the fallback would otherwise hide."""
-    from xiaolin_showdown.logic.summons import _DESIRES
+    from xiaolin_showdown.logic.flow.summons import _DESIRES
 
     duelists = [c for c in load_catalog().characters if c.affiliation in {"xiaolin", "heylin"}]
     missing = [c.name for c in duelists if c.name not in _DESIRES]

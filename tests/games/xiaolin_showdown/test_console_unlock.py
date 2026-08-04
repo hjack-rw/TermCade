@@ -14,7 +14,7 @@ from termcade.ui.app import EngineApp
 from termcade.ui.screens.console import DEBUG_ENV, ConsoleScreen
 
 from xiaolin_showdown.game import build_game
-from xiaolin_showdown.logic.ladder import LADDER, progress
+from xiaolin_showdown.logic.config.ladder import LADDER, progress
 
 
 @pytest.fixture(autouse=True)

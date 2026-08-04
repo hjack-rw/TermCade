@@ -13,9 +13,9 @@ import pytest
 from termcade.core.rng import Rng
 from termcade.ui.app import EngineApp
 from xiaolin_showdown.game import build_game
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.screens.temple import TempleScreen
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.screens.run.temple import TempleScreen
 
 pytestmark = pytest.mark.slow
 

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from termcade.core.settings import Difficulty, Settings
 
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.ladder import (
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.config.ladder import (
     boss_tier_unlocked,
     effective_difficulty,
     progress,

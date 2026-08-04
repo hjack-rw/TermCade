@@ -22,9 +22,9 @@ from textual.widgets import Button
 from termcade.ui.app import EngineApp
 
 from xiaolin_showdown.game import build_game
-from xiaolin_showdown.logic.state import XiaolinState
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.settings import (
+from xiaolin_showdown.logic.schema.state import XiaolinState
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.config.settings import (
     XiaolinSettings,
     default_settings,
     deck_size_for,
@@ -108,7 +108,7 @@ async def test_a_run_already_saved_keeps_the_rules_it_was_dealt(tmp_path, catalo
     """
     from termcade.core.rng import Rng
 
-    from xiaolin_showdown.logic.setup import new_game
+    from xiaolin_showdown.logic.flow.setup import new_game
 
     old_rules = XiaolinSettings(max_deck_size=20, point_limit=13)
     state = new_game(catalog, Rng(1), catalog.character(1), settings=old_rules)
@@ -181,7 +181,7 @@ async def test_the_slot_marks_the_save_beside_its_name(tmp_path, catalog):
     from termcade.core.rng import Rng
     from termcade.ui.screens.save_slot import SaveSlotScreen
 
-    from xiaolin_showdown.logic.setup import new_game
+    from xiaolin_showdown.logic.flow.setup import new_game
 
     older = XiaolinSettings(max_deck_size=20, point_limit=13)
     state = new_game(catalog, Rng(1), catalog.character(1), settings=older)

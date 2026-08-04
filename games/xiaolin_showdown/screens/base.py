@@ -7,8 +7,8 @@ from typing import cast
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.screens.menu import MenuScreen
 
-from ..logic.settings import XiaolinSettings
-from ..logic.state import XiaolinState
+from ..logic.config.settings import XiaolinSettings
+from ..logic.schema.state import XiaolinState
 
 
 class _Run:
@@ -32,9 +32,9 @@ class _Run:
         than recomputing it. Lazy imports: outcome.py imports the temple.
         """
         self.state.has_ended = True
-        from ..logic.ladder import record_win
-        from ..logic.outcome import final_score
-        from .outcome import OutcomeScreen
+        from ..logic.config.ladder import record_win
+        from ..logic.flow.outcome import final_score
+        from .run.outcome import OutcomeScreen
 
         outcome = final_score(self.state, self.ctx.rng)  # type: ignore[attr-defined]
         if outcome.winner is self.state.player.character:

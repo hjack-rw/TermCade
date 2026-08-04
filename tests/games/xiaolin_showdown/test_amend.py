@@ -11,7 +11,7 @@ from copy import deepcopy
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.actions import deposit, usable_powers, use_power
+from xiaolin_showdown.logic.flow.actions import deposit, usable_powers, use_power
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
 
 MOUSE = 66  # Hodoku Mouse — amend/use

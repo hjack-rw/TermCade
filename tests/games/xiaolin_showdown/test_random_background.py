@@ -10,12 +10,12 @@ from dataclasses import replace
 
 from factories import auto_choices, run_showdown
 
-from xiaolin_showdown.logic.battle import Round
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.constants import ELEMENTS
-from xiaolin_showdown.logic.duel import Duel
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.logic.settings import XiaolinSettings
+from xiaolin_showdown.logic.flow.battle import Round
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.schema.constants import ELEMENTS
+from xiaolin_showdown.logic.flow.duel import Duel
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
 
 async def _background_must_not_be_asked(_options):

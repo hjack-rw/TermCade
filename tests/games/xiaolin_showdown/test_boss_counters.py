@@ -1,6 +1,6 @@
 """A boss wary of its own counters — steal them, and bank them the instant they're held.
 
-Jack's own five (see logic/jack.py), Hannibal's own five, and Chase's one (all in
+Jack's own five (see logic/characters/jack.py), Hannibal's own five, and Chase's one (all in
 docs/design/BOSSES.md) are the keyed sets built so far; Wuya has none yet, and that is a real,
 empty set, not a gap."""
 
@@ -10,10 +10,11 @@ from termcade.core.rng import Rng
 
 from factories import duelist, wu
 
-from xiaolin_showdown.logic import bot, jack
+from xiaolin_showdown.logic.flow import bot
+from xiaolin_showdown.logic.characters import jack
 from xiaolin_showdown.logic.mechanics.powers import Mechanic
-from xiaolin_showdown.logic.models import Character, Power
-from xiaolin_showdown.logic.turn import _priority_deposit, counters_against, pick_deposit
+from xiaolin_showdown.logic.schema.models import Character, Power
+from xiaolin_showdown.logic.flow.turn import _priority_deposit, counters_against, pick_deposit
 
 
 def _character(name: str, mechanic: Mechanic) -> Character:
@@ -37,7 +38,7 @@ def _plain_character() -> Character:
 
 
 def test_counters_against_jack_is_his_own_set():
-    assert counters_against(_jack_character()) == jack.COUNTER_MECHANICS
+    assert counters_against(_jack_character()) == jack.counter
 
 
 def test_counters_against_hannibal_is_his_five():

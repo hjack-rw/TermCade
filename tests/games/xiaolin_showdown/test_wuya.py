@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from termcade.core.rng import Rng
 
-from xiaolin_showdown.logic.actions import use_power
-from xiaolin_showdown.logic.constants import WEAR_LIMIT
-from xiaolin_showdown.logic.models import Character, Mechanic, Power
-from xiaolin_showdown.logic.settings import XiaolinSettings
-from xiaolin_showdown.logic.state import XiaolinState
-from xiaolin_showdown.logic.temple_ai import WITCH_RECALL_LIMIT, WITCH_RECALL_MARGIN
-from xiaolin_showdown.logic.training import can_train
-from xiaolin_showdown.logic.turn import RECALL, bank_value, bot_turn
+from xiaolin_showdown.logic.flow.actions import use_power
+from xiaolin_showdown.logic.schema.constants import WEAR_LIMIT
+from xiaolin_showdown.logic.schema.models import Character, Mechanic, Power
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.schema.state import XiaolinState
+from xiaolin_showdown.logic.characters.wuya import WITCH_RECALL_LIMIT, WITCH_RECALL_MARGIN
+from xiaolin_showdown.logic.flow.training import can_train
+from xiaolin_showdown.logic.flow.turn import RECALL, bank_value, bot_turn
 
 from factories import duelist, wu
 
@@ -107,7 +107,7 @@ def test_six_across_the_board_is_still_master():
 
 
 def test_a_chosen_opponent_overrides_the_roster_pick(catalog):
-    from xiaolin_showdown.logic.setup import new_game
+    from xiaolin_showdown.logic.flow.setup import new_game
 
     state = new_game(catalog, Rng(1), catalog.character(1), roster="boss", opponent=catalog.character(12))
     assert state.bot.character.name == "Wuya"

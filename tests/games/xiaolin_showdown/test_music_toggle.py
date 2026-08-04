@@ -17,7 +17,7 @@ from termcade.ui.app import EngineApp
 from termcade.ui.widgets import Button
 
 from xiaolin_showdown.game import build_game
-from xiaolin_showdown.screens.settings import SettingsScreen
+from xiaolin_showdown.screens.reference.settings import SettingsScreen
 
 pytestmark = pytest.mark.slow
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 import pytest
 
 from xiaolin_showdown.logic.mechanics.scoring import initiative, initiative_sources
-from xiaolin_showdown.logic.models import Card, Mechanic, Player
-from xiaolin_showdown.screens.format import bonus_tooltip
+from xiaolin_showdown.logic.schema.models import Card, Mechanic, Player
+from xiaolin_showdown.screens.display.format import bonus_tooltip
 from factories import duelist, wu
 
 JETBOOTSU = 10  # +1, the player's own buff

@@ -10,23 +10,22 @@ from __future__ import annotations
 from termcade.ui.screens.dialog import ChoiceModal
 from termcade.ui.screens.log import GameLogScreen
 
-from xiaolin_showdown.logic.constants import TOURNAMENT
-from xiaolin_showdown.logic.duel import DuelState
+from xiaolin_showdown.logic.schema.constants import TOURNAMENT
+from xiaolin_showdown.logic.flow.duel import DuelState
 from xiaolin_showdown.logic.mechanics.powers import is_gamble, trigger_of
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute
-from xiaolin_showdown.logic.turn import VAULT
-from xiaolin_showdown.screens.duel import DuelScreen
-from xiaolin_showdown.screens.duel_board import _showdown_story, _wager_label
-from xiaolin_showdown.screens.format import (
+from xiaolin_showdown.logic.flow.turn import VAULT
+from xiaolin_showdown.screens.run.duel import DuelScreen
+from xiaolin_showdown.screens.display.duel_board import _showdown_story, _wager_label
+from xiaolin_showdown.screens.display.format import display_name, stats_line
+from xiaolin_showdown.screens.display.headline import (
     OPPONENT_LOG,
     SHOWDOWN_LOG,
-    display_name,
     opponent_move,
-    stats_line,
     wu_in_prose,
     your_move,
 )
-from xiaolin_showdown.screens.temple import TempleScreen
+from xiaolin_showdown.screens.run.temple import TempleScreen
 
 
 def _log(app) -> str:

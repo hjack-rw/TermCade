@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from xiaolin_showdown.logic.actions import (
+from xiaolin_showdown.logic.flow.actions import (
     SPENT_MESSAGE,
     can_deposit,
     can_draw,
@@ -19,7 +19,7 @@ from xiaolin_showdown.logic.actions import (
     usable_powers,
     use_power_blocked,
 )
-from xiaolin_showdown.logic.settings import deposit_limit
+from xiaolin_showdown.logic.config.settings import deposit_limit
 
 BRAS_FINGER = 16  # a `deposit`-trigger Wu: usable only while a deposit is still allowed
 PLAIN_WU = 6

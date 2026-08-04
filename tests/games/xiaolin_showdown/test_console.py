@@ -20,7 +20,7 @@ from termcade.ui.screens.console import DEBUG_ENV, ConsoleScreen
 
 from xiaolin_showdown.console import COMMANDS
 from xiaolin_showdown.game import build_game
-from xiaolin_showdown.screens.temple import TempleScreen
+from xiaolin_showdown.screens.run.temple import TempleScreen
 
 ROOSTER_BOOSTER = 43
 SHIMO_STAFF = 44
@@ -231,7 +231,7 @@ async def test_it_opens_on_the_start_menu_too(tmp_path):
     unlock cheat only touches settings — see test_console_unlock.py), so the console itself no
     longer refuses to open just because the start menu has no game running yet.
     """
-    from xiaolin_showdown.screens.start import StartScreen
+    from xiaolin_showdown.screens.run.start import StartScreen
 
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1)
     async with app.run_test(size=(120, 40)) as pilot:

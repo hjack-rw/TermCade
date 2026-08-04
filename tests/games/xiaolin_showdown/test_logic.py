@@ -12,7 +12,7 @@ from copy import deepcopy
 from termcade.core.rng import Rng
 from termcade.core.saves import SaveManager, SqliteBackend
 
-from xiaolin_showdown.logic.actions import (
+from xiaolin_showdown.logic.flow.actions import (
     FIZZLE_MESSAGE,
     can_deposit,
     can_draw,
@@ -22,17 +22,17 @@ from xiaolin_showdown.logic.actions import (
     usable_powers,
     use_power,
 )
-from xiaolin_showdown.logic.battle import Ground, Round
-from xiaolin_showdown.logic.bot import choose_background, choose_boost, choose_card, choose_challenge
+from xiaolin_showdown.logic.flow.battle import Ground, Round
+from xiaolin_showdown.logic.flow.bot import choose_background, choose_boost, choose_card, choose_challenge
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
-from xiaolin_showdown.logic.catalog import load_catalog
-from xiaolin_showdown.logic.constants import FIRST_DECK_CARD
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.schema.constants import FIRST_DECK_CARD
 from xiaolin_showdown.logic.mechanics.scoring import count_end_stats, initiative
-from xiaolin_showdown.logic.models import Card, Mechanic, Player, Power
-from xiaolin_showdown.logic.outcome import final_score
-from xiaolin_showdown.logic.settings import XiaolinSettings, deck_size_for, point_limit_for
-from xiaolin_showdown.logic.setup import new_game
-from xiaolin_showdown.logic.state import XiaolinState
+from xiaolin_showdown.logic.schema.models import Card, Mechanic, Player, Power
+from xiaolin_showdown.logic.flow.outcome import final_score
+from xiaolin_showdown.logic.config.settings import XiaolinSettings, deck_size_for, point_limit_for
+from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.logic.schema.state import XiaolinState
 from factories import NO_STATS, STATS, duelist, ground, wu
 
 

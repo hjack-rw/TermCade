@@ -18,7 +18,7 @@ from enum import StrEnum
 
 from termcade.core.rng import Rng
 
-from ..models import Mechanic, Power
+from ..schema.models import Mechanic, Power
 
 
 class Timing(StrEnum):
