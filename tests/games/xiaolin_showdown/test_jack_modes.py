@@ -175,7 +175,8 @@ def test_chamelon_boost_card_bumps_only_the_contested_stat():
     duel.state.player.character.stats = {"force": 9, "agility": 2, "intellect": 2}
     card = duel._chamelon_boost_card()
     assert card is not None
-    assert card.stats == {"force": 6, "agility": 0, "intellect": 0}  # 9 - his own 3
+    # 9 - his own 3, plus CHAMELON_MARGIN (1) past parity, not just up to it
+    assert card.stats == {"force": 7, "agility": 0, "intellect": 0}
     assert card.element == ""  # never resonates or suffers — precisely the bump, nothing else
 
 
@@ -273,21 +274,39 @@ async def test_setup_background_choice_reads_jacks_real_stats(monkeypatch):
     assert captured["bot_stats"] == duel.state.bot.character.stats
 
 
-def test_jack_stats_display_helper_denies_only_the_contested_stat_in_chamelon_mode():
+def test_jack_stats_display_helper_hides_chamelon_denial_its_a_boost_not_a_base():
+    # Chamelon-Bot's denial is a boost now (see `_chamelon_boost_card`), already shown on the
+    # Offensive line — the header must not bake it in too, or the printed total double-counts it.
     jack_player = duelist(stats={"force": 3, "agility": 3, "intellect": 7})
     opponent = duelist(stats={"force": 9, "agility": 9, "intellect": 2})
     duel_state = DuelState()
-    live = Round(stat="force")
 
     duel_state.jack_mode = jack.CHAMELON_NAME
-    shown = _jack_stats(duel_state, jack_player, opponent, live)
-    assert shown == {"force": 9, "agility": 3, "intellect": 7}  # only the contested stat denied
+    assert _jack_stats(duel_state, jack_player, opponent) is None
 
     duel_state.jack_mode = jack.AI_JACK_NAME
-    assert _jack_stats(duel_state, jack_player, opponent, live) is None
+    assert _jack_stats(duel_state, jack_player, opponent) is None
 
     duel_state.jack_mode = None
-    assert _jack_stats(duel_state, jack_player, opponent, live) is None
+    assert _jack_stats(duel_state, jack_player, opponent) is None
+
+
+def test_jack_stats_display_helper_shows_good_jacks_override():
+    # Good Jack sets no `jack_mode` while worn — the header must key off `yoyo_flipped` directly, or
+    # it silently falls back to Evil Jack's raw stats mid-fight.
+    duel = _jack_duel(player_priority=True)
+    jack_player = duel.state.bot
+    opponent = duel.state.player
+    jack_player.yoyo_flipped = True
+    real = jack_player.character.stats
+
+    shown = _jack_stats(duel.duel, jack_player, opponent)
+
+    assert shown == {
+        "force": jack.GOOD_JACK_STAT + (real["force"] - jack.JACK_PRINTED_PHYSICAL),
+        "agility": jack.GOOD_JACK_STAT + (real["agility"] - jack.JACK_PRINTED_PHYSICAL),
+        "intellect": jack_player.good_jack_intellect,
+    }
 
 
 def test_is_construct_true_for_jong():

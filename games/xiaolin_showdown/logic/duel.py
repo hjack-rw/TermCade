@@ -71,6 +71,13 @@ _CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET
 # prize, see `_award_prize`). +1 not +2: at +2 the `bot.BEAST_MARGIN` when-to-beast dial reads flat.
 BEAST_BOOST = 1
 
+# Chamelon-Bot's denial: how far ABOVE parity it closes the gap when the player leads, not just up to
+# it (see `_chamelon_boost_card`). Swept 0-3 (n=300, then confirmed n=500) once the pool's growth
+# (Denshi Bunny through the Yo-Yo family) had pushed Jack from his old ~23.6% up to 29.2% — owner:
+# "I would like him a bit lower." 0 (exact parity, the shipped baseline through 2026-08-04): 29.2%.
+# 1: 18.0%. 2: overshoots to ~10%. 1 is the only value in range — a discrete dial, not a smooth one.
+CHAMELON_MARGIN = 1
+
 # Hannibal's Elemental Deflection covers the four elements — never metal, which he cannot deflect.
 # Two halves: his own Wu of these ignore the arena's DRAG (−1 -> 0, the lift kept), and the foe's Wu
 # of these lose their arena LIFT (+1 -> 0). Set on both sides in `_ground`.
@@ -976,10 +983,10 @@ class Duel:
 
     def _chamelon_boost_card(self) -> Card | None:
         """A synthetic boost, built fresh each cycle, never a real catalog row: raises Jack's own
-        stat to the opponent's on the ONE stat this battle contests, never below his own, never
-        touching the other two. `None` when he isn't sent as Chamelon-Bot, the stat needs no help,
-        or he has already spent it this showdown. `_commit_boost` knows its reserved id and never
-        stakes it — a computed effect, not a Wu he could lose.
+        stat past the opponent's by `CHAMELON_MARGIN` on the ONE stat this battle contests, never
+        below his own, never touching the other two. `None` when he isn't sent as Chamelon-Bot, the
+        stat needs no help, or he has already spent it this showdown. `_commit_boost` knows its
+        reserved id and never stakes it — a computed effect, not a Wu he could lose.
 
         Rebuilt fresh each cycle rather than sourced from `_boost_options`, so it is never subject
         to that machinery's identity-based "already spent" filter — checked here by id instead, or a
@@ -994,7 +1001,7 @@ class Duel:
         if not contested or contested not in own:
             return None
         opponent_stat = jong.battle_stats(self.state.player).get(contested, 0)
-        bump = opponent_stat - own[contested]
+        bump = opponent_stat - own[contested] + CHAMELON_MARGIN
         if bump <= 0:
             return None
         stats: dict[str, int | None] = {stat: 0 for stat in own}

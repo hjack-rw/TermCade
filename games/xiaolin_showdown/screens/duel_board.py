@@ -181,9 +181,10 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             deflect="ward" if _bot_deflects else None,
             # Jack's identity swap: `jack_mode` IS the shown name for AI Jack / Chamelon-Bot, but
             # Attack!'s own rotates through `attack_bot_name` instead — see `DuelState.jack_mode`.
-            # Chamelon-Bot's header must also read what it actually scores as, not his own printed stats.
+            # Attack! and Good Jack's headers must also read what they actually score as, not his own
+            # printed stats — Chamelon-Bot's denial is a boost, already carried by the offensive line.
             shown_name=duel.attack_bot_name if duel.jack_mode == jack.ATTACK_NAME else duel.jack_mode,
-            shown_stats=_jack_stats(duel, state.bot, state.player, live),
+            shown_stats=_jack_stats(duel, state.bot, state.player),
         ),
     ]
     if duel.winner_character:
@@ -205,26 +206,31 @@ def _beast_for(duel: DuelState, live: Round) -> str | None:
 
 
 def _jack_stats(
-    duel: DuelState, jack_player: Player, opponent: Player, live: Round
+    duel: DuelState, jack_player: Player, opponent: Player
 ) -> dict[str, int] | None:
-    """His shown stats when they diverge from his own printed 3/3/7, exactly as they score — `None`
-    for AI Jack or plain Jack, where the header reads his own printed stats like anyone else's.
+    """His shown stats when they diverge from his own printed 3/3/7, exactly as `duel.Duel._jack_base`
+    computes them — `None` for AI Jack, plain Jack, or Chamelon-Bot, where the header reads his own
+    printed stats like anyone else's.
 
-    Chamelon-Bot denies the dodge on the ONE stat actually contested this battle (`live.stat` — a
-    tournament's other two legs see his plain printed stats), raising it to the opponent's, never
-    below his own — matching `duel.Duel._bot_base` exactly, not a full mirror. Attack! is his flat
-    ATTACK_STAT plus the same metal resonance/suffer swing `duel.Duel._jack_base` adds for real —
-    duplicated here rather than shared, same as `_beast_for` already duplicates a `duel.py` check:
+    Chamelon-Bot is deliberately absent here: its denial is a BOOST now (`duel.Duel._chamelon_boost_card`
+    / `_commit_boost`), not a base override, so it already appears on the Offensive line like any other
+    boost — baking it into the header too once double-counted it (base showed the bumped total AND the
+    offensive line showed the bump again). Attack! is his flat ATTACK_STAT plus the same metal
+    resonance/suffer swing `_jack_base` adds for real. Good Jack (`Player.yoyo_flipped`) is
+    `_jack_base`'s GOOD_JACK_STAT override on force/agility plus his separately trained intellect —
+    both duplicated here rather than shared, same as `_beast_for` already duplicates a `duel.py` check:
     this module only ever reads `DuelState`, never a live `Duel`.
     """
-    if duel.jack_mode == jack.CHAMELON_NAME:
-        own = dict(jong.battle_stats(jack_player))
-        if live.stat in own:
-            own[live.stat] = max(own[live.stat], jong.battle_stats(opponent).get(live.stat, 0))
-        return own
     if duel.jack_mode == jack.ATTACK_NAME:
         swing = element_score("metal", duel.background) if duel.background else 0
         return {stat: jack.ATTACK_STAT + swing for stat in jong.battle_stats(opponent)}
+    if mechanic_of(jack_player.character.power) is Mechanic.BOT and jack_player.yoyo_flipped:
+        real = jack_player.character.stats
+        return {
+            "force": jack.GOOD_JACK_STAT + (real["force"] - jack.JACK_PRINTED_PHYSICAL),
+            "agility": jack.GOOD_JACK_STAT + (real["agility"] - jack.JACK_PRINTED_PHYSICAL),
+            "intellect": jack_player.good_jack_intellect,
+        }
     return None
 
 

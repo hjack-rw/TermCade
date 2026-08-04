@@ -66,7 +66,7 @@ class Mechanic(StrEnum):
     ANIMATE = "animate"  # Heart of Jong — nothing fielded alone; in the boost slot it morphs (Moby Morpher shape, arena element) into an animated form the background names. The seed of Mala Mala Jong's deferred assembly
     HACK = "hack"  # Denshi Bunny — vs a robot construct (Jack in any bot identity swap, never Mala Mala Jong): a stand-in (AI Jack, Attack!) auto-loses outright; a modifier (Chamelon-Bot's boost, Jack-Bot's curse) is nullified instead
     STEAL = "steal"  # Sands of Time — takes the opponent's strongest hand Wu, or a random deck card if the hand is empty; the same policy AI Jack's own steal already uses
-    CONDUCT = "conduct"  # Shard of Lightning — +1 to the contested stat per metal Wu on the table this battle, either side, boosts included, plus +1 more if the arena itself is metal. Uncapped.
+    CONDUCT = "conduct"  # Shard of Lightning — +1 to the contested stat per metal Wu on the table this battle, -1 per non-metal Wu, either side, boosts included, plus +1/-1 more once the arena itself is decided. Uncapped, can go negative.
     STAT_SWAP = "stat_swap"  # Ying Yo-Yo / Yang Yo-Yo — names a stat, swapped with the opponent's Character for the rest of the showdown; also flips the caster's shown affiliation for the rest of the run (Good Jack, for Jack specifically)
     CHI_SWAP = "chi_swap"  # Ying-Yang Yo-Yo (combined) — same stat swap as the halves, but flips the OPPONENT's affiliation instead of the caster's own; a separate temple power lets the caster correct their own, exiling the card for good
 
