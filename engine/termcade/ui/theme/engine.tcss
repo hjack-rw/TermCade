@@ -159,12 +159,9 @@ ToastRack {
 }
 
 /* --- Dev console (backtick) ----------------------------------------------- */
-/* It FLOATS over the game: the board stays visible under a dimmed veil, so a Wu conjured into a hand
-   can be watched landing in it. A full screen would hide the very thing you are changing. */
-/* Semi-transparent, deliberately: the board is *readable* through the console. You conjure a Wu and
-   watch the hand it lands in without closing anything. Opaque, the console would hide the very thing
-   it exists to change. 30% veil over the game, 80% panel over that — enough contrast to read the text
-   against, not enough to blindfold the board. */
+/* Floats over the game rather than replacing it: the board stays readable under a dimmed veil, so
+   whatever the console conjures can be watched landing on it. 30% veil over the game, 80% panel over
+   that — enough contrast to read the console's own text against, not enough to blindfold the board. */
 ConsoleScreen {
     align: center middle;
     background: $background 30%;
@@ -262,14 +259,9 @@ GameLogScreen.-touch BoxedPanel {
     max-height: 100%;
     overflow-y: auto;
 }
-/* Look Up lists both hands, which is more rows than a phone has room for. Five at a time, the rest
-   a scroll away — enough to compare without the list owning the whole screen. */
-LookUpScreen.-touch BoxedPanel,
-DepositScreen.-touch BoxedPanel,
-ChoiceModal.-touch BoxedPanel,
-SettingsScreen.-touch BoxedPanel {
-    /* Five options: each is a bordered button three rows tall, plus the panel's own border and its
-       "Choose a card" line. Eleven rows fitted exactly one of them. */
+/* Five options: each is a bordered button three rows tall, plus the panel's own border and its
+   "Choose a card" line. Eleven rows fitted exactly one of them. */
+ChoiceModal.-touch BoxedPanel {
     max-height: 24;
 }
 GameLogScreen.-touch #log-body,

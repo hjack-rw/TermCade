@@ -42,8 +42,7 @@ SELF_CORRECT_YOYO = "Correct Your Own Alignment"
 
 
 class UsePowerScreen(XiaolinMenu):
-    """The Early Bird is listed among the Wu powers: it costs the same action and spends a Wu, so it
-    is a power like any other — it just belongs to no card."""
+    """The Early Bird is listed among the Wu powers — same action cost, but belongs to no card."""
 
     BINDINGS = [("escape", "app.pop_screen", "Cancel")]
 
@@ -65,8 +64,7 @@ class UsePowerScreen(XiaolinMenu):
         ]
         if can_early_bird(self.state, self.rules):
             items.append(MenuItem(id="early-bird", label=EARLY_BIRD))
-        # The set is complete: offer the transform. Its own entry, not a Wu spend — it consumes the
-        # whole hand's worth, not one card, so it reads as the momentous thing it is.
+        # Its own entry, not a Wu spend — it consumes the whole hand's worth, not one card.
         if can_construct(self.state, player_actions(self.state, self.rules)):
             items.append(MenuItem(id="construct", label=CONSTRUCT))
         budget = player_actions(self.state, self.rules)
@@ -92,9 +90,9 @@ class UsePowerScreen(XiaolinMenu):
         self._spend(self._usable[self.index_of(item_id, "pow")])
 
     def _return_to_temple(self, toast: str, log_line: str, action: str) -> None:
-        """Every power-worker ends the same way: pop back to the temple, flash a toast that must NOT
-        self-log (``log=False`` — the journal owns the log's shape), then journal the outcome. One
-        place, so a forgotten ``log=False`` cannot double-log a mangled toast into the Game Log."""
+        """Every power-worker ends the same way: pop back to the temple, flash a toast that never
+        self-logs, then journal the outcome. Centralized so a forgotten ``log=False`` can't
+        double-log a toast."""
         self.app.pop_screen()
         self.engine_app.notify(toast, log=False)
         self.ctx.journal.add(log_line, title=your_move(action))
@@ -191,8 +189,7 @@ class UsePowerScreen(XiaolinMenu):
         return None
 
     async def _ask_destination(self, target: Card | None) -> bool:
-        """Where the shoved Wu lands — the two costs of Repulsion. Deposit pays them points but is
-        forever; the deck gives no points but they draw it back. Returns True for the deck."""
+        """Where the shoved Wu lands. Returns True for the deck, False for a deposit."""
         if target is not None:
             top = card_headline(target)
             top.append(" — where does it go?")
@@ -208,8 +205,8 @@ class UsePowerScreen(XiaolinMenu):
         )
 
     async def _ask_priority(self) -> bool:
-        """Reveal and question on one screen: the next Wu is the whole reason to want initiative, so
-        choosing before seeing it would be no choice at all."""
+        """Reveal the next Wu before asking whether to take initiative — choosing blind would be no
+        choice at all."""
         coming = coming_wu(self.state)
         if coming:
             top = card_headline(coming[0])

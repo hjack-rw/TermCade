@@ -40,9 +40,7 @@ def build_game() -> Game:
         # A run saved under a smaller pool still plays by its own rules. The slot says so, rather
         # than leaving the player to wonder why the game feels different.
         save_note=save_note,
-        # `~` opens the console; these are what it can do. It exists to make a NEW Wu testable:
-        # deal it into a hand, stack the pile with it, and play the thing you are judging by the
-        # same rules a dealt Wu would be played by.
+        # `~` opens the console (see console.py) — its commands.
         console_commands=COMMANDS,
         # The Game Log is the engine's; the Wu in it are ours. Without this a card is plain grey words
         # on the one screen that recounts the whole run.

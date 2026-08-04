@@ -23,9 +23,8 @@ class StartScreen(EngineScreen):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="start-root"):
-            # Both wordmarks are mounted and the stylesheet picks one on the `-narrow` breakpoint.
-            # Choosing in Python would mean recomposing the screen on every resize, and this screen
-            # is the first thing a player sees — it should not flicker while a phone is turned.
+            # Both wordmarks are mounted; the stylesheet picks one on the `-narrow` breakpoint.
+            # Choosing in Python would force a recompose on every resize.
             with Center():
                 yield Static(BANNER, id="banner")
                 yield Static(BANNER_COMPACT, id="banner-compact")

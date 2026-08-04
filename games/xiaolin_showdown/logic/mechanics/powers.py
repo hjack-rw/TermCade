@@ -47,49 +47,34 @@ class Rule:
 
 # What a GAMBLE Wu pays when it is banked, inclusive. Nobody is told this: the card shows `?`.
 #
-# Its DB `points` is the card's *expected* value (read only by `point_limit_for` and the bot's ranking),
-# not a payout the card can pay: the true average is 1.5 against a stored 1, so the bot undervalues it by
-# a hair — deliberate, one Wu, in the player's favour. Widen the spread and the stored value must move.
+# Its DB `points` is the card's *expected* value (read only by `point_limit_for` and the bot's
+# ranking), not a payout the card can pay — the two are allowed to differ. Widen the spread and the
+# stored value must move to match.
 #
-# ⚠ THIS IS THE ONLY RANDOMNESS A DUELIST CANNOT SEE COMING, AND IT BELONGS TO EXACTLY ONE WU.
-# Everything else in this game is open hands and hard choices — that is the whole pitch, and it only
-# reads as a virtue while it stays true. A second card that rolls makes the first one ordinary and
-# the promise false. If you are about to give another Wu a random anything: don't.
+# The only randomness a duelist cannot see coming, and it belongs to exactly one Wu — a second card
+# that rolls would make this one ordinary. If you are about to give another Wu a random anything: don't.
 GAMBLE_SPREAD = (-2, 5)
 
 # What the Orb and the Curse pour into the one stat their caster names. Both print `? ? ?` — the mark
 # of a Wu whose stats are resolved when it is played — so the magnitude lives here, not in the row.
-#
-# Worth 3 because a battle scores every stat, not just the contested one: the contested stat is
-# worth 2 points and the other two 1 each (`battle.score_battle`). So pouring it into the challenge
-# is the obvious line, and pouring it into the two side stats to steal 1+1 instead is the one that
-# has to be *chosen*. Move this number and that choice moves with it.
 NAMED_STAT_VALUE = 3
 
-# How deep into the draw pile Teleskopia sees. Three, not one: a single card tells you what you are
-# about to draw, three lets you plan a turn around it — which is the whole reason to spend a Wu on
-# looking instead of banking it.
+# How many cards ahead Teleskopia reveals in the draw pile.
 SCOPE_DEPTH = 3
 
 # What the Morpher becomes when it is played. It prints `? ? ?` and takes these instead: the full
-# value on the two stats the battle is *not* fought over, and less on the one it is.
-#
-# The dip is the price of the rest of the card, and the Morpher is the one Wu that can pay it: it
-# chooses the element it counts as, so it always matches the arena, and the elemental bonus lands on
-# the contested stat *alone* — which stands the low stat straight back up. The cost is real anyway,
-# because the contested stat scores double (`battle.score_battle`) and metal arenas grant nothing.
+# value on the two stats the battle is *not* fought over, and less on the one it is — it chooses the
+# element it counts as, so the elemental bonus can land on the contested stat alone.
 MORPH_ASIDE = 2
 MORPH_CONTESTED = 1
 
 # What a Morpher lends when it is spent as a *boost* instead of fielded — a flat 1/1/1, in the element
-# its caster names. A dragon that chooses its colour: weaker than the fielded 2/2/1 shape, but always
-# in tune with the arena. This is the mode a wudai Moby Morpher (Hannibal's, or any found in the pool
-# and laid as a boost) takes, since the inalienable slot can only ever boost.
+# its caster names. This is the mode a wudai Moby Morpher (Hannibal's, or any found in the pool and
+# laid as a boost) takes, since the inalienable slot can only ever boost.
 MORPH_BOOST = 1
 
 # What the Heart of Jong's animated form takes in every stat when it comes alive **in the boost slot** —
-# a flat shape, no Morpher dip, always the arena's own element (so the elemental bonus stands it up). Set
-# above the Morpher's 2/2/1: a self-scoring extra fighter (see the opponent's balance Wu). Measured.
+# a flat shape, no Morpher dip, always the arena's own element.
 ANIMATE_STAT = 3
 # Fielded as a plain Wu instead of boosted, the Heart is a weaker middling body — no summon, no arena
 # element (it rests metal). The boost is the point; the field is a fallback.
@@ -459,18 +444,18 @@ SAPPHIRE_DRAGON = 69  # Agalmatosis — the one Wu a duelist cannot command; fie
 
 
 def is_uncontrolled(power: Power) -> bool:
-    """The Sapphire Dragon. Fielded, it turns on its own summoner — that side loses the showdown outright,
-    the inverse of the Treasurebox — and its stats never count, so they read ``?`` like the Gamble's.
-    Keyed to the power *id*: the name is flavour and has changed more than once, the id is stable."""
+    """The Sapphire Dragon. Fielded, it loses the showdown outright for its own summoner, and its
+    stats never count (reads ``?`` like the Gamble's). Keyed to the power *id*: the name is flavour
+    and has changed more than once, the id is stable."""
     return power.id == SAPPHIRE_DRAGON
 
 
-EMPEROR_SCORPION = 29  # Subjugation — Mala Mala Jong's bane, and its DB text already names the construct
+EMPEROR_SCORPION = 29  # Subjugation — Mala Mala Jong's bane
 
 
 def is_jong_bane(power: Power) -> bool:
-    """Emperor Scorpion. Fielded against Mala Mala Jong it disassembles the construct — that BATTLE is
-    won outright (a tournament leg, not the whole showdown). Id-keyed, like the Sapphire Dragon."""
+    """Emperor Scorpion. Fielded against Mala Mala Jong it wins that BATTLE outright (a tournament
+    leg, not the whole showdown). Id-keyed, like the Sapphire Dragon."""
     return power.id == EMPEROR_SCORPION
 
 
@@ -483,9 +468,8 @@ def roll_gamble(rng: Rng) -> int:
 def names_a_stat(power: Power) -> bool:
     """Does this Wu ask its caster which stat to pour itself into?
 
-    Both do — the Orb pours a gain, the Curse pours a wound. What they aim at is the same question,
-    asked of whoever plays them, so the duel asks it in one place. Both Yo-Yo forms ask the same
-    question for a third reason — which stat to swap with the opponent's Character.
+    BUFF/MISFORTUNE and both Yo-Yo forms all ask the same question of whoever plays them, so the
+    duel asks it in one place.
     """
     return mechanic_of(power) in (Mechanic.BUFF, Mechanic.MISFORTUNE, Mechanic.STAT_SWAP, Mechanic.CHI_SWAP)
 

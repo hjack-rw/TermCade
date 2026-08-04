@@ -10,19 +10,13 @@ from ..flow.turn import duel_value
 
 # What the oldest lost Wu must be worth before Wuya's witchcraft spends her temple action on the
 # recall. She pays no Wu (unlike the Rooster), so the bar sits under the Rooster's own REVIVAL_MARGIN
-# (see temple_ai.py) — but an action is still a deposit not made, and a scrap is not worth one.
+# (see temple_ai.py).
 WITCH_RECALL_MARGIN = 3
 
-# How many Wu the witchcraft may call back in a whole run. The recall is a RESOURCE, not a tap: with
-# no ceiling she never runs out of ammunition and the counterplay collapses to outrunning her to the
-# point target. A cap lets her spend it greedily — the margin stays low, so she takes what is worth
-# taking — and then it is gone. Raising the margin instead reached the same win rate by tuning the
-# signature mechanic into almost never firing, which is a footnote, not a boss.
+# How many Wu the witchcraft may call back in a whole run — a capped resource, not a tap.
 WITCH_RECALL_LIMIT = 3
 
-# Wuya's Witchcraft senses the Shen Gong Wu: she flies the Early Bird on a shorter initiative lead
-# than anyone else needs — her bond feels the moment to snatch the pile rather than outrunning them to
-# it. This is her tempo edge now that the flat +1 initiative is gone; the value is a balance knob.
+# Wuya flies the Early Bird on a shorter initiative lead than anyone else needs.
 WITCH_EARLY_BIRD_GAP = 2
 
 

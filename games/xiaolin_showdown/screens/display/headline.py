@@ -20,13 +20,8 @@ from .format import card_name_text, power_name_text, stats_line
 def card_headline(card: Card) -> Text:
     """One Wu, named: its name in its element's colour, then its stats in brackets. Nothing else.
 
-    **The established shape for a card anywhere it is named** — a button, a dialog, a reveal. The type
-    glyph is deliberately absent: it belongs to the temple's hand panels, where it says what can build
-    Mala Mala Jong and gives the eye something to sort by. On a button it is decoration, and decoration
-    on a button is noise.
-
     Built on a FRESH Text: `card_name_text` carries the element colour as its base style, so appending
-    to it directly tints the stats too (see `card_label`, which learned this the same way).
+    to it directly tints the stats too (see `card_label`, which hits the same trap).
     """
     line = Text()
     line.append_text(card_name_text(card, bold=True))
@@ -34,9 +29,7 @@ def card_headline(card: Card) -> Text:
     return line
 
 
-# What a Game Log entry is filed under. Three kinds, and the difference is WHOSE it is: a move of
-# yours, a move of theirs, and the showdown — which is neither. A showdown is not somebody's move; it
-# is what the two moves were leading to, so it is titled flat and owns no side.
+# Game Log entry titles.
 YOUR_LOG = "Your move"
 OPPONENT_LOG = "Opponent's move"
 SHOWDOWN_LOG = "Showdown"
@@ -48,29 +41,20 @@ def your_move(action: str) -> str:
 
 
 def opponent_move(actions: Sequence[str]) -> str:
-    """``Opponent's move: Deposit`` — the same shape, the other side of the table.
+    """``Opponent's move: Deposit`` — the same shape as :func:`your_move`.
 
-    One rule for both duelists: whose move, then which action. A move of theirs titled differently
-    from the same move of yours makes a reader compare two shapes instead of two sides.
-
-    A turn buys one action, so there is normally one to name. Where a rule hands out more (the console
-    can), the actions are not listed — a title is a label, and a label that grows is a sentence.
+    With more than one action (only possible via the console) the title omits them and reads
+    ``Opponent's move`` alone.
     """
     return f"{OPPONENT_LOG}: {actions[0]}" if len(actions) == 1 else OPPONENT_LOG
 
 
 def wu_in_prose(prose: str) -> Text:
-    """The game's own prose, with every Wu it names drawn as a Wu.
+    """The game's own prose, with every Wu it names drawn element-coloured, as elsewhere.
 
-    The Game Log's lines are sentences the game wrote — "Katnappé played Bras Finger", "Drew Eagle
-    Scope" — and a card written in plain grey words is a card in the one place the game does not look
-    like itself. Every other screen prints a Wu as an element-coloured name and its stats; so does this.
-
-    **A Wu is introduced once.** The first time it is named it comes with its stats, because that is
-    the moment a reader needs them; every mention after that is the name alone. Repeating the triple
-    turns a sentence into a datasheet, and the second copy tells nobody anything new.
-
-    Longest name first, or a Wu whose name contains another's gets cut in half by it.
+    A Wu is introduced once: the first mention gets its stats (`card_headline`), later mentions just
+    the name (`card_name_text`). Names are matched longest-first, or a Wu whose name contains another's
+    would get cut in half by it.
     """
     names, cards = _wu_names()
     text = Text()
@@ -95,14 +79,9 @@ def _wu_names() -> tuple[re.Pattern[str], dict[str, Card]]:
 
 
 def power_headline(card: Card) -> Text:
-    """A Wu named by its *power*: ``Teleskopia (Eagle Scope)``.
+    """A Wu named by its *power*: ``Teleskopia (Eagle Scope)`` — no stats, unlike `card_headline`.
 
-    The shape for a screen that asks which power to spend: the power is the thing being chosen, and
-    the Wu is only which card it costs you. No stats — a power does not care what the card fights for,
-    and printing them here asks a reader to weigh numbers that have nothing to do with the choice.
-    `card_headline` is the other way round, and belongs everywhere a *card* is what is being picked.
-
-    Fresh ``Text``, as always: both name helpers carry a colour as their base style.
+    Fresh ``Text``: both name helpers carry a colour as their base style.
     """
     line = Text()
     line.append_text(power_name_text(card.power))

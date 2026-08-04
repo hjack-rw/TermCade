@@ -26,8 +26,7 @@ from ...logic.schema.models import Card, Character, Power
 from ...logic.content.naming import display_name  # moved to logic (the duel needs it too); screens import it here
 from ...logic.flow.training import TRAIN_BOOST_STEP
 
-# element -> colour, as explicit hex so the theme's ANSI palette can't remap it (the OG mapping:
-# water blue, fire red, wind/air yellow, earth green, metal a neutral grey).
+# element -> colour, as explicit hex so the theme's ANSI palette can't remap it.
 COLORS = {
     "water": "#4a9eff",
     "fire": "#ff5555",
@@ -36,21 +35,19 @@ COLORS = {
     "metal": "#ced4da",
 }
 
-# Card / affiliation icons — plain Unicode symbols, deliberately picked for *text* presentation
-# (each has Emoji_Presentation=No), so any renderer that owns a glyph for them draws them monochrome,
-# never as colour emoji. They do need a comprehensive symbol font, though: on Windows that is Segoe
-# UI Symbol (reached automatically via font fallback), and the browser build embeds a covering font
-# in serve.py so xterm.js always has the glyphs. Written as \u/\U escapes so the source stays ASCII.
+# Plain Unicode symbols picked for *text* presentation (Emoji_Presentation=No), so no renderer draws
+# them as colour emoji. Needs a comprehensive symbol font: Segoe UI Symbol on Windows (font fallback),
+# and the browser build embeds a covering font in serve.py. Written as \u/\U escapes to keep source ASCII.
 ICONS = {
-    "wudai": "\U0001f5e1",  # weapon — the elemental warrior Wu
+    "wudai": "\U0001f5e1",  # weapon
     "head": "♔",  # crown
     "torso": "\U0001f580",  # armor
     "amulet": "\U0001f396",  # neckless
     "arms": "\U0001f591",  # hand
-    "boots": "⛸︎",  # feet — VS15: ambiguous width, so ask for the text face
+    "boots": "⛸︎",  # VS15: ambiguous width, so ask for the text face
     "item": "\U0001f6e0",  # tools
-    "xiaolin": "☯",  # yin-yang — the light-side monks
-    "heylin": "☸",  # dharma wheel — the dark-side villains
+    "xiaolin": "☯",  # yin-yang
+    "heylin": "☸",  # dharma wheel
     "construct": "⚙",  # robot gear
     "empty": "",
 }
@@ -67,8 +64,8 @@ def stats_line(stats: Mapping[str, int | None]) -> str:
     return "/".join(stat_str(stats[key]) for key in STAT_ORDER)
 
 
-# The stat a battle is decided on, wherever it is drawn: bright white and bold, against the dim of the
-# two that only count single. Bold on its own is advisory — a terminal may render it as nothing.
+# Style for the contested stat. Explicit bright colour, not just bold — bold alone is advisory and a
+# terminal may render it as nothing.
 CONTESTED_STYLE = "bold bright_white"
 
 
@@ -82,9 +79,6 @@ def stats_text(values: Sequence[str], challenge: str | None = None) -> Text:
     for index, (stat, value) in enumerate(zip(STAT_ORDER, values)):
         if index:
             text.append("/", style="dim")
-        # Bright on the contested stat, dim on the rest. One rule, everywhere a stat is printed — the
-        # end totals AND the Wu on the table — so the eye learns a single thing to look for. An explicit
-        # colour, because bold alone is a hint a terminal may ignore and is invisible on a dim ground.
         text.append(value, style="dim" if challenge and stat != challenge else CONTESTED_STYLE)
     return text
 
@@ -93,8 +87,7 @@ def card_stats_text(stats: Mapping[str, int | None], challenge: str | None = Non
     return stats_text([stat_str(stats[key]) for key in STAT_ORDER], challenge)
 
 
-# A negated line — a Sphere, a Scorpion, a Mirror. Not zero: *absent*. `?` is a stat not yet
-# resolved and `0` is a stat that resolved to nothing, and this is neither.
+# Not zero: *absent*. `?` is a stat not yet resolved, `0` is a stat resolved to nothing, this is neither.
 ABSENT = "-"
 
 
@@ -115,8 +108,7 @@ def affiliation_icon(character: Character) -> str:
     return ICONS.get(character.affiliation, "")
 
 
-# The five elements in turn, for a name that belongs to all of them — the Treasurebox of the Blind
-# Swordsman, whose wish reaches into every colour.
+# Element order for a name cycled through all five colours (see WISH below).
 _ELEMENT_CYCLE = ("water", "fire", "wind", "earth", "metal")
 
 
@@ -130,15 +122,9 @@ def _rainbow_name(name: str, *, bold: bool = False) -> Text:
 
 
 def card_name_text(card: Card, *, bold: bool = False) -> Text:
-    """The card's name as element-coloured Rich text.
-
-    In a duel the queue holds stand-ins whose ``element`` is what the card *resolved* as — a Morpher
-    wears its chosen element — so this shows the in-duel element, not the printed one. A curse mirror
-    keeps the element it is, and earns no bonus for the side it lands on (that is the duel's job, not
-    a colour's). A card with no element falls back to plain white.
-
-    The Treasurebox of the Blind Swordsman (WISH) is the one exception: it is every element and none,
-    so its name runs through all five colours rather than taking one.
+    """The card's name as element-coloured Rich text, using the in-duel resolved ``element`` (not
+    necessarily the printed one). The WISH card is the exception: its name runs through all five
+    colours rather than taking one. A card with no element falls back to plain white.
     """
     if mechanic_of(card.power) is Mechanic.WISH:
         return _rainbow_name(display_name(card.name), bold=bold)
@@ -147,42 +133,27 @@ def card_name_text(card: Card, *, bold: bool = False) -> Text:
 
 
 def points_label(card: Card) -> str:
-    """A card's deposit value — ``X`` when it has none to give.
-
-    A *born* wudai weapon can never be staked, lost or banked, so ``X`` reads "not for sale" where a
-    ``0`` would read "worth nothing": a dragon held from the start, or Hannibal's Morpher. A wudai
-    *found* in the pile — the Shimo Staff — is the exception: it is banked like any Wu and shows its
-    real points, as does a Morpher drawn from the pool (type ``arms``).
-    """
+    """A card's deposit value: ``X`` for a born wudai (can never be staked, lost or banked),
+    ``?`` for a gamble card, else its printed points."""
     if _is_born_wudai(card):
         return "X"
-    if is_gamble(card.power):  # nobody knows, and the card is not going to tell you
+    if is_gamble(card.power):
         return "?"
     return str(card.points)
 
 
-# Every ``type == "wudai"`` card, closed — Jack is the last boss, so this set does not grow further:
-#   * The four playable dragons (power id -1..-4) and Jack-Bot (power id -8) are BORN wudai: granted
-#     inalienably, printed wudai from the start, never in the pool, never banked.
-#   * Hannibal's Moby Morpher is wudai only in the one hand it can never leave (`held_as_wudai`
-#     converts the granted copy from its printed ``arms``); any other copy stays ``arms`` in the pool,
-#     an ordinary Wu. Its MORPH mechanic is what marks the born copy, since its power id (40) is
-#     positive — it was never going to fit the negative-id rule the dragons and Jack-Bot use.
-#   * The Shimo Staff is wudai printed, but ownerless: found, staked, lost and banked like any Wu. It
-#     reads boost-only (`is_boost_slot`) without ever being *born* to anyone.
+# Born wudai: negative power id (the dragons, Jack-Bot), or MORPH (Hannibal's Morpher, whose power id
+# is positive so it can't use the negative-id rule).
 def _is_born_wudai(card: Card) -> bool:
-    """A signature wudai a duelist holds from the start, never banked — as opposed to one won off the
-    pile (the Shimo Staff) or held only by convention (a Morpher drawn from the pool by anyone else)."""
+    """A signature wudai a duelist holds from the start, never banked."""
     if card.type != "wudai":
         return False
     return card.power.id < 0 or mechanic_of(card.power) is Mechanic.MORPH
 
 
 def display_type(card: Card) -> str:
-    """The type word a player reads, and the ``ICONS`` key it's drawn from — ``card.type`` itself for
-    every wudai above except Jack-Bot: a robot reading "Wudai" is a costuming mismatch, so it borrows
-    the ``construct`` icon Mala Mala Jong already prints rather than adding a new one.
-    """
+    """The type word/``ICONS`` key for a card — ``card.type``, except a BOT-mechanic card (Jack-Bot)
+    reads as ``construct`` instead of ``wudai``."""
     if mechanic_of(card.power) is Mechanic.BOT:
         return "construct"
     return card.type
@@ -247,18 +218,16 @@ def prompt(top: str | Text, question: str | Text) -> Text:
 def bonus_tooltip(bonuses: Sequence[int]) -> str:
     """``(+1, -1)`` — the buffs and debuffs behind an initiative, for a hover tooltip.
 
-    ``bonuses`` are the ones ``scoring.initiative_sources`` credits: this duelist's own buffs and
-    the opponent's debuffs, one per distinct value, so they always sum to the initiative shown.
-    Nothing applies → ``(none)``, so a silent hover always means "no tooltip here", never "no Wu".
+    ``bonuses`` are the ones ``scoring.initiative_sources`` credits, so they always sum to the
+    initiative shown. Nothing applies → ``(/)``.
     """
     if not bonuses:
         return "(/)"
     return f"({', '.join(f'{bonus:+d}' for bonus in bonuses)})"
 
 
-# What a Wu does, in one line, under its flavour. The trigger is already printed beside the power's
-# name, so it is not repeated here. Not every mechanic gets one: a plain Wu's stats are the whole of
-# it, and the joke Wu tells you nothing on purpose.
+# One-line effect text per mechanic, shown under a Wu's flavour. The trigger is printed separately
+# (see trigger_label), so it is not repeated here. Not every mechanic has an entry.
 EFFECTS = {
     Mechanic.HAND_SIZE: "Hand limit: +1",
     Mechanic.DRAW: "Draw a Wu from the incoming Wu pile.",
@@ -275,8 +244,7 @@ EFFECTS = {
     Mechanic.WARD: "Your Wu of its element cannot be dragged down this battle.",
     Mechanic.TRANSFER: "Swap your entire hand with your opponent's.",
     Mechanic.WITCHCRAFT: "Spent Wu return to her hand, worn; her turn can recall the lost.",
-    # Read off the constant, not typed out. This said "+3" while the duel dealt 1 — the card was
-    # lying to the player about a number the game had already measured and chosen.
+    # Read off the constant so this can't drift from what the duel actually deals.
     Mechanic.BEAST_FORM: f"+{BEAST_BOOST} to the contested stat, element-free; his Wu score nothing.",
     Mechanic.READ_DECK: "Read your opponent's personal Deck.",
     Mechanic.SCRY: f"Look at the next {SCOPE_DEPTH} Wu in the incoming Wu pile.",
@@ -295,8 +263,7 @@ EFFECTS = {
     "instead correct your own — exiled either way.",
     Mechanic.AMEND: "Take back your previous action this turn (boss runs only).",
     Mechanic.WISH: "One wish, then gone: deposit for points, restore a Vaulted Wu, or field to win the Showdown.",
-    # TRAIN_BOOST is not here: its number is the card's own ``train_step``, filled in by `effect_line`,
-    # so a higher-tier Wu never shows the base tier's "+3".
+    # TRAIN_BOOST is not here: its number is per-card (``train_step``), filled in by `effect_line`.
     Mechanic.BUFF: f"You name one stat. It takes +{NAMED_STAT_VALUE} in the battle.",
     Mechanic.MISFORTUNE: f"You name one stat. Your opponent takes −{NAMED_STAT_VALUE} in the battle.",
     Mechanic.FETCH: "Pull any one Wu from your own Deck into your hand.",
@@ -316,24 +283,20 @@ EFFECTS = {
 }
 
 
-# A wudai weapon is boost-only and unlosable — but a *character* whose power is one does not print the
-# weapon's own rules; they possess it. So the same mechanic reads one way on the Wu, another on its owner.
+# Mechanics that read differently on the Wu itself vs. the character who possesses it (see is_card
+# below).
 _WUDAI_MECHANICS = frozenset({Mechanic.DRAGON, Mechanic.MORPH, Mechanic.BOT})
 
 
 def effect_line(power: Power, *, is_card: bool = True) -> str | None:
     """The one-liner under a Wu's flavour, or ``None`` for the ones that do not earn one.
 
-    ``is_card`` distinguishes the Wu from the character who holds it: a dragon (or Hannibal's Morpher)
-    reads "boost only, can't be lost" as a *weapon*, but "possesses a custom wudai weapon" as a *power*.
+    ``is_card`` distinguishes the Wu from the character who holds it — text differs between the two.
     """
     mechanic = mechanic_of(power)
     if not is_card:
-        # Hannibal's Morpher is his one wudai, held unlosably; a dragon is a generic born weapon.
         if mechanic is Mechanic.MORPH:
-            # His Elemental Manipulation (power −5) is two things on one line: the Morpher, and the
-            # Deflection — his Wu shrug off the elements' drag, and the foe's elemental lift is turned
-            # aside (metal, which he cannot deflect, is spared). A passive; it only shows here.
+            # power id -5 (Elemental Manipulation) also carries a Deflection passive, described only here.
             if power.id == -5:
                 return "Immutable Moby Morpher; deflects the elements — his drag and the foe's lift, metal aside."
             return "Immutable Moby Morpher."
@@ -344,13 +307,11 @@ def effect_line(power: Power, *, is_card: bool = True) -> str | None:
         if mechanic is Mechanic.WITCHCRAFT:
             return "Her spent Wu return to her; the lost answer her call."
         if mechanic is Mechanic.BEAST_FORM:
-            # Was "+3 ... gifts the prize he wins" — wrong twice over. The beast KEEPS its prize;
-            # it is the ordinary Wu-play win that gifts one away (`duel._award_prize`), and that is
-            # the whole reason the mode is a choice worth making rather than a trap.
+            # Prize-gifting on a win is handled separately, in duel._award_prize.
             return f"Takes Beast Form for +{BEAST_BOOST}, but wields no Wu; keeps the prize he wins."
-    if is_uncontrolled(power):  # the Sapphire Dragon: a temple play only — fielded, it turns on you
+    if is_uncontrolled(power):
         return "Temple only: train a whole level at once. Fielded, it loses the Showdown for you."
-    if mechanic is Mechanic.TRAIN_BOOST:  # the number is the card's own, not one baked per mechanic
+    if mechanic is Mechanic.TRAIN_BOOST:  # the number is per-card, not baked per mechanic
         step = power.train_step or TRAIN_BOOST_STEP
         return f"Spend it to summon help to train against: +{step} to your training bar, once."
     return EFFECTS.get(mechanic)
@@ -368,9 +329,8 @@ _TRIGGERS = {
 def trigger_label(power: Power, *, is_card: bool = True, card_type: str | None = None) -> str:
     """When a power fires, e.g. ``On Play`` — or ``? ? ?`` for the gamble Wu, which says nothing.
 
-    A wudai fires as a *boost*, whatever the weapon's own trigger — so it reads ``On Boost`` whether
-    shown on the character who possesses it (a dragon, or Hannibal) or on a wudai-typed Wu itself
-    (Hannibal's Morpher). The same Morpher drawn from the pool (type ``arms``) is fielded: ``On Play``.
+    A wudai always fires as a *boost*, regardless of the weapon's own trigger (see ``_WUDAI_MECHANICS``
+    and ``card_type``).
     """
     if is_gamble(power):
         return "? ? ?"

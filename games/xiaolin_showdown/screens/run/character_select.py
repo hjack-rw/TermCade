@@ -1,8 +1,6 @@
 """Character select — pick a playable dragon, then deal a fresh game into the temple.
 
-Feeds the chosen character into ``new_game`` with the current (settings-derived) ruleset. A BOSS
-run adds one screen between the two: each boss is a distinct mechanic, so a boss is CHOSEN — the
-easy and hard tiers deal a random opponent, the boss tier never does.
+Feeds the chosen character into ``new_game`` with the current (settings-derived) ruleset.
 """
 
 from __future__ import annotations
@@ -21,8 +19,7 @@ from ..display.format import affiliation_icon, char_stats, display_name
 from ..display.headline import opponent_move
 from .temple import TempleScreen
 
-# A boss's archetype, by the mechanic its power carries — the tooltip in the boss picker. Keyed off
-# the power, not the id, so a new boss names its own archetype by the mechanic it is built on.
+# Keyed off the power's mechanic, not the boss id, so a new boss picks up an archetype automatically.
 _BOSS_ARCHETYPE: dict[Mechanic, str] = {
     Mechanic.MORPH: "Elemental Boss",
     Mechanic.WITCHCRAFT: "Shen Gong Wu Boss",
@@ -39,10 +36,8 @@ def _character_row(character: Character) -> str:
 def _begin_run(screen: XiaolinMenu, catalog: Catalog, character: Character, opponent: Character | None) -> None:
     """Deal the run and open the temple — shared by both select screens.
 
-    The temple turn is one turn and both of you take it. Every later one of theirs runs as a
-    showdown ends; the first has no showdown to end, so it runs here, before the temple opens.
-    Without it the opponent sits out the whole opening turn and meets you with a hand they never
-    got to shape.
+    ``bot_turn`` runs here because every later bot turn runs as a showdown ends, and the
+    temple's opening turn has no showdown to end it.
     """
     difficulty = effective_difficulty(screen.ctx.settings.current)
     settings = screen.rules
@@ -87,8 +82,7 @@ class CharacterSelectScreen(XiaolinMenu):
     def on_select(self, item_id: str) -> None:
         character = self._catalog.character(self.index_of(item_id, "char"))
         if roster_of(effective_difficulty(self.ctx.settings.current)) == "boss":
-            # A boss is picked, never dealt — every boss is its own mechanic, and "which one" is
-            # the whole decision. Pushed, so escape returns here to re-pick the character.
+            # Pushed, not switched, so escape returns here to re-pick the character.
             self.app.push_screen(BossSelectScreen(self._catalog, character))
             return
         _begin_run(self, self._catalog, character, None)

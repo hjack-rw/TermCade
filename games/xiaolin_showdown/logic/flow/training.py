@@ -16,30 +16,19 @@ from ..schema.models import Mechanic, Player
 from ..schema.state import XiaolinState
 
 TRAIN_LENGTH = 10  # what a full bar takes; the temple tooltip reads progress/TRAIN_LENGTH
-STAT_CAP = 5  # no base stat may pass this — outstat the plain Wu and the pricing collapses
+STAT_CAP = 5  # no base stat may pass this
 LOSS_FILL = 1  # what a lost showdown teaches
 TRAIN_BOOST_STEP = 3  # a summon Wu spent at the temple (TRAIN_BOOST) shoves this much into the bar at once
-# Boss-run rule: a beating from a boss teaches DOUBLE. One of the two asymmetries that offset a
-# boss's powers without touching duel stats (measured: 0.5% -> 3.0% alone, 5.0% with the extra
-# actions — docs/design/BOSSES.md). Written as the same law for both sides; the boss sits at the
-# cap, so only the player can collect.
+# Boss-run rule: a beating from a boss teaches DOUBLE. The boss sits at the cap, so only the player
+# can collect. See docs/design/BOSSES.md.
 BOSS_LOSS_FILL = 2
-# Jack Spicer alone: a boy genius who adapts fast, and the only boss for whom this constant does
-# anything — force/agility (3/3) sit under the cap for him, unlike the other three (already MASTER
-# on every stat), so he is the only one who can actually bank a loss into a raise. Set equal to
-# TRAIN_LENGTH on purpose, not tuned to an arbitrary number: one defeat teaches him the whole
-# lesson, an instant payout rather than a partial fill. Swept 2-25 (n=400 each) toward the owner's
-# ~20% target once stats were ruled settled — the win rate plateaus at 21.8% from 10 up (bot raises
-# also plateau at 2.50/run, a real ceiling from run length, not fill speed), so 10 is the smallest
-# value that reaches it (see docs/design/BOSSES.md).
+# Jack Spicer alone: force/agility (3/3) sit under the cap for him, unlike the other three (already
+# MASTER on every stat), so he is the only boss who can bank a loss into a raise. Equal to
+# TRAIN_LENGTH: one defeat teaches him the whole lesson, an instant payout rather than a partial
+# fill. See docs/design/BOSSES.md.
 JACK_LOSS_FILL = TRAIN_LENGTH
 # Jack's own ceiling on FORCE alone, below the universal STAT_CAP — agility trains all the way to
-# STAT_CAP like anyone else (show-justified: he's the agile one), but a gap on raw strength is the
-# acceptable weak point that survives training. He starts 3/3/7 — fully trained to STAT_CAP on both
-# he would end 5/5/7, matching or beating every dragon on every stat at once (Omi 5/5/2, Raimundo
-# 4/4/4, Kimiko 3/4/5, Clay 5/3/4) — "the weakest boss" turning into the numerically strongest one.
-# Capping force alone keeps the payoff (losing teaches him, he comes back stronger) without ever
-# letting him close the one gap that's supposed to stay open.
+# STAT_CAP, but force stops short. See docs/design/BOSSES.md.
 JACK_FORCE_CAP = 4
 
 

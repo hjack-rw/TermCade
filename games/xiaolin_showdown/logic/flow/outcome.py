@@ -31,17 +31,13 @@ def final_score(state: XiaolinState, rng: Rng) -> Outcome:
     player_points, bot_points = state.player.points, state.bot.points
 
     if not state.card_deck:  # the pile ran dry — leftover hand cards count toward the score
-        # The hand only. A dragon Wu is inalienable — it can never be staked, lost or banked, and a
-        # Wu that was never yours to spend has no business paying out at the end.
-        #
-        # A gamble Wu left in hand is rolled here like any other deposit: holding it to the last is
-        # the same bet as banking it, made blind. It is a gamble to even keep it.
+        # The hand only — a dragon Wu is inalienable and never has business paying out here. A
+        # gamble Wu left in hand is rolled like any other deposit.
         player_points = max(0, player_points + sum(bank_value(c, rng) for c in state.player.hand))
         bot_points = max(0, bot_points + sum(bank_value(c, rng) for c in state.bot.hand))
 
-    # Mala Mala Jong: to reach the end of the game still in the form is to win it outright, whatever
-    # the points say — the whole reason to assemble the construct and race the pile down (see
-    # logic/characters/jong.py). If somehow both wear it, neither claim stands and the points decide as usual.
+    # Mala Mala Jong: reaching the end still in the form wins outright, whatever the points say (see
+    # logic/characters/jong.py). If somehow both wear it, neither claim stands and points decide.
     if bot.is_jong(state.player) and not bot.is_jong(state.bot):
         return Outcome(player_points, bot_points, state.player.character)
     if bot.is_jong(state.bot) and not bot.is_jong(state.player):

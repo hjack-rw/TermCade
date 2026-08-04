@@ -4,9 +4,8 @@ The stage machine awaits the player's decisions; here each ``await`` raises a :c
 via ``push_screen_wait`` and resolves with the chosen value. The whole showdown runs in an async
 worker so the UI stays responsive and the pure game logic never touches Textual.
 
-One press of "Gong Yi Tanpai" plays exactly one showdown (stages 1→6→0). The temple turn runs here
-too, at the end — you shelve any surplus Wu, the bot takes its turn, and the hands settle — so
-control returns to the temple, or, when the draw pile is spent, to the :class:`~.outcome.OutcomeScreen`.
+One press of "Gong Yi Tanpai" plays exactly one showdown, then control returns to the temple, or,
+once the draw pile is spent, to :class:`~.outcome.OutcomeScreen`.
 """
 
 from __future__ import annotations
@@ -39,9 +38,7 @@ class DuelScreen(XiaolinScreen):
     """One showdown, stepped through a phase at a time — the player presses Continue to advance,
     seeing each phase resolve, and the choice phases raise their modal inline."""
 
-    # Rules is a binding and nothing more: it never joins the prompt line, because that line is the
-    # duel's *move* list and looking something up is not a move. It costs no turn and changes no
-    # state, so it stays available for the whole showdown, long after Retreat has stopped being.
+    # Rules stays bound for the whole showdown, unlike Retreat — it costs no turn and changes no state.
     BINDINGS = [
         ("enter,space", "continue", "Continue"),
         ("8", "rules", "Rules"),
@@ -68,9 +65,8 @@ class DuelScreen(XiaolinScreen):
     def page_back(self) -> None:
         """Back here means Retreat, not "pop the screen".
 
-        A duel *replaces* the temple (`switch_screen`), so popping it lands on the main menu and
-        abandons the run — which is exactly what a player tapping Back is not asking for. Retreat
-        walks back to the temple, and refuses once the showdown is committed.
+        A duel *replaces* the temple (`switch_screen`), so popping it would land on the main menu
+        instead. Retreat walks back to the temple, and refuses once the showdown is committed.
         """
         self.action_retreat()
 
@@ -79,31 +75,27 @@ class DuelScreen(XiaolinScreen):
 
     def action_rules(self) -> None:
         """Put the rulebook on screen. The showdown underneath is mid-await on ``_continue`` and
-        simply keeps waiting — nothing is advanced, nothing is skipped, and the key is dead while a
-        choice modal is up, because a modal owns the input while it is the active screen."""
+        keeps waiting; nothing advances or is skipped. Dead while a choice modal is up, since the
+        modal owns input while it is the active screen."""
         self.app.push_screen(RulesScreen())
 
     def action_retreat(self) -> None:
         """Back out before the showdown begins — return to the temple.
 
-        Only the opening board offers this: from the first "Continue" the priority is locked (or the
-        coin is thrown) and the prize is drawn, so there is nothing left to walk away from.
+        Only available before the showdown is committed (see `_committed`).
         """
         if self._committed:
-            # Not logged: this is a *refusal*, an answer to a key, not something that happened in the
-            # run. A log full of the game saying no is a log nobody reads.
+            # Not logged: a refusal isn't something that happened in the run.
             self.engine_app.notify("Gong Yi Tanpai! There is no retreat from a showdown.", log=False)
             return
         self._retreating = True
         self._continue.set()
 
     async def _await_continue(self, prompt: str, *, retreat: str = "") -> None:
-        # The prompt is the click target as well as the words: a showdown steps forward on Enter or
-        # Space, and a phone has neither. Tapping the line that says "Continue" is what a touch player
-        # tries first, and without this the duel simply stops for them at the opening board.
+        # The prompt line doubles as the click target (Enter/Space have no touch equivalent).
         #
-        # ``retreat`` is a SECOND action on the same line, and it gets its own span — stylizing the
-        # whole line once made "Esc Retreat" continue the showdown instead of backing out of it.
+        # ``retreat`` gets its own span rather than the whole line — styling the whole line once
+        # made "Esc Retreat" trigger continue instead of retreat.
         line = Text(f"▶  {prompt}")
         line.stylize(Style(meta={"@click": "screen.continue()"}))
         if retreat:
@@ -130,20 +122,17 @@ class DuelScreen(XiaolinScreen):
         await self.show_message(f"The coin lands {face.upper()}.  {outcome}", title="COIN TOSS")
 
     def _announce_wager(self, duel: DuelState, state: XiaolinState) -> None:
-        """You called the challenge, so your opponent sets the price — and names it to your face."""
+        """Announce the wager the opponent set."""
         name = display_name(state.bot.character.name)
         self.engine_app.notify(
             # Not logged: the showdown's own story tells who staked what, in the order it happened.
-            # Logging it here as well would say the same thing twice, once out of order.
             f"{name} requested a {_wager_label(duel.wager)}",
             title="The stakes",
             log=False,
         )
 
     def _announce_jack_steal(self, duel: DuelState) -> None:
-        """AI Jack strikes before you choose a Wu, not after — so the toast fires the moment it
-        happens. A card gone from your options a beat later is explained already, not a fresh
-        surprise stacked on the one that took it."""
+        """Announce Jack's card steal, immediately, before the player chooses a Wu."""
         self.engine_app.notify(
             f"Jack Spicer stole your {duel.jack_stolen} before you could field it!",
             title="AI Jack",
@@ -151,7 +140,7 @@ class DuelScreen(XiaolinScreen):
         )
 
     def _announce_yoyo_flip(self) -> None:
-        """A Yin/Yang Yo-Yo just flipped the player's own affiliation — cosmetic, but worth a beat."""
+        """Announce a Yin/Yang Yo-Yo flip of the player's affiliation."""
         self.engine_app.notify(
             "It's hard to spot the difference, isn't it?",
             title="Yin-Yang Yo-Yo",
@@ -161,17 +150,14 @@ class DuelScreen(XiaolinScreen):
     def _announce_end_surprises(self, duel: DuelState) -> None:
         """Two outcomes the board shows without explaining, so only a toast can account for them."""
         if duel.prize_gifted:
-            # Toast only, not logged (the board's last line carries it): he won the Wu and
-            # gave it back, and there is nothing on screen a player could read that from —
-            # the Wu simply turns up in their hand. It is meant to land as a surprise.
+            # Toast only: the board's last line already carries this.
             self.engine_app.notify(
                 "He beat you for the Wu, then pressed it into your hands.",
                 title="The Good Guys Finish Last",
                 log=False,
             )
         if any(r.player.element_cancelled or r.bot.element_cancelled for r in duel.rounds):
-            # Toast only, not logged: two element-setters disagreed and cancelled — the player
-            # would otherwise see a Wu keep its own colour with no reason given.
+            # Toast only: the board doesn't otherwise explain why the elements cancelled.
             self.engine_app.notify(
                 "Two Wu clashed over the element — both cancelled; each side kept its own.",
                 title="Elements cancelled",
@@ -185,8 +171,7 @@ class DuelScreen(XiaolinScreen):
         duel = Duel(state, rng, self._choices(), settings)
         self._duel = duel
 
-        # Initiative is already on the board: this press commits you to the priority you can see, or
-        # (on a tie) draws the coin that settles it. It is the last moment you may walk away.
+        # Last moment to retreat — this press commits to the shown priority (or draws the coin on a tie).
         self._show_board(duel)
         await self._await_continue("Continue to begin the showdown", retreat="Esc Retreat")
         if self._retreating:
@@ -202,40 +187,30 @@ class DuelScreen(XiaolinScreen):
             tied = duel.duel.player.initiative == duel.duel.bot.initiative
             if stage == COMMITMENT and duel.duel.jack_stolen:
                 self._announce_jack_steal(duel.duel)
-            # A Yo-Yo may be played on any Card stage, not just once at commitment — checked every
-            # pass and cleared right away, unlike `jack_stolen`'s one-time COMMITMENT window.
+            # Checked every pass and cleared right away, unlike `jack_stolen`'s one-time
+            # COMMITMENT-only window.
             if duel.duel.yoyo_flipped_announce:
                 self._announce_yoyo_flip()
                 duel.duel.yoyo_flipped_announce = False
             if stage == COMMITMENT and (tied or self.state.initiative_contested):
                 await self._reveal_coin_toss(duel.duel.player_priority is True)
-            # They set the price only if you called a *stat*. A tournament prices itself — three
-            # battles of one Wu — so there is nothing they named and nothing to announce.
+            # Only when a stat was called — a tournament prices itself, so there's nothing to announce.
             if stage == SETUP and duel.duel.player_priority and duel.duel.challenge != TOURNAMENT:
                 self._announce_wager(duel.duel, state)
-            if stage == END:  # the end phase (the loser's stakes change hands) has run
+            if stage == END:  # the END stage has already run
                 self._announce_end_surprises(duel.duel)
                 break
             await self._await_continue("Continue")
 
-        # The result raises no toast — it is written across the board, and a toast over it would be
-        # telling a player what they are looking at. But the board is gone the moment they leave, so
-        # the one thing a showdown is *for* would be the one thing the log could not tell them.
-        #
-        # It is the LAST line of the turn it was fought in, and it belongs to neither duelist: a
-        # showdown is not somebody's move, it is what the two moves were leading to.
+        # Not toasted (the board already shows the result); logged as the last line of the turn.
         self.ctx.journal.add(_showdown_story(duel.duel, state), title=SHOWDOWN_LOG)
 
-        # The result is already on screen, so head straight into the temple turn (no extra Continue):
-        # you shelve any surplus Wu (your choice), the bot banks points, then the
-        # hands settle (which may flag the run over on the point limit). Skip once the pile is spent.
+        # No extra Continue — head straight into the temple turn once the result is on screen.
+        # Skipped once the draw pile (and so the run) is spent.
         if not state.has_ended:
             await self._discard_surplus(state, settings)
-            # The showdown closed the turn. What follows is the *next* one opening — starting with
-            # their half of it, which is why the log must be cut here and not after.
+            # next_turn() here, not after: what follows is the bot's half of the *next* turn opening.
             self.ctx.journal.next_turn()
-            # Their half of the temple turn that is about to open. The first turn of a run has no
-            # showdown in front of it, so that one is taken at character select instead.
             difficulty = self.ctx.settings.current.difficulty  # the bot's deposit skill follows it
             moves = bot_turn(state, settings, rng=rng, difficulty=difficulty)
             self.app.notify(
@@ -301,11 +276,7 @@ class DuelScreen(XiaolinScreen):
         return await self.choose("Choose the background element", _element_options(options), title="BACKGROUND")
 
     async def _pick_wager(self, options: list[int]) -> int:
-        """They named the stat; you name how wide the battle is. Both hands are face up — read them.
-
-        Never asked on a tournament: three battles of one Wu is the whole of it, and there is nothing
-        left to price.
-        """
+        """Choose how many Wu to wager. Never asked on a tournament — there's only one to choose."""
         if len(options) == 1:
             return options[0]  # nothing to decide: one of you can only field the one Wu
         return await self.choose(
@@ -318,11 +289,7 @@ class DuelScreen(XiaolinScreen):
         return await self.choose("Choose an element", _element_options(list(ELEMENTS)), title="ELEMENT")
 
     async def _pick_stat(self, options: list[str]) -> str:
-        """Where the Orb's flood, or the Curse's misfortune, lands.
-
-        The contested stat is worth double, so it is the obvious answer — but the other two are worth
-        a point each, and taking both of them wins the battle just the same. That is the whole card.
-        """
+        """Which stat an effect targets."""
         return await self.choose("Which stat do you name?", _stat_options(options), title="NAME A STAT")
 
     async def _pick_boost(self, cards: list[Card]) -> Card | None:
@@ -333,8 +300,7 @@ class DuelScreen(XiaolinScreen):
         return await self.choose("Play a boost Wu?", options, title="BOOST")
 
     async def _pick_counter(self, cards: list[Card]) -> Card | None:
-        """A Heart of Jong woke a summon on the far side. Field one extra Wu to answer it — off the
-        wager, so it scores but can never be lost — or pass."""
+        """Field an extra Wu (off the wager, so it can't be lost) to answer a summon, or pass."""
         if self._duel is not None:
             self._show_board(self._duel)
         options: list[tuple[ContentText, Card | None]] = [
@@ -348,14 +314,14 @@ class DuelScreen(XiaolinScreen):
         )
 
     async def _pick_card(self, cards: list[Card]) -> Card:
-        """Field a Wu, blind. Your opponent is choosing theirs against the same board you see."""
+        """Field a Wu. Blind — the opponent is choosing theirs at the same time."""
         if self._duel is not None:
             self._show_board(self._duel)
         return await self.choose("Play a card", card_options(cards, suffix_stats=True), title="CARD")
 
     async def _pick_amend(self, options: AmendOptions) -> Amend | None:
-        """A Hodoku Mouse was fielded: rewrite one term of this round, or leave it. Two steps — which
-        term, then its new value — and the reveal is already on the board behind the modal."""
+        """Rewrite one term of the round, or leave it, via a two-step picker: which term, then its
+        new value."""
         kinds: list[tuple[str, str]] = []
         if options.stats:
             kinds.append(("Contest a different stat", "challenge"))

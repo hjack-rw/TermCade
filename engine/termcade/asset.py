@@ -1,12 +1,7 @@
 """Read the page's CSS and JavaScript from files, and fill in what Python has to decide.
 
-The page used to be built out of concatenated string literals — eight ``<script>`` blocks and four
-``<style>`` blocks, written as Python source, with no editor able to tell that any of it was
-JavaScript. Nothing checked a bracket, nothing coloured a keyword, and a typo showed up as a browser
-that quietly did less than it used to.
-
-Now each block is a real ``.js`` or ``.css`` file under ``web/``, and this module is the whole of
-the machinery that gets it into the page.
+Each block is a real ``.js`` or ``.css`` file under ``web/``, so an editor can check a bracket and
+colour a keyword; this module is the whole of the machinery that gets it into the page.
 
 **``$name``, not ``{name}``.** Every other line of CSS and JavaScript is a brace, so ``str.format``
 would mean doubling almost all of them — which is how a template gets harder to read than the string

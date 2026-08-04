@@ -4,9 +4,8 @@
 `? ? ?` or 0/0/0 — so the stats answer **zero**, and nothing anywhere complains. The opponent then
 banks the strongest card in the game for two points, and prices a wager as though the slot were empty.
 
-That is not a hypothetical. It is what happened to the pours and the three negations: five cards
-worth nothing to the opponent, for a measured 16 points of its win rate, until a simulation caught it.
-Nothing in the type system, the linter or the suite had anything to say.
+That is not a hypothetical: it is what happened to the pours and the three negations, until a
+simulation caught it. Nothing in the type system, the linter or the suite had anything to say.
 
 So this file is the thing that has something to say. A new mechanic must be **priced** (an entry in
 `_MECHANIC_VALUE`) or **excused** (declared in `_STATS_ARE_THE_WHOLE_VALUE`). It may not be forgotten.

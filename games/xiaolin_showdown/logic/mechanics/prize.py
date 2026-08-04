@@ -1,7 +1,5 @@
-"""Who takes the revealed Wu — the four ways to claim it, and what happens when nobody does.
-
-Winning the showdown settles who keeps their own Wu. It does **not** hand you the one you were both
-racing for. That has to be *earned*, and there are four ways to earn it, tried in order:
+"""Who takes the revealed Wu — the four ways to claim it, tried in order, and what happens when
+nobody does. See docs/design/CIRCULATION.md for the full rationale.
 
 1. **a decisive blow** — one stat at or above ``N``
 2. **a broad win** — two stats at ``N-1``
@@ -9,21 +7,13 @@ racing for. That has to be *earned*, and there are four ways to earn it, tried i
 4. **being in tune with the arena** — your Wu belonged where the fight happened
 
 The first three are read off a *single battle*'s three end values, so a tournament (three battles)
-gets three bites at them and a stat challenge one. That is not an accident: a tournament commits
-three Wu where a wager is usually one, and triple the commitment buys roughly double the prize. It is
-why "which challenge do I call" is a real question — **call a stat challenge to protect your hand,
-call a tournament when you want the Wu.**
+gets three bites at them and a stat challenge one.
 
-The fourth is the only one you can *aim* at while the showdown is being fought. It asks whether the
-Wu you fielded belonged in the arena you fought in — resonant Wu count for you, opposed ones against
-(and metal is opposed to every coloured ground). A Serpent's Tail **vetoes** it: if the ground has
-stopped resonating, nobody was in tune with anything.
+The fourth asks whether the Wu you fielded belonged in the arena you fought in — resonant Wu count
+for you, opposed ones against (and metal is opposed to every coloured ground). A Serpent's Tail
+**vetoes** it: if the ground has stopped resonating, nobody was in tune with anything.
 
 Fail all four and the Wu is **lost** — not destroyed. It goes out of play, and it can surface again.
-
-Measured over 200 runs a tier: this moves the prize in ~37% of showdowns on Easy and ~49% on Hard
-(against ~15–20% for the single decisive blow it replaced), while the win rate moves under two points
-— it changes circulation, not balance.
 """
 
 from __future__ import annotations

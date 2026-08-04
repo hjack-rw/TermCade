@@ -5,9 +5,8 @@ version never breaks an old settings file.
 
 The merge is forward-compatible; it is not *backward*-compatible on its own, and that is what
 ``ENGINE_OPTIONS`` and the prune in :meth:`SettingsStore.load` are for. A key the game has since
-removed lives on in the file forever — Xiaolin's settings still carried ``draw_limit`` and
-``deposit_limit`` long after the one-action economy replaced both. They did nothing, which is worse
-than doing something wrong: the next person to read the file believes them.
+removed would otherwise live on in the file forever, doing nothing — which is worse than doing
+something wrong: the next person to read the file believes it still means something.
 """
 
 from __future__ import annotations
@@ -76,9 +75,9 @@ class SettingsStore:
     def _pruned(self, settings: Settings) -> Settings:
         """Drop options no game and no engine declares — a knob that was removed is not a setting.
 
-        A settings file keeps every key ever written into it. Xiaolin's still carried ``draw_limit``
-        and ``deposit_limit`` months after the one-action economy replaced them both: inert, and a trap
-        for the next person to read the file and assume they mean something.
+        A settings file keeps every key ever written into it. A removed option would otherwise sit
+        there inert forever — a trap for the next person to read the file and assume it still means
+        something.
 
         **A game that declares no options at all is opting out**, and keeps whatever it wrote. Options
         are free-form by contract; pruning is a service to a game that has told the engine what its

@@ -4,18 +4,14 @@ A duel is a *loop of showdowns* over the shared draw pile until it runs dry. One
 stages 1→6 then a closing stage 0:
 
     1 Commitment   → draw the prize card; a tied initiative is settled by a coin toss here
-    2 Setup        → the challenger names the stat (or a tournament); the other the wager; the arena is
-                     a random element by default (settings.random_background), or the other's pick if off
+    2 Setup        → challenge, wager and arena are decided
     3 Boost        → each duelist may lay a boost Wu ahead of the Wu they are about to field
     4 Card         → both field one Wu, blind to each other; :mod:`.mechanics.resolve` resolves both
     5 Resolvement  → weigh the battles, decide the winner, maybe award the prize card
     0 End          → the loser's staked cards change hands; reset for the next showdown
 
-**Three Wu, spent one of two ways.** The challenger names a *stat* or a *tournament*. On a stat, the
-other duelist names the wager — one to three Wu, all fielded together in a single battle. A
-tournament asks nobody: it is three battles of one Wu, contesting force, then agility, then intellect,
-and may only be called when both duelists can field three. Either way Boost→Card loops once per Wu,
-each Wu optionally preceded by a boost, and no boost Wu serves twice.
+Boost→Card loops once per Wu owed this showdown (one to three), each Wu optionally preceded by a
+boost, and no boost Wu serves twice.
 
 **Initiative is not a stage.** It is a property of the two hands, so a showdown opens with it already
 resolved and on the board: the first "Continue" either commits you to the priority you can see, or
@@ -58,23 +54,16 @@ from .wear import hand_over
 END, COMMITMENT, SETUP, BOOST, CARD, RESOLVEMENT = range(6)
 LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD repeats per Wu wagered
 
-# The Wu that ask their caster for an element: the Morpher (its shape), the Eye (its own colour), the
-# Monsoon (the whole arena's).
+# Wu that ask their caster to name an element (see :mod:`.mechanics.powers`).
 _CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET_ARENA})
 
-# The summon-flavour pools ({beast}, {drawing}, {desire}, {spirit}, {fear}, the Jong forms) and their
-# resolvers live in :mod:`.summons`; the duel passes the two characters and the arena, and shows the
-# name they return in place of the Wu's own.
+# The summon-flavour pools and their resolvers live in :mod:`.summons`; the duel passes the two
+# characters and the arena, and shows the name they return in place of the Wu's own.
 
-# Chase Young's Beast Form: +1 on the contested stat, in exchange for his Wu (the beast keeps its
-# prize, see `_award_prize`). +1 not +2: at +2 the `chase.BEAST_MARGIN` when-to-beast dial reads flat.
+# Chase Young's Beast Form bonus on the contested stat (see `_award_prize` for the prize side-effect).
 BEAST_BOOST = 1
 
-# Chamelon-Bot's denial: how far ABOVE parity it closes the gap when the player leads, not just up to
-# it (see `_chamelon_boost_card`). Swept 0-3 (n=300, then confirmed n=500) once the pool's growth
-# (Denshi Bunny through the Yo-Yo family) had pushed Jack from his old ~23.6% up to 29.2% — owner:
-# "I would like him a bit lower." 0 (exact parity, the shipped baseline through 2026-08-04): 29.2%.
-# 1: 18.0%. 2: overshoots to ~10%. 1 is the only value in range — a discrete dial, not a smooth one.
+# How far above parity Chamelon-Bot closes the gap when the player leads (see `_chamelon_boost_card`).
 CHAMELON_MARGIN = 1
 
 
@@ -90,9 +79,7 @@ class DuelState:
     player_priority: bool | None = None  # who names the challenge (None = tie → coin toss)
     player: Duelist = field(default_factory=Duelist)
     bot: Duelist = field(default_factory=Duelist)
-    # How many Wu each duelist must field, all at once, in the one battle. Named by the duelist who
-    # did NOT call the challenge — you set the terms, I set the price — and capped by what both can
-    # actually play. A tournament does not ask: it is always one Wu in each of its three battles.
+    # How many Wu each duelist must field, all at once, in the one battle (see `_wager_options`).
     wager: int = 1
     # Jack-bots Attack!'s own wager: each side 0-3, decided independently and blind to the other —
     # `wager` above stays unused for it. `None` unless `jack_mode is jack.ATTACK_NAME`.
@@ -100,8 +87,8 @@ class DuelState:
     bot_wager: int | None = None
     rounds: list[Round] = field(default_factory=list)  # the battles fought, in order
     winner: bool | None = None  # True = player won, False = bot won
-    # A Treasurebox of the Blind Swordsman (WISH) was fielded: that side wins the showdown outright, whatever
-    # the battles said. ``None`` is the ordinary game, decided on the ground. Spent with the showdown.
+    # A WISH card was fielded: that side wins the showdown outright, whatever the battles said.
+    # ``None`` is the ordinary game, decided on the ground. Spent with the showdown.
     auto_winner: bool | None = None
     winner_character: str | None = None
     card_won: bool = False
@@ -109,17 +96,16 @@ class DuelState:
     # The player's payout is never taken here — the temple offers them the choice instead.
     bot_trained: str | None = None
     # Chase Young's Beast Form (see characters/chase.choose_beast_form): the stat BEAST_BOOST lands on.
-    # When set, his fielded Wu score NOTHING (offence_negated) — he wagers them, never wields them.
+    # When set, his fielded Wu score NOTHING (offence_negated) — see `_boost`.
     beast_stat: str | None = None
-    # Chase won the Wu and handed it to the duelist he beat ("The Good Guys Finish Last", see
-    # `_award_prize`). Recorded rather than re-derived: the screen must not have to know which of his
-    # two modes gives the prize back, and the player cannot see it happen — the Wu simply arrives.
+    # Chase gifted the prize to the loser this showdown (see `_award_prize`). Recorded rather than
+    # re-derived: the screen doesn't need to know which of his modes triggers it.
     prize_gifted: bool = False
     # The Wu the wear rule vaulted as this showdown ended — (name, was the player's, points paid) —
     # for the screen to report (see logic/flow/wear.py).
     worn_out: list[tuple[str, bool, int]] = field(default_factory=list)
     # Which of the four routes claimed it (`mechanics.prize`), or None when nobody did and the Wu was
-    # lost. Kept so the board can say *how* it was won: a card that simply appears teaches nothing.
+    # lost. Kept so the board can report how it was won.
     prize_route: PrizeRoute | None = None
     # Jack conceded this showdown rather than pay its normal cost (see `jack.choose_to_flee`) — the
     # prize still resolves through the normal ladder in `_award_prize`, unaffected; the only thing
@@ -130,14 +116,12 @@ class DuelState:
     # `_resolve_ai_jack_steal`), never at mode selection. `None` when nothing was stolen: the mode
     # never fired, or the opponent's hand and deck were both already empty.
     jack_stolen: str | None = None
-    # A "Serpent's Tail" (play/−1) played by *either* duelist voids the elemental bonus for the whole
-    # showdown — a condition of the duel, not of the queue it was played into. It carries across
-    # every round: the ground stays intangible once someone makes it so.
+    # Voids the elemental bonus for the rest of the showdown once played by either side — a duel-wide
+    # condition, not scoped to the round it was played into.
     elemental_bonus_cancelled: bool = False
-    elemental_bonus_reversed: bool = False  # a Celestial Dial: resonance and opposition swap all match
-    # Jack Spicer's Jack-Bot (see characters/jack.choose_jack_bot): the flavour name it curses under this
-    # cycle, one of `jack.JACK_BOT_NAMES` — chosen fresh whenever he deploys it, `None` when he holds
-    # back for a normal Wu instead, or doesn't boost at all.
+    elemental_bonus_reversed: bool = False  # swaps resonance/opposition for the rest of the showdown
+    # Jack-Bot's flavour name this cycle (see characters/jack.choose_jack_bot), one of
+    # `jack.JACK_BOT_NAMES` — chosen fresh whenever he deploys it, `None` otherwise.
     jack_bot_name: str | None = None
     # Jack Spicer's identity swap (see characters/jack.choose_jack_mode): `jack.AI_JACK_NAME`,
     # `jack.CHAMELON_NAME`, `jack.ATTACK_NAME`, or `None` fighting as himself — decided once, at
@@ -369,8 +353,7 @@ class Duel:
         # only when the bot leads does it name the challenge here; a leading player waits for stage 2.
         # Attack! already set BRAWL above — nobody names it, so this must not overwrite that.
         if not self.duel.player_priority and self.duel.jack_mode != jack.ATTACK_NAME:
-            # A Prognosis Conch already pinned the bot's challenge when it was spent — read, and set
-            # in stone. Otherwise the bot names it fresh from its hand now.
+            # state.locked_challenge, if already set, overrides a freshly-chosen one.
             self.duel.challenge = self.state.locked_challenge or bot.choose_challenge(
                 jong.battle_stats(self.state.bot),
                 self._challenge_options(),
@@ -383,9 +366,8 @@ class Duel:
         if self.duel.jack_mode == jack.ATTACK_NAME:
             await self._setup_brawl()
             return
-        # The arena is either a random roll neither duelist chose (revealed after the wager, the show's
-        # own way) or the non-challenger's pick — settings.random_background decides, and the wager is
-        # named the same either way.
+        # The arena is either a random roll neither duelist chose (revealed after the wager) or the
+        # non-challenger's pick — settings.random_background decides; the wager is named either way.
         random_bg = bool(self.settings.random_background)
         if self.duel.player_priority:
             self.duel.challenge = await self.choices.challenge(self._challenge_options())
@@ -413,12 +395,9 @@ class Duel:
         if random_bg:  # the arena is a roll neither duelist chose, revealed once the wager is set
             self.duel.background = self.rng.choice(list(ELEMENTS))
         self.duel.background_name = self._draw_place(self.duel.background)
-        # Chase Young decides now, the challenge known: go Beast Form (BEAST_BOOST on one stat, his
-        # Wu all dead, and he KEEPS what he wins) or field his Wu as an ordinary duelist — who gifts
-        # the prize on a win, see `_award_prize`. Chase ALONE.
-        # Beast Form is once a fight — in a tournament he still boosts only one of the three stats.
-        # A construct skips Chase's Beast Form as it skips the wudai: Mala Mala Jong fights as the 6/6/6
-        # body it is, not through his character power.
+        # Chase decides Beast Form once, here, for the whole showdown — even in a tournament, only
+        # one of the three stats gets it. Skipped for a construct: Mala Mala Jong fights as its own
+        # body, not through his character power.
         if bot.is_chase(self.state.bot) and self.duel.challenge and not bot.is_jong(self.state.bot):
             contested = self._stat_names() if self._is_tournament() else [self.duel.challenge]
             self.duel.beast_stat = chase.choose_beast_form(
@@ -426,15 +405,12 @@ class Duel:
             )
 
     async def _setup_brawl(self) -> None:
-        """Jack-bots Attack!'s own setup — nothing named here matches a normal showdown's shape.
+        """Jack-bots Attack!'s own setup — shaped differently from a normal showdown.
 
-        No challenge to ask for: `_choose_jack_mode` already set BRAWL. The element is always
-        explicitly picked by the non-challenger, never `settings.random_background`'s roll — Attack!
-        revives that older rule on purpose. No named place either, only the element itself.
-
-        Each side wagers independently, 0-3, and blind to the other — the same simultaneous-choice
-        rule Gong Yi Tanpai already enforces for boosts and cards, just one stage earlier here since
-        nobody's wager sets the terms for anybody else's.
+        No challenge to ask for (`_choose_jack_mode` already set BRAWL). The element is always
+        explicitly picked by the non-challenger, never `settings.random_background`'s roll, and gets
+        no named place. Each side wagers independently, 0-3, blind to the other — decided one stage
+        earlier than usual, since no wager sets the terms for the other's.
         """
         if self.duel.player_priority:
             # The generic heuristic weighs Wu elements in hand — it has no way to know picking metal
@@ -456,9 +432,8 @@ class Duel:
         )
 
     def _brawl_wager_options(self, *, is_player: bool) -> list[int]:
-        """Attack!'s own wager, for one side — 0 up to that side's own hand (capped by
-        ``max_wager``), independent of the other's. Zero is legal: Jack's body fights regardless of
-        what either side commits, and so does the challenger's — see ``docs/design/BOSSES.md``."""
+        """One side's wager for Attack! — 0 up to that side's own hand, capped by ``max_wager``,
+        independent of the other's. Zero is legal (see ``docs/design/BOSSES.md``)."""
         hand_size = len(self.state.player.hand if is_player else self.state.bot.hand)
         return list(range(0, min(hand_size, self.settings.max_wager) + 1))
 
@@ -467,14 +442,8 @@ class Duel:
         return min(len(self.state.player.hand), len(self.state.bot.hand), self.settings.max_wager)
 
     def _wager_options(self) -> list[int]:
-        """How many Wu go into the battle — named by whoever did NOT call the challenge.
-
-        You set the terms, I set the price. They all land at once, so this is the width of the field,
-        not a number of exchanges. Capped by what *both* can field: a wager one duelist cannot answer
-        is not a wager, it is a forfeit.
-
-        A tournament never asks. Its three battles cost one Wu each, and that is the whole of it.
-        """
+        """How many Wu options to offer — named by whoever did NOT call the challenge, capped by what
+        both duelists can field. A tournament never asks: each of its battles costs one Wu."""
         return list(range(1, max(1, self._can_field()) + 1))
 
     def _draw_place(self, element: str | None) -> str | None:
@@ -496,16 +465,15 @@ class Duel:
             self.duel.round.player_fielded >= player_target and self.duel.round.bot_fielded >= bot_target
         ):
             self.duel.rounds.append(Round(stat=self._stat_of(len(self.duel.rounds))))
-            # Beast Form: Chase's fielded Wu score nothing — he wagers them, never wields them. The
-            # existing offence-negated path zeroes his played Wu and strikes them on the board.
+            # Beast Form: route through the existing offence-negated path so Chase's played Wu score
+            # nothing.
             if self.duel.beast_stat is not None:
                 self.duel.round.bot.offence_negated = True
             self.duel.round.player.is_construct = self._is_construct(self.state.player)
             self.duel.round.bot.is_construct = self._is_construct(self.state.bot)
 
-        # Gong Yi Tanpai: both duelists choose against the ground as it stands *now*, and neither
-        # sees what the other laid this stage. The opponent reads the frozen copy, so the order the
-        # code happens to run in cannot leak the player's choice into theirs.
+        # Simultaneous choice: neither side sees what the other lays this stage. The opponent reads a
+        # frozen copy of the ground so execution order can't leak the player's pick into theirs.
         blind = deepcopy(self.duel.round)
 
         player_card = await self.choices.boost(self._boost_options(self.state.player, is_player=True))
@@ -513,8 +481,8 @@ class Duel:
             # A Morpher spent as a boost still chooses its element; any other boost ignores the ask.
             self._commit_boost(player_card, is_player=True, element=await self._element_for(player_card))
 
-        # In Beast Form Chase lays no boost — his Wu never lift, never curse, never score. Outside it
-        # he boosts like anyone. `beast_stat` is set only for Chase, and only when he took the beast.
+        # In Beast Form Chase lays no boost. `beast_stat` is set only for Chase, and only when he
+        # took the beast.
         if self.duel.beast_stat is None:
             bot_boosts = self._boost_options(self.state.bot, is_player=False)
             # Jack-Bot is his own permanent boost, not one of the three he swaps INTO — while he's
@@ -524,12 +492,9 @@ class Duel:
             # `jack_mode` while worn, so he never reads as a construct, correctly (see `_jack_base`).
             if not self._is_construct(self.state.bot) and not self.state.bot.yoyo_flipped:
                 jack_bot = next((c for c in bot_boosts if mechanic_of(c.power) is Mechanic.BOT), None)
-            # Chamelon-Bot's denial: a boost like the curse above, not a base override — see
-            # `_chamelon_boost_card`. `None` when he isn't sent as Chamelon-Bot this showdown, or
-            # when the contested stat needs no help this battle. Unlike Jack-Bot's curse it targets
-            # his OWN side, so it can be weighed by the same reach-comparison as any real boost —
-            # fielded alongside Shimo Staff, the Heart, or anything else in hand, not preferred over
-            # them by default.
+            # Chamelon-Bot's denial is a boost, not a base override (see `_chamelon_boost_card`) —
+            # so it can be weighed by the same reach-comparison as any real boost, not preferred
+            # over them by default.
             chamelon_card = self._chamelon_boost_card()
             if chamelon_card is not None:
                 bot_boosts = [*bot_boosts, chamelon_card]
@@ -544,12 +509,11 @@ class Duel:
                     self._commit_boost(chosen, is_player=False, element=self.duel.background or "")
 
     async def _card(self) -> None:
-        """Both duelists field one Wu, at the same moment and blind to each other.
+        """Both duelists field one Wu at the same moment, blind to each other.
 
-        Gong Yi Tanpai is a simultaneous reveal: neither duelist may answer a Wu they have seen land.
-        The code has to run in some order, so the opponent chooses against a frozen copy of the ground
-        taken before anyone committed, and both Wu are resolved afterwards. A duelist with nothing
-        left to field plays nothing and stands on their base stats.
+        Execution has to run in some order, so the opponent chooses against a frozen copy of the
+        ground taken before anyone committed; both Wu resolve afterward. A duelist with nothing left
+        to field plays nothing and stands on base stats.
         """
         current = self.duel.round
         blind = deepcopy(current)
@@ -595,34 +559,31 @@ class Duel:
                 self._resolve_bot(current, bot_card)
             else:
                 # In Beast Form his Wu are NULLIFIED, not skipped: a neutral stand-in enters the
-                # queue so the board strikes it to -/-/- (offence_negated, set in `_boost`) — like an
-                # Emperor Scorpion's victim. It is staked (the opponent can still win it), lends
-                # nothing, and casts no curse: he meets the wager but wields none of it.
+                # queue so the board strikes it to -/-/- (offence_negated, set in `_boost`). It is
+                # staked (the opponent can still win it), lends nothing, and casts no curse.
                 current.bot.queue.append(stand_in(bot_card))
 
-        # Treasurebox of the Blind Swordsman (WISH): fielded, it wins the showdown outright — the ground
-        # is overridden at Resolvement, and it is exiled at the End. Either duelist's win it (the bot
-        # never fields it by policy, but the rule is written for whoever does).
+        # WISH: fielded, it wins the showdown outright — the ground is overridden at Resolvement, and
+        # it is exiled at the End. Either duelist's win it (the bot never fields it by policy, but the
+        # rule is written for whoever does).
         if player_card is not None and mechanic_of(player_card.power) is Mechanic.WISH:
             self.duel.auto_winner = True
         if bot_card is not None and mechanic_of(bot_card.power) is Mechanic.WISH:
             self.duel.auto_winner = False
-        # The Sapphire Dragon: fielded, it turns on its own summoner — that side LOSES the showdown
-        # outright, the inverse of the Treasurebox. A wish outranks it: an auto-win already set stands,
-        # since the Treasurebox was played to seize the showdown and the dragon only forfeits it.
+        # is_uncontrolled: fielded, it turns on its own summoner — that side loses the showdown
+        # outright, the inverse of WISH. WISH outranks it: an auto-win already set stands.
         if player_card is not None and is_uncontrolled(player_card.power) and self.duel.auto_winner is None:
             self.duel.auto_winner = False
         if bot_card is not None and is_uncontrolled(bot_card.power) and self.duel.auto_winner is None:
             self.duel.auto_winner = True
-        # Emperor Scorpion on Mala Mala Jong: it disassembles the construct, taking THIS battle (a
-        # tournament leg, not the whole showdown — so it sets the round, not auto_winner).
+        # is_jong_bane vs a constructed Jong: takes this battle only (round.bane_winner, not
+        # auto_winner — a tournament leg, not the whole showdown).
         if player_card is not None and is_jong_bane(player_card.power) and bot.is_jong(self.state.bot):
             current.bane_winner = True
         if bot_card is not None and is_jong_bane(bot_card.power) and bot.is_jong(self.state.player):
             current.bane_winner = False
-        # Hodoku Mouse (AMEND): fielded, after the reveal, it lets its player rewrite ONE term of
-        # THIS round before it is weighed — the contested stat, the arena, or the challenger's ground.
-        # It fights as its own 1/1/1 too (resolved above like any Wu). The bot never amends.
+        # AMEND: after the reveal, lets its player rewrite one term of this round before it's
+        # weighed. Fights as its own Wu too (resolved above). The bot never amends.
         if player_card is not None and mechanic_of(player_card.power) is Mechanic.AMEND:
             await self._offer_amend()
         # Score only once the battle is full — a wagered field is weighed as a whole, not per Wu.
@@ -632,9 +593,9 @@ class Duel:
             self._score_round(current)
 
     async def _offer_balance(self, current: Round) -> None:
-        """A Heart of Jong summoned an extra fighter on ``heart_summoner``'s side. The OTHER side may
-        field one OFF-WAGER Wu here to answer it: it scores like any Wu, but it is never staked (it
-        cannot be lost) and it does not count against the wager. Optional, and only if they have one."""
+        """The side opposite ``heart_summoner`` may field one off-wager Wu here to answer the summon:
+        it scores like any Wu, but it is never staked and doesn't count against the wager. Optional,
+        and only if they have one."""
         answerer = not current.heart_summoner
         options = self._playable(self.state.duelist(answerer), is_player=answerer)
         if not options:
@@ -693,10 +654,8 @@ class Duel:
         )
 
     def _apply_amend(self, amend: Amend) -> None:
-        """Rewrite one term of the current round in place — the next ``_score_round`` reads it.
-
-        A tournament amends only THIS battle's stat; a stat challenge, its one stat. The ground is
-        taken through ``conch_tiebreak``, the same lever a Cube of Haniku or a Prognosis writes."""
+        """Rewrite one term of the current round in place — the next ``_score_round`` reads it. Ground
+        is taken through ``conch_tiebreak``, the same field other initiative powers write."""
         if amend.kind == "challenge":
             self.duel.round.stat = amend.value
             if not self._is_tournament():
@@ -733,10 +692,9 @@ class Duel:
         self.duel.player.stakes[self.duel.player.stakes.index(out_wu)] = in_wu
 
     def _apply_elemental(self, effect: str | None) -> None:
-        """A played Wu's showdown-wide effect: void, reverse or re-colour the arena, seize the
-        ground, hack a construct, steal a Wu, charge a Shard of Lightning, or swap a stat with a
-        Yin/Yang Yo-Yo (either half flips the caster's own affiliation, the combined one flips the
-        opponent's)."""
+        """Dispatches a played Wu's showdown-wide effect: void/reverse/recolor the arena, seize the
+        ground, hack a construct, steal a Wu, set the conduct caster, or swap a stat (self or
+        opponent affiliation flip, depending on which half was played)."""
         if effect and effect.startswith("background:"):
             self.duel.background = effect.split(":", 1)[1]
         elif effect == "cancel":
@@ -759,15 +717,14 @@ class Duel:
             self._swap_stat_and_flip(who == "player", stat, flip_self=False)
 
     def _swap_stat_and_flip(self, is_player: bool, stat: str, *, flip_self: bool) -> None:
-        """Yin/Yang Yo-Yo: names a stat, toggling it into (or out of) `swapped_stats` — read live at
-        `_swapped_bases`, the same reason `conduct_caster` reads live rather than resolving once at
-        play time, so it stays correct whichever order the effects fire in.
+        """Toggles a stat into (or out of) `swapped_stats` — read live at `_swapped_bases`, the same
+        reason `conduct_caster` reads live rather than resolving once at play time, so it stays
+        correct regardless of effect order.
 
         Also flips an affiliation for the rest of the RUN, not just this showdown
         (`Player.yoyo_flipped`) — Jack alone reads this as Good Jack (`jack.GOOD_JACK_STAT`) rather
-        than a plain Xiaolin<->Heylin flip. ``flip_self`` is which side: True for either half (the
-        caster's own — "it's hard to spot the difference"), False for the combined Ying-Yang Yo-Yo
-        (the OPPONENT's — "you change Jack, not Jack changes himself").
+        than a plain flip. ``flip_self`` selects which side: True for the caster's own, False for the
+        opponent's (the combined half).
         """
         if stat in self.duel.swapped_stats:
             self.duel.swapped_stats.discard(stat)
@@ -781,19 +738,14 @@ class Duel:
             self.duel.yoyo_flipped_announce = True
 
     def _conduct_bonus(self, is_player: bool) -> int:
-        """Shard of Lightning's swing: +1 to the contested stat per metal Wu on the table this
-        battle, -1 per non-metal Wu — either side's queue, boosts and inert curse mirrors alike
-        (only the element is read; an elementless card, e.g. Chamelon-Bot's denial, counts as
-        neither). The arena itself follows the same +1/-1 rule, once it has been decided. Zero
-        unless ``is_player`` is the side that cast it this battle.
+        """The contested-stat swing from a played conductor: +1 per metal Wu on the table this
+        battle, -1 per non-metal (either side's queue, boosts and curse mirrors alike; an elementless
+        card counts as neither) — the decided arena follows the same rule. Zero unless ``is_player``
+        is the side that cast it this battle.
 
-        Can go negative — a non-metal-heavy field turns the caster's own conductor against them —
-        and is uncapped either way by design: the one place a Wu is deliberately let past the
-        game's usual stat ceiling.
-
-        Read live off the queues rather than resolved once at play time, so a Wu fielded *after*
-        the Shard still counts — the same reason `boost_negated`/`defence_negated` read at scoring
-        time instead of when they were set.
+        Read live off the queues rather than resolved once at play time, so a Wu fielded *after* the
+        cast still counts — the same reason `boost_negated`/`defence_negated` read at scoring time
+        instead of when they were set.
         """
         if not self.duel.rounds or self.duel.round.conduct_caster != is_player:
             return 0
@@ -806,9 +758,8 @@ class Duel:
         return net
 
     def _player_base(self) -> dict[str, int]:
-        """The player's current stats — a Yin/Yang Yo-Yo's cross-swap already resolved — plus Shard
-        of Lightning's swing on the contested stat if they cast it this battle — the player-side
-        mirror of `_bot_base`'s own bumps."""
+        """The player's current stats: cross-swap already resolved, plus the conduct swing on the
+        contested stat if they cast it this battle — mirrors `_bot_base`."""
         base, _ = self._swapped_bases()
         contested = self.duel.round.stat if self.duel.rounds else self.duel.challenge
         bonus = self._conduct_bonus(True)
@@ -817,9 +768,9 @@ class Duel:
         return base
 
     def _steal_wu(self, is_player: bool) -> None:
-        """Sands of Time: takes the opponent's strongest hand Wu, or a random deck card if their
-        hand is empty — the same policy AI Jack's own steal already uses (see `bot.steal_target`),
-        just open to any duelist who plays the card, not gated to Jack."""
+        """Takes the opponent's strongest hand Wu, or a random deck card if their hand is empty — the
+        same policy AI Jack's own steal already uses (see `bot.steal_target`), open to whoever plays
+        the card."""
         mine = self.state.player if is_player else self.state.bot
         theirs = self.state.bot if is_player else self.state.player
         target = bot.steal_target(theirs.hand, theirs.deck, self.rng)
@@ -830,9 +781,9 @@ class Duel:
         mine.hand.append(target)
 
     def _hack_construct(self, is_player: bool) -> None:
-        """Denshi Bunny: vs Jack in a bot identity (never Mala Mala Jong), a stand-in (AI Jack,
-        Attack!) auto-loses outright — Jack himself was never the one fighting. A modifier instead
-        (Chamelon-Bot's boost, Jack-Bot's curse) is nullified, and the fight proceeds normally.
+        """Vs Jack in a bot identity (never Mala Mala Jong): a stand-in mode (AI Jack, Attack!)
+        auto-loses outright since Jack himself isn't the one fighting; a modifier mode (Chamelon-Bot,
+        Jack-Bot) instead has its card nullified and the fight proceeds normally.
 
         Zeroes the specific card, not a blanket `boost_negated`/`defence_negated` flag — those negate
         every boost or every curse on a side, and Jack may have fielded a REAL boost Wu instead of
@@ -854,12 +805,10 @@ class Duel:
                 card.stats = {stat: 0 for stat in card.stats}
 
     def _seize_ground(self, is_player: bool) -> None:
-        """Cube of Haniku: its caster takes the challenger's ground for the rest of this showdown,
-        overriding a Prognosis set at the temple (it wrote ``conch_tiebreak`` there; this outwrites it,
-        since the Wu is fielded after). Both duelists fielding one cancels to the priority default —
-        neither holds a ground they both grabbed, the way two initiative powers contest (no
-        last-writer-wins). ``ground_seized`` remembers who seized so a second seize is a clash, not a
-        temple Prognosis being legitimately overridden."""
+        """Its caster takes the challenger's ground for the rest of the showdown, overriding a
+        temple-set ``conch_tiebreak`` (this is fielded later, so it wins). Both sides seizing cancels
+        to the priority default — no last-writer-wins between two initiative powers.
+        ``ground_seized`` distinguishes that clash from a legitimate override."""
         if self.state.ground_seized is not None and self.state.ground_seized != is_player:
             self.state.conch_tiebreak = None  # both seized — back to who leads
         else:
@@ -876,9 +825,9 @@ class Duel:
         )
 
     def _summon_display(self, card: Card, *, is_player: bool) -> str | None:
-        """A summon Wu enters the board as the thing it calls up — a clone, a horde, a fear — not as
-        itself; the hand still shows the Wu. Flavour only: the stats are the Wu's own. ``None`` for an
-        ordinary Wu (its own name stands). The pools and their keying live in :mod:`.summons`."""
+        """A summon Wu enters the board as the thing it calls up, not as itself — the hand still
+        shows the Wu, and only the display name changes; stats are the Wu's own. ``None`` for an
+        ordinary Wu. Pools and their keying live in :mod:`.summons`."""
         template = card.power.summon
         if not template:
             return None
@@ -901,13 +850,13 @@ class Duel:
             bot_stats=self._bot_base(),
             bonus_cancelled=self.duel.elemental_bonus_cancelled,
             bonus_reversed=self.duel.elemental_bonus_reversed,
-            # Hannibal's Elemental Deflection (both halves, elements only): his own Wu shrug off the
-            # arena's drag, and the foe's arena lift is turned aside. Empty for any other opponent.
+            # Hannibal: his own Wu ignore arena drag, and the foe's arena lift is turned aside.
+            # Empty for any other opponent.
             bot_ward=hannibal.DEFLECTED_ELEMENTS if bot.is_hannibal(self.state.bot) else frozenset(),
             player_deflect=hannibal.DEFLECTED_ELEMENTS if bot.is_hannibal(self.state.bot) else frozenset(),
-            # Priority is the last word on a battle nothing else can separate — held by whoever called
-            # the challenge (settled by initiative, or the coin on a tie). A Prognosis Conch splits
-            # the two: the opponent leads and names the stat, but its caster keeps the ground.
+            # Priority is the last word when nothing else separates the battle — normally whoever
+            # called the challenge. An initiative power can split the two: the opponent leads and
+            # names the stat, but its caster keeps the ground.
             challenger_is_player=(
                 self.state.conch_tiebreak
                 if self.state.conch_tiebreak is not None
@@ -917,20 +866,21 @@ class Duel:
 
     def _jack_base(self) -> dict[str, int]:
         """Jack's real current stats, before Beast Form's or Chamelon-Bot's per-battle swing (both
-        live in `_bot_base` — they only ever touch the ONE stat actually contested, so both need to
-        know which battle they're in, which this method does not).
+        live in `_bot_base` — they only touch the one contested stat, and need to know which battle
+        that is, which this method does not).
 
         Attack! is a flat ATTACK_STAT on every stat, metal, plus the same resonance/suffer swing a
-        metal Wu already gets for free — `Character` carries no element of its own, so this is where
-        it has to be added, same shape as `BEAST_BOOST`. The swing needs a decided ground; it reads
-        as neutral (0) while one is still being picked (see `_setup_brawl`, which calls this to
-        choose it). Good Jack (a Yin/Yang Yo-Yo away, see `Player.yoyo_flipped`) is a flat
-        GOOD_JACK_STAT on force/agility PLUS whatever training delta Evil Jack has already banked on
-        them — "stupider by design" only touches intellect, which is Good Jack's own separately
-        trained value (`Player.good_jack_intellect`), never derived from Evil's frozen real one.
-        Otherwise his plain printed stats — Chamelon-Bot included, here.
+        metal Wu gets for free — `Character` carries no element of its own, so it's added here, same
+        shape as `BEAST_BOOST`. The swing needs a decided ground; it reads as neutral (0) while one
+        is still being picked (see `_setup_brawl`, which calls this to choose it).
 
-        The one seam every bot-stats read of him passes through, so all three are real, not cosmetic.
+        Good Jack (`Player.yoyo_flipped`) is a flat GOOD_JACK_STAT on force/agility plus whatever
+        training delta Evil Jack has already banked on them; intellect is his own separately trained
+        value (`Player.good_jack_intellect`), never derived from Evil's. Otherwise his plain printed
+        stats.
+
+        The one seam every bot-stats read of him passes through, so all three modes are real, not
+        cosmetic.
         """
         if self.duel.jack_mode == jack.ATTACK_NAME:
             swing = element_score("metal", self.duel.background) if self.duel.background else 0
@@ -959,12 +909,12 @@ class Duel:
     def _bot_base(self) -> dict[str, int]:
         """The bot's base stats for the CURRENT battle. Beast Form adds BEAST_BOOST to the stat it
         named, in the ONE battle that contests it — a tournament's other two legs see the plain
-        printed stats. Chamelon-Bot's own denial is a BOOST now (see `_chamelon_boost_card`/
-        `_commit_boost`), not a base override: it competes for the same one-per-fielded-Wu slot as
-        Jack-Bot's curse and any real Wu, the same trade a player accepts for any other boost.
+        printed stats. Chamelon-Bot's own denial is a boost, not a base override (see
+        `_chamelon_boost_card`/`_commit_boost`) — it competes for the same one-per-fielded-Wu slot as
+        any real boost.
 
-        On the BASE, so it is element-free by nature: it earns no arena bonus and no elemental counter
-        can touch it (they act on the elemental bonus, which a base stat never carries).
+        On the BASE, so it is element-free by nature: it earns no arena bonus and no elemental
+        counter can touch it (they act on the elemental bonus, which a base stat never carries).
         """
         _, base = self._swapped_bases()
         contested = self.duel.round.stat if self.duel.rounds else self.duel.challenge
@@ -1008,7 +958,7 @@ class Duel:
             ),
             # Elementless, deliberately: precisely the bump and nothing else. An elemental tag would
             # let the arena swing it further off parity or short of it — `element_score` exempts an
-            # elementless card entirely (the same rule the Sapphire Dragon stands on).
+            # elementless card entirely.
             element="", type="item", points=0,
         )
 
@@ -1017,18 +967,18 @@ class Duel:
             score_brawl(current, self._ground())
         else:
             score_battle(current, self._ground())
-        if current.bane_winner is not None:  # Emperor Scorpion took this battle from the construct
+        if current.bane_winner is not None:  # a bane power took this battle from the construct
             current.winner = current.bane_winner
 
     async def _element_for(self, card: Card) -> str:
-        """Some Wu let the player name an element: the Morpher its shape, the Eye its own colour, the
-        Monsoon the whole arena's. Any other card ignores the ask and takes the background."""
+        """Wu in `_CHOOSES_ELEMENT` let the player name an element; any other card takes the
+        background."""
         if mechanic_of(card.power) in _CHOOSES_ELEMENT:
             return await self.choices.element(self.duel.background or "")
         return self.duel.background or ""
 
     async def _stat_for(self, card: Card) -> str | None:
-        """The Orb and the Curse are told which stat to pour into; every other Wu already knows."""
+        """Wu that name a stat (`names_a_stat`) ask; every other Wu already knows."""
         if names_a_stat(card.power):
             return await self.choices.stat(self._stat_names())
         return None
@@ -1038,12 +988,9 @@ class Duel:
         return list(self.state.player.character.stats)
 
     async def _resolvement(self) -> None:
-        """Weigh the match. A Wu must belong to someone, so this always names a winner.
-
-        Three steps, in order. Rounds won is the honest headline. Aggregate margin breaks a level
-        match by *how* the rounds were won — a rout counts for more than a whisker, which is what
-        makes committing your best Wu worth doing. Only when nothing at all separates them does the
-        duelist who called the challenge hold the ground: rare, and dramatic when it lands.
+        """Weigh the match; always names a winner. Three steps in order: rounds won decides first; a
+        level match falls to aggregate margin; only when nothing separates them does the challenger
+        hold the ground.
         """
         player_rounds, bot_rounds = self.duel.rounds_won
         if player_rounds != bot_rounds:
@@ -1052,7 +999,7 @@ class Duel:
             margin = sum(r.score for r in self.duel.rounds)
             self.duel.winner = margin > 0 if margin else bool(self.duel.player_priority)
         if self.duel.auto_winner is not None:
-            self.duel.winner = self.duel.auto_winner  # a Treasurebox wins outright, whatever the battles said
+            self.duel.winner = self.duel.auto_winner  # an auto-winner overrides the battle result
 
         if (
             bot.is_jack(self.state.bot) and self.duel.jack_mode is None and self.duel.winner
@@ -1082,18 +1029,17 @@ class Duel:
         if not self.state.card_deck:
             self.state.has_ended = True
 
-        # the loser gives up every card they staked this showdown; the winner takes them — fresh,
-        # since a Wu's wear belongs to the duelist who used it (see logic/flow/wear.py). A fled Jack keeps
-        # his: that is the whole point of conceding rather than fighting it out.
+        # the loser's staked cards go to the winner, fresh (wear belongs to whoever used a Wu, see
+        # wear.py). A fled Jack keeps his — the point of conceding.
         winner, loser = self._winner_and_loser()
         if not self.duel.jack_fled:
             for card in self.duel.duelist(not self.duel.winner).stakes:
                 loser.remove_card(card)
                 jong.take_won(winner, hand_over(card))  # into the hand, or banked if the winner is locked
 
-        # Mala Mala Jong losing a showdown drops the form: it always wagers parts, so a loss always
-        # breaks the set. The winner already took the wagered parts above; the Heart now comes out of
-        # exile to them too, and the loser reverts.
+        # A losing Mala Mala Jong drops the form (a loss always breaks the set, since it always
+        # wagers parts). The winner already took those parts above; the Heart comes out of exile to
+        # them too.
         if bot.is_jong(loser):
             heart = jong.revert(loser)
             if heart is not None:
@@ -1103,8 +1049,8 @@ class Duel:
         # cashes a full bar on the spot; the raised stat is kept for the screen to report.
         self.duel.bot_trained = record_showdown(self.state, player_won=bool(self.duel.winner))
 
-        # A Treasurebox is exiled by its wish: gone from the winner's hand for good, before wear could
-        # vault it for points and before any recovery power (Luck, Refresh, Witchcraft) could reach it.
+        # A WISH card is exiled outright: removed from the winner's hand before wear could vault it
+        # for points or any recovery power could reach it.
         if self.duel.auto_winner is not None:
             champion = self.state.duelist(self.duel.auto_winner)
             for card in [c for c in champion.hand if mechanic_of(c.power) is Mechanic.WISH]:
@@ -1153,12 +1099,11 @@ class Duel:
         return [e for e in ELEMENTS if e not in self.state.previous_background]
 
     def _boost_options(self, player: Player, *, is_player: bool) -> list[Card]:
-        """Boost Wu still available — every Wu fielded may carry one, and each must be a different Wu.
+        """Boost Wu still available — every fielded Wu may carry one, and each must be a different Wu.
 
-        A boost is spent once a showdown, not once a battle. So a three-Wu field can be boosted three
-        times, but only by a duelist holding three distinct boost Wu — you cannot lift the whole field
-        with one dragon. And a Wu is spent whichever slot it went into: fielded as an ordinary Wu, it
-        is gone, and cannot come back to boost the next one.
+        A boost is spent once a showdown, not once a battle: a three-Wu field can be boosted three
+        times, but only by a duelist holding three distinct boost Wu. A Wu is spent whichever slot it
+        went into — fielded as an ordinary Wu, it cannot come back to boost the next one.
         """
         duelist = self.duel.duelist(is_player)
         # Mala Mala Jong boosts only with the Heart it exiled — never a part, never a wudai — and only
@@ -1185,13 +1130,11 @@ class Duel:
         return excluding(player.hand, self.duel.duelist(is_player).stakes)
 
     def _choose_jack_mode(self) -> None:
-        """Jack's identity swap: Attack! (a Brawl), AI Jack (steal), or Chamelon-Bot (mirror the
-        opponent) — decided once, right after priority. "After committing to the fight" does not
-        distinguish who leads, and this is early enough either way: nothing is staked, boosted or
-        fielded yet this showdown. The steal fires here, before either side has picked a Wu — meant
-        to land as a sudden loss, not a tidy one: the screen raises a toast the moment it happens
-        (see `screens/duel._announce_jack_steal`), so a card missing from your options later isn't a
-        surprise, only the theft is.
+        """Jack's identity swap (Attack!, AI Jack, Chamelon-Bot, or himself) — decided once, right
+        after priority: nothing is staked, boosted, or fielded yet this showdown.
+
+        The steal fires here, before either side picks a Wu, so the screen's toast (see
+        `screens/duel._announce_jack_steal`) lands before a menu could reveal the theft first.
         """
         if not bot.is_jack(self.state.bot):
             return
@@ -1219,13 +1162,11 @@ class Duel:
         self._resolve_ai_jack_steal()
 
     def _resolve_ai_jack_steal(self) -> None:
-        """AI Jack's theft: the strongest Wu in the opponent's hand, or a random deck card if the
-        hand is empty — fires the moment his mode is picked, before either side has chosen a Wu, so
-        it can take away the answer the player was about to reach for. A no-op if nothing qualifies,
-        or Jack isn't in AI Jack mode this showdown.
+        """AI Jack's theft: the strongest Wu in the opponent's hand, or a random deck card if empty —
+        fires the moment his mode is picked, before either side has chosen a Wu. No-op if nothing
+        qualifies or Jack isn't in AI Jack mode.
 
-        A counter Wu (`jack.is_counter`) is taken outright, ahead of a stronger ordinary one — Jack
-        is wary of exactly these, whatever else is in reach."""
+        A counter Wu (`jack.is_counter`) is taken outright, ahead of a stronger ordinary one."""
         if self.duel.jack_mode != jack.AI_JACK_NAME:
             return
         target = bot.steal_target(
@@ -1252,13 +1193,11 @@ class Duel:
         duelist = self.duel.duelist(is_player)
         mine, theirs = self.duel.round.sides(is_player)
         player = self.state.player if is_player else self.state.bot
-        # What cannot be lost is what sits in the inalienable slot — *not* every Wu that boosts. A
-        # wudai weapon found in the pile boosts exactly like the one a character was born holding,
-        # and is staked like anything else you carry: win it, lose it, bank it.
-        # What cannot be staked: the inalienable slot, and the Heart Mala Mala Jong exiled — it is out
-        # of play powering the form, so a boost can never lose it. Chamelon-Bot's denial joins them:
-        # a computed effect built fresh each cycle, never a real Wu Jack is holding — there is
-        # nothing there to lose.
+        # What can be staked: everything except the inalienable slot — a wudai weapon found in the
+        # pile boosts and stakes like any other Wu; only the character's own inalienable copy is
+        # exempt. What cannot be staked: the inalienable slot, the Heart Mala Mala Jong exiled (out
+        # of play powering the form), and Chamelon-Bot's denial (a computed effect, not a real Wu
+        # Jack holds).
         is_jong_heart = card is player.jong_heart
         is_chamelon_boost = card.id == jack.CHAMELON_BOOST_ID
         if not is_one_of(card, player.inalienable_hand) and not is_jong_heart and not is_chamelon_boost:
@@ -1287,17 +1226,15 @@ class Duel:
             boosted.stats = {stat: 0 for stat in boosted.stats}
             mine.spent.append(boosted)
         elif is_chamelon_boost:
-            # A gadget that showed up, not stats blended into the Wu it lifts — the board reads it
-            # the same way as Jack-Bot's curse ("Chamelon-Bot & <Wu>", not "Chamelon-Bot + <Wu>"),
-            # via the same boost-slot tracking `Side.jack_bot` already exists for.
+            # A gadget that showed up, not stats blended into the Wu it lifts — tracked via the same
+            # boost-slot list `Side.jack_bot` already exists for.
             mine.jack_bot.append(boosted)
         mine.queue.append(boosted)
 
     def _is_construct(self, player: Player) -> bool:
         """Whether this duelist fights this showdown as a construct — Mala Mala Jong, or Jack in any
-        of his three identity swaps (Attack!, AI Jack, Chamelon-Bot: each sends one of his own bots,
-        not him). The hook a future Denshi Bunny reads for its auto-win; Jong is separately queryable
-        via `bot.is_jong` for its own immunity from it."""
+        of his three identity swaps (each sends a bot, not himself). Read by Denshi Bunny's auto-win
+        check; Jong is separately queryable via `bot.is_jong` for its own immunity."""
         return bot.is_jong(player) or (bot.is_jack(player) and self.duel.jack_mode is not None)
 
     def _winner_and_loser(self) -> tuple[Player, Player]:
@@ -1306,10 +1243,8 @@ class Duel:
         return self.state.bot, self.state.player
 
     def _award_prize(self) -> None:
-        """Winning settles who keeps their own Wu. Taking the revealed one has to be *earned*.
-
-        Four routes, in :mod:`.mechanics.prize` — a decisive blow, a broad win, total command, or
-        having fought in tune with the arena. Fail all four and the Wu is **lost**, not destroyed.
+        """Winning settles who keeps their own Wu; taking the revealed one must be earned via one of
+        the routes in :mod:`.mechanics.prize`. Failing all of them, the Wu is lost, not destroyed.
         """
         winner, loser = self._winner_and_loser()
         self.duel.winner_character = winner.character.name
@@ -1330,14 +1265,13 @@ class Duel:
             )
         self.duel.card_won = self.duel.prize_route is not None
         if self.duel.card_won:
-            # "The Good Guys Finish Last": a WU-PLAY win gifts the prize to the duelist Chase beat; a
-            # Beast-Form win keeps it (in the beast his Wu are dead weight either way). `card_won` stays
-            # true — a route was earned, the log reads a win — only the taker changes.
+            # a WU-PLAY win gifts the prize to Chase's opponent; Beast Form keeps it. `card_won`
+            # stays true — only the taker changes.
             gifts = bot.is_chase(winner) and self.duel.beast_stat is None
             self.duel.prize_gifted = gifts
             takes_prize = loser if gifts else winner
             jong.take_won(takes_prize, self.duel.stakes)  # into the hand, or banked if locked
         else:
-            # Lost, not destroyed. It leaves play, and one day it can surface again — which is what
-            # the Rooster Booster reaches for. Until that card exists, nothing reads this pile.
+            # Lost, not destroyed — parked in state.lost for a future recovery power; nothing reads
+            # it yet.
             self.state.lost.append(self.duel.stakes)

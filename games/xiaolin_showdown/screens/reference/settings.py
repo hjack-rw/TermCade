@@ -85,9 +85,8 @@ class SettingsScreen(XiaolinScreen):
                 yield Static("Beat Hard to unlock the boss ladder.", classes="setting-hint")
             yield Button(_music_label(self._music), id="music")
             yield Button(_sfx_label(self._sfx), id="sfx")
-        # OUTSIDE the panel: the panel scrolls once the rows outgrow it, and Save was its last child,
-        # so on a short screen the only way to commit the changes scrolled out of sight. Out here it
-        # keeps its place at the bottom however far the settings themselves are scrolled.
+        # OUTSIDE the panel: the panel scrolls once the rows outgrow it. Save was its last child, so
+        # on a short screen it scrolled out of sight with them; out here it stays anchored.
         yield Button("Save", id="save", variant="primary")
         yield Footer()
 
@@ -109,8 +108,8 @@ class SettingsScreen(XiaolinScreen):
             values[field.name] = int(raw) if raw else getattr(XiaolinSettings(), field.name)
         coerced, adjusted = XiaolinSettings.coerce(values)
         if adjusted:
-            # Don't silently accept an out-of-range value (which would just do nothing) — flag it as
-            # a toast, like the bot-turn log, and keep the screen open so the player can fix it.
+            # Flag an out-of-range value as a toast rather than silently doing nothing, and keep the
+            # screen open so the player can fix it.
             self.app.notify(
                 _out_of_range_message(adjusted), title="Invalid settings", severity="warning"
             )

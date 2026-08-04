@@ -39,11 +39,10 @@ class _DealWeights:
 
 _BASE_WEIGHTS = _DealWeights(base=1, points=2, duel=1)
 
-# Per-opponent scenario overrides: some opponents are beaten by a different deck than the default deals,
-# so their matchup skews the deal. Boss-only in practice — a scenario needs the opponent known before
-# the deal, which holds only for a CHOSEN opponent (bosses are picked, never dealt); a randomly dealt
-# roster gets the default. Wuya's Witchcraft recycles spent Wu, so game LENGTH feeds her; a point-richer
-# deck races her to the target before the grind pays off, lifting her back above Chase (the final wall).
+# Per-opponent scenario overrides: some opponents are beaten by a different deck than the default deals.
+# Boss-only in practice — a scenario needs the opponent known before the deal, which holds only for a
+# CHOSEN opponent (bosses are picked, never dealt); a randomly dealt roster gets the default.
+# See docs/balance/BALANCE.md §15 for why Wuya's is tuned as it is.
 _SCENARIOS: dict[str, _DealWeights] = {
     "Wuya": replace(_BASE_WEIGHTS, points=4),
 }
@@ -224,7 +223,7 @@ def _weighted_sample(cards: list[Card], k: int, rng: Rng, deal_weights: _DealWei
 def _deck_weight(card: Card, weights: _DealWeights) -> int:
     """A Wu's odds of being dealt into a run: point-rich and duel-strong Wu are likelier, so a dealt
     deck can reach its target and still field sharp fights, while the base keeps every Wu reachable.
-    The blend is the matchup's :class:`_DealWeights`; measured play sets them, not a guess.
+    The blend is the matchup's :class:`_DealWeights`.
     """
     return weights.base + weights.points * card.points + weights.duel * duel_value(card)
 
@@ -245,9 +244,8 @@ def _player_set_their_own_deal(settings: XiaolinSettings, cards: list[Card]) -> 
 def _pile_size(roster: str) -> int:
     """How many Wu to leave in the draw pile after the opening hands, or ``0`` for the whole pool.
 
-    The per-roster table (:data:`_PILE_SIZE`) is live by default. ``XS_PILE`` is a measurement override:
-    an integer forces that size on every roster (for sweeps), and ``"full"`` (or ``0``) deals the whole
-    pool, the pre-weighting baseline the harness compares against.
+    The per-roster table (:data:`_PILE_SIZE`) is live by default. ``XS_PILE`` overrides it: an integer
+    forces that size on every roster, and ``"full"`` (or ``0``) deals the whole pool.
     """
     override = os.environ.get("XS_PILE")
     if override is None:

@@ -8,13 +8,9 @@ The browser features the game needs all live here: the auto-fit that sizes the t
 window, the meta channel the app talks to the page through, the WebAudio bridge, the touch
 gestures, the arcade Back button, and the font declarations that reach xterm without patching it.
 
-**The CSS and JavaScript are in ``web/``, not in this file.** They used to be written out as Python
-string literals, which meant no editor knew any of it was JavaScript: nothing checked a bracket,
-nothing coloured a keyword, and every value Python had to supply arrived as an f-string brace in a
-language made of braces. What stays here is the part that is genuinely a decision — which grid to
-fit, which keycode the Back button sends, which faces are declared and over what range — while
-:mod:`termcade.asset` does the reading and the filling in. The docstrings stay here too: they are
-about *why the page needs this at all*, which is a question about the game, not about the script.
+**The CSS and JavaScript are in ``web/``, not in this file.** What stays here is the part that is
+genuinely a decision — which grid to fit, which keycode the Back button sends, which faces are
+declared and over what range — while :mod:`termcade.asset` does the reading and the filling in.
 """
 
 from __future__ import annotations
@@ -99,30 +95,21 @@ VIEWPORT = (
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
 )
 
-# An xterm cell measures about this much per px of font size. These were briefly made pessimistic to
-# force the whole grid inside a phone's viewport — and the result was a font nobody could read. A
-# player would rather scroll a legible board than squint at one that fits, and the way OUT of a
-# screen no longer depends on the fit: it is a page-level button (see `back_overlay`).
+# An xterm cell measures about this much per px of font size. A player would rather scroll a
+# legible board than squint at one that fits — the way OUT of a screen does not depend on the fit,
+# it is a page-level button (see `back_overlay`).
 #
-# 0.62 is 0xProto's advance, and it is an ESTIMATE — good enough to pick a font size, not good enough
-# to lay anything out from. xterm rounds the cell to whole DEVICE pixels, so what a CSS pixel is
-# worth depends on the display: at font 8 the cell is 4px on a plain screen and about 4.96px at 3x,
-# where a third of a CSS pixel is still a real one. A width computed from this constant was 20% out
-# on a 3x phone, which is how a cap meant to hand the game 110 columns handed it 88 — below the
-# layout's own breakpoint, so the panels stacked and the state row truncated. The width cap that
-# caused it is gone: the browser measures its own cells and the fit addon reads them.
+# 0.62 is 0xProto's advance, and it is an ESTIMATE — good enough to pick a font size, not good
+# enough to lay anything out from: xterm rounds the cell to whole DEVICE pixels, so what a CSS
+# pixel is worth depends on the display, and this constant can be off by ~20% on a high-DPI phone.
 #
 # ONE thing still lays out from this estimate — ``min_px``, and through it the too-small overlay's
-# breakpoints. That is the same 20% error, so on a 3x display the overlay can cover a window the
-# game would have run in, or stay hidden over one it cannot. It is tolerable only because the games
-# that ship set no ``min_size`` at all, so the overlay is never emitted; a cartridge that asks for
-# one inherits a threshold nobody has measured. Fixing it means asking the browser for its cell
-# before deciding, the way the fit does.
+# breakpoints — so that overlay inherits the same ~20% error. Tolerable only because no game that
+# ships sets ``min_size``, so the overlay is never emitted; a cartridge that asks for one inherits a
+# threshold nobody has measured. Fixing it means asking the browser for its cell, the way the fit does.
 CELL_W, CELL_H = 0.62, 1.25
-# The floor used to be 8, which is where a phone broke: fitting the game's 44 rows into a landscape
-# viewport needs 7px, and clamping back up to 8 made the grid 50px taller than the screen — the page
-# loaded overflowing and had to be pinched and scrolled. The floor only ever applies when even
-# the smallest fit fails; landscape still resolves to 7, portrait to 5.
+# The floor only applies when even the smallest fit fails to reach it; landscape resolves to 7,
+# portrait to 5.
 MIN_FONT, MAX_FONT = 8, 28
 
 # The fallback grid for a server with no game descriptor lives in `serve.py`, which is what decides

@@ -22,8 +22,7 @@ from .turn import bank_value, duel_value, max_hand_size, shelve
 from .power_effects import FIZZLE_MESSAGE, PowerReport, _Spend, _fire
 
 # Whether Wuya's witchcraft-restored Wu wear out (vault on the third use) or reuse forever, and
-# whether it returns them at all. Balance knobs for how hard the witch is — the harness flips them
-# (XS_WITCH_NOWEAR / XS_WITCH_OFF) to measure the tireless and the no-return forms.
+# whether it returns them at all.
 WITCHCRAFT_WEARS = True
 WITCHCRAFT_RETURNS = True
 
@@ -227,12 +226,8 @@ def _has_target(state: XiaolinState, card: Card, is_player: bool = True) -> bool
 def early_bird_options(state: XiaolinState, *, is_player: bool = True) -> list[Card]:
     """The Wu you may surrender to the Early Bird: your *highest* initiative, by magnitude.
 
-    Magnitude, not sign: a ``-2`` is as much a Wu of speed as a ``+2``. One drags them, one lifts you,
-    and both open the gap by two — so both are the price, and neither is a cheaper one.
-
-    A choice, not a pick: several Wu can tie at the top, and which one you let go of is yours to say.
-    That it must be a *highest* one is what keeps the rule honest — outrunning them costs you the very
-    thing you outran them with, so the Early Bird cannot be flown twice on the same wings.
+    Magnitude, not sign: a ``-2`` is as much a Wu of speed as a ``+2`` — both open the gap by two.
+    Several Wu can tie at the top; which one you give up is yours to say.
     """
     me = state.duelist(is_player)
     # Wuya's witchcraft cheats the toll: she gives up her WEAKEST Wu, not her fastest — the bird
@@ -355,12 +350,8 @@ def use_power(
     rng: Rng | None = None,
 ) -> PowerReport:
     """Fire ``card``'s power, then discard it for **no points**; return its :class:`PowerReport`
-    (a toast line and a shorter log line).
-
-    Distinct from :func:`deposit`, which banks the Wu for its points. Seven powers do something —
-    Chronokinesis draws, Diaskopia and Teleskopia reveal, Oxyderkia buys the next showdown's
-    initiative, Attraction pulls a Wu to you, Repulsion shoves one out of your opponent's hand, and
-    Euthymia calls one back from the lost; the gag Wu fizzles.
+    (a toast line and a shorter log line). Distinct from :func:`deposit`, which banks the Wu for its
+    points. See ``power_effects.REPORTS`` for what each mechanic does; the gag Wu fizzles.
 
     ``is_player`` is which duelist fired it — the bot spends a Wu by exactly these rules. The rest
     are the answers a power needs and the logic layer cannot ask for: ``priority`` is Oxyderkia's

@@ -36,82 +36,66 @@ class XiaolinState:
     previous_challenge: list[str] = field(default_factory=list)
     previous_background: list[str] = field(default_factory=list)
     has_ended: bool = False
-    # Actions spent this turn, one counter each (both reset by the duel end phase). A temple turn buys
-    # one action — bank a Wu, spend a Wu's power, or draw one off your shelf — so the hand is a
-    # resource and a Wu spent is a Wu not replaced.
-    #
-    # The bot has its own because it is held to the same count, and because the mercy rule can spend
-    # it: a duelist dealt back in from the pile (`turn._emergency_fill`) has had their turn's action
-    # spent for them. The cards are the action, not a gift on top of it.
+    # Actions spent this turn (reset by the duel end phase). The bot has its own because
+    # `turn._emergency_fill` (the mercy rule) can spend it on the bot's behalf.
     actions_taken: int = 0
     bot_actions_taken: int = 0
-    # How many of those actions went to the vault. At most HALF a turn's budget may be cashed (see
-    # `settings.deposit_limit`), so a bigger action budget buys tempo — a draw, a power, a stat — and
-    # not simply a faster way to bank. Counted separately because `actions_taken` cannot say which
-    # actions were deposits.
+    # How many of this turn's actions went to the vault — kept separate because `actions_taken` alone
+    # can't say which actions were deposits (see `settings.deposit_limit`).
     deposits_taken: int = 0
     bot_deposits_taken: int = 0
     # The opponent takes the same temple turn you do, and takes it once. Retreating from a
     # showdown returns you to a turn you have already spent, so this keeps them from banking
     # twice on the way back in. Reset, like the counters, by the duel end phase.
     bot_turn_done: bool = False
-    # What the Mind Reader Conch was promised: who holds priority in the next showdown, whatever
-    # the initiative sums say. ``None`` is the ordinary game, where the hands decide.
+    # Who holds priority next showdown, set by a temple power. ``None`` is the ordinary game.
     #
     # Spent by the duel *end* phase, not by the showdown that reads it — a player who opens a
-    # showdown and retreats has not had their answer yet, and the Conch is already gone from their
-    # hand. Burning it there would sell them a Wu for nothing.
+    # showdown and retreats has not had their answer yet, and burning it there would sell them
+    # a Wu for nothing.
     forced_priority: bool | None = None
-    # The new Mind Reader Conch (Prognosis): you let the opponent lead, but you read their every move.
-    # ``locked_challenge`` is the stat they are pinned to next showdown (chosen the moment the Conch is
-    # spent, revealed to you, unchanged even as their hand shifts); ``conch_tiebreak`` is who holds the
-    # challenger's ground despite NOT leading — the caster. Both spent by the duel end phase, like
-    # ``forced_priority``. ``None`` is the ordinary game.
+    # The Prognosis power's promise: ``locked_challenge`` is the stat the opponent is pinned to next
+    # showdown; ``conch_tiebreak`` is who holds the challenger's ground despite not leading. Both
+    # spent by the duel end phase, like ``forced_priority``. ``None`` is the ordinary game.
     locked_challenge: str | None = None
     conch_tiebreak: bool | None = None
-    # A Cube of Haniku (seize_ground) fielded this showdown: who took the challenger's ground, or
-    # ``None`` for nobody. Tracked apart from ``conch_tiebreak`` so a second Cube reads as a clash to
-    # cancel, not as a temple Prognosis being legitimately overwritten. Spent by the duel end phase.
+    # Who seized the challenger's ground this showdown (SEIZE_GROUND), or ``None``. Tracked apart from
+    # ``conch_tiebreak`` so a second seize reads as a clash to cancel, not as overwriting a Prognosis.
+    # Spent by the duel end phase.
     ground_seized: bool | None = None
-    # The board and RNG stream as they stood before the player's most recent temple action, kept so a
-    # Hodoku Mouse (AMEND) can put them back. One level deep. Never serialized — a run is saved only
-    # between turns, when it is ``None`` (cleared at turn-over by ``turn.refill_hands``).
+    # The board and RNG stream as they stood before the player's most recent temple action, kept so an
+    # AMEND power can put them back. One level deep. Never serialized — a run is saved only between
+    # turns, when it is ``None`` (cleared at turn-over by ``turn.refill_hands``).
     undo_stash: tuple[dict[str, Any], list[Any]] | None = None
-    # Both duelists reached for the initiative the same turn (a Conch and/or Glasses each): neither's
-    # answer stands and the coin decides, since we cannot play the two out simultaneously. Set when a
-    # second initiative power lands on an already-answered showdown; spent by the duel end phase.
+    # Both duelists reached for the initiative the same turn: neither's answer stands and the coin
+    # decides. Set when a second initiative power lands on an already-answered showdown; spent by the
+    # duel end phase.
     initiative_contested: bool = False
     # How many Wu Wuya's witchcraft has called back this run (see `characters.wuya.WITCH_RECALL_LIMIT`).
-    # Per-run, never reset by the turn: the allowance is the whole run, which is what makes the recall
-    # a resource to spend rather than an answer she always has.
+    # Per-run, never reset by the turn.
     witch_recalls: int = 0
-    # The flavour Jack-Bot last cursed under (`jack.JACK_BOT_NAMES`), so the next curse can rule it
-    # out — the whole point being it never repeats back to back. Per-run, not per-showdown: it must
-    # survive the temple between fights, and a reload should not let the same name land twice in a row.
+    # The Jack-Bot flavour last cursed under (`jack.JACK_BOT_NAMES`), so the next curse can rule it
+    # out. Per-run, not per-showdown — must survive the temple between fights and a reload.
     last_jack_bot_name: str | None = None
-    # Same idea, Attack!'s own pool (`jack.ATTACK_BOT_NAMES`) — a separate counter, since the two
-    # swaps never repeat against each other, only within their own pool.
+    # Same idea for Attack!'s own pool (`jack.ATTACK_BOT_NAMES`) — a separate counter, since the two
+    # never rule each other out.
     last_attack_bot_name: str | None = None
-    # Jack cannot spam a stand-in (AI Jack/Chamelon-Bot): one forces himself next, and himself makes
-    # the next one eligible again — a showdown-to-showdown alternation, not a random pick each time.
-    # Starts `False` so the very first showdown is himself. Attack! rolls independently and does not
-    # touch this — it neither costs nor grants eligibility, so the pattern resumes where it left off.
+    # Whether a stand-in (AI Jack/Chamelon-Bot) is eligible next showdown — alternates with playing
+    # himself (see `jack.choose_jack_mode`). Starts `False`. Attack! rolls independently and never
+    # touches this.
     jack_can_swap: bool = False
-    # Jack's recent form THIS RUN, in showdowns won/lost — grows Attack!'s own chance while he is
-    # losing, shrinks it while he is winning (see `jack.choose_jack_mode`/`attack_chance`), so the
-    # trickster reaches for the bots when he needs them, not on a flat schedule. Updated once a
-    # showdown ends (`duel._end`), clamped so a long streak cannot run away.
+    # Jack's recent form this run, in showdowns won/lost — feeds Attack!'s own odds (see
+    # `jack.choose_jack_mode`/`attack_chance`). Updated at showdown end (`duel._end`), clamped so a
+    # streak can't run away.
     jack_attack_momentum: int = 0
-    # How many showdowns Jack has fled THIS RUN — a losing showdown fought as himself he can concede
-    # instead of paying its normal cost (see `jack.choose_to_flee`). Capped at `jack.JACK_FLEE_CAP`.
+    # How many showdowns Jack has fled this run (see `jack.choose_to_flee`). Capped at
+    # `jack.JACK_FLEE_CAP`.
     jack_flees_used: int = 0
-    # Wu that surfaced, were fought over, and that nobody won hard enough to keep. They are **lost**,
-    # not destroyed: out of play, and one day recoverable (the Rooster Booster reaches for the oldest).
-    # Shared — a Wu dies to a showdown, not to a duelist.
+    # Wu fought over and won by neither side — out of play, not destroyed, and one day recoverable
+    # (the Rooster Booster reaches for the oldest). Shared between both duelists.
     lost: list[Card] = field(default_factory=list)
-    # Wu spent on their own power and discarded (deposited Wu are banked and gone, and never reach it).
-    # Shared and in the order they were used — a Refresh Wu calls the most recent back, whoever spent
-    # it, into the caster's hand.
+    # Wu spent on their own power and discarded (deposited Wu are banked and never reach it). Shared,
+    # in the order used — a Refresh Wu calls the most recent back into the caster's hand.
     used: list[Card] = field(default_factory=list)
     # A per-game win target, when this run deals a weighted subset of the pool (its size varies, so its
     # target must too). ``None`` uses ``settings.point_limit`` — the ordinary whole-pool game.

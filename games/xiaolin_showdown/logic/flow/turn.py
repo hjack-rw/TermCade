@@ -33,14 +33,11 @@ from ..config.settings import XiaolinSettings, deposit_limit, player_actions, pl
 from ..schema.state import XiaolinState
 from .training import TRAIN_LENGTH, add_progress, can_train, pick_stat, raise_stat, turn_over
 
-# What a booster is worth in a showdown. It carries no stats of its own, so without this premium a
-# skilled bot would happily bank one for points.
+# What a booster is worth in a showdown, since it carries no stats of its own.
 BOOSTER_PREMIUM = 4
 
-# The bot never banks its hand below this. It may deposit one Wu a turn and its only income is
-# winning showdowns, so with no floor it cashes its own bench and ends the run holding a single Wu
-# against a full hand — measured at 5 -> 1.3 Wu over a run. Two is what a duelist needs to still be
-# an opponent; three starves it, because a hand that sits at three can never bank at all.
+# The bot never banks its hand below this floor. A deposit requires more than DUEL_FLOOR left in
+# hand (see `_bank_surplus`), so 2 is the minimum that still allows any deposit at all.
 DUEL_FLOOR = 2
 
 
@@ -124,14 +121,9 @@ def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettin
     """Refill a hand with nothing FIELDABLE in it — own shelf first, then the pile (emptying it ends
     the run).
 
-    "Nothing playable" is not "nothing at all": a dragon (``boost``/0) can only ever be laid as a
-    boost, so a hand of them has no answer to a showdown. An amplifier (``boost``/+1) *can* be fielded,
-    badly.
-
-    ``empty_draw_limit`` is how many Wu the mercy PAYS, not the hand size it fills to. Filling to a
-    size paid a duelist holding a wudai one Wu LESS than one holding none — the wudai already occupied
-    a slot — so the rule shorted the very hands it exists to rescue. A count is blind to what is held.
-    ``max_hand_size`` still caps it: the mercy may not overfill a hand.
+    ``empty_draw_limit`` is how many Wu the mercy PAYS, not the hand size it fills to — an inalienable
+    Wu already held must not shrink the payout, so the count is against ``owed``, not against room
+    alone. ``max_hand_size`` still caps it: the mercy may not overfill a hand.
     """
     room = max_hand_size(player, settings.max_hand_size) - len(player.whole_hand)
     owed = min(settings.empty_draw_limit, room)
@@ -154,31 +146,24 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     Mechanic.NULLIFY_WU: 5,
     Mechanic.NULLIFY_CURSE: 4,
     # Prints 0/0/0; its swing is board-dependent and uncapped (see `duel.Duel._conduct_bonus`), so
-    # the bot can't know its true value at decision time. Priced level with NULLIFY_CURSE — usually
-    # good, not knowably maximal, and never banked as junk.
+    # the bot can't know its true value at decision time. Priced level with NULLIFY_CURSE.
     Mechanic.CONDUCT: 4,
-    # A whole-hand swap swings at least as hard as a negation. The bot does not SPEND it yet
-    # (temple_ai has no policy for it) — this price only keeps it from banking the strongest
-    # tempo card in the pool as junk.
+    # The bot has no spend policy for this yet (temple_ai) — priced only to keep it from banking as junk.
     Mechanic.TRANSFER: 5,
-    # Refresh prints 0/0/0 — its worth is the second use it buys back, not stats. Priced as a modest
-    # utility so the bot holds it rather than banking it as junk; the bot has no policy to spend it yet.
+    # Prints 0/0/0 — no spend policy yet, priced as a modest utility so it isn't banked as junk.
     Mechanic.REFRESH: 3,
-    # The Treasurebox prints 0/0/0 but FIELDED it wins the showdown outright — the highest table value
-    # there is. The bot has no policy to field or wish it; this only keeps it from banking the strongest
-    # Wu in the pool as junk. (Deposited it is worth its 10 printed points, counted the ordinary way.)
+    # Prints 0/0/0 but FIELDED it wins the showdown outright (see `bot.choose_card`, which always
+    # fields it). No policy to field or wish it deliberately; priced only against banking it as junk.
+    # (Deposited it is worth its 10 printed points, counted the ordinary way.)
     Mechanic.WISH: 10,
-    # Heart of Jong prints ? ? ? but in the boost slot comes alive as a flat ANIMATE_STAT form — priced
-    # off that so retuning the form re-prices the bot, and it is never banked as junk. Fielded alone it
-    # does nothing, but the bot reads its worth from the boost it can be, not the blank it looks like.
+    # Prints ? ? ? but in the boost slot comes alive as a flat ANIMATE_STAT form — priced off that so
+    # retuning the form re-prices the bot.
     Mechanic.ANIMATE: ANIMATE_STAT * 3,
-    # Prints ? ? ?; the swap lasts the whole showdown and the affiliation flip it also causes
-    # outlives it entirely (see `duel.Duel._swap_stat_and_flip`) — level with TRANSFER, the other
-    # mechanic the bot has no deliberate policy for yet. Never banked as junk.
+    # Prints ? ? ?; the swap outlives the battle (see `duel.Duel._swap_stat_and_flip`) — no spend
+    # policy yet, level with TRANSFER.
     Mechanic.STAT_SWAP: 5,
-    # Never dealt (see `constants.in_pool`) — only ever reached by combining both halves — but still
-    # needs a price so a bot holding one never banks it as junk. Same swap as STAT_SWAP, flips the
-    # OPPONENT instead of the caster, and offers a temple self-correct on top: priced a step above.
+    # Never dealt (see `constants.in_pool`) — only reached by combining both halves — but still needs
+    # a price so a bot holding one never banks it as junk. Same swap as STAT_SWAP, priced a step above.
     Mechanic.CHI_SWAP: 6,
 }
 
@@ -226,14 +211,11 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         # opponent (`resolve.curse_from_boost`), not scored as its own printed stats, so there is
         # nothing here for a points-vs-stats check to weigh in the first place.
         Mechanic.BOT,
-        # The Serpent's Tail voids the elemental bonus for both duelists all showdown, and vetoes the
-        # prize's elemental route with it. That is plainly worth more than the stats it prints — and it
-        # is *meant* to be: the veto is the card, and the author has priced it as such (4 points, the
-        # top of the pool). It is not underpriced here by oversight. Do not "fix" it.
+        # Worth more than its printed stats (it vetoes the elemental bonus and the prize's elemental
+        # route both), but priced by stats alone deliberately — do not raise it.
         Mechanic.NULLIFY_ELEMENT,
-        # The Celestial Dial reverses the elemental bonus all showdown — worth more than its printed
-        # 1/1/1, but priced by them here: the reversal is contextual (great against an in-tune opponent,
-        # nothing against a metal one) and the bot reads that from its play-it-out eval, not from here.
+        # Worth more than its printed stats (it reverses the elemental bonus), but priced by them —
+        # the reversal is contextual, read by the bot's play-it-out eval, not here.
         Mechanic.REVERSE_ELEMENT,
         # The four boss counters print real stats; their showdown effect (negate a boost, recolour a
         # side or the arena) is contextual and read by the bot's play-it-out eval, not priced here.
@@ -245,9 +227,8 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         # Prints real stats; its shield (no curse on the stat it boosts) is contextual, read by the
         # bot's play-it-out eval, not priced here.
         Mechanic.STAT_SHIELD,
-        # Prints real stats; its seize (the challenger's ground for the showdown) only decides level
-        # battles, so it is contextual — and the bot does not yet field it *for* the seize, so pricing
-        # it would be a number nothing measured. Excused until the bot plays it deliberately.
+        # Prints real stats; its seize only decides level battles, and the bot has no policy to field
+        # it for the seize — excused until it does.
         Mechanic.SEIZE_GROUND,
         # Prints real stats; its win-vs-construct is entirely contextual — worth nothing outside a
         # Jack fight, and even then only in two of his four states. Read by the bot's play-it-out
@@ -298,9 +279,8 @@ def duel_value(card: Card) -> int:
 def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
     """Which Wu the bot deposits, by difficulty. ``None`` when nothing in hand is worth points.
 
-    Hard takes the highest points, full stop: over 250 runs, weighting by ``duel_value`` lost ground at
-    every weight, and refusing to deposit a booster cost 5 points of win rate. Points are the win
-    condition. Easy sheds its least useful Wu and hoards weapons — it duels as well, and never closes.
+    Hard takes the highest points, full stop — points are the win condition. Easy sheds its least
+    useful Wu and hoards weapons, so it duels well but never closes.
     """
     # A Treasurebox is worth far more fielded (it wins the showdown) than its 10 banked points, so the
     # bot keeps it for the duel rather than cashing it — see bot.choose_card, which always fields it.
@@ -353,9 +333,7 @@ def bank_value(card: Card, rng: Rng) -> int:
     """What depositing this Wu pays: its printed points, unless it is the gamble, which is rolled.
 
     Both duelists bank on the same terms and neither is told the gamble's worth — the bot picks it by
-    the DB expected value (``GAMBLE_SPREAD``), blind like a player eyeing a ``?``. A boss is made hard
-    by SHORTENING its runs, not cutting its scoring: long runs feed the player's training bar, the one
-    legal boss-run asymmetry, so run length predicts a boss's difficulty better than its stats do.
+    the DB expected value (``GAMBLE_SPREAD``), blind like a player eyeing a ``?``.
     """
     return roll_gamble(rng) if is_gamble(card.power) else card.points
 
@@ -559,9 +537,8 @@ def _self_correct_good_jack(
 ) -> BotMove | None:
     """Jack alone: the moment the combined Ying-Yang Yo-Yo is in hand and he's worn as Good Jack,
     flip back to himself. Good Jack forfeits every one of his bot forms while worn (`Duel._boost`'s
-    gate on `Player.yoyo_flipped`) — his whole archetype — so there is no strategic reason to stay a
-    moment longer than the Yo-Yo makes him; unconditional, not a margin call (v1, swept later like
-    every other boss knob if a nuance ever turns up worth keeping him worn for)."""
+    gate on `Player.yoyo_flipped`), so there is no reason to stay a moment longer than the Yo-Yo
+    makes him."""
     from .actions import can_self_correct_yoyo, self_correct_yoyo
 
     bot = state.bot
@@ -573,11 +550,8 @@ def _self_correct_good_jack(
     return BotMove(POWER, f"{name} corrected {jack.GOOD_JACK_NAME} back to himself.")
 
 
-# The boss temple order: bank the surplus AHEAD of any power. A boss wins showdowns on its stats, so
-# the temple is a race to the point target — keep a hand big enough to field a full wager, snatch
-# cheap Wu off the pile, and BANK. A power is not taken here; it falls through to the generic path,
-# which fires one only once the surplus is gone. That is the whole fix: banking outranks a power for
-# a boss, so a reusable witchcraft power stops being an every-turn substitute for reaching the target.
+# The boss temple order: bank the surplus AHEAD of any power. A power is not taken here; it falls
+# through to the generic path below, which fires one only once the surplus is gone.
 _BOSS_ORDER = (
     _construct_jong,
     _self_correct_good_jack,
@@ -599,8 +573,8 @@ _GENERIC_ORDER = (
     _bank_surplus,
 )
 
-# Chase Young meddles in no mere mortal affairs: at the temple he only trains, draws, or banks —
-# never spends a Wu's power, never flies the Early Bird. His Wu are points and wagers, nothing more.
+# Chase Young's order: only trains, draws, or banks — never spends a Wu's power, never flies the
+# Early Bird.
 _CHASE_ORDER = (_cash_training, _draw_thin_hand, _bank_surplus)
 
 

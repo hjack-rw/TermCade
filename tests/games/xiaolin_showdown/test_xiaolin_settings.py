@@ -32,9 +32,8 @@ def test_the_mercy_hand_can_never_beat_the_wager_cap():
     """Being dealt back in must not pay better than playing well.
 
     The mercy rule is income, and it is paid to whoever is losing — a hand empties because it was
-    staked and forfeited. Unclamped, raising this one number in the Settings box took the player's
-    hard-tier win rate from 37% to 72%: you were simply paid more for losing. You are dealt back in to
-    duel, never dealt more than you could have staked.
+    staked and forfeited. Left unclamped, raising this one Settings number let a losing player get
+    paid for it instead. You are dealt back in to duel, never dealt more than you could have staked.
     """
     greedy = XiaolinSettings(empty_draw_limit=9, max_wager=3)
 

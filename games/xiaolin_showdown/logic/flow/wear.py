@@ -6,8 +6,7 @@ spot — banked for its points, costing no action. Only showdowns count, never t
 
 The count is PER WEARER, and remembered: a Wu that changes hands arrives fresh for its new owner,
 but its old owner's count waits in the card's pocket — win it back and you resume where you left
-off. Measured against reset-on-every-transfer at 200 runs/tier: identical within noise; remembered
-is the author's call.
+off.
 
 The inalienable wudai is exempt — it cannot be banked at all, so it cannot wear out.
 """

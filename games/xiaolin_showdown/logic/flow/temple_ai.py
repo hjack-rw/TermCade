@@ -59,8 +59,7 @@ def choose_temple_power(
 
     ``is_player`` is the *seat*, not the difficulty. It defaults to the opponent's, which is who plays
     by this in a real game — but every rule below is written as "my hand, their hand", so a simulation
-    can sit a player in the same chair. Without that the harness only ever banked and drew, never spent
-    a power, and every player win rate it reported was a floor.
+    can sit a player in the same chair.
     """
     for card in state.duelist(is_player).whole_hand:
         mechanic = mechanic_of(card.power)
@@ -261,9 +260,8 @@ def choose_early_bird(
 ) -> Card | None:
     """The Wu surrendered to outrun the other duelist, or ``None``.
 
-    Flown only as a comeback (behind on points). An opponent that took it whenever it could lost ~8
-    points of hard-tier win rate over 120 runs a tier: it costs a real Wu, the initiative lead that
-    names the challenge, and the turn's action — and points are the win condition.
+    Flown only as a comeback (behind on points): it costs a real Wu, the initiative lead that names
+    the challenge, and the turn's action — and points are the win condition.
     """
     from .actions import early_bird_options, initiative_lead  # local: actions imports this module
 
@@ -291,10 +289,8 @@ def choose_early_bird(
 
 
 # What the surrendered Wu may be worth in a showdown before the opponent would rather duel for the
-# prize than buy it. Measured across 3/4/5: at 3 the opponent never flies at all (reaching the gap
-# needs a ±2, and the price is always your highest, so a "cheap" flight does not exist), and at 4 and
-# 5 it plays identically. It is kept at the plain Wu's magnitude because that is what it *means* — do
-# not read the number as a live knob; the comeback rule above is what actually decides this.
+# prize than buy it. Kept at the plain Wu's magnitude because that is what it *means* — the comeback
+# rule above is what actually decides this, not this ceiling.
 EARLY_BIRD_CEILING = 5
 
 

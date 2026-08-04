@@ -2,9 +2,8 @@
 
 A ``Mixer`` is a list of playheads and an adder. It never touches a device — ``fill`` is the only
 thing the audio thread calls, and it takes a frame count and returns bytes. That is what makes it
-testable with no sound card, and it is also the whole reason the engine could not have sound
-effects before: the old backend handed a *file* to the OS, and the OS plays one at a time, so an
-effect could only ever replace the music rather than land on top of it.
+testable with no sound card, and summing samples in-process before the device sees them is what
+lets an effect land *over* the music instead of replacing it.
 
 The mix is a plain sum, so voices must leave each other headroom (see the gains in
 :mod:`termcade.core.audio`). Anything over the limit is clipped, not wrapped — a wrap turns a loud
@@ -108,41 +107,54 @@ class Mixer:
         with self._lock:
             spent: list[Voice] = []
             for voice in self._voices:
-                length = len(voice.pcm)
-                if length == 0:  # nothing to play, and a looping empty voice would spin forever
-                    spent.append(voice)
-                    continue
-                pos = voice.pos
-                if voice.fade_step:  # the ramping path — see `fade`; gains move per sample
-                    gain, step, target = voice.gain, voice.fade_step, voice.fade_to
-                    for i in range(frames):
-                        if pos >= length:
-                            if not voice.loop:
-                                break
-                            pos = 0
-                        out[i] += int(voice.pcm[pos] * gain)
-                        pos += 1
-                        if step:
-                            gain += step
-                            if (step > 0 and gain >= target) or (step < 0 and gain <= target):
-                                gain, step = target, 0.0
-                    voice.gain, voice.fade_step = gain, step
-                    # Faded to nothing and asked to leave: a looping voice never runs out on its own,
-                    # so this is the only way the tune being crossfaded OUT of is ever collected.
-                    if not step and voice.drop_when_faded and gain <= 0.0:
-                        spent.append(voice)
-                else:
-                    for i in range(frames):
-                        if pos >= length:
-                            if not voice.loop:
-                                break
-                            pos = 0
-                        out[i] += int(voice.pcm[pos] * voice.gain)
-                        pos += 1
-                voice.pos = pos
-                if pos >= length and not voice.loop:
-                    spent.append(voice)
+                self._mix_voice(voice, out, frames, spent)
             for voice in spent:
                 if voice in self._voices:  # a voice can be flagged twice: faded out AND run out
                     self._voices.remove(voice)
         return array("h", (max(-PEAK, min(PEAK, sample)) for sample in out)).tobytes()
+
+    def _mix_voice(self, voice: Voice, out: list[int], frames: int, spent: list[Voice]) -> None:
+        length = len(voice.pcm)
+        if length == 0:  # nothing to play, and a looping empty voice would spin forever
+            spent.append(voice)
+            return
+        pos = voice.pos
+        if voice.fade_step:  # the ramping path — see `fade`; gains move per sample
+            pos = self._mix_ramped(voice, out, frames, length, pos, spent)
+        else:
+            pos = self._mix_constant(voice, out, frames, length, pos)
+        voice.pos = pos
+        if pos >= length and not voice.loop:
+            spent.append(voice)
+
+    def _mix_constant(self, voice: Voice, out: list[int], frames: int, length: int, pos: int) -> int:
+        for i in range(frames):
+            if pos >= length:
+                if not voice.loop:
+                    break
+                pos = 0
+            out[i] += int(voice.pcm[pos] * voice.gain)
+            pos += 1
+        return pos
+
+    def _mix_ramped(
+        self, voice: Voice, out: list[int], frames: int, length: int, pos: int, spent: list[Voice]
+    ) -> int:
+        gain, step, target = voice.gain, voice.fade_step, voice.fade_to
+        for i in range(frames):
+            if pos >= length:
+                if not voice.loop:
+                    break
+                pos = 0
+            out[i] += int(voice.pcm[pos] * gain)
+            pos += 1
+            if step:
+                gain += step
+                if (step > 0 and gain >= target) or (step < 0 and gain <= target):
+                    gain, step = target, 0.0
+        voice.gain, voice.fade_step = gain, step
+        # Faded to nothing and asked to leave: a looping voice never runs out on its own,
+        # so this is the only way the tune being crossfaded OUT of is ever collected.
+        if not step and voice.drop_when_faded and gain <= 0.0:
+            spent.append(voice)
+        return pos

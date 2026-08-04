@@ -88,9 +88,9 @@ def test_each_recall_spends_one_of_the_allowance():
 def test_she_banks_at_everyone_elses_rate():
     """No duelist banks at a special rate — including her.
 
-    A "Shen Gong Wu hunger" halving her deposits was built and reverted the same day: it stopped her
-    CLOSING rather than making her score less, her runs went 7.7 showdowns to 13.8, and the longer
-    runs fed the player's training bar until she was the easiest boss in the tier (8.8% -> 20.8%).
+    A special deposit-rate penalty for her was built and reverted the same day: it made her runs
+    longer without making her lose more, which only worked against her difficulty. This pins the
+    reversion.
     """
     rich = wu(1, name="Rich", points=5)
     assert bank_value(rich, Rng(0)) == rich.points

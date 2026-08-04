@@ -52,9 +52,8 @@ def _wager_label(wager: int) -> str:
     return f"{wager} vs {wager}"
 
 
-# Keyed by the stage machine's own constants (imported from `duel`), never by the bare integers.
-# Written out as `{0: "End", 1: ...}` this was a second, silent copy of `range(6)`: reorder the
-# stages there and the board would keep the old labels, naming Boost as Card and nobody the wiser.
+# Keyed by the stage machine's own constants (imported from `duel`), never by bare integers — a
+# literal `{0: "End", 1: ...}` would silently go stale if the stages were reordered.
 # SETUP is absent on purpose — it has two names depending on who moved, handled below.
 _PHASE_NAMES = {
     END: "End",
@@ -70,8 +69,8 @@ def _phase_name(duel: DuelState) -> str:
     if duel.stage == END and duel.winner_character is None:
         return "Gong Yi Tanpai!"
     if duel.stage == SETUP:
-        # Setup is one stage but two moves: the priority holder names the contested stat, the other
-        # answers with the element. Title it with the move *this* duelist made.
+        # One stage, two possible titles: the priority holder names the stat ("Challenge"), the
+        # other answers with the element ("Background").
         return "Challenge" if duel.player_priority else "Background"
     return _PHASE_NAMES.get(duel.stage, "")
 
@@ -86,8 +85,8 @@ _DIVIDER_MIN = 36  # the rule under the prize never shrinks below this, however 
 
 
 def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
-    # The exchange on the table. Before the first Boost there is none, so an empty stand-in keeps the
-    # board a pure function of the state rather than a special case at every line.
+    # Empty stand-in before the first Boost, so the board stays a pure function of state rather than
+    # a special case at every line.
     live = duel.rounds[-1] if duel.rounds else Round()
 
     # Hannibal's Elemental Deflection: the scorer turns aside the elements (metal aside), so the board
@@ -96,19 +95,14 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
 
     prize_line = _prize_line(duel)
 
-    # The prize is not in play. A drawn rule sets it apart from the cards that are — an underline would
-    # only span the glyphs and collapse to nothing when the prize is a dash.
-    #
-    # It is drawn to the LINE it sits under, not to a fixed width: the moment a claim was appended
-    # ("[Claimed: by being in tune with the arena]") the line outgrew a 36-column rule and the rule read as
-    # broken. A rule that does not reach the end of what it underlines is worse than none.
+    # Sized to the LINE it sits under, not a fixed width — a fixed 36-column rule went visibly short
+    # once a "[Claimed: ...]" suffix could be appended to the prize line.
     divider = Text(
         "─" * max(_DIVIDER_MIN, prize_line.cell_len), style="dim", justify="center"
     )
 
-    # Jack-bots Attack!'s Brawl is not a regular duel, and its meta row says so: no named stat, no
-    # named place — the "Element" label alone, so a player never reads it as a background that just
-    # never changed.
+    # Brawl's meta row reads "Element" instead of "Challenge"/"Background" — it has no named stat or
+    # place, so the normal labels would misread as a background that just never changed.
     is_brawl = duel.challenge == BRAWL
     meta = Table.grid(padding=(0, 8))  # initiative / challenge / background, grouped, not spread
     meta.add_column(justify="left")
@@ -121,8 +115,8 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         ),
         labelled(
             "Element" if is_brawl else "Background",
-            # The place, not the element — but coloured by the element, which is what scores. A place
-            # can serve two pools, so the same name may read green today and red tomorrow.
+            # Coloured by the element as summoned, not looked up — a place can serve more than one
+            # element pool, so the same name may read a different colour next time.
             (duel.background or "—").upper() if is_brawl
             else (duel.background_name or duel.background or "—").upper(),
             strong=bool(duel.background),
@@ -131,8 +125,8 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         labelled("Initiative", f"P1: {duel.player.initiative}  P2: {duel.bot.initiative}"),
     )
 
-    # A tournament runs three battles and needs its running score. A wagered stat challenge runs one
-    # battle and needs no tally — only a reminder of how wide it is. A plain 1v1 needs neither.
+    # Tournament shows a running score; a wagered challenge shows just the wager width; a plain 1v1
+    # shows neither.
     tally: list[RenderableType] = []
     if duel.challenge == TOURNAMENT:
         won_player, won_bot = duel.rounds_won
@@ -145,8 +139,8 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
         line.append(f"P1: {won_player}  P2: {won_bot}")
         tally = [line, ""]
     elif is_brawl:
-        # Neither side's count answers the other's here — say both, since "wager" alone would imply
-        # the shared number every other showdown has.
+        # Both wagers shown — a single "wager" would imply the one shared number every other
+        # showdown has, but a brawl's two sides needn't match.
         line = Text(justify="center")
         line.append(f"P1 wagers: {duel.player_wager or 0}   P2 wagers: {duel.bot_wager or 0}", style="bold")
         tally = [line, ""]
@@ -179,10 +173,9 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             beast=_beast_for(duel, live),
             # Hannibal himself: his own Wu shrug off the arena's drag, so no strike either.
             deflect="ward" if _bot_deflects else None,
-            # Jack's identity swap: `jack_mode` IS the shown name for AI Jack / Chamelon-Bot, but
-            # Attack!'s own rotates through `attack_bot_name` instead — see `DuelState.jack_mode`.
-            # Attack! and Good Jack's headers must also read what they actually score as, not his own
-            # printed stats — Chamelon-Bot's denial is a boost, already carried by the offensive line.
+            # `jack_mode` is the shown name for AI Jack / Chamelon-Bot; Attack! rotates through
+            # `attack_bot_name` instead — see `DuelState.jack_mode`. Attack! and Good Jack's headers
+            # read what they actually score as (`shown_stats`), not the printed base stats.
             shown_name=duel.attack_bot_name if duel.jack_mode == jack.ATTACK_NAME else duel.jack_mode,
             shown_stats=_jack_stats(duel, state.bot, state.player),
         ),
@@ -194,32 +187,26 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
 
 
 def _resonant_background(duel: DuelState) -> str | None:
-    """The background, unless a played Serpent's Tail voided the elemental bonus — then no Wu
-    resonates with it, and the board must stop claiming they do."""
+    """The background, unless the elemental bonus was cancelled this battle — then no Wu resonates
+    with it, and the board must stop claiming they do."""
     return None if duel.elemental_bonus_cancelled else duel.background
 
 
 def _beast_for(duel: DuelState, live: Round) -> str | None:
-    """The stat Chase's Beast Form boosts on the table right now — set only in the battle that
-    contests it (a tournament's other legs see the plain stats), so the board shows it once."""
+    """The stat Beast Form boosts on the table right now — set only in the battle that contests it,
+    so the board shows it once."""
     return duel.beast_stat if duel.beast_stat and live.stat == duel.beast_stat else None
 
 
 def _jack_stats(
     duel: DuelState, jack_player: Player, opponent: Player
 ) -> dict[str, int] | None:
-    """His shown stats when they diverge from his own printed 3/3/7, exactly as `duel.Duel._jack_base`
-    computes them — `None` for AI Jack, plain Jack, or Chamelon-Bot, where the header reads his own
-    printed stats like anyone else's.
-
-    Chamelon-Bot is deliberately absent here: its denial is a BOOST now (`duel.Duel._chamelon_boost_card`
-    / `_commit_boost`), not a base override, so it already appears on the Offensive line like any other
-    boost — baking it into the header too once double-counted it (base showed the bumped total AND the
-    offensive line showed the bump again). Attack! is his flat ATTACK_STAT plus the same metal
-    resonance/suffer swing `_jack_base` adds for real. Good Jack (`Player.yoyo_flipped`) is
-    `_jack_base`'s GOOD_JACK_STAT override on force/agility plus his separately trained intellect —
-    both duplicated here rather than shared, same as `_beast_for` already duplicates a `duel.py` check:
-    this module only ever reads `DuelState`, never a live `Duel`.
+    """His shown stats when they diverge from his own printed base, mirroring `duel.Duel._jack_base`.
+    ``None`` for AI Jack, plain Jack, or Chamelon-Bot — Chamelon-Bot's denial is a boost, already on
+    the Offensive line, so baking it into the header too would double-count it. Attack! is flat
+    ATTACK_STAT plus the same metal resonance swing `_jack_base` applies; Good Jack is GOOD_JACK_STAT
+    on force/agility plus his separately trained intellect. Duplicated here rather than shared with
+    `duel.py` (same as `_beast_for`): this module only ever reads `DuelState`, never a live `Duel`.
     """
     if duel.jack_mode == jack.ATTACK_NAME:
         swing = element_score("metal", duel.background) if duel.background else 0
@@ -235,9 +222,9 @@ def _jack_stats(
 
 
 def _beast_offensive(stat: str, cards: list[Card], challenge: str | None) -> _CardsLine:
-    """Chase's Beast Form as the boost it is: ``Offensive: Beast Form (0/1/0) + <Wu> (-/-/-)`` — an
-    element-free, uncoloured boost lifting his own Wu, which are nullified beside it (offence_negated,
-    struck like an Emperor Scorpion's victim). BEAST_BOOST sits on the one stat he named."""
+    """Beast Form as the boost it is: ``Offensive: Beast Form (0/1/0) + <Wu> (-/-/-)`` — an
+    element-free, uncoloured boost lifting his own Wu, which are struck to nothing beside it
+    (offence_negated). BEAST_BOOST sits on the one stat he named."""
     tag = Text()
     tag.append("     Offensive: ", style="dim")
 
@@ -279,8 +266,7 @@ def _side_line(
         header.append("✫ ", style=Style(bold=True, meta={"tooltip": "Challenger"}))
     header.append(name, style="bold")
     header.append(" (base ", style="dim")
-    # A Sphere of Jianyu has them: the duelist themselves count for nothing this battle, and only
-    # the Wu they played answer for them.
+    # base_negated: the duelist's own stats count nothing this battle, only the Wu they played.
     if side.base_negated:
         header.append_text(absent_stats_text(challenge))
     else:
@@ -291,15 +277,10 @@ def _side_line(
         header.append("→  ", style="dim")
         header.append_text(stats_text([str(value) for value in side.result], challenge))
 
-    # The queue mixes two things — Wu this duelist played and curses cast at them. `Side` already
-    # knows the difference; splitting it again here is how the board and the scorer drift apart.
-    # Both lines always render — a dash reads as "nothing there", where a missing line reads as a
-    # bug, and the two duelists' blocks stay the same height.
-    # Both lines read the background, in opposite directions: what lifts a Wu you played drags down
-    # a curse cast at you. Printed here exactly as scored, so the shifts sum to the total by `base`.
-    # Chase's Beast Form rides the Offensive line like the boost it is — ``Beast Form (0/2/0) + <Wu>``
-    # — his own Wu struck to -/-/- beside it. Otherwise the ordinary line: only the Wu that still move
-    # a stat earn the background's bonus (see `earns_bonus` in the scorer).
+    # `side.mine()`/`side.suffered` already distinguish played Wu from curses cast at this duelist —
+    # don't re-derive that split here. Both lines always render (a dash, not a missing line) so the
+    # two duelists' blocks stay the same height. Background applies in opposite directions per line —
+    # lift on Offensive, drag on Defensive — so the printed shifts sum to the total by `base`.
     offensive = (
         _beast_offensive(beast, side.mine(), challenge)
         if beast
@@ -361,13 +342,11 @@ class _CardsLine:
 
 
 def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
-    """The whole showdown in order, for the Game Log — the build-up says why the result was what it was,
-    and the board that showed it is gone. Every line is a fact the duel already holds."""
+    """The whole showdown in order, for the Game Log. Every line is a fact the duel already holds."""
     if duel.stakes is None:  # retreated, or the pile ran dry: no prize was ever drawn
         return Text()
 
-    # The duelist who holds priority names the challenge; the other answers with the background and,
-    # on a stat challenge, with the price.
+    # The duelist who holds priority names the challenge; the other answers.
     caller, answerer = _duelists(duel, state)
 
     story = Text()
@@ -378,20 +357,14 @@ def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
     elif duel.challenge:
         _line(story, Text(f"{caller} challenged {answerer} in a battle of {duel.challenge.upper()}!"))
     if duel.background:
-        # The background and the price are ONE move: the duelist who did not call the challenge answers
-        # with both. Two lines made them read as two turns.
-        #
-        # The PLACE, coloured by the element it was summoned under — which is what scores, and which no
-        # lookup could recover: half the arenas serve two elements, and the same name reads green today
-        # and red tomorrow. The board colours it the same way, from the same fact.
+        # Coloured by the element as summoned, not looked up — same reasoning as the board's own
+        # background label.
         place = display_name(duel.background_name or duel.background)
         answer = [
             Text("The background was "),
             Text(place, style=f"bold {COLORS.get(duel.background, 'white')}"),
         ]
-        # A tournament is three battles of one Wu — its price is fixed by the shape of it, and there is
-        # nothing left for the answerer to name. On a stat challenge they name the width of the field,
-        # in the same words the toast used when they named it to your face.
+        # Tournament's price is fixed by its shape; only a stat challenge has a wager to report.
         if duel.challenge != TOURNAMENT and duel.wager:
             answer.append(Text(f", and {answerer} requested a {_wager_label(duel.wager)}"))
         answer.append(Text("!"))
@@ -424,15 +397,8 @@ def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
 
 
 def _spoils(story: Text, duel: DuelState) -> None:
-    """What changed hands — the loser's field, which is the winner's gain.
-
-    The *wager* is not written down: by the time this is read the price is history, and a line naming
-    what each side laid out only pushes the one that matters off the top. What a duelist walked away
-    with is the fact a player comes back for.
-
-    Nothing is added when nothing moved (a dead heat), because a line saying so would be a line saying
-    nothing.
-    """
+    """What changed hands: the loser's staked field, taken by the winner. Nothing is added on a
+    dead heat, when nothing moved."""
     if duel.winner is None:
         return
     taken = duel.duelist(not duel.winner).stakes
@@ -463,14 +429,9 @@ def _duelists(duel: DuelState, state: XiaolinState) -> tuple[str, str]:
 
 
 def _showdown_result(duel: DuelState) -> tuple[Text, ...]:
-    """The last line of the story.
-
-    Winning the showdown and winning the *Wu* are two different things — a duelist can take the duel
-    and still see the prize lost — so this says which happened, and never implies the other.
-
-    The prize is named, not re-introduced: its stats were printed the moment it surfaced, three lines
-    up, and a second copy of the same triple tells a reader nothing.
-    """
+    """The last line of the story: winning the showdown and winning the *Wu* are two different
+    things, so this says which happened and never implies the other. The prize is named without its
+    stats — already printed three lines up."""
     assert duel.stakes is not None
     prize = card_name_text(duel.stakes)
     # A spaced en dash before the coloured Wu name: unlike the em dash it does not fill the cell, so a
@@ -481,9 +442,8 @@ def _showdown_result(duel: DuelState) -> tuple[Text, ...]:
     if duel.prize_route is None:
         return (Text(f"{who} won the showdown, but not the Wu – "), prize, Text(" was lost!"))
     if duel.prize_gifted:
-        # He won it and gave it away. Said outright because it is the one thing here the player cannot
-        # see happen: the Wu just turns up in their hand, and without this the line above would read
-        # as Chase keeping a Wu they are holding.
+        # Said outright: the prize just turns up in the other duelist's hand, invisibly, so the line
+        # must say so or it reads as the winner keeping it.
         return (
             Text(f"{who} won and claimed "),
             prize,
@@ -493,11 +453,7 @@ def _showdown_result(duel: DuelState) -> tuple[Text, ...]:
 
 
 def _prize_line(duel: DuelState) -> Text:
-    """The Wu both duelists are racing for, and — once it is settled — how it was taken.
-
-    A Wu that simply appears in a hand teaches a player nothing about the four ways to earn one, and
-    *lost* is the outcome they will meet most often. So the board says which it was.
-    """
+    """The Wu both duelists are racing for, and — once it is settled — how it was taken."""
     line = Text(justify="center")
     line.append("Prize: ", style="dim")
     if duel.stakes is None:
@@ -507,9 +463,8 @@ def _prize_line(duel: DuelState) -> Text:
     line.append_text(card_headline(duel.stakes))
     if duel.winner is None:  # still being fought over
         return line
-    # The reason is set apart on purpose. Run it straight on from the Wu's name and a reader joins the
-    # two — "Serpent's Tail ... in tune with the arena" reads as a claim ABOUT the Tail, which is the
-    # one Wu that could never make it. The prize is what was *won*; the route is how the winner won it.
+    # Set apart, not run on from the Wu's name — run together it reads as a claim about the Wu itself
+    # rather than about how it was won.
     if duel.prize_route is None:
         line.append("   [Wu was lost, but it may surface again...]", style="dim italic")
     else:
@@ -530,9 +485,8 @@ def _cards_line(
     deflect: str | None = None,
     jack_bot: list[Card] | None = None,
 ) -> _CardsLine:
-    """One line of the board. ``negated`` means a Sphere, Scorpion or Mirror has taken it for this
-    battle: the Wu are still named — you must see what was turned off — but they read ``-/-/-`` and
-    take no elemental colour, because they are not there to resonate with anything."""
+    """One line of the board. ``negated`` means a nullifying effect has taken it for this battle: the
+    Wu are still named, but read ``-/-/-`` and take no elemental colour."""
     # The label's dim MUST be a span, never the Text's base style: `_CardsLine` appends the Wu into a
     # COPY of this label, and a base style would dim everything appended after it.
     tag = Text()
@@ -543,9 +497,8 @@ def _cards_line(
     entries: list[Text] = []
     joiners: list[Text] = []
     for index, card in enumerate(cards):
-        # a booster and the Wu it lifts are one play: "Bracelet + Fist", not two entries. The Heart of
-        # Jong's summon is NOT an amplifier — a separate fighter — so it joins with " & ", not " + ".
-        # Jack-Bot's curse reads the same way: a construct that showed up, not stats blended in.
+        # A booster and the Wu it lifts are one play: "X + Y", not two entries. An ANIMATE summon or
+        # a jack_bot entry is a separate construct, not stats blended in, so it joins with " & " instead.
         prev = cards[index - 1] if index else None
         if prev is not None and _from_the_boost_slot(prev, amplifiers, jack_bot):
             is_construct = mechanic_of(prev.power) is Mechanic.ANIMATE or is_one_of(prev, jack_bot or ())
@@ -556,10 +509,8 @@ def _cards_line(
 
         # A Wu that no longer moves a stat earns no elemental bonus, so it must not be drawn one.
         earns = not negated and (earning is None or is_one_of(card, earning))
-        # A FRESH Text, and the name appended into it — `card_name_text` carries the element colour as
-        # its *base* style, so building on it directly tints everything that follows. That is why the
-        # stats were coming out blue on a water Wu, and why bold on top of a colour never read as
-        # "brighter". `card_label` documents the same trap.
+        # Fresh Text: `card_name_text` carries the element colour as its *base* style, so building on
+        # it directly would tint everything appended after it (see `card_label`).
         entry = Text()
         entry.append_text(card_name_text(card))
         entry.append(" (", style="dim")
@@ -578,13 +529,12 @@ def _played_stats_text(
     card: Card, challenge: str | None, background: str | None, sign: int = 1,
     deflect: str | None = None,
 ) -> Text:
-    """The stats as they will SCORE: the elemental shift is invisible in the printed triple, so a Wu
-    could read ``0/0/4`` and score 3. Where it bites, the printed value is struck and the effective one
-    follows. ``sign`` is -1 on the Defensive line — a resonant curse harms you more.
+    """The stats as they will SCORE, not as printed: where the elemental shift bites, the printed
+    value is struck and the effective one follows. ``sign`` is -1 on the Defensive line.
 
-    ``deflect`` is Hannibal's Elemental Deflection, so the board strikes only what the scorer does:
-    ``"ward"`` (his own Wu) turns aside a drag, ``"lift"`` (the foe's) a lift — the four elements only,
-    never metal. Without it the strike would claim a shift the score never took.
+    ``deflect`` mirrors Elemental Deflection in the scorer: ``"ward"`` cancels a negative shift,
+    ``"lift"`` a positive one, both only on ``DEFLECTED_ELEMENTS``. Without it the strike would claim
+    a shift the score never took.
     """
     text = Text()
     shift = sign * _elemental_shift(card, challenge, background)
@@ -626,10 +576,8 @@ def _elemental_shift(card: Card, challenge: str | None, background: str | None) 
 def _from_the_boost_slot(card: Card, amplifiers: list[Card], jack_bot: list[Card] | None = None) -> bool:
     """Was ``card`` played at the power stage, ahead of the card the board prints next to it?
 
-    Three boost Wu qualify — the dragon (``boost``/0, lends a flat 1/1/1), the amplifier
-    (``boost``/+1, lends 1 per stat the next card moves), and Jack-Bot's curse (lands on the
-    opponent, never the caster). They differ in what they lend and who it lands on, not in when
-    they land, and the joiner is about the slot. A mirror is inert, its power stripped, so identity
-    — tracked in ``amplifiers``/``jack_bot`` — is the only way left to tell.
+    Three boost mechanics qualify: the dragon, the amplifier, and Jack-Bot's curse. A mirror strips
+    the power off the card it negates, so identity — tracked via ``amplifiers``/``jack_bot`` — is the
+    only way left to tell which slot a card was played from.
     """
     return is_one_of(card, amplifiers) or is_one_of(card, jack_bot or ()) or is_boost_slot(card.power)

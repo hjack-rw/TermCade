@@ -1,9 +1,8 @@
-"""The boss ladder — bosses are earned by winning, not chosen off a menu from the start.
+"""The boss ladder — the cleared-count gate for the boss roster.
 
-Beating Hard opens the boss tier at its easiest chair (Jack); beating each boss in turn opens the
-next. Ordered by MECHANIC, not character id — ``_BOSS_ARCHETYPE`` in
-``screens/character_select.py`` already keys the boss picker off it, and a mechanic survives a DB
-renumber that a hardcoded id would not.
+Ordered by MECHANIC, not character id — ``_BOSS_ARCHETYPE`` in ``screens/character_select.py``
+already keys the boss picker off it, and a mechanic survives a DB renumber that a hardcoded id
+would not.
 """
 
 from __future__ import annotations
@@ -15,8 +14,7 @@ from termcade.core.settings import Difficulty, Settings
 from ..mechanics.powers import Mechanic, mechanic_of
 from ..schema.models import Character
 
-# Jack first — Hard's own reward — then the boss tier's own ladder, Hannibal < Wuya < Chase (the
-# order BALANCE.md measures them in).
+# Jack, then Hannibal, Wuya, Chase.
 LADDER: tuple[Mechanic, ...] = (
     Mechanic.BOT,
     Mechanic.MORPH,

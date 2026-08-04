@@ -1,9 +1,4 @@
-"""Temple screen — the between-duel hub (the *deposit* screen is the Vault).
-
-Three stacked panels: game state, both hands (element-coloured), and actions. Each panel's
-content is a Rich grid that expands to fill the box; secondary labels are dimmed and names
-are emphasised, and the whole screen rebuilds on return so deposits and draws show at once.
-"""
+"""Temple screen — the between-duel hub (the *deposit* screen is the Vault)."""
 
 from __future__ import annotations
 
@@ -57,45 +52,37 @@ from ..reference.rules import RulesScreen
 from ..actions.use_power import UsePowerScreen
 
 
-# Anything narrower than this, relative to its height, is a phone held upright. Portrait grids
-# measure about 1.4; landscape and desktop measure about 4. Nothing sits near 2.5.
+# Below this width/height ratio the grid is a portrait phone; landscape and desktop sit near 4.
 _PORTRAIT_RATIO = 2.5
 
 
 class TempleScreen(XiaolinScreen):
-    # No Back here: the temple IS the run, and the only thing under it is the main menu.
+    # No Back: the temple is the run's root screen.
     BACK_ALLOWED = False
 
     # Seeded by `compose` with the value it actually rendered, so the first resize — which arrives
-    # DURING mount — compares against the truth and does nothing. Defaulting it to a guess meant a
-    # narrow screen always rebuilt itself mid-mount, tearing down a Header that was still building.
+    # DURING mount — compares against the truth and does nothing. Defaulting to a guess meant a
+    # narrow screen always rebuilt itself mid-mount, tearing down a Header still building.
     _bars_were_compact = False
 
     @property
     def _short_names(self) -> bool:
         """Whether to show a duelist by their first name alone.
 
-        The DEVICE answers this, not the width — the same reason the Back button asks. A phone in
-        landscape reports 110 columns, more than some laptops, and the state row still cannot afford
-        "SALVADOR CUMO": at that width the full name pushes Deck and Initiative past the edge and
-        both truncate to their labels. A desktop at 110 columns has the same row and does not need
-        the help, because nothing about it is going to get narrower.
+        The DEVICE answers this, not the column width — a phone in landscape can report more
+        columns than a laptop, so width alone can't tell them apart.
         """
         return bool(os.environ.get(TOUCH_ENV))
 
     def _compact_bars(self, size: Size | None = None) -> bool:
         """Whether the training bars should be a percentage instead of a bar.
 
-        Portrait is an ASPECT RATIO, not a width. Column counts were tried twice and both were
-        wrong: an xterm cell is about half its font size, so a phone reports 97 columns on a 390px
-        screen and 107 on a larger one, and any threshold picked from that lands on the wrong side
-        of somebody's phone. A grid only 1.4 times wider than it is tall is a phone stood upright;
-        landscape and every desktop are 4 times wider.
+        Portrait is judged by ASPECT RATIO, not column width: terminal cell aspect ratio varies
+        by device, so a fixed column threshold lands on the wrong side of some phones.
 
-        ``size`` is the shape to judge, and a resize MUST pass the one its event carries. Reading
-        ``app.size`` there answers with the size the app still had when the handler ran, which on a
-        rotation is the shape being left behind — so the temple compared the new orientation against
-        itself, found nothing had changed, and stayed in the layout it was already in.
+        ``size`` must be the value the resize event carries, not ``app.size`` — during a
+        rotation, ``app.size`` still holds the shape being left behind, so a check against it
+        never detects the change.
         """
         size = size if size is not None else self.app.size
         if not size.height:
@@ -105,9 +92,9 @@ class TempleScreen(XiaolinScreen):
     def on_resize(self, event: events.Resize) -> None:
         """Rebuild when a rotation crosses the breakpoint, and only then.
 
-        The bars are Rich text baked at compose time, so unlike the stylesheet they do not reflow on
-        their own. Guarded on the value actually changing: a resize arrives as a burst, and
-        rebuilding the temple on every one of them would tear the screen apart while a phone turns.
+        The bars are Rich text baked at compose time, so unlike the stylesheet they don't reflow
+        on their own. Guarded on the value actually changing: a resize arrives as a burst, and
+        rebuilding on every one would tear the screen apart mid-rotation.
         """
         compact = self._compact_bars(event.size)
         if compact != self._bars_were_compact:
@@ -140,8 +127,8 @@ class TempleScreen(XiaolinScreen):
         yield Header()
 
         with BoxedPanel(title="STATE OF THE GAME"):
-            # TooltipStatic, not Static: the Points figure carries the run's target on a hover, and a
-            # plain Static never reads the `meta` that answers it.
+            # TooltipStatic, not Static: the Points figure carries a hover tooltip via `meta`,
+            # which a plain Static never reads.
             yield TooltipStatic(
                 temple_render._summary_line(
                     player, bot, state,
@@ -165,9 +152,7 @@ class TempleScreen(XiaolinScreen):
             yield temple_render._hand_panel(jong.shown_name(bot), bot_rows)
 
         # Keyed by the shown number, so the greying and the hover reason come from one source.
-        # "4" opens on the Early Bird alone: it is a power, and a fast duelist has one to spend even
-        # holding no Wu that acts.
-        budget = player_actions(state, rules)  # 3 to the boss's one in a boss run
+        budget = player_actions(state, rules)
         blocked: dict[str, str | None] = {
             "1": "The run is over." if state.has_ended else None,
             "2": draw_blocked(state, rules),
@@ -200,9 +185,8 @@ class TempleScreen(XiaolinScreen):
         self._offer_payout()
 
     def on_mount(self) -> None:
-        # A boss run is fought to a faster tune. Set here rather than at character select because the
-        # temple is where a run actually begins — and re-set on every return to it, so loading a saved
-        # boss run into the temple sounds right too. `play_tune` no-ops when it is already playing.
+        # Set here (not at character select) so loading a saved run into the temple also picks
+        # the right tune. `play_tune` no-ops when it's already playing.
         boss = self.state.boss_run
         self.engine_app.play_tune(
             XIAOLIN_BOSS if boss else XIAOLIN, name="boss" if boss else ""
@@ -210,9 +194,8 @@ class TempleScreen(XiaolinScreen):
         self._offer_payout()
 
     def _offer_payout(self) -> None:
-        """A bar filled by a lost showdown waits for its stat pick — offer it the moment the player
-        is back at the temple. Once per fill: a dismissed offer stays claimable through Train, and
-        the flag re-arms when the payout is gone so the NEXT full bar is offered again."""
+        """Offer a full training bar's payout once per fill. The flag re-arms once the payout is
+        claimed, so the next full bar is offered again."""
         if not payout_ready(self.state.player):
             self._payout_offered = False
             return
@@ -291,8 +274,7 @@ class TempleScreen(XiaolinScreen):
 
     @work
     async def _pick_training_stat(self) -> None:
-        """A full bar pays out: the player picks which base stat rises (the bot shores up its lowest
-        on its own — see `logic.training`). Free, even on a spent turn: the ten fills paid for it."""
+        """The player picks which base stat rises when a training bar pays out."""
         player = self.state.player
         stat = await self.choose(
             prompt("Your training paid off!", "Which stat do you raise?"),
@@ -335,8 +317,8 @@ class TempleScreen(XiaolinScreen):
         self.app.push_screen(SaveSlotScreen("save", title=title))
 
 
-# Which screen action each number key runs, read off the bindings rather than written out again —
-# so a rebound key moves its click target with it instead of quietly pointing at the old action.
+# Read off the bindings rather than written out again, so a rebound key moves its click target
+# with it instead of quietly pointing at the old action.
 _ACTION_BY_KEY = {
     binding.key: binding.action
     for binding in Binding.make_bindings(TempleScreen.BINDINGS)

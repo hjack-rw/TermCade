@@ -1,13 +1,8 @@
-"""The Early Bird Gets The Worm — a Wu taken by being faster, instead of by winning a showdown.
+"""The Early Bird Gets The Worm — outrunning the other duelist on initiative by ``early_bird_gap``
+takes the next Wu off the pile with no duel, at the cost of one of the caster's fastest Wu (by
+magnitude, so a ``-2`` costs as much as a ``+2``).
 
-Outrun the other duelist on initiative by ``early_bird_gap`` and the next Wu off the pile is yours
-with no duel. You were simply quicker: you reached it first, so there was nothing to fight over.
-
-The price is what makes it a rule rather than a gift. You surrender one of your **fastest** Wu — by
-magnitude, so a ``-2`` costs as much as a ``+2`` — and it is discarded for no points. The lead that
-bought the worm is the lead you spend on it, so nobody flies twice on the same wings.
-
-Both duelists play by this, and the numbers are read off the settings, never restated.
+Both duelists play by this, and the numbers here are read off the settings, never restated.
 """
 
 from __future__ import annotations
@@ -219,10 +214,8 @@ def test_a_spent_turn_grounds_the_bird(state, catalog):
 def test_you_can_never_outrun_them_on_a_wu_you_do_not_hold(state, catalog):
     """A lead always comes out of your *own* hand — so the price can always be paid.
 
-    Worth pinning, because it is easy to assume the opposite. Their negatives do not slow *them*: they
-    land on **you** (`scoring.initiative`). Your lead is your own positives, plus your own negatives
-    dragging them down — both of which are Wu in your hand. So "fast enough to fly, with nothing to
-    surrender" cannot happen, and `early_bird_blocked`'s guard against it is belt-and-braces.
+    Worth pinning, because it is easy to assume the opposite: `early_bird_blocked`'s guard against
+    "fast enough to fly, with nothing to surrender" is belt-and-braces, not dead code.
 
     Swept over every hand the pool can print, rather than argued.
     """
@@ -277,11 +270,9 @@ async def test_flying_it_from_the_power_screen_takes_the_wu(open_vault, state, c
 
 # --- the opponent's policy: when it is worth flying at all ---------------------------------------
 #
-# The rule above says a duelist *may* fly. This says when the opponent *does* — and it is the half that
-# went untested while the simulation was busy measuring it. Flying costs a real Wu, the lead that names
-# the challenge, and the turn's action (which could have banked points, and points are the win
-# condition). Measured, an opponent that flew whenever it could lost ~8 points of win rate. So it flies
-# as a comeback: only while it is behind.
+# The rule above says a duelist *may* fly. This says when the opponent *does* — and it is the half
+# that went untested while a simulation was busy showing flying-whenever-possible costs more than it
+# is worth. So it flies as a comeback: only while it is behind.
 
 
 def _bot_outruns(state, catalog):

@@ -36,13 +36,12 @@ BANNER = """\
    ░░░░░     ░░░░░░  ░░░░░     ░░░░░ ░░░ ░░░░░   ░░░░░░░░░   ░░░░░░░░  ░░░░░░░░  ░░░░░░"""
 
 # The same wordmark at 38 columns, for a screen with no room for the full one. BANNER is 89 wide and
-# a phone held upright has about 81, so the brand was the one thing on the start screen that could
-# not fit — it ran off the side while everything under it sat comfortably inside.
+# a phone held upright has about 81, so the brand is the one thing on the start screen that would
+# not fit.
 #
-# Still a figure font (pyfiglet "small", generated once and baked in like BANNER itself). A plain
-# letter-spaced line was tried first and fits in one row, but a wordmark that is just text is not a
-# wordmark: the start screen stops looking like a cabinet and starts looking like a form. Four rows
-# is the price of it still reading as one.
+# Still a figure font (pyfiglet "small", generated once and baked in like BANNER itself) rather than
+# a plain letter-spaced line: a wordmark that is just text stops the start screen looking like a
+# cabinet and starts it looking like a form.
 BANNER_COMPACT = (
     r" _____              ___         _     " "\n"
     r"|_   _|__ _ _ _ __ / __|__ _ __| |___ " "\n"

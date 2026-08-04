@@ -1,23 +1,13 @@
 """The Lore book, loaded from the prose that ships with the cartridge.
 
-A **book, not a scrolling document**: the reader turns pages, and a page is a unit the author chose.
-That is the whole feature — the pacing of the lore is part of the lore — so the split lives here, in
-pure logic, where a test can assert what a chapter holds without booting an app.
+Pages are units the author chose, so the split lives here in pure logic, testable without booting
+an app. An authored `---` rule ends a section; failing that, `##` headings do. Sections are then
+packed onto pages — as many as fit, whole, in written order; a section is never split or reordered,
+and one that overflows a page alone still gets its own page.
 
-**Where a section ends.** An authored `---` rule ends a section; the file stays a legitimate markdown
-document, and the author owns where one idea stops and the next starts. Where a chapter carries no
-rule, it falls back to its `##` headings, which are the author's units too.
-
-**Where a PAGE ends.** Sections are then packed onto pages: as many as fit, whole, in the order they
-were written. A section is never split and never reordered, so the author's units survive — the only
-thing decided here is how many of them share a sheet, which is a typesetting question and not a
-pacing one. One section per page left pages a third full; a section that no longer fits simply starts
-the next one.
-
-Rendering lives here too (`page_renderable`) rather than in the screen, because the packer has to
-measure exactly what the screen will draw — headings, blank lines and all. Two copies of that model
-would drift and the packer would quietly mis-fill. `rich` is a text library with no TTY and is not
-`textual`, so the no-textual rule for `logic/` still holds.
+Rendering lives here too (`page_renderable`), not in the screen, because the packer has to measure
+exactly what the screen will draw — two copies of that model would drift and mis-fill. `rich` is a
+text library with no TTY, not `textual`, so the no-textual rule for `logic/` still holds.
 """
 
 from __future__ import annotations

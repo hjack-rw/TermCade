@@ -285,6 +285,17 @@ DepositScreen Button {
     margin: 1 0;
 }
 
+/* --- Touch: long lists need a shorter cap than the generic phone rule gives -------------------- */
+/* Look Up lists both hands, which is more rows than a phone has room for. Five at a time, the rest
+   a scroll away — enough to compare without the list owning the whole screen. */
+LookUpScreen.-touch BoxedPanel,
+DepositScreen.-touch BoxedPanel,
+SettingsScreen.-touch BoxedPanel {
+    /* Five options: each is a bordered button three rows tall, plus the panel's own border and its
+       "Choose a card" line. Eleven rows fitted exactly one of them. */
+    max-height: 24;
+}
+
 /* --- Rules --------------------------------------------------------------- */
 RulesScreen BoxedPanel {
     width: 72;

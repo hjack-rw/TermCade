@@ -300,12 +300,11 @@ def choose_boost(
 
     The Heart of Jong is never boosted here: its summon hands the far side a free off-wager Wu that
     answers it, so the extra body nets out — the naive reach-score would over-count it, blind to that
-    cost. The bot fields the Heart as a plain 2/2/2 instead. (A construct's own 1/1/1 Heart boost has
-    no such cost, but the bot ~never assembles, so the simple exclusion is worth more than the nuance.)
+    cost. The bot fields the Heart as a plain 2/2/2 instead.
 
     Jack-Bot is never boosted here either: it curses the *opponent*, and "what it makes reachable"
-    only ever measures the caster's own side. See `characters.jack.choose_jack_bot`, decided separately before this
-    is even called.
+    only ever measures the caster's own side. See `characters.jack.choose_jack_bot`, decided
+    separately before this is even called.
     """
     options = [o for o in options if mechanic_of(o.power) not in (Mechanic.ANIMATE, Mechanic.BOT)]
     if not options:
@@ -473,10 +472,7 @@ def choose_wager(options: Sequence[int], own_hand: Sequence[Card], opponent_hand
         """What the whole field would carry at this width, theirs subtracted from mine."""
         return sum(mine[:width]) - sum(theirs[:width])
 
-    # Take the WIDEST field you are still ahead in; if you are behind in all of them, take the
-    # narrowest bet on offer.
-    #
-    # That is the expected-swing rule: the swing is `w x (2P - 1)`, and any sane reading of a margin
-    # into a chance is monotone — so the best width turns on the *sign* of the margin, not its scale.
+    # The swing at width w is `w * (2P - 1)`, monotone in w — so only the *sign* of the margin
+    # matters, not its scale: take the widest field still ahead, else the narrowest on offer.
     ahead = [width for width in options if margin(width) > 0]
     return max(ahead) if ahead else min(options)

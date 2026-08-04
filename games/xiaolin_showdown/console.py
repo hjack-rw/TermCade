@@ -1,12 +1,8 @@
 """The console's commands — what a duelist may do to a run that is not playing it.
 
-**These exist to make a new Wu testable.** A card is worth whatever it does in a real showdown, and a
-40-card pile deals it to you when it feels like it — which is not a test, it is a wait. So: put the Wu
-in a hand, stack the pile with the one you want fought over, and go and play the thing you are judging.
-
-Every command acts on the **live run**, so the Wu you conjure is fielded, boosted, cursed and scored by
-exactly the rules a dealt one would be. That is the whole point: a sandbox that plays by its own rules
-tests nothing.
+These exist to make a new Wu testable without waiting for the draw pile to deal it: put it in a hand
+or stack the pile, then play it. Every command acts on the **live run**, so the Wu is fielded, boosted,
+cursed and scored by exactly the rules a dealt one would be.
 
 They are found by typing them and no other way (`~` opens the console). Nothing in the game links here.
 """
@@ -184,15 +180,9 @@ def clear(ctx: GameContext, args: Sequence[str]) -> str:
 
 
 def refresh(ctx: GameContext, args: Sequence[str]) -> str:
-    """Give the turn's action back, so several powers can be spent in one temple turn.
-
-    The one-action economy is the whole of the temple: a Wu spent is a Wu not banked, and that is what
-    makes a hand a resource rather than a thing that refills itself. It is also what makes *testing* a
-    power slow — two powers cost two turns, with a showdown in between whether you wanted one or not.
-
-    So this hands the action back and does nothing else. The powers still fire by the real rules; you
-    simply get to fire more than one before the showdown. `refresh them` does the same for the opponent,
-    for a card that only shows what it is when it is used against you.
+    """Give the turn's action back, so several powers can be spent in one temple turn instead of one
+    per turn. The powers still fire by the real rules; only the turn budget is reset. `refresh them`
+    does the same for the opponent.
     """
     state = _state(ctx)
     who = args[0] if args else "me"

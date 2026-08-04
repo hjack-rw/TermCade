@@ -1,21 +1,10 @@
 """Rules screen — a book with a contents list, not a scroll.
 
-**The sections are the navigation.** A rulebook read top to bottom is a rulebook nobody reads: a player
-arrives with a question ("what does initiative *do*?") and wants the two paragraphs that answer it, not
-a wall to scan. So the left rail lists the sections and the right pane shows the one you picked. How to
-Play sits at the top of that rail, because it is where a player who has *no* question yet should land.
+The left rail lists the sections; the right pane shows the one picked, with How to Play at the
+top. Search (`R`) is hidden until summoned and cuts across every section.
 
-**The search is hidden until it is wanted, and `R` is what wants it.** A search box sitting open on a
-book you have not read yet is clutter, and a rulebook is read far more often than it is searched. `R`
-summons it and puts the cursor in it; `Tab` stays what it is everywhere else in the engine — the focus
-key — and moves between the rail and the box once the box exists.
-
-Searching **cuts across every section**: it is the answer to "a rule just bit me and I do not know
-where it lives". The rail steps aside while results are up, because a result already says which section
-it came from, and Escape puts the book back the way it was.
-
-The numbers are read from the live settings, never typed twice. A rulebook that says 7 while the game
-checks 8 is worse than no rulebook, and `test_rules_screen.py` fails the moment the two part.
+The numbers are read from the live settings, never typed twice — `test_rules_screen.py` fails the
+moment the two part.
 """
 
 from __future__ import annotations
@@ -40,9 +29,7 @@ from ..base import XiaolinScreen
 
 PRIMER = "How to Play"  # the first entry in the rail, and where a player with no question yet lands
 
-# The loop, and nothing else. A player who reads only this can sit down and play a whole run: what a
-# turn buys, what a showdown costs, how a Wu changes hands, how the run ends. Every rule in the
-# reference below is an answer to a question this raises — and none of them has to be read first.
+# The loop, and nothing else — everything in the reference below answers a question this raises.
 HOW_TO_PLAY: list[str] = [
     "Collect Shen Gong Wu, bank them for points, and reach the target before your opponent does.",
     "A turn at the Temple allows for ONE action: bank a Wu for its points, spend a Wu for its power, or "
@@ -66,10 +53,9 @@ def _route(route: PrizeRoute) -> str:
 def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[str, list[str]]:
     """The rulebook, with the game's own numbers in it.
 
-    ``target`` is THIS run's win target, when a run is live. The shipped deal gives each game its own
-    target, derived from the subset it dealt — so the settings' figure is read off the whole pool and is
-    NOT the number the player is racing to. Omitted (no run yet, from the start screen), the settings'
-    figure is the honest answer: it is what a new game would be dealt.
+    ``target`` is this run's win target when a run is live — it can differ from
+    ``settings.point_limit``, which is read off the whole pool rather than the subset actually
+    dealt. Omitted (no run yet), the settings figure is used as the honest default.
     """
     target = target if target is not None else settings.point_limit
     return {
@@ -163,9 +149,8 @@ def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[s
         "Claiming the Prize": [
             "Winning the Showdown is not enough. The prize Wu answers only to a decisive victory, and "
             "there are four ways to take it, evaluated in that order:",
-            # The route NAMES are quoted from `PrizeRoute` itself, never retyped. The board announces
-            # the winning route in the enum's own words — "[Claimed: a decisive blow]" — so a book that
-            # called it something else would teach a player a name the game never says.
+            # Route names are quoted from `PrizeRoute` itself, never retyped, so the book always
+            # matches the words the board announces.
             f"{_route(PrizeRoute.DECISIVE_BLOW)}: beat {settings.prize_threshold} on the contested "
             "stat in any one battle.",
             f"{_route(PrizeRoute.BROAD_WIN)}: beat {settings.prize_threshold - 1} on any two stats.",
@@ -210,9 +195,7 @@ def matching(rules: dict[str, list[str]], query: str) -> dict[str, list[str]]:
 class RulesScreen(XiaolinScreen):
     """The book: a rail of sections on the left, the one you picked on the right."""
 
-    # `Tab` is the engine's focus key everywhere and stays that way here — it moves between the rail
-    # and the search box once the box exists. `R` is what *summons* the box: a search field sitting open
-    # on a book you have not read yet is clutter, and a rulebook is read far more often than searched.
+    # `Tab` stays the engine's focus key; `R` summons the search box.
     BINDINGS = [
         Binding("r", "search", "Search", show=True),
         Binding("escape", "back", "Back", show=True),
@@ -241,13 +224,8 @@ class RulesScreen(XiaolinScreen):
         yield Footer()
 
     def on_mount(self) -> None:
-        """The book opens out of focus mode, like every other screen in the engine.
-
-        `Tab` is advertised in the footer as the way **into** keyboard mode, so a screen that started in
-        it would make the advertised key throw you *out* of a mode you never asked to enter.
-
-        The rail keeps its highlight regardless — the highlight says which section is on the page, and
-        that is true whether or not the rail holds the keyboard.
+        """The book opens out of focus mode, matching every other screen in the engine — `Tab` is
+        advertised in the footer as the way into keyboard mode.
         """
         self.query_one("#rule-search", Input).display = False  # hidden until `R` asks for it
         self.query_one("#rule-nav", ListView).index = 0
@@ -257,11 +235,10 @@ class RulesScreen(XiaolinScreen):
 
     # --- the rail ---------------------------------------------------------------------------
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-        """Pick a section and it is *shown* — no click, no Enter. Moving the cursor is the choice.
+        """Highlighting a section shows it — no click or Enter needed.
 
-        Keyed by the item's id rather than the label rendered inside it: reading a widget's text back
-        out to decide what it meant is a round trip through the display, and the display is the last
-        place a decision should live.
+        Keyed by the item's id rather than the label rendered inside it: reading a widget's text
+        back out to decide what it meant is a round trip through the display.
         """
         if self._searching or event.item is None or event.item.id is None:
             return
@@ -271,9 +248,9 @@ class RulesScreen(XiaolinScreen):
     def showing(self) -> dict[str, list[str]]:
         """The rules on the page right now, under the headings they came from.
 
-        The page itself is a Rich table, and reading text back out of a rendered widget is a round trip
-        through the display — brittle, and it tests the renderer rather than the book. This is what the
-        screen *decided to show*, one step before Rich draws it, and it is what the tests ask about.
+        Reading text back out of a rendered Rich table would be brittle and would test the
+        renderer, not the book — this is what the screen decided to show, one step before Rich
+        draws it.
         """
         return self._visible
 
@@ -332,10 +309,7 @@ def _page(heading: str, rules: list[str]) -> Table:
 
 
 def _all_of_it(rules: dict[str, list[str]]) -> Table:
-    """Search results: every section that still has something in it, its heading kept.
-
-    The heading is what makes a hit useful — "you found this under *Initiative*" is half the answer.
-    """
+    """Search results: every section that still has something in it, heading included."""
     grid = Table.grid(padding=(0, 0))
     grid.add_column(justify="left", ratio=1)
     for heading, section in rules.items():
@@ -346,11 +320,10 @@ def _all_of_it(rules: dict[str, list[str]]) -> Table:
 
 
 class _Rule:
-    """One rule, wrapped so that no line of it is left holding a single word.
+    """One rule, wrapped so no line is left holding a single word.
 
-    A greedy wrap ends a rule on whatever is left over, which is regularly one short word sitting
-    alone under a full line. It reads as a mistake. Where the line above can spare a word, one is
-    pulled down to keep it company; the text itself is never touched.
+    A greedy wrap regularly leaves one short word alone under a full line. Where the line above can
+    spare a word, one is pulled down to keep it company; the text itself is never touched.
     """
 
     def __init__(self, rule: str) -> None:
@@ -366,10 +339,9 @@ class _Rule:
 def _line(words: list[str]) -> str:
     """The line as it will be PRINTED — em dashes already given their gap.
 
-    Wrapping has to measure the printed line, not the joined one: `spaced_dashes` puts a column back
-    after every dash, and a wrap that measured the text before that ran hands Rich a line one column
-    too long. Rich then breaks it again, on its own terms, and the whole balancing act below is undone
-    by a word dropped onto a line of its own.
+    Wrapping must measure the printed line, not the joined one: `spaced_dashes` adds a column back
+    after every dash, so measuring the joined text under-counts and Rich re-wraps the line on its
+    own terms, undoing the balancing done below.
     """
     return spaced_dashes(" ".join(words))
 
@@ -387,12 +359,11 @@ def _wrap(words: list[str], width: int) -> list[list[str]]:
 
 
 def _balance(words: list[str], width: int) -> list[str]:
-    """Wrap ``words`` into even lines rather than a full one and a stub.
+    """Wrap ``words`` into even lines rather than a full one and a ragged stub.
 
-    Greedy wrapping packs each line to the margin and leaves whatever is over on the last, which is
-    where the ragged tails come from — a rule that fills the width and then drops two words underneath
-    reads as though it broke. The line *count* is what greedy gets right, so this keeps that and then
-    wraps again at the narrowest width that still fits in it. Same number of lines, evenly filled.
+    Greedy wrapping gets the line *count* right but leaves whatever's left over on the last line.
+    This keeps that count, then re-wraps at the narrowest width that still fits within it — same
+    number of lines, evenly filled.
     """
     if not words:
         return []
@@ -412,8 +383,7 @@ def _bullets(rules: list[str]) -> Table:
     under its own text, not under the bullet. Padding on a ``Static`` indents the whole block and
     cannot do that.
     """
-    # A blank line between rules. They are paragraphs, not a list of nouns — run together they read as
-    # a wall, and the rail freed the width to afford the air.
+    # A blank line between rules — read as paragraphs, not a dense list.
     grid = Table.grid(padding=(1, 1))
     grid.add_column(justify="left", width=1)  # the bullet
     grid.add_column(justify="left", ratio=1)  # the rule, free to wrap under itself

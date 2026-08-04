@@ -18,14 +18,12 @@ from ..mechanics.powers import mechanic_of
 from ..schema.models import Card, Mechanic, Player
 
 # The construct's costume: the name and affiliation a screen shows, and the flat stat it fights at.
-# Wuya-tier (6/6/6); Chase is 7/7/7, so the form is a genuine spike for a Xiaolin and lateral for a
-# boss. Never written onto the real character — read through :func:`battle_stats` / :func:`shown_name`.
+# Never written onto the real character — read through :func:`battle_stats` / :func:`shown_name`.
 JONG_NAME = "Mala Mala Jong"
 JONG_AFFILIATION = "construct"
 JONG_STAT = 6
-# The construct boosts only with its own Heart, and only as itself: a flat 1/1/1, element metal, one
-# battle — not the ANIMATE summon (no arena form, no opponent's off-wager answer). The Heart it exiled
-# to build the form is the source, so it is never staked and never wears (see duel._commit_boost).
+# The construct's own boost: a flat 1/1/1, element metal, one battle. Sourced from the exiled Heart,
+# so it is never staked and never wears (see duel._commit_boost).
 JONG_BOOST_STAT = 1
 
 # The five assembly slots — one Wu of each ``type`` (any Wu of that type counts) plus the Heart is

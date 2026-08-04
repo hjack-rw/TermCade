@@ -24,8 +24,8 @@ from ..display.format import (
 )
 
 
-# The rare Wu that ported in under a second name — shown as `aka "..."` in the detail. One entry does
-# not earn a DB column; keyed by card id.
+# A handful of Wu carry a second name — shown as `aka "..."` in the detail. Too few to earn a
+# DB column; keyed by card id.
 _ALIASES = {64: "Sword of the Storm", 77: "Thorn of Thunderbolt"}  # Blade of the Nebula, Shard of Lightning
 
 
@@ -73,8 +73,7 @@ class DetailScreen(EngineScreen):
                 if power.description and not is_gamble(power):
                     yield Static(power.description, classes="description")
 
-            # What it does, in a line, under the flavour. A hidden power still gets one: the dragon's
-            # name stays its own business, but the rule it plays by is not a secret.
+            # A hidden power still gets an effect line — the name is hidden, not the rule it plays by.
             if power.initiative_bonus:
                 yield Static(f"Initiative bonus: {power.initiative_bonus:+d}", classes="power")
             elif effect := effect_line(power, is_card=self._is_card):

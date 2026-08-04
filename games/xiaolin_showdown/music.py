@@ -1,17 +1,9 @@
-"""The rules Xiaolin's soundtrack is composed under. Slower and pentatonic, where the cabinet
+"""The rules Xiaolin's soundtrack is composed under — slower and pentatonic, where the cabinet
 itself is brisk and minor.
 
-Two changes carry the whole sound, and they work together:
-
-**Yu pentatonic** — the minor five-note scale. It has no semitones in it at all, so no two notes
-in the game's vocabulary can clash the way a minor second does. The engine's promise is that an
-unheard seed cannot produce a wrong note, only a different one; on this scale that promise costs
-nothing to keep, because there is no wrong note left to play.
-
-**Quartal chords** — fourths and fifths, no thirds. The third is the interval that tells an ear
-"major" or "minor", and with it the harmony reads as Western however exotic the melody on top.
-Take it out and the chords go open and modal, and the pentatonic line above them stops sounding
-like a Western tune wearing a costume.
+Yu pentatonic scale (no semitones) so a seeded, unheard melody can't land on a clashing note — only
+a different one. Quartal chords (fourths/fifths, no thirds) keep the harmony open rather than reading
+as Western major/minor.
 """
 
 from __future__ import annotations
@@ -31,10 +23,8 @@ XIAOLIN = Style(
     bpm_range=(80, 100),
 )
 
-# The same music, driven. A boss is the one opponent the temple's pace is wrong for, so only the TEMPO
-# moves: same yu scale, same quartal progressions, same roots, and the tune is rendered off the same
-# seed — the faster cousin of what was already playing, not a different piece. Change anything else here
-# and the boss stops sounding like the same temple in trouble.
+# Only the tempo moves — same scale, progressions and roots, rendered off the same seed. Changing
+# anything else here breaks the "same temple, faster" effect.
 XIAOLIN_BOSS = Style(
     scale=XIAOLIN.scale,
     progressions=XIAOLIN.progressions,

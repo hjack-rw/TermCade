@@ -85,9 +85,8 @@ class Game:
     #
     # The engine cannot do this itself: the log's lines are prose the game wrote ("Katnappé played Bras
     # Finger"), and only the game knows that "Bras Finger" is a Wu — which element colours it, what its
-    # stats are, that a card is written `Name (1/2/3)` everywhere else it appears. Without this the log
-    # is the one screen in the game where a card is plain grey words, and it reads as a different game.
-    # None = draw the message as it was written.
+    # stats are, that a card is written `Name (1/2/3)` everywhere else it appears. None = draw the
+    # message as it was written.
     log_line: Callable[[str], Any] | None = None
 
 

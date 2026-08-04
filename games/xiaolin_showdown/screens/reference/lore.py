@@ -1,12 +1,7 @@
 """The Lore book — one page on screen, turned by hand.
 
-A **book, not a scrolling document**. The split into pages is authored (see `logic/content/lore.py`); this
-screen only shows one of them and moves between them. There is deliberately **no scrollbar**: a
-scrollbar turns prose into a wall of text with a position indicator, and the position a scrollbar
-would carry is in the footer instead, as `page 3 / 24`.
-
-The reader turns from the last page of a chapter straight into the first of the next, so the six
-chapters read as one continuous text. The contents page opens the book and doubles as a jump menu.
+The split into pages is authored (see `logic/content/lore.py`); this screen only shows one of
+them and moves between them.
 """
 
 from __future__ import annotations
@@ -35,8 +30,7 @@ class LoreScreen(XiaolinScreen):
         Binding("right,space,n", "next", "Next", show=True),
         Binding("c", "contents", "Contents", show=True),
         Binding("escape", "leave", "Leave", show=True),
-        # The chapter jumps answer from anywhere, not just the contents page: a reader who knows they
-        # want the Elements should not have to walk back to the front of the book to say so.
+        # Chapter jumps work from anywhere, not just the contents page.
         *(Binding(str(n), f"chapter({n - 1})", show=False) for n in range(1, 10)),
     ]
 
@@ -81,8 +75,7 @@ class LoreScreen(XiaolinScreen):
         self.app.pop_screen()
 
     def _turn(self, step: int) -> None:
-        """Move a page, stopping at the covers. The book does not wrap: running off the last page back
-        to the contents would read as the text having restarted."""
+        """Move a page, stopping at the covers (no wraparound)."""
         self._page = max(0, min(len(self._pages) - 1, self._page + step))
         self._show()
 
@@ -100,23 +93,17 @@ class LoreScreen(XiaolinScreen):
         return page_renderable(chapter.pages[index])
 
     def _contents(self) -> Text:
-        """The front of the book, and the jump menu — the number beside a chapter is the key that opens it.
-
-        Laid out to breathe: the page is 32 rows and the list is five, so the space is there to use.
-        """
+        """The front of the book, and the jump menu — the number beside a chapter is the key that opens it."""
         text = Text()
         text.append("\n")
         text.append("  Table of Contents\n", style="bold")
         text.append("\n\n")
         for number, chapter in enumerate(self._book, 1):
-            # The number IS the key that opens the chapter — and a phone has no number
-            # row, so the line itself opens it too: the same span the key would trigger.
+            # The line is clickable too, mirroring the key binding — a phone has no number row.
             start = len(text.plain)
-            # ONE styled run for the whole row, number included. Styled separately — the number bold,
-            # the title plain — they render as two segments, and the hover highlight follows the
-            # segment under the cursor rather than the clickable span: the row lit up from the title
-            # onwards and left its own number outside the highlight, looking like the number was not
-            # part of the target. It always was; only the lighting disagreed.
+            # ONE styled run for the whole row, number included — styling the number and title as
+            # separate segments made the hover highlight follow the segment under the cursor rather
+            # than the whole clickable span, leaving the number looking unclickable.
             text.append(f"      {number}    {chapter.title}\n\n", style="bold")
             text.stylize(
                 Style(meta={"@click": f"screen.chapter({number - 1})"}),
@@ -130,10 +117,10 @@ class LoreScreen(XiaolinScreen):
         return text
 
     def _position(self) -> Text:
-        """What a scrollbar would have said: where you are, and in which chapter.
+        """Where you are, and in which chapter.
 
-        The middle dot (U+00B7) divides the parts — the same character the training bar uses for its
-        remainder, so it is already known to render in the fonts this game ships with.
+        The middle dot (U+00B7) divides the parts — the same character the training bar uses, so
+        it's already known to render in the fonts this game ships with.
         """
         chapter, index = self._pages[self._page]
         if chapter is None:

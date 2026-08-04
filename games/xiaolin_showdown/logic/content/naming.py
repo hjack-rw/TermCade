@@ -7,11 +7,8 @@ phone cannot spare the columns. One rule, one home.
 
 from __future__ import annotations
 
-# A name longer than this is shortened to its first word where space is scarce. The threshold is the
-# point of it: "Le Mime" is two words and seven characters, and "Le" is not a name — so the rule has
-# to fire on what a name COSTS, not on how many words it happens to have. At 10 it takes Salvador
-# Cumo, Hannibal Roy Bean and Chase Young, all of whom are known by their first name, and leaves
-# Le Mime whole.
+# A name longer than this is shortened to its first word where space is scarce — fires on what a name
+# COSTS, not on word count, so "Le Mime" isn't cut down to "Le".
 SHORTEN_OVER = 10
 
 
