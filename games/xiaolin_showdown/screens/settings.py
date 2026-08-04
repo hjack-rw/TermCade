@@ -20,10 +20,12 @@ from termcade.core.settings import Difficulty
 from termcade.ui.app import EngineApp
 from termcade.ui.widgets import BoxedPanel, Button
 
+from ..logic.ladder import boss_tier_unlocked
 from ..logic.settings import XiaolinSettings
 from .base import XiaolinScreen
 
 # The difficulty button cycles these in order. NORMAL (an old file or the engine default) folds to EASY.
+# BOSS only enters the cycle once the ladder has opened it — see `_cycle`.
 _DIFFICULTY_CYCLE = (Difficulty.EASY, Difficulty.HARD, Difficulty.BOSS)
 
 
@@ -55,12 +57,17 @@ class SettingsScreen(XiaolinScreen):
     _difficulty: Difficulty = Difficulty.EASY
     _music: bool = True
     _sfx: bool = True
+    _boss_unlocked: bool = False
+
+    def _cycle(self) -> tuple[Difficulty, ...]:
+        """The states the difficulty button cycles through — BOSS only once the ladder has opened it."""
+        return _DIFFICULTY_CYCLE if self._boss_unlocked else _DIFFICULTY_CYCLE[:2]
 
     def compose(self) -> ComposeResult:
         current = self.ctx.settings.current
-        self._difficulty = (
-            current.difficulty if current.difficulty in _DIFFICULTY_CYCLE else Difficulty.EASY
-        )
+        self._boss_unlocked = boss_tier_unlocked(current)
+        cycle = self._cycle()
+        self._difficulty = current.difficulty if current.difficulty in cycle else Difficulty.EASY
         self._music = bool(current.options.get(MUSIC_OPTION, True))
         self._sfx = bool(current.options.get(SFX_OPTION, True))
         rules = self.rules
@@ -74,6 +81,8 @@ class SettingsScreen(XiaolinScreen):
                     classes="setting-row",
                 )
             yield Button(_difficulty_label(self._difficulty), id="difficulty")
+            if not self._boss_unlocked:
+                yield Static("Beat Hard to unlock the boss ladder.", classes="setting-hint")
             yield Button(_music_label(self._music), id="music")
             yield Button(_sfx_label(self._sfx), id="sfx")
         # OUTSIDE the panel: the panel scrolls once the rows outgrow it, and Save was its last child,
@@ -122,8 +131,9 @@ class SettingsScreen(XiaolinScreen):
         self.app.pop_screen()
 
     def _toggle_difficulty(self) -> None:
-        nxt = (_DIFFICULTY_CYCLE.index(self._difficulty) + 1) % len(_DIFFICULTY_CYCLE)
-        self._difficulty = _DIFFICULTY_CYCLE[nxt]
+        cycle = self._cycle()
+        nxt = (cycle.index(self._difficulty) + 1) % len(cycle)
+        self._difficulty = cycle[nxt]
         self.query_one("#difficulty", Button).label = _difficulty_label(self._difficulty)
 
     def _toggle_music(self) -> None:

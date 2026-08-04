@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from copy import deepcopy
+from dataclasses import replace
 from typing import cast
 
 from termcade.app.game import GameContext
@@ -23,6 +24,7 @@ from termcade.ui.screens.console import Command
 from .logic.catalog import load_catalog
 from .logic.turn import shelve
 from .logic.jong import PART_TYPES
+from .logic.ladder import LADDER, LADDER_OPTION
 from .logic.mechanics.powers import Mechanic, mechanic_of
 from .logic.models import Card
 from .logic.state import XiaolinState
@@ -206,6 +208,19 @@ def refresh(ctx: GameContext, args: Sequence[str]) -> str:
     raise ValueError("refresh me | refresh them | refresh both")
 
 
+def unlock(ctx: GameContext, args: Sequence[str]) -> str:
+    """Clear the whole boss ladder at once — every boss selectable from the settings screen,
+    without grinding Hard and three boss wins to reach the one you actually want to test.
+
+    Written into the settings file (like a real ladder win), so it survives a restart same as
+    genuine progress would.
+    """
+    settings = ctx.settings.current
+    updated = replace(settings, options={**settings.options, LADDER_OPTION: len(LADDER)})
+    ctx.settings.save(updated)
+    return f"boss ladder fully unlocked: {len(LADDER)}/{len(LADDER)} bosses"
+
+
 COMMANDS: dict[str, Command] = {
     "find": Command(find, "find <word> — list the Wu whose name holds it, with their ids"),
     "give": Command(give, "give <id>... — deal a Wu straight into your hand"),
@@ -220,4 +235,5 @@ COMMANDS: dict[str, Command] = {
     "refresh": Command(
         refresh, "refresh [me|them|both] — give the turn's action back, to spend another power"
     ),
+    "unlock": Command(unlock, "unlock — clear the whole boss ladder, every boss selectable"),
 }

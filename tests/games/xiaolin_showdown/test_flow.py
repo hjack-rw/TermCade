@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 
 from termcade.core.settings import Difficulty
 from termcade.ui.app import EngineApp
@@ -13,6 +14,8 @@ from textual.widgets import Button, Input, Static
 from xiaolin_showdown.game import build_game
 from termcade.core.rng import Rng
 from xiaolin_showdown.logic.catalog import load_catalog
+from xiaolin_showdown.logic.ladder import LADDER, LADDER_OPTION
+from xiaolin_showdown.logic.outcome import Outcome
 from xiaolin_showdown.logic.setup import new_game
 from xiaolin_showdown.screens.character_select import CharacterSelectScreen
 from xiaolin_showdown.screens.detail import DetailScreen
@@ -41,6 +44,13 @@ async def _boot(app, pilot):
             return
         await pilot.pause()
     raise AssertionError("start screen never appeared")
+
+
+def _unlock_boss_ladder(app, stages: int = len(LADDER)) -> None:
+    """Write ladder progress straight into settings — these tests are about the SELECT screens'
+    own behaviour, not about earning the tier, so they start from wherever it has been opened."""
+    current = app.ctx.settings.current
+    app.ctx.settings.save(replace(current, options={**current.options, LADDER_OPTION: stages}))
 
 
 async def _new_game_at_vault(app, pilot):
@@ -358,8 +368,9 @@ async def test_game_over_shows_the_outcome_and_can_play_again(tmp_path):
         await _new_game_at_vault(app, pilot)  # a live game state to score
         app.ctx.state.has_ended = True
         app.ctx.state.player.points = 4
+        outcome = Outcome(player_points=4, bot_points=0, winner=app.ctx.state.player.character)
 
-        app.push_screen(OutcomeScreen())
+        app.push_screen(OutcomeScreen(outcome))
         await pilot.pause()
         assert isinstance(app.screen, OutcomeScreen)
 
@@ -436,6 +447,7 @@ async def test_the_difficulty_toggle_cycles_easy_hard_boss(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:
         await _boot(app, pilot)
+        _unlock_boss_ladder(app)  # BOSS only enters the cycle once the ladder has opened it
         await pilot.click("#settings")
         await pilot.pause()
 
@@ -494,6 +506,7 @@ async def test_a_boss_run_asks_which_boss(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path, seed=1234)
     async with app.run_test(size=(150, 60)) as pilot:
         await _boot(app, pilot)
+        _unlock_boss_ladder(app)
         await pilot.click("#settings")
         await pilot.pause()
         await pilot.click("#difficulty")

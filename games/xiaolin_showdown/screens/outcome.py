@@ -11,14 +11,18 @@ from textual.widgets import Footer, Header, Static
 
 from termcade.ui.widgets import BoxedPanel, Button
 
-from ..logic.outcome import final_score
+from ..logic.outcome import Outcome
 from .base import XiaolinScreen
 from .format import display_name
 
 
 class OutcomeScreen(XiaolinScreen):
+    def __init__(self, outcome: Outcome) -> None:
+        super().__init__()
+        self._outcome = outcome
+
     def compose(self) -> ComposeResult:
-        outcome = final_score(self.state, self.ctx.rng)
+        outcome = self._outcome
         verdict = (
             "A TIE —  NOBODY WINS!"
             if outcome.winner is None

@@ -345,10 +345,11 @@ class EngineApp(App[None]):
         # absent, and this is absent.
         if not debug_enabled():
             return
-        # And only over a RUNNING game: every command acts on a run — deal a Wu into a hand, stack a
-        # pile, set the score — so a console on the start menu is a box whose every answer is "there is
-        # no game".
-        if self.ctx is None or self.ctx.state is None:
+        # `ctx` itself must exist (a Game is running); its `state` need not — most commands act on a
+        # live run and say so plainly ("no run in progress") when there isn't one, but not every
+        # command does (a cartridge may offer one that only touches settings, e.g. an unlock cheat
+        # reachable from the main menu).
+        if self.ctx is None:
             return
         self.push_screen(ConsoleScreen())
 

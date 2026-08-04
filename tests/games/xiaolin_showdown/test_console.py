@@ -225,11 +225,11 @@ async def test_the_cursor_is_in_the_field_the_moment_it_opens(console):
         assert app.screen.focused is app.screen.query_one("#console-input", Input)
 
 
-async def test_it_does_not_open_where_there_is_no_game(tmp_path):
-    """Every command acts on a run — deal a Wu, stack a pile, set the score.
-
-    On the start menu there is nothing to act on, so a console would be a box whose every answer is
-    "there is no game". It opens where it can do something and stays shut where it cannot.
+async def test_it_opens_on_the_start_menu_too(tmp_path):
+    """Most commands act on a run — deal a Wu, stack a pile, set the score — and say so plainly
+    when there isn't one (see the next test). But not every command needs a run (the boss-ladder
+    unlock cheat only touches settings — see test_console_unlock.py), so the console itself no
+    longer refuses to open just because the start menu has no game running yet.
     """
     from xiaolin_showdown.screens.start import StartScreen
 
@@ -242,7 +242,21 @@ async def test_it_does_not_open_where_there_is_no_game(tmp_path):
         await pilot.press("grave_accent")
         await pilot.pause()
 
-        assert isinstance(app.screen, StartScreen)  # nothing happened, and nothing should have
+        assert isinstance(app.screen, ConsoleScreen)
+
+
+async def test_a_run_dependent_command_refuses_cleanly_with_no_run(tmp_path):
+    app = EngineApp(build_game(), data_dir=tmp_path, seed=1)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("grave_accent")
+        await pilot.pause()
+
+        app.screen.query_one("#console-input", Input).value = f"give {ROOSTER_BOOSTER}"
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert "no run in progress" in str(app.screen.query_one("#console-output", Static).render())
 
 
 async def test_a_shipped_build_has_no_console_at_all(tmp_path, state, monkeypatch):

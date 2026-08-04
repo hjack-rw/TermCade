@@ -184,6 +184,13 @@ SettingsScreen .setting-label {
     height: 1;
     content-align: left middle;
 }
+SettingsScreen .setting-hint {
+    width: 28;
+    height: auto;
+    color: $text-muted;
+    text-align: center;
+    margin-top: 1;
+}
 SettingsScreen Input {
     width: 6;
     height: 1;

@@ -10,6 +10,7 @@ from __future__ import annotations
 from termcade.ui.screens.menu import MenuItem
 
 from ..logic.catalog import Catalog, load_catalog
+from ..logic.ladder import effective_difficulty, unlocked_bosses
 from ..logic.mechanics.powers import Mechanic, mechanic_of
 from ..logic.models import Character
 from ..logic.settings import roster_of
@@ -42,19 +43,19 @@ def _begin_run(screen: XiaolinMenu, catalog: Catalog, character: Character, oppo
     Without it the opponent sits out the whole opening turn and meets you with a hand they never
     got to shape.
     """
-    current = screen.ctx.settings.current
+    difficulty = effective_difficulty(screen.ctx.settings.current)
     settings = screen.rules
     state = new_game(
         catalog,
         screen.ctx.rng,
         character,
         settings=settings,
-        roster=roster_of(current.difficulty),
+        roster=roster_of(difficulty),
         opponent=opponent,
     )
     screen.ctx.state = state
 
-    moves = bot_turn(state, settings, rng=screen.ctx.rng, difficulty=current.difficulty)
+    moves = bot_turn(state, settings, rng=screen.ctx.rng, difficulty=difficulty)
     state.bot_turn_done = True
     screen.app.switch_screen(TempleScreen())
     screen.app.notify(
@@ -84,7 +85,7 @@ class CharacterSelectScreen(XiaolinMenu):
 
     def on_select(self, item_id: str) -> None:
         character = self._catalog.character(self.index_of(item_id, "char"))
-        if roster_of(self.ctx.settings.current.difficulty) == "boss":
+        if roster_of(effective_difficulty(self.ctx.settings.current)) == "boss":
             # A boss is picked, never dealt — every boss is its own mechanic, and "which one" is
             # the whole decision. Pushed, so escape returns here to re-pick the character.
             self.app.push_screen(BossSelectScreen(self._catalog, character))
@@ -103,6 +104,7 @@ class BossSelectScreen(XiaolinMenu):
         self._character = character  # the dragon already chosen, carried into the deal
 
     def menu_items(self) -> list[MenuItem]:
+        bosses = unlocked_bosses(self._catalog.opponents("boss"), self.ctx.settings.current)
         return [
             MenuItem.indexed(
                 "boss",
@@ -110,7 +112,7 @@ class BossSelectScreen(XiaolinMenu):
                 _character_row(boss),
                 tooltip=_BOSS_ARCHETYPE.get(mechanic_of(boss.power)),
             )
-            for boss in self._catalog.opponents("boss")
+            for boss in bosses
         ]
 
     def on_select(self, item_id: str) -> None:
