@@ -11,9 +11,9 @@ from termcade.core.rng import Rng
 
 from ..characters import jong
 from ..schema.catalog import load_mechanic_config
-from ..schema.constants import YANG_YOYO_ID, YIN_YANG_YOYO_ID, YING_YOYO_ID
+from ..schema.constants import EAGLE_SCOPE_ID, FALCONS_EYE_ID, YANG_YOYO_ID, YIN_YANG_YOYO_ID, YING_YOYO_ID
 from ..mechanics.scoring import initiative
-from ..mechanics.powers import Mechanic, mechanic_of, trigger_of
+from ..mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of, trigger_of
 from ..schema.models import Card, Player
 from ..config.settings import XiaolinSettings, deposit_limit, player_actions
 from ..schema.state import XiaolinState
@@ -442,6 +442,45 @@ def combine_yoyo(state: XiaolinState, combined: Card, *, is_player: bool = True)
     me.remove_card(next(c for c in me.hand if c.id == YING_YOYO_ID))
     me.remove_card(next(c for c in me.hand if c.id == YANG_YOYO_ID))
     me.hand.append(combined)
+    state.spend_action(is_player)
+
+
+def can_farsight(state: XiaolinState, actions_per_turn: int, *, is_player: bool = True) -> bool:
+    """May this duelist scan and reorder the pile right now — Falcon's Eye and Eagle Scope both in
+    hand (each names the other its printed sister), an action to spend, and a pile to rearrange."""
+    if state.actions_spent(is_player) >= actions_per_turn:
+        return False
+    ids = {card.id for card in state.duelist(is_player).hand}
+    return FALCONS_EYE_ID in ids and EAGLE_SCOPE_ID in ids and bool(state.card_deck)
+
+
+def farsight(
+    state: XiaolinState, order: list[Card], settings: XiaolinSettings, *, is_player: bool = True
+) -> None:
+    """Spend Falcon's Eye and Eagle Scope together: the next ``SCOPE_DEPTH`` Wu of the pile, set back
+    down in ``order`` — the caster's own arrangement of what they just saw. Assumes :func:`can_farsight`.
+    Neither Wu banks any points for it; this is their power, not their price.
+
+    Ordinarily both are spent into the shared used pile, the same as any other power (see
+    ``use_power``). Wuya's Witchcraft returns a spent Wu to her hand instead of losing it, worn one
+    further — so both sisters wear separately here, and only wear-vault (banked for points, not the
+    used pile) on whichever use brings it to its own third.
+    """
+    me = state.duelist(is_player)
+    falcons_eye = next(c for c in me.hand if c.id == FALCONS_EYE_ID)
+    eagle_scope = next(c for c in me.hand if c.id == EAGLE_SCOPE_ID)
+    if WITCHCRAFT_RETURNS and mechanic_of(me.character.power) is Mechanic.WITCHCRAFT:
+        for card in (falcons_eye, eagle_scope):
+            card.uses += 1
+            if WITCHCRAFT_WEARS and card.uses >= settings.wear_limit:
+                me.remove_card(card)
+                me.points = max(0, me.points + card.points)
+    else:
+        for card in (falcons_eye, eagle_scope):
+            me.remove_card(card)
+            state.used.append(card)  # into the shared used pile for a Refresh Wu to call back
+    depth = min(SCOPE_DEPTH, len(state.card_deck))
+    state.card_deck[:depth] = order
     state.spend_action(is_player)
 
 

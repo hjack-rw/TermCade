@@ -52,6 +52,12 @@ YING_YOYO_ID = 71
 YANG_YOYO_ID = 72
 YIN_YANG_YOYO_ID = 10
 
+# The printed sisters (see logic/actions.farsight) — each names the other in its own card text.
+# Matched by id, not `Mechanic.READ_DECK`/`SCRY` alone, for the same reason as the Yo-Yo halves
+# above: a mechanic check can't tell "this specific Wu" apart from any other card sharing it.
+FALCONS_EYE_ID = 61
+EAGLE_SCOPE_ID = 64
+
 
 def in_pool(card_id: int) -> bool:
     """Whether a card is dealt into a run's draw pile at all.

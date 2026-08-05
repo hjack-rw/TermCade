@@ -16,18 +16,20 @@ from ...logic.flow.actions import (
     can_combine_yoyo,
     can_construct,
     can_early_bird,
+    can_farsight,
     can_self_correct_yoyo,
     coming_wu,
     combine_yoyo,
     construct_jong,
     early_bird,
     early_bird_options,
+    farsight,
     self_correct_yoyo,
     usable_powers,
     use_power,
 )
 from ...logic.schema.constants import YIN_YANG_YOYO_ID
-from ...logic.mechanics.powers import Mechanic, mechanic_of
+from ...logic.mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of
 from ...logic.schema.models import Card
 from ...logic.config.settings import player_actions
 from ...logic.flow.turn import EARLY_BIRD, POWER
@@ -39,6 +41,16 @@ NOTHING_COMING = "The pile is empty — nothing is coming."
 CONSTRUCT = "Construct Mala Mala Jong"
 COMBINE_YOYO = "Combine into Yin-Yang Yo-Yo"
 SELF_CORRECT_YOYO = "Correct Your Own Alignment"
+FARSIGHT = "Farsight: Reorder the Coming Wu"
+
+
+def _ordinal(position: int) -> str:
+    """1st, 2nd, 3rd, 4th... — as many places as Farsight ever needs to ask for."""
+    if 10 <= position % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(position % 10, "th")
+    return f"{position}{suffix}"
 
 
 class UsePowerScreen(XiaolinMenu):
@@ -72,6 +84,8 @@ class UsePowerScreen(XiaolinMenu):
             items.append(MenuItem(id="combine-yoyo", label=COMBINE_YOYO))
         if can_self_correct_yoyo(self.state, budget):
             items.append(MenuItem(id="self-correct-yoyo", label=SELF_CORRECT_YOYO))
+        if can_farsight(self.state, budget):
+            items.append(MenuItem(id="farsight", label=FARSIGHT))
         return items
 
     def on_select(self, item_id: str) -> None:
@@ -80,6 +94,9 @@ class UsePowerScreen(XiaolinMenu):
             return
         if item_id == "construct":
             self._construct()
+            return
+        if item_id == "farsight":
+            self._farsight()
             return
         if item_id == "combine-yoyo":
             self._combine_yoyo()
@@ -126,6 +143,40 @@ class UsePowerScreen(XiaolinMenu):
             "Reach the end of the game in the form to win outright.",
             POWER,
         )
+
+    @work
+    async def _farsight(self) -> None:
+        """Falcon's Eye and Eagle Scope together: see as far down the pile as Teleskopia ever could,
+        then set what you saw back down in whatever order you choose — both Wu spent for it."""
+        depth = min(SCOPE_DEPTH, len(self.state.card_deck))
+        coming = coming_wu(self.state, depth)
+        order = await self._ask_order(coming)
+        if order is None:
+            return
+        farsight(self.state, order, self.rules, is_player=True)
+        seen = ", ".join(card.name for card in order)
+        self._return_to_temple(
+            "You saw as far down the pile as your sister Wu could see, and set it back down your own way.",
+            f"You spent Falcon's Eye and Eagle Scope together and reordered the coming Wu: {seen}.",
+            POWER,
+        )
+
+    async def _ask_order(self, coming: list[Card]) -> list[Card] | None:
+        """One pick at a time — which Wu comes 1st, then which of what's left comes 2nd, and so on —
+        until every revealed Wu has a place. `None` if the player backs out partway through."""
+        remaining = list(coming)
+        order: list[Card] = []
+        for position in range(1, len(coming) + 1):
+            picked = await self.choose(
+                f"Which comes {_ordinal(position)}?",
+                card_options(remaining),
+                title="FARSIGHT",
+            )
+            if picked is None:
+                return None
+            remaining = [card for card in remaining if card is not picked]  # by identity — two Wu
+            order.append(picked)  # can print the same face (`cards.is_one_of`'s reason for existing)
+        return order
 
     @work
     async def _combine_yoyo(self) -> None:
