@@ -23,8 +23,8 @@ from termcade.ui.typography import spaced_dashes
 from ...logic.mechanics.prize import PrizeRoute
 from ...logic.config.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings, deposit_limit
 from ...logic.schema.state import XiaolinState
-from ...logic.flow.training import BOSS_LOSS_FILL, STAT_CAP, TRAIN_LENGTH
-from ...logic.flow.wear import WEAR_LIMIT
+from ...logic.flow.temple_ai import EARLY_BIRD_GAP
+from ...logic.flow.training import boss_loss_fill
 from ..base import XiaolinScreen
 
 PRIMER = "How to Play"  # the first entry in the rail, and where a player with no question yet lands
@@ -60,13 +60,13 @@ def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[s
     target = target if target is not None else settings.point_limit
     return {
         "At the Temple": [
-            f"A turn buys you {settings.actions_per_turn} action: deposit a Wu for its "
+            f"A turn buys you {settings.actions_per_turn_player} action: deposit a Wu for its "
             "points, use its power, draw one from your Deck, or train.",
             "Depositing a Wu forfeits its power. You are vaulting it, not spending it.",
             "Your hand never refills itself. Drawing it back up costs you the turn's action too.",
             "Drawing with a full hand SWAPS: shelve one Wu to your Deck and take another. "
             "Your Deck is shuffled, so a shelved Wu comes back in its own time.",
-            f"Your hand holds {settings.max_hand_size} Wu. Over that, you shelve one back to your Deck.",
+            f"Your hand holds {settings.max_hand_size_player} Wu. Over that, you shelve one back to your Deck.",
             f"Left with nothing you can field, you are dealt back in – {settings.empty_draw_limit} "
             "Wu, from your own Deck first and the pile only after it. It costs you the turn's action, "
             "the same as a Draw, and it pays the same as a Draw. "
@@ -75,17 +75,20 @@ def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[s
             f"Bank {target} points and the run is yours!",
         ],
         "Training": [
-            "Losing a Showdown fills your training bar by 1. You learn more from a beating than from a win.",
+            f"Losing a Showdown fills your training bar by {settings.loss_fill_player}. You learn more "
+            "from a beating than from a win.",
             "Spending a Temple turn training fills it by 1 too, for the turn's one action.",
-            f"A full bar ({TRAIN_LENGTH}) raises a base stat of your CHOICE by 1.",
-            f"No stat is ever raised past {STAT_CAP}. A balanced duelist with every stat there, has nothing more to gain.",
+            f"A full bar ({settings.train_length_player}) raises a base stat of your CHOICE by 1.",
+            f"No stat is ever raised past {settings.stat_cap}. A balanced duelist with every stat "
+            "there, has nothing more to gain.",
             "A cashed in progress bar shows full for the rest of the turn, then resets and climbs again.",
             "Your opponent trains by the same rule.",
         ],
         "Facing a Boss": [
             "A boss already sits at the top level on every stat. Their bar reads MASTER "
             "they have nothing left to train, and you can't climb toward their level.",
-            f"A beating from a boss teaches DOUBLE: losing a Showdown fills your bar by {BOSS_LOSS_FILL}.",
+            "A beating from a boss teaches DOUBLE: losing a Showdown fills your bar by "
+            f"{boss_loss_fill(settings)}.",
             f"Against a boss, a Temple turn buys you {BOSS_PLAYER_ACTIONS} actions to their one. You better prepare yourself!",
             f"At most {deposit_limit(BOSS_PLAYER_ACTIONS)} of them may be Deposits - half a turn, "
             "rounded up. The extra actions are there to arm you, not to fill your vault faster.",
@@ -97,7 +100,7 @@ def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[s
             "Matching Initiative bonuses do NOT stack. Different ones do: a +1 beside a +2 is +3.",
             "A Wu with a NEGATIVE bonus slows your opponent, not you. "
             "Holding one makes you the faster of the two, exactly as a positive one does.",
-            f"Lead them by {settings.early_bird_gap} and the Early Bird advantage is yours: "
+            f"Lead them by {EARLY_BIRD_GAP} and the Early Bird advantage is yours: "
             "take the next Wu straight off the pile, with no Showdown at all. "
             "It is treated as a power, and it costs the turn's action like any other.",
             "The Early Bird's price is one of your FASTEST Wu, and it is discarded for no points.",
@@ -130,7 +133,7 @@ def rules_for(settings: XiaolinSettings, *, target: int | None = None) -> dict[s
             "put it all in one place.",
         ],
         "Three Times in a Row": [
-            f"Commit the same Wu to {WEAR_LIMIT} Showdowns (staked, or spent as a Boost) and it "
+            f"Commit the same Wu to {settings.wear_limit} Showdowns (staked, or spent as a Boost) and it "
             "wears out: it is deposited for you, for its full points, the moment that Showdown ends. "
             "It costs no action.",
             "Only Showdowns count towards the wear limit, never turns spent sitting in your hand.",

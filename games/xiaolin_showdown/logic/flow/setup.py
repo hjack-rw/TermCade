@@ -8,7 +8,6 @@ reproduces the identical game. Card pops consume no randomness.
 
 from __future__ import annotations
 
-import os
 from copy import deepcopy
 from dataclasses import dataclass, replace
 
@@ -18,14 +17,9 @@ from ..schema.catalog import Catalog
 from ..schema.constants import in_pool
 from ..mechanics.cards import held_as_wudai
 from ..schema.models import Card, Character, Player
-from ..config.settings import XiaolinSettings, deck_size_for, point_limit_for
+from ..config.settings import XiaolinSettings, deal_target, pile_size_for, point_limit_for
 from ..schema.state import XiaolinState
 from .turn import duel_value
-
-# Weighted-subset deal (prototype, flag-gated). A run deals a weighted sample of the pool instead of
-# the whole thing, so a game stays concise as the pool grows. Sizes are the Wu left in the DRAW PILE
-# after the opening hands; the boss stays short (tighter, swingier), the rest run a little longer.
-_PILE_SIZE = {"easy": 40, "hard": 40, "boss": 30}
 
 # Deal weight = how likely a Wu is dealt into a run. Points (so the deck can reach the target) and duel
 # strength (so the fights stay sharp) both pull it up; the base keeps every Wu reachable. Points lead,
@@ -63,24 +57,23 @@ def new_game(
     overrides the roster's random pick with a CHOSEN one: a boss is picked, never dealt.
     """
     cards = catalog.cards
-    # Omitted settings mean "the shipped game": the pool-derived deck and target, which the weighted
-    # deal below then supersedes. Deriving them (not the hardcoded field defaults) keeps that true as
-    # the pool grows, so a default run is never mistaken for a customised one.
-    settings = settings or XiaolinSettings(
-        max_deck_size=deck_size_for(cards), point_limit=point_limit_for(cards)
-    )
+    # Omitted settings mean "the shipped game": this roster's natural deal, which the weighted deal
+    # below then supersedes. Deriving them (not the hardcoded field defaults) keeps that true as the
+    # pool grows, so a default run is never mistaken for a customised one.
+    if settings is None:
+        deck_size, point_limit = deal_target(roster, cards, XiaolinSettings())
+        settings = XiaolinSettings(max_deck_size=deck_size, point_limit=point_limit)
 
     # The shipped game deals a weighted subset of the pool, so a run stays concise as the pool grows.
     # A player who set their own deck size or win target opts out of it into a custom game (dealt the
     # whole pool at their numbers) — guardrail, not lock, the same stance the mercy rule takes.
-    pile = _pile_size(roster)
-    if pile > 0 and not _player_set_their_own_deal(settings, cards):
+    pile = pile_size_for(roster)
+    if pile > 0 and not _player_set_their_own_deal(settings, cards, roster):
         return _weighted_game(catalog, rng, player_character, settings, roster, opponent, pile)
 
-    # Draw pile = the pool (every card whose id is >= FIRST_DECK_CARD — a signature Wu's id sits
-    # below it, whatever sign it carries), padded with blanks (card 0) to full size.
+    # Draw pile = the pool (every card whose id is >= FIRST_DECK_CARD — a signature Wu's id sits below
+    # it, whatever sign it carries), capped at ``max_deck_size`` — never padded past what the pool has.
     card_order = [card.id for card in cards if in_pool(card.id)]
-    card_order += [0] * (settings.max_deck_size - len(card_order))
     rng.shuffle(card_order)  # RNG call 1 — must precede the bot pick
 
     draw_pile = [deepcopy(catalog.card(i)) for i in card_order[: settings.max_deck_size]]
@@ -228,28 +221,12 @@ def _deck_weight(card: Card, weights: _DealWeights) -> int:
     return weights.base + weights.points * card.points + weights.duel * duel_value(card)
 
 
-def _player_set_their_own_deal(settings: XiaolinSettings, cards: list[Card]) -> bool:
+def _player_set_their_own_deal(settings: XiaolinSettings, cards: list[Card], roster: str) -> bool:
     """True when the player set their own deck size or win target, opting into a custom game.
 
-    Those two settings are pool-DERIVED by default (:func:`deck_size_for`, :func:`point_limit_for`); a
-    value that differs is a deliberate override, and the weighted deal steps aside to honor it literally
-    — the same signal :func:`~.settings.save_note` uses to star a customised save.
+    Those two settings are ROSTER-DERIVED by default (:func:`~.settings.deal_target`); a value that
+    differs is a deliberate override, and the weighted deal steps aside to honor it literally — the
+    same signal :func:`~.settings.save_note` uses to star a customised save.
     """
-    return (
-        settings.max_deck_size != deck_size_for(cards)
-        or settings.point_limit != point_limit_for(cards)
-    )
-
-
-def _pile_size(roster: str) -> int:
-    """How many Wu to leave in the draw pile after the opening hands, or ``0`` for the whole pool.
-
-    The per-roster table (:data:`_PILE_SIZE`) is live by default. ``XS_PILE`` overrides it: an integer
-    forces that size on every roster, and ``"full"`` (or ``0``) deals the whole pool.
-    """
-    override = os.environ.get("XS_PILE")
-    if override is None:
-        return _PILE_SIZE.get(roster, 0)
-    if override == "full":
-        return 0
-    return int(override)
+    deck_size, point_limit = deal_target(roster, cards, settings)
+    return settings.max_deck_size != deck_size or settings.point_limit != point_limit

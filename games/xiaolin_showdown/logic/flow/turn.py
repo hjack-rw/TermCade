@@ -26,12 +26,11 @@ from ..mechanics.powers import (
     roll_gamble,
 )
 from ..characters import chase, hannibal, jack
-from ..schema.constants import WEAR_LIMIT
 from ..mechanics.cards import hand_over
 from ..schema.models import Card, Character, Player
 from ..config.settings import XiaolinSettings, deposit_limit, player_actions, plays_keen
 from ..schema.state import XiaolinState
-from .training import TRAIN_LENGTH, add_progress, can_train, pick_stat, raise_stat, turn_over
+from .training import add_progress, can_train, pick_stat, raise_stat, turn_over
 
 # What a booster is worth in a showdown, since it carries no stats of its own.
 BOOSTER_PREMIUM = 4
@@ -81,10 +80,11 @@ def oversee_hand_size(
     for from the main pile. Returns ``False`` after shedding (the caller re-checks), ``True`` else.
     """
     player = state.duelist(is_player)
-    over = len(player.whole_hand) - max_hand_size(player, settings.max_hand_size)
+    base_hand = settings.max_hand_size_player if is_player else settings.max_hand_size_bot
+    over = len(player.whole_hand) - max_hand_size(player, base_hand)
     if over <= 0:
         if not player.hand:  # nothing fieldable — see `Player.hand` vs `inalienable_hand`
-            _emergency_fill(state, player, settings)
+            _emergency_fill(state, player, settings, is_player=is_player)
             _charge_the_turn(state, settings, is_player=is_player)
         return True
     if state.has_ended:
@@ -114,10 +114,12 @@ def _charge_the_turn(state: XiaolinState, settings: XiaolinSettings, *, is_playe
     if is_player:
         state.actions_taken = player_actions(state, settings)  # the whole budget, boss run or not
     else:
-        state.bot_actions_taken = settings.actions_per_turn
+        state.bot_actions_taken = settings.actions_per_turn_bot
 
 
-def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettings) -> None:
+def _emergency_fill(
+    state: XiaolinState, player: Player, settings: XiaolinSettings, *, is_player: bool
+) -> None:
     """Refill a hand with nothing FIELDABLE in it — own shelf first, then the pile (emptying it ends
     the run).
 
@@ -125,7 +127,8 @@ def _emergency_fill(state: XiaolinState, player: Player, settings: XiaolinSettin
     Wu already held must not shrink the payout, so the count is against ``owed``, not against room
     alone. ``max_hand_size`` still caps it: the mercy may not overfill a hand.
     """
-    room = max_hand_size(player, settings.max_hand_size) - len(player.whole_hand)
+    base_hand = settings.max_hand_size_player if is_player else settings.max_hand_size_bot
+    room = max_hand_size(player, base_hand) - len(player.whole_hand)
     owed = min(settings.empty_draw_limit, room)
     while player.deck and owed > 0:
         player.hand.append(player.deck.pop(0))
@@ -276,7 +279,7 @@ def duel_value(card: Card) -> int:
     return stats + _MECHANIC_VALUE.get(mechanic, 0) + premium
 
 
-def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
+def pick_deposit(hand: list[Card], difficulty: Difficulty, wear_limit: int) -> Card | None:
     """Which Wu the bot deposits, by difficulty. ``None`` when nothing in hand is worth points.
 
     Hard takes the highest points, full stop — points are the win condition. Easy sheds its least
@@ -292,7 +295,7 @@ def pick_deposit(hand: list[Card], difficulty: Difficulty) -> Card | None:
     # A Wu one showdown from wearing out banks ITSELF, free (see wear.py) — spending the turn's
     # action on it wastes the action. Prefer any other candidate; near-worn only when that is all
     # there is.
-    fresh = [card for card in candidates if card.uses < WEAR_LIMIT - 1]
+    fresh = [card for card in candidates if card.uses < wear_limit - 1]
     candidates = fresh or candidates
     if plays_keen(difficulty):
         return max(candidates, key=lambda c: c.points)
@@ -312,7 +315,7 @@ def counters_against(character: Character) -> frozenset[Mechanic]:
     return frozenset()
 
 
-def _priority_deposit(bot: Player) -> Card | None:
+def _priority_deposit(bot: Player, wear_limit: int) -> Card | None:
     """Any boss with a keyed counter set (`counters_against`) banks one the instant they hold it —
     stolen, or simply drawn, since these are ordinary pool Wu picked up like anyone else's — ahead
     of `pick_deposit`'s own points-first rule. Getting it out of the player's reach matters more
@@ -325,7 +328,7 @@ def _priority_deposit(bot: Player) -> Card | None:
     counters = [card for card in bot.hand if mechanic_of(card.power) in wary_of]
     if not counters:
         return None
-    fresh = [card for card in counters if card.uses < WEAR_LIMIT - 1]
+    fresh = [card for card in counters if card.uses < wear_limit - 1]
     return max(fresh or counters, key=lambda c: c.points)
 
 
@@ -386,7 +389,7 @@ def bot_turn(
 
     # Every action charges its own budget — `use_power` does it for the powers, and the draw and the
     # deposit below do it for themselves. Charging it here as well would bill the turn twice.
-    while state.bot_actions_taken < settings.actions_per_turn:
+    while state.bot_actions_taken < settings.actions_per_turn_bot:
         acted = _bot_acts(state, settings, rng, difficulty, name)
         if acted is None:
             break
@@ -456,13 +459,13 @@ def _cash_training(
     left in the run. A just-taken payout waits for the turnover — the bar cannot climb until it
     resets."""
     if (
-        can_train(state.bot)
+        can_train(state.bot, settings)
         and not state.bot.just_trained
-        and TRAIN_LENGTH - state.bot.training <= _TRAIN_WITHIN
+        and settings.train_length_bot - state.bot.training <= _TRAIN_WITHIN
     ):
         state.bot_actions_taken += 1
-        if add_progress(state.bot):
-            stat = pick_stat(state.bot)
+        if add_progress(state.bot, settings, is_player=False):
+            stat = pick_stat(state.bot, settings)
             raise_stat(state.bot, stat)
             return BotMove(TRAIN, f"{name} completed their training: their {stat} rose.")
         return BotMove(TRAIN, f"{name} spent the turn training.")
@@ -476,9 +479,11 @@ def _bank_surplus(
     last card out of the hand, and never spend more than half the turn's budget doing it."""
     bot = state.bot
     if len(bot.hand) > DUEL_FLOOR and state.bot_deposits_taken < deposit_limit(
-        settings.actions_per_turn
+        settings.actions_per_turn_bot
     ):
-        banked = _priority_deposit(bot) or pick_deposit(bot.hand, difficulty)
+        banked = _priority_deposit(bot, settings.wear_limit) or pick_deposit(
+            bot.hand, difficulty, settings.wear_limit
+        )
         if banked is not None:
             points = bank_value(banked, rng)
             bot.points = max(0, bot.points + points)  # a bad gamble cannot go below zero
@@ -506,6 +511,7 @@ def _play_power(
         report = use_power(
             state,
             play.card,
+            settings,
             is_player=False,
             priority=play.priority,
             target=play.target,
@@ -526,7 +532,7 @@ def _construct_jong(
     close for an outright win, so it outranks every other temple move — take it and lock the hand."""
     from .actions import can_construct, construct_jong
 
-    if not can_construct(state, settings.actions_per_turn, is_player=False):
+    if not can_construct(state, settings.actions_per_turn_bot, is_player=False):
         return None
     construct_jong(state, is_player=False)
     return BotMove(POWER, f"{name} assembled Mala Mala Jong — race it to the end.")
@@ -544,7 +550,7 @@ def _self_correct_good_jack(
     bot = state.bot
     if mechanic_of(bot.character.power) is not Mechanic.BOT or not bot.yoyo_flipped:
         return None
-    if not can_self_correct_yoyo(state, settings.actions_per_turn, is_player=False):
+    if not can_self_correct_yoyo(state, settings.actions_per_turn_bot, is_player=False):
         return None
     self_correct_yoyo(state, is_player=False)
     return BotMove(POWER, f"{name} corrected {jack.GOOD_JACK_NAME} back to himself.")

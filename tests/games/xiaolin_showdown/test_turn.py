@@ -44,7 +44,11 @@ def _state(player: Player, bot: Player, *, main: int = 0) -> XiaolinState:
     return XiaolinState(catalog=None, player=player, bot=bot, card_deck=[_card() for _ in range(main)])  # type: ignore[arg-type]
 
 
-_SETTINGS = XiaolinSettings(max_hand_size=6, actions_per_turn=1, empty_draw_limit=3)
+_SETTINGS = XiaolinSettings(
+    max_hand_size_player=6, max_hand_size_bot=6,
+    actions_per_turn_player=1, actions_per_turn_bot=1,
+    empty_draw_limit=3,
+)
 
 
 def test_max_hand_size_grows_by_one_with_a_third_arm_sash():
@@ -136,7 +140,7 @@ def test_being_dealt_back_in_spends_the_turn_it_lands_on():
     refill_hands(state, _SETTINGS, rng=Rng(0))
 
     assert player.hand  # they were dealt back in
-    assert state.actions_taken == _SETTINGS.actions_per_turn  # and the turn it lands on is spent
+    assert state.actions_taken == _SETTINGS.actions_per_turn_player  # and the turn it lands on is spent
 
 
 def test_a_turn_that_needed_no_mercy_opens_with_its_action_unspent():
@@ -229,7 +233,11 @@ def test_bot_turn_stops_at_its_one_action():
     bot.hand.extend(_card(mechanic=Mechanic.FILLER, points=2) for _ in range(3))
     state = _state(_player(3), bot, main=0)
 
-    bot_turn(state, XiaolinSettings(max_hand_size=6, actions_per_turn=1), rng=Rng(1), difficulty=Difficulty.EASY)
+    bot_turn(
+        state,
+        XiaolinSettings(max_hand_size_bot=6, actions_per_turn_bot=1),
+        rng=Rng(1), difficulty=Difficulty.EASY,
+    )
 
     assert state.bot.points == 2  # only one deposit, though three Wu could be cashed
     assert len(bot.hand) == 2
@@ -276,7 +284,11 @@ def test_a_bot_never_banks_its_hand_below_the_duel_floor():
     bot.hand.extend(_card(mechanic=Mechanic.FILLER, points=2) for _ in range(DUEL_FLOOR))
     state = _state(_player(3), bot, main=0)
 
-    bot_turn(state, XiaolinSettings(max_hand_size=6, actions_per_turn=9), rng=Rng(1), difficulty=Difficulty.HARD)
+    bot_turn(
+        state,
+        XiaolinSettings(max_hand_size_bot=6, actions_per_turn_bot=9),
+        rng=Rng(1), difficulty=Difficulty.HARD,
+    )
 
     assert len(bot.hand) == DUEL_FLOOR  # it banked nothing: everything it holds, it needs
     assert state.bot.points == 0
@@ -288,7 +300,11 @@ def test_a_bot_banks_whatever_sits_above_the_floor():
     bot.hand.extend(_card(mechanic=Mechanic.FILLER, points=2) for _ in range(DUEL_FLOOR + 1))
     state = _state(_player(3), bot, main=0)
 
-    bot_turn(state, XiaolinSettings(max_hand_size=6, actions_per_turn=9), rng=Rng(1), difficulty=Difficulty.HARD)
+    bot_turn(
+        state,
+        XiaolinSettings(max_hand_size_bot=6, actions_per_turn_bot=9),
+        rng=Rng(1), difficulty=Difficulty.HARD,
+    )
 
     assert len(bot.hand) == DUEL_FLOOR
     assert state.bot.points == 2  # the one Wu above the floor

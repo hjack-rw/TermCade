@@ -10,7 +10,7 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 
 from ..characters import jong
-from ..schema.constants import WEAR_LIMIT, YANG_YOYO_ID, YIN_YANG_YOYO_ID, YING_YOYO_ID
+from ..schema.constants import YANG_YOYO_ID, YIN_YANG_YOYO_ID, YING_YOYO_ID
 from ..mechanics.scoring import initiative
 from ..mechanics.powers import Mechanic, mechanic_of, trigger_of
 from ..schema.models import Card, Player
@@ -112,7 +112,7 @@ def can_draw(state: XiaolinState, settings: XiaolinSettings) -> bool:
 
 def draw_swaps(state: XiaolinState, settings: XiaolinSettings) -> bool:
     """Whether a Draw would SWAP (hand already full) rather than simply add a Wu."""
-    return len(state.player.whole_hand) >= max_hand_size(state.player, settings.max_hand_size)
+    return len(state.player.whole_hand) >= max_hand_size(state.player, settings.max_hand_size_player)
 
 
 def draw(state: XiaolinState, *, rng: Rng | None = None) -> Card:
@@ -144,24 +144,24 @@ def swap_from_hand(state: XiaolinState, shelved: Card, *, rng: Rng) -> Card:
     return drawn
 
 
-def train_blocked(state: XiaolinState, actions_per_turn: int) -> str | None:
+def train_blocked(state: XiaolinState, actions_per_turn: int, settings: XiaolinSettings) -> str | None:
     """Why training is disallowed right now, or ``None`` when it is allowed.
 
-    A waiting payout is never blocked: the 10 fills already paid for it, so picking the stat is
-    free even on a spent turn.
+    A waiting payout is never blocked: a full bar already paid for it, so picking the stat is free
+    even on a spent turn.
     """
-    if payout_ready(state.player):
+    if payout_ready(state.player, settings):
         return None
     if state.player.just_trained:
         return "Your training is now complete!"
-    if not can_train(state.player):
+    if not can_train(state.player, settings):
         return "Nothing left to train."
     if spent := spent_gate(state, actions_per_turn):
         return spent
     return None
 
 
-def train(state: XiaolinState, *, rng: Rng | None = None) -> bool:
+def train(state: XiaolinState, settings: XiaolinSettings, *, rng: Rng | None = None) -> bool:
     """Spend the turn's action on the bar. Returns whether the payout is now waiting.
 
     A Ring of Nine Xing in hand doubles the point earned, as it doubles a lost showdown's. ``rng`` is
@@ -170,10 +170,12 @@ def train(state: XiaolinState, *, rng: Rng | None = None) -> bool:
     if rng is not None:
         state.stash_undo(rng)
     state.actions_taken += 1
-    return add_progress(state.player, 2 if doubles_training(state.player) else 1)
+    return add_progress(state.player, settings, 2 if doubles_training(state.player) else 1)
 
 
-def usable_powers(state: XiaolinState, actions_per_turn: int, *, is_player: bool = True) -> list[Card]:
+def usable_powers(
+    state: XiaolinState, actions_per_turn: int, settings: XiaolinSettings, *, is_player: bool = True
+) -> list[Card]:
     """Wu whose power this duelist can actively use now: a hand power-up (``hand``/+1), or a
     ``use``-trigger Wu while the turn's action is unspent — and only if it has something to act on."""
     unspent = state.actions_spent(is_player) < actions_per_turn
@@ -182,11 +184,15 @@ def usable_powers(state: XiaolinState, actions_per_turn: int, *, is_player: bool
         card
         for card in mine.whole_hand
         if mechanic_of(card.power) is Mechanic.HAND_FIZZLE
-        or (trigger_of(card.power) == "use" and unspent and _has_target(state, card, is_player))
+        or (
+            trigger_of(card.power) == "use"
+            and unspent
+            and _has_target(state, card, settings, is_player)
+        )
     ]
 
 
-def _has_target(state: XiaolinState, card: Card, is_player: bool = True) -> bool:
+def _has_target(state: XiaolinState, card: Card, settings: XiaolinSettings, is_player: bool = True) -> bool:
     """Is there anything for this Wu's power to act on?
 
     A Wu that reveals is worth nothing against nothing: an opponent holding no personal deck, or a
@@ -219,7 +225,7 @@ def _has_target(state: XiaolinState, card: Card, is_player: bool = True) -> bool
     if mechanic is Mechanic.WISH:
         return bool(me.vault or them.vault)  # a Treasurebox wishes back a deposit — yours or, better, theirs
     if mechanic is Mechanic.TRAIN_BOOST:
-        return can_train(me)  # a summon trains you against it — useless once every base stat is capped
+        return can_train(me, settings)  # a summon trains you against it — useless once every stat is capped
     return True
 
 
@@ -254,7 +260,7 @@ def early_bird_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | 
         return "No Wu left on the pile."
     from .temple_ai import early_bird_gap  # local: temple_ai imports this module
     lead = initiative_lead(state, is_player=True)
-    gap = early_bird_gap(state, settings, is_player=True)
+    gap = early_bird_gap(state, is_player=True)
     if lead < gap:
         return (
             f"Your initiative lead is {lead}. You need {gap} "
@@ -306,9 +312,9 @@ def early_bird(
     return EARLY_BIRD_MESSAGE.format(taken=taken.name, given=surrendered.name)
 
 
-def use_power_blocked(state: XiaolinState, actions_per_turn: int) -> str | None:
+def use_power_blocked(state: XiaolinState, actions_per_turn: int, settings: XiaolinSettings) -> str | None:
     """Why no power can be used right now, or ``None`` when one can."""
-    if usable_powers(state, actions_per_turn):
+    if usable_powers(state, actions_per_turn, settings):
         return None
     # A `use`-trigger Wu only counts while the turn's action is unspent, so a spent turn is the more
     # useful thing to say than "no Wu with a power".
@@ -342,6 +348,7 @@ def _consume_amend(state: XiaolinState, me: Player) -> None:
 def use_power(
     state: XiaolinState,
     card: Card,
+    settings: XiaolinSettings,
     *,
     is_player: bool = True,
     priority: bool | None = None,
@@ -368,7 +375,7 @@ def use_power(
     # which must not stash over the very board it means to restore.
     if is_player and rng is not None and mechanic is not Mechanic.AMEND:
         state.stash_undo(rng)
-    spend = _Spend(state, card, is_player, priority, target, to_deck, rng)
+    spend = _Spend(state, card, settings, is_player, priority, target, to_deck, rng)
     message = _fire(spend)
     state.spend_action(is_player)
     if mechanic is Mechanic.AMEND:
@@ -381,7 +388,7 @@ def use_power(
     # by the sorcery. The wear rule is her leash: the return that brings it to the limit vaults it.
     if WITCHCRAFT_RETURNS and mechanic_of(spend.me.character.power) is Mechanic.WITCHCRAFT:
         card.uses += 1
-        if not WITCHCRAFT_WEARS or card.uses < WEAR_LIMIT:
+        if not WITCHCRAFT_WEARS or card.uses < settings.wear_limit:
             return message  # restored: it never leaves her hand
         spend.me.remove_card(card)
         # A wear-vault, not a deposit: the sorcery used the Wu up, she did not choose to cash it.

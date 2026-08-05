@@ -15,15 +15,16 @@ from __future__ import annotations
 
 from termcade.core.rng import Rng
 
-from ..schema.constants import WEAR_LIMIT
 from ..mechanics.cards import hand_over, is_one_of
 from ..schema.models import Card, Player
 from .turn import bank_value
 
-__all__ = ["WEAR_LIMIT", "hand_over", "record_showdown"]
+__all__ = ["hand_over", "record_showdown"]
 
 
-def record_showdown(player: Player, committed: list[Card], *, rng: Rng) -> list[tuple[Card, int]]:
+def record_showdown(
+    player: Player, committed: list[Card], *, rng: Rng, wear_limit: int
+) -> list[tuple[Card, int]]:
     """Wear every Wu ``player`` committed to the ended showdown and STILL HOLDS, then vault the
     worn-out for their points. Returns what was vaulted, with what each paid, for the log.
 
@@ -34,7 +35,7 @@ def record_showdown(player: Player, committed: list[Card], *, rng: Rng) -> list[
         if is_one_of(card, player.hand):
             card.uses += 1
     vaulted = []
-    for card in [c for c in player.hand if c.uses >= WEAR_LIMIT]:
+    for card in [c for c in player.hand if c.uses >= wear_limit]:
         player.remove_card(card)
         paid = bank_value(card, rng)
         player.points = max(0, player.points + paid)  # a bad gamble cannot go below zero

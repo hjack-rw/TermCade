@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.actions import use_power
 from xiaolin_showdown.logic.schema.models import Mechanic
 from xiaolin_showdown.logic.schema.state import XiaolinState
 
 from factories import duelist, wu
+
+DEFAULT = XiaolinSettings()
 
 
 def _state_with_lantern() -> tuple[XiaolinState, object]:
@@ -18,14 +21,14 @@ def _state_with_lantern() -> tuple[XiaolinState, object]:
 
 def test_the_lantern_swaps_the_two_hands():
     state, lantern = _state_with_lantern()
-    use_power(state, lantern)
+    use_power(state, lantern, DEFAULT)
     assert [c.name for c in state.player.hand] == ["Theirs A", "Theirs B"]
     assert [c.name for c in state.bot.hand] == ["Mine"]
 
 
 def test_the_spent_lantern_crosses_to_nobody():
     state, lantern = _state_with_lantern()
-    use_power(state, lantern)
+    use_power(state, lantern, DEFAULT)
     assert all(c.name != "Lantern" for c in state.player.hand + state.bot.hand)
     assert state.actions_taken == 1
 
@@ -34,14 +37,14 @@ def test_the_wudai_slot_sits_out_the_swap():
     state, lantern = _state_with_lantern()
     dragon = wu(0, name="Wudai")
     state.player.inalienable_hand.append(dragon)
-    use_power(state, lantern)
+    use_power(state, lantern, DEFAULT)
     assert state.player.inalienable_hand == [dragon]
 
 
 def test_wear_crosses_by_the_hand_over_rule():
     state, lantern = _state_with_lantern()
     state.bot.hand[0].uses = 2  # worn twice by the opponent
-    use_power(state, lantern)
+    use_power(state, lantern, DEFAULT)
     taken = next(c for c in state.player.hand if c.name == "Theirs A")
     assert taken.uses == 0 and taken.uses_memory == 2  # fresh for you; their count pocketed
 
@@ -65,13 +68,12 @@ def test_the_bot_spends_the_lantern_only_from_behind():
 
 def test_the_bot_leaves_a_near_worn_wu_to_bank_itself():
     from termcade.core.settings import Difficulty
-    from xiaolin_showdown.logic.schema.constants import WEAR_LIMIT
     from xiaolin_showdown.logic.flow.turn import pick_deposit
 
     worn = wu(1, points=3)
-    worn.uses = WEAR_LIMIT - 1
+    worn.uses = DEFAULT.wear_limit - 1
     fresh = wu(1, points=2)
-    assert pick_deposit([worn, fresh], Difficulty.HARD) is fresh
+    assert pick_deposit([worn, fresh], Difficulty.HARD, DEFAULT.wear_limit) is fresh
 
 
 def test_a_background_is_still_picked_against_an_empty_hand():
@@ -89,5 +91,5 @@ def test_an_empty_opposing_hand_fizzles_the_swap():
     state = XiaolinState(  # type: ignore[arg-type]
         catalog=None, player=duelist(hand=[lantern, wu(1, name="Mine")]), bot=duelist(), card_deck=[]
     )
-    use_power(state, lantern)
+    use_power(state, lantern, DEFAULT)
     assert [c.name for c in state.player.hand] == ["Mine"]  # nothing swapped, the Wu still spent

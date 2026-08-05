@@ -13,6 +13,7 @@ from termcade.core.rng import Rng
 
 from factories import auto_choices
 
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow import wear
 from xiaolin_showdown.logic.flow.battle import Round
 from xiaolin_showdown.logic.schema.catalog import load_catalog
@@ -25,6 +26,7 @@ from xiaolin_showdown.logic.flow.setup import new_game
 from xiaolin_showdown.logic.flow.turn import duel_value
 
 HEART = 74
+WEAR_LIMIT = XiaolinSettings().wear_limit
 
 
 def _duel_on(background: str) -> Duel:
@@ -103,7 +105,7 @@ async def test_the_off_wager_wu_still_wears():
     await duel._offer_balance(duel.duel.round)
     answered = duel.duel.bot.off_wager[0]
     before = answered.uses
-    wear.record_showdown(duel.state.bot, duel.duel.bot.off_wager, rng=duel.rng)
+    wear.record_showdown(duel.state.bot, duel.duel.bot.off_wager, rng=duel.rng, wear_limit=WEAR_LIMIT)
     assert answered.uses == before + 1  # one showdown answered, one use spent
 
 

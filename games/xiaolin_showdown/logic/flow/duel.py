@@ -1047,7 +1047,9 @@ class Duel:
 
         # losing teaches: the loser's training bar gains one (see logic/flow/training.py). The bot
         # cashes a full bar on the spot; the raised stat is kept for the screen to report.
-        self.duel.bot_trained = record_showdown(self.state, player_won=bool(self.duel.winner))
+        self.duel.bot_trained = record_showdown(
+            self.state, self.settings, player_won=bool(self.duel.winner)
+        )
 
         # A WISH card is exiled outright: removed from the winner's hand before wear could vault it
         # for points or any recovery power could reach it.
@@ -1064,7 +1066,9 @@ class Duel:
             # kept out of the wear tally even though it rode the boost slot this showdown.
             heart = self.state.duelist(is_player).jong_heart
             committed = [c for c in side.stakes + side.boosts_spent + side.off_wager if c is not heart]
-            vaulted = wear.record_showdown(self.state.duelist(is_player), committed, rng=self.rng)
+            vaulted = wear.record_showdown(
+                self.state.duelist(is_player), committed, rng=self.rng, wear_limit=self.settings.wear_limit
+            )
             self.duel.worn_out += [(card.name, is_player, paid) for card, paid in vaulted]
             # A part worn out and vaulted breaks the set — the form drops here too, the Heart coming
             # home (the lost-showdown drop above already handled the loser; this catches the winner).

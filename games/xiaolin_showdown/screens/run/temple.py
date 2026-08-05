@@ -39,7 +39,7 @@ from ...logic.flow.actions import (
 )
 from ...logic.mechanics.scoring import initiative
 from ...logic.config.settings import player_actions
-from ...logic.flow.training import TRAIN_LENGTH, payout_ready, raise_stat, trainable_stats
+from ...logic.flow.training import payout_ready, raise_stat, trainable_stats
 from ...logic.flow.turn import DRAW, TRAIN
 from ...music import XIAOLIN, XIAOLIN_BOSS
 from ..base import XiaolinScreen
@@ -141,6 +141,9 @@ class TempleScreen(XiaolinScreen):
             yield TooltipStatic(
                 temple_render._state_grid(
                     player, bot, init_player, init_bot,
+                    train_length_player=rules.train_length_player,
+                    train_length_bot=rules.train_length_bot,
+                    settings=rules,
                     compact=self._bars_were_compact, short_names=self._short_names,
                 ),
                 id="state",
@@ -165,9 +168,9 @@ class TempleScreen(XiaolinScreen):
                     or can_combine_yoyo(state, budget)
                     or can_self_correct_yoyo(state, budget)
                 )
-                else use_power_blocked(state, budget)
+                else use_power_blocked(state, budget, rules)
             ),
-            "5": train_blocked(state, budget),
+            "5": train_blocked(state, budget, rules),
         }
         with BoxedPanel(title="ACTIONS"):
             yield TooltipStatic(temple_render._actions_grid(blocked, _ACTION_BY_KEY), id="actions")
@@ -196,7 +199,7 @@ class TempleScreen(XiaolinScreen):
     def _offer_payout(self) -> None:
         """Offer a full training bar's payout once per fill. The flag re-arms once the payout is
         claimed, so the next full bar is offered again."""
-        if not payout_ready(self.state.player):
+        if not payout_ready(self.state.player, self.rules):
             self._payout_offered = False
             return
         if not self._payout_offered:
@@ -244,7 +247,7 @@ class TempleScreen(XiaolinScreen):
         state, rules = self.state, self.rules
         budget = player_actions(state, rules)
         if (
-            usable_powers(state, budget)
+            usable_powers(state, budget, rules)
             or can_early_bird(state, rules)
             or can_construct(state, budget)
             or can_combine_yoyo(state, budget)
@@ -257,17 +260,18 @@ class TempleScreen(XiaolinScreen):
             self.app.push_screen(DepositScreen())
 
     def action_train(self) -> None:
-        if train_blocked(self.state, player_actions(self.state, self.rules)) is not None:
+        if train_blocked(self.state, player_actions(self.state, self.rules), self.rules) is not None:
             return
-        if payout_ready(self.state.player):
+        if payout_ready(self.state.player, self.rules):
             self._pick_training_stat()  # the bar is already full: picking the stat is free
             return
-        if train(self.state, rng=self.ctx.rng):  # rng lets a Hodoku Mouse take the fill back
+        if train(self.state, self.rules, rng=self.ctx.rng):  # rng lets a Hodoku Mouse take the fill back
             self._pick_training_stat()  # this very turn filled it
             return
         self.app.notify(
             "You trained for +1 progress.\n"
-            f"Progress towards the next Stat upgrade: {self.state.player.training}/{TRAIN_LENGTH}!",
+            f"Progress towards the next Stat upgrade: "
+            f"{self.state.player.training}/{self.rules.train_length_player}!",
             title=your_move(TRAIN),
         )
         self.rebuild()
@@ -278,7 +282,7 @@ class TempleScreen(XiaolinScreen):
         player = self.state.player
         stat = await self.choose(
             prompt("Your training paid off!", "Which stat do you raise?"),
-            [(stat.capitalize(), stat) for stat in trainable_stats(player)],
+            [(stat.capitalize(), stat) for stat in trainable_stats(player, self.rules)],
             title="TRAINING",
         )
         if stat is None:

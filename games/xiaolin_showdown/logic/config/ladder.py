@@ -65,7 +65,14 @@ def record_win(settings: Settings, *, difficulty: Difficulty, boss: Character | 
 
     ``progress`` counts CLEARED stages, so the boss actually fightable at ``progress == N`` is
     ``LADDER[N - 1]`` (index ``N - 1``) — beating it is what takes ``progress`` to ``N + 1``.
+
+    A win under house-ruled settings never advances the ladder — it is not the Hard/Boss fight the
+    ladder measures, the same signal ``save_note`` uses to star a customised save.
     """
+    from .settings import rules_modified  # local: settings must not drag the DB into every import
+
+    if rules_modified(settings):
+        return settings
     current = progress(settings)
     if boss is None:
         advanced = 1 if difficulty is Difficulty.HARD and current < 1 else current

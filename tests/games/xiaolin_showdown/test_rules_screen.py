@@ -14,6 +14,7 @@ import pytest
 from textual.widgets import Input, ListItem, ListView
 
 from xiaolin_showdown.logic.flow.battle import Round
+from xiaolin_showdown.logic.flow.temple_ai import EARLY_BIRD_GAP
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute, claim_route
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.screens.reference.rules import (
@@ -142,9 +143,8 @@ def _bars_the_code_checks(threshold: int) -> dict[PrizeRoute, int]:
 
 
 def test_the_early_bird_prints_the_gap_the_code_checks():
-    settings = XiaolinSettings(early_bird_gap=6)
-
-    assert "lead them by 6" in _all_text(rules_for(settings))
+    """A mechanic constant, not a setting — the book must still read it off the code, not restate it."""
+    assert f"lead them by {EARLY_BIRD_GAP}" in _all_text(rules_for(XiaolinSettings()))
 
 
 def test_searching_narrows_the_book_to_the_rules_that_mention_it():

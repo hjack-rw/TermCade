@@ -10,6 +10,7 @@ from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
 
 from ...logic.schema.models import Card, Character
+from ...logic.config.settings import XiaolinSettings
 from ...logic.mechanics.powers import is_gamble
 from ..display.format import (
     char_stats,
@@ -76,6 +77,8 @@ class DetailScreen(EngineScreen):
             # A hidden power still gets an effect line — the name is hidden, not the rule it plays by.
             if power.initiative_bonus:
                 yield Static(f"Initiative bonus: {power.initiative_bonus:+d}", classes="power")
-            elif effect := effect_line(power, is_card=self._is_card):
+            elif effect := effect_line(
+                power, is_card=self._is_card, settings=XiaolinSettings.from_settings(self.ctx.settings.current)
+            ):
                 yield Static(effect, classes="power")
         yield Footer()

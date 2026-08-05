@@ -19,7 +19,11 @@ from xiaolin_showdown.logic.flow.duel import Duel
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.setup import new_game
-from xiaolin_showdown.logic.flow.training import STAT_CAP, TRAIN_BOOST_STEP
+from xiaolin_showdown.logic.flow.training import train_boost_step
+
+DEFAULT = XiaolinSettings()
+STAT_CAP = DEFAULT.stat_cap
+TRAIN_BOOST_STEP = train_boost_step(0, DEFAULT)  # the base (weakest) tier's step, at the shipped bar length
 
 FIST = 6  # Fist of Tebigong — a plain Wu that fights on its stats, to stand against the dragon
 
@@ -44,13 +48,13 @@ def _seed(state, cid):
 def test_spending_a_summon_shoves_the_training_bar(state):
     tongue = _seed(state, TONGUE)
     before = state.player.training
-    use_power(state, tongue, is_player=True, rng=Rng(1))
+    use_power(state, tongue, DEFAULT, is_player=True, rng=Rng(1))
     assert state.player.training == before + TRAIN_BOOST_STEP
 
 
 def test_a_spent_summon_leaves_the_hand(state):
     tongue = _seed(state, TONGUE)
-    use_power(state, tongue, is_player=True, rng=Rng(1))
+    use_power(state, tongue, DEFAULT, is_player=True, rng=Rng(1))
     assert not any(mechanic_of(c.power) is Mechanic.TRAIN_BOOST for c in state.player.whole_hand)
 
 
@@ -59,20 +63,20 @@ def test_a_higher_tier_summon_shoves_its_own_step(state):
     monarch = _seed(state, MONARCH)
     assert monarch.power.train_step > TRAIN_BOOST_STEP  # a higher tier, and it says so on the card
     before = state.player.training
-    use_power(state, monarch, is_player=True, rng=Rng(1))
+    use_power(state, monarch, DEFAULT, is_player=True, rng=Rng(1))
     assert state.player.training == before + monarch.power.train_step
 
 
 def test_the_sapphire_dragon_fills_the_whole_bar_from_empty(state):
     """Its boost is as big as the bar, so from any progress it tops out — one level, on the spot. Read
-    off the card: the moment TRAIN_LENGTH outgrows its step, this fails and points here."""
-    from xiaolin_showdown.logic.flow.training import TRAIN_LENGTH, payout_ready
+    off the card: the moment the bar length outgrows its step, this fails and points here."""
+    from xiaolin_showdown.logic.flow.training import payout_ready
 
     sapphire = _seed(state, SAPPHIRE)
-    assert sapphire.power.train_step >= TRAIN_LENGTH  # a full-bar boost, and the card says so
+    assert sapphire.power.train_step >= DEFAULT.train_length_player  # a full-bar boost, the card says so
     state.player.training = 0
-    use_power(state, sapphire, is_player=True, rng=Rng(1))
-    assert payout_ready(state.player)  # a level waits, from an empty bar
+    use_power(state, sapphire, DEFAULT, is_player=True, rng=Rng(1))
+    assert payout_ready(state.player, DEFAULT)  # a level waits, from an empty bar
 
 
 def test_the_sapphire_dragon_rests_metal_but_scores_nothing(state):
@@ -87,7 +91,7 @@ def test_a_summon_is_hidden_once_every_stat_is_capped(state):
     _seed(state, TONGUE)
     for stat in state.player.character.stats:
         state.player.character.stats[stat] = STAT_CAP
-    offered = [c for c in usable_powers(state, 1) if mechanic_of(c.power) is Mechanic.TRAIN_BOOST]
+    offered = [c for c in usable_powers(state, 1, DEFAULT) if mechanic_of(c.power) is Mechanic.TRAIN_BOOST]
     assert not offered
 
 

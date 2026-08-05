@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 
-from termcade.core.settings import Settings
+from termcade.core.settings import Difficulty, Settings
 from textual.widgets import Button
 
 from termcade.ui.app import EngineApp
@@ -26,9 +26,8 @@ from xiaolin_showdown.logic.schema.state import XiaolinState
 from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.config.settings import (
     XiaolinSettings,
+    default_deal,
     default_settings,
-    deck_size_for,
-    point_limit_for,
     refreshed_for_pool,
     save_note,
 )
@@ -51,8 +50,11 @@ def test_a_file_written_for_a_smaller_pool_is_brought_up_to_date():
 
     fresh = XiaolinSettings.from_settings(refreshed_for_pool(_stale()))
 
-    assert fresh.max_deck_size == deck_size_for(cards)
-    assert fresh.point_limit == point_limit_for(cards)
+    # The pool default is roster-aware (see `deal_target`): `_stale()` carries no difficulty, which
+    # folds to "easy" — the weighted pile's numbers, not the pool-wide ones.
+    deck_size, point_limit = default_deal(_stale(), cards)
+    assert fresh.max_deck_size == deck_size
+    assert fresh.point_limit == point_limit
 
 
 def test_the_defaults_carry_no_fingerprint_of_their_own():
@@ -67,11 +69,11 @@ def test_the_defaults_carry_no_fingerprint_of_their_own():
 
 def test_what_the_player_actually_chose_survives_the_refresh():
     """Only the two values that were never theirs are recomputed. Everything else is a preference."""
-    chosen = Settings(options={**_stale().options, "max_hand_size": 9, "prize_threshold": 5})
+    chosen = Settings(options={**_stale().options, "max_hand_size_player": 9, "prize_threshold": 5})
 
     kept = XiaolinSettings.from_settings(refreshed_for_pool(chosen))
 
-    assert kept.max_hand_size == 9
+    assert kept.max_hand_size_player == 9
     assert kept.prize_threshold == 5
 
 
@@ -96,8 +98,9 @@ async def test_booting_the_game_heals_a_stale_file_on_disk(tmp_path):
         await pilot.pause()
 
         on_disk = json.loads(path.read_text(encoding="utf-8"))["options"]
-        assert on_disk["max_deck_size"] == deck_size_for(load_catalog().cards)
-        assert on_disk["point_limit"] == point_limit_for(load_catalog().cards)
+        deck_size, point_limit = default_deal(Settings(difficulty=Difficulty.EASY))
+        assert on_disk["max_deck_size"] == deck_size
+        assert on_disk["point_limit"] == point_limit
 
 
 async def test_a_run_already_saved_keeps_the_rules_it_was_dealt(tmp_path, catalog):
@@ -133,9 +136,8 @@ async def test_a_run_already_saved_keeps_the_rules_it_was_dealt(tmp_path, catalo
 def test_a_save_dealt_the_current_pool_needs_no_note():
     """The note is for a run that plays differently. A current one is just a save."""
     cards = load_catalog().cards
-    current = XiaolinSettings(
-        max_deck_size=deck_size_for(cards), point_limit=point_limit_for(cards)
-    ).to_settings()
+    deck_size, point_limit = default_deal(Settings(), cards)  # no difficulty set -> folds to "easy"
+    current = XiaolinSettings(max_deck_size=deck_size, point_limit=point_limit).to_settings()
 
     assert save_note(current) is None
 

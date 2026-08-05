@@ -31,7 +31,6 @@ from ...logic.mechanics.powers import Mechanic, is_boost_slot, mechanic_of
 from ...logic.mechanics.scoring import contributing, element_score
 from ...logic.schema.models import Card, Player
 from ...logic.schema.state import XiaolinState
-from ...logic.flow.wear import WEAR_LIMIT
 from .format import (
     COLORS,
     CONTESTED_STYLE,
@@ -341,7 +340,7 @@ class _CardsLine:
         yield line
 
 
-def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
+def _showdown_story(duel: DuelState, state: XiaolinState, *, wear_limit: int) -> Text:
     """The whole showdown in order, for the Game Log. Every line is a fact the duel already holds."""
     if duel.stakes is None:  # retreated, or the pile ran dry: no prize was ever drawn
         return Text()
@@ -389,7 +388,7 @@ def _showdown_story(duel: DuelState, state: XiaolinState) -> Text:
         _line(
             story,
             Text(
-                f"{'Your' if was_player else 'Their'} {name} wore out after {WEAR_LIMIT} showdowns: "
+                f"{'Your' if was_player else 'Their'} {name} wore out after {wear_limit} showdowns: "
                 f"vaulted for {paid} pt{'s' if paid != 1 else ''}."
             ),
         )

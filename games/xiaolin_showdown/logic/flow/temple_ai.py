@@ -15,7 +15,7 @@ from ..mechanics.scoring import initiative
 from ..schema.models import Card
 from ..config.settings import XiaolinSettings, player_actions
 from ..schema.state import XiaolinState
-from .training import TRAIN_BOOST_STEP, TRAIN_LENGTH, can_train
+from .training import can_train, train_boost_step
 from .turn import duel_value
 
 # How much better the best Wu on the shelf must be than the one a plain Draw would hand over, before
@@ -92,25 +92,28 @@ def choose_temple_power(
         if mechanic is Mechanic.REFRESH and _worth_refreshing(state):
             return TemplePlay(card)
 
-        if mechanic is Mechanic.TRAIN_BOOST and _worth_summoning_to_train(state, card, is_player):
+        if mechanic is Mechanic.TRAIN_BOOST and _worth_summoning_to_train(state, settings, card, is_player):
             return TemplePlay(card)
 
     return None
 
 
-def _worth_summoning_to_train(state: XiaolinState, card: Card, is_player: bool = False) -> bool:
+def _worth_summoning_to_train(
+    state: XiaolinState, settings: XiaolinSettings, card: Card, is_player: bool = False
+) -> bool:
     """Spend a summon Wu at the temple only when its shove COMPLETES the training bar.
 
     A summon Wu is worth more fielded than fed to a half-full bar — but a shove that finishes a level
     pays out a stat on the spot, a permanent gain nothing else this turn can match, and never a wasted
     partial fill. The Sapphire Dragon's full-bar boost always qualifies (and it can never be fielded, so
-    the temple is its only use); a +3/+6 only near the top of the bar. Never on the last card in hand.
+    the temple is its only use); a lower tier only near the top of the bar. Never on the last card in hand.
     """
     me = state.duelist(is_player)
-    if not can_train(me) or me.just_trained or len(me.hand) <= 1:
+    if not can_train(me, settings) or me.just_trained or len(me.hand) <= 1:
         return False
-    step = card.power.train_step or TRAIN_BOOST_STEP
-    return me.training + step >= TRAIN_LENGTH
+    step = train_boost_step(card.power.train_step, settings, is_player=is_player)
+    train_length = settings.train_length_player if is_player else settings.train_length_bot
+    return me.training + step >= train_length
 
 
 def _worth_swapping(state: XiaolinState, is_player: bool = False) -> bool:
@@ -245,14 +248,18 @@ def _worth_reaching_for(state: XiaolinState, is_player: bool = False) -> bool:
 
 # --- The Early Bird: a Wu off the pile, taken by being faster ----------------------
 
+# A mechanic constant, not a player setting — the same margin the pool's own numbers are priced
+# against. Wuya's own version lives beside her, in `WITCH_EARLY_BIRD_GAP`.
+EARLY_BIRD_GAP = 3
 
-def early_bird_gap(state: XiaolinState, settings: XiaolinSettings, *, is_player: bool) -> int:
-    """The initiative lead needed to fly the Early Bird — shortened for Wuya, whose sense finds the
-    moment for her. Everyone else pays the settings gap in full."""
+
+def early_bird_gap(state: XiaolinState, *, is_player: bool) -> int:
+    """The initiative lead needed to fly the Early Bird — a mechanic constant, not a player setting;
+    shortened for Wuya, whose sense finds the moment for her. Everyone else pays it in full."""
     me = state.duelist(is_player)
     if mechanic_of(me.character.power) is Mechanic.WITCHCRAFT:
-        return min(settings.early_bird_gap, WITCH_EARLY_BIRD_GAP)
-    return settings.early_bird_gap
+        return min(EARLY_BIRD_GAP, WITCH_EARLY_BIRD_GAP)
+    return EARLY_BIRD_GAP
 
 
 def choose_early_bird(
@@ -268,10 +275,10 @@ def choose_early_bird(
     me, them = state.duelist(is_player), state.opponent(is_player)
     spent = state.actions_spent(is_player)
     # Each side flies against its own budget — in a boss run the player's is the larger one.
-    budget = player_actions(state, settings) if is_player else settings.actions_per_turn
+    budget = player_actions(state, settings) if is_player else settings.actions_per_turn_bot
     if spent >= budget or not state.card_deck:
         return None
-    if initiative_lead(state, is_player=is_player) < early_bird_gap(state, settings, is_player=is_player):
+    if initiative_lead(state, is_player=is_player) < early_bird_gap(state, is_player=is_player):
         return None
     if me.points >= them.points:
         return None  # ahead, or level: bank the points and keep the speed that names the challenge

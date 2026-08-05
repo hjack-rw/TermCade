@@ -6,6 +6,8 @@ lives in one number, ``Settings.options["boss_ladder"]`` — these tests are abo
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from termcade.core.settings import Difficulty, Settings
 
 from xiaolin_showdown.logic.schema.catalog import load_catalog
@@ -16,6 +18,7 @@ from xiaolin_showdown.logic.config.ladder import (
     record_win,
     unlocked_bosses,
 )
+from xiaolin_showdown.logic.config.settings import default_deal
 
 _BOSSES = load_catalog().opponents("boss")
 _JACK = next(b for b in _BOSSES if b.name == "Jack_Spicer")
@@ -25,7 +28,14 @@ _CHASE = next(b for b in _BOSSES if b.name == "Chase_Young")
 
 
 def _settings(*, difficulty: Difficulty = Difficulty.EASY, ladder: int = 0) -> Settings:
-    return Settings(difficulty=difficulty, options={"boss_ladder": ladder})
+    """A win-eligible settings object: the ladder gate now refuses to advance on house rules (see
+    `rules_modified`), so these tests need the difficulty's own natural deal, not a bare options dict.
+    """
+    deck_size, point_limit = default_deal(Settings(difficulty=difficulty))
+    return Settings(
+        difficulty=difficulty,
+        options={"boss_ladder": ladder, "max_deck_size": deck_size, "point_limit": point_limit},
+    )
 
 
 def test_fresh_settings_have_a_locked_boss_tier() -> None:
@@ -77,9 +87,18 @@ def test_beating_an_already_cleared_boss_does_not_advance_again() -> None:
 
 
 def test_clearing_the_whole_ladder_in_order() -> None:
-    settings = Settings()
+    settings = _settings(difficulty=Difficulty.HARD)
     for boss in (None, _JACK, _HANNIBAL, _WUYA, _CHASE):
         difficulty = Difficulty.HARD if boss is None else Difficulty.BOSS
+        # A real player's difficulty and deal move together (`base.py` always passes
+        # `settings.difficulty` as the win's difficulty) — keep this fixture the same way, refreshing
+        # the natural deal each time the tier changes so the gate sees an unmodified ruleset.
+        deck_size, point_limit = default_deal(Settings(difficulty=difficulty))
+        settings = replace(
+            settings,
+            difficulty=difficulty,
+            options={**settings.options, "max_deck_size": deck_size, "point_limit": point_limit},
+        )
         settings = record_win(settings, difficulty=difficulty, boss=boss)
 
     assert unlocked_bosses(_BOSSES, settings) == [_JACK, _HANNIBAL, _WUYA, _CHASE]
@@ -105,3 +124,21 @@ def test_effective_difficulty_honours_boss_once_unlocked() -> None:
     unlocked = _settings(difficulty=Difficulty.BOSS, ladder=1)
 
     assert effective_difficulty(unlocked) is Difficulty.BOSS
+
+
+def test_beating_hard_under_house_ruled_settings_does_not_advance_the_ladder() -> None:
+    settings = replace(
+        _settings(difficulty=Difficulty.HARD), options={"boss_ladder": 0, "max_hand_size": 9}
+    )
+    updated = record_win(settings, difficulty=Difficulty.HARD, boss=None)
+
+    assert updated is settings
+
+
+def test_beating_a_boss_under_house_ruled_settings_does_not_advance_the_ladder() -> None:
+    settings = replace(
+        _settings(difficulty=Difficulty.BOSS, ladder=1), options={"boss_ladder": 1, "prize_threshold": 3}
+    )
+    updated = record_win(settings, difficulty=Difficulty.BOSS, boss=_JACK)
+
+    assert updated is settings

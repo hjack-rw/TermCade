@@ -1,8 +1,8 @@
 """Save must stay reachable on a screen too short to show every setting at once.
 
-The settings panel scrolls once its rows outgrow it. Save used to be the panel's last child, so on
-a phone the only way to commit a change scrolled out of sight — the player could edit everything
-and then have nothing to press.
+Save sits directly under GAME SETTINGS, outside the panel itself — a deliberate choice (left-aligned
+under the section, not docked to the screen edge). On a screen too short for everything, the SCREEN
+scrolls to reach it, same as any other page that outgrows its window.
 """
 
 from __future__ import annotations
@@ -21,32 +21,31 @@ pytestmark = pytest.mark.slow
 _SHORT = (110, 24)
 
 
-async def test_save_is_not_inside_the_scrolling_panel(tmp_path):
+async def test_save_is_not_inside_the_panel(tmp_path):
     app = EngineApp(build_game(), data_dir=tmp_path)
     async with app.run_test(size=_SHORT) as pilot:
         app.push_screen(SettingsScreen())
         await pilot.pause()
 
         save = app.screen.query_one("#save", Button)
-        panel = app.screen.query_one(BoxedPanel)
+        panel = app.screen.query_one("#game-settings-panel", BoxedPanel)
 
-        assert save not in panel.walk_children(), "scrolling the settings would take Save with them"
+        assert save not in panel.walk_children(), "Save must stay a sibling of the panel, not inside it"
 
 
-async def test_save_is_on_screen_when_the_settings_overflow(tmp_path):
-    """The panel scrolls; Save keeps its place at the bottom regardless."""
+async def test_save_is_reachable_by_scrolling_the_screen(tmp_path):
+    """Too short for everything at once: the SCREEN scrolls, and that has to be enough to reach it."""
     app = EngineApp(build_game(), data_dir=tmp_path)
     async with app.run_test(size=_SHORT) as pilot:
         app.push_screen(SettingsScreen())
         await pilot.pause()
 
-        panel = app.screen.query_one(BoxedPanel)
-        panel.scroll_end(animate=False)
+        app.screen.scroll_end(animate=False)
         await pilot.pause()
 
         save = app.screen.query_one("#save", Button)
         assert save.region.height > 0, "Save was not laid out at all"
-        assert save.region.bottom <= app.screen.size.height, "Save fell off the bottom"
+        assert save.region.bottom <= app.screen.size.height, "Save is still off-screen after scrolling"
 
 
 async def test_save_still_saves_from_there(tmp_path):

@@ -54,7 +54,7 @@ class UsePowerScreen(XiaolinMenu):
         # the same, so a second row is only noise — collapse by name, and `_spend` fires one copy.
         seen: set[str] = set()
         self._usable: list[Card] = []
-        for card in usable_powers(self.state, player_actions(self.state, self.rules)):
+        for card in usable_powers(self.state, player_actions(self.state, self.rules), self.rules):
             if card.name not in seen:
                 seen.add(card.name)
                 self._usable.append(card)
@@ -158,7 +158,7 @@ class UsePowerScreen(XiaolinMenu):
         to_deck = await self._ask_destination(target) if mechanic is Mechanic.BOUNCE else False
 
         report = use_power(
-            self.state, card, priority=priority, target=target, to_deck=to_deck, rng=self.ctx.rng
+            self.state, card, self.rules, priority=priority, target=target, to_deck=to_deck, rng=self.ctx.rng
         )
         # the log drops the power name — the line here already gives it — and keeps only the outcome
         self._return_to_temple(

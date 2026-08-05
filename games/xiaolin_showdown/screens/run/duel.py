@@ -203,7 +203,9 @@ class DuelScreen(XiaolinScreen):
             await self._await_continue("Continue")
 
         # Not toasted (the board already shows the result); logged as the last line of the turn.
-        self.ctx.journal.add(_showdown_story(duel.duel, state), title=SHOWDOWN_LOG)
+        self.ctx.journal.add(
+            _showdown_story(duel.duel, state, wear_limit=self.rules.wear_limit), title=SHOWDOWN_LOG
+        )
 
         # No extra Continue — head straight into the temple turn once the result is on screen.
         # Skipped once the draw pile (and so the run) is spent.
@@ -224,7 +226,7 @@ class DuelScreen(XiaolinScreen):
     async def _discard_surplus(self, state: XiaolinState, settings: XiaolinSettings) -> None:
         """Over the hand limit (you just won cards) → choose which Wu to shelve to your deck."""
         while not state.has_ended:
-            if len(state.player.whole_hand) <= max_hand_size(state.player, settings.max_hand_size):
+            if len(state.player.whole_hand) <= max_hand_size(state.player, settings.max_hand_size_player):
                 return
             card = await self.choose(
                 "Too many Wu —  shelve one to your deck",

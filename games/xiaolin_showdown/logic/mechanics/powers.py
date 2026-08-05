@@ -66,7 +66,10 @@ SCOPE_DEPTH = 3
 # value on the two stats the battle is *not* fought over, and less on the one it is — it chooses the
 # element it counts as, so the elemental bonus can land on the contested stat alone.
 MORPH_ASIDE = 2
-MORPH_CONTESTED = 1
+# The contested stat gives up exactly the elemental boost's own weight (the ±1 element match/mismatch
+# swing in `battle.score_battle`) — the Morpher's chosen element lands everywhere else, never on the
+# stat it picked the fight over. Not an independent balance number.
+MORPH_CONTESTED = MORPH_ASIDE - 1
 
 # What a Morpher lends when it is spent as a *boost* instead of fielded — a flat 1/1/1, in the element
 # its caster names. This is the mode a wudai Moby Morpher (Hannibal's, or any found in the pool and

@@ -111,6 +111,16 @@ def test_new_game_hand_sizes():
     assert 0 < len(state.card_deck) < deck_size_for(cat.cards)
 
 
+def test_new_game_never_pads_the_deck_with_blanks():
+    """A ``max_deck_size`` set beyond the pool caps at the pool, not blank card 0 filler."""
+    cat = load_catalog()
+    huge = XiaolinSettings(max_deck_size=deck_size_for(cat.cards) * 10)
+    state = new_game(cat, Rng(1), _omi(cat), settings=huge)
+
+    assert len(state.card_deck) <= deck_size_for(cat.cards)
+    assert all(card.id != 0 for card in state.card_deck)
+
+
 def test_snapshot_round_trips_through_savemanager(tmp_path):
     cat = load_catalog()
     rng = Rng("duel-seed")
@@ -287,19 +297,20 @@ def test_custom_settings_freeze_into_the_save(tmp_path):
 def test_settings_clamp_impossible_values_to_a_playable_range():
     # Whatever a player types on the Settings screen, a game must still be dealable.
     s = XiaolinSettings(
-        max_hand_size=0,
+        max_hand_size_player=0,
+        max_hand_size_bot=0,
         starting_hand_player=0,
         starting_hand_bot=0,
         max_deck_size=1,
         point_limit=0,
         starting_points_player=99,
-        actions_per_turn=0,
+        actions_per_turn_player=0,
     )
-    assert s.max_hand_size == 1
+    assert s.max_hand_size_player == 1 and s.max_hand_size_bot == 1
     assert s.starting_hand_player == 1 and s.starting_hand_bot == 1
     assert s.point_limit == 2
     assert s.starting_points_player == s.point_limit - 1  # capped below the point limit
-    assert s.actions_per_turn == 1
+    assert s.actions_per_turn_player == 1
     assert s.max_deck_size >= s.starting_hand_player + s.starting_hand_bot + 1  # deck fits both hands
 
 
@@ -348,7 +359,7 @@ def test_use_power_draws_a_wu_and_banks_no_points():
     hand_size, deck_before = len(state.player.hand), len(state.card_deck)
     drawn = state.card_deck[0]  # Chronokinesis takes the top of the pile — read its name off the card
 
-    message = use_power(state, bras)
+    message = use_power(state, bras, XiaolinSettings())
 
     assert message.log == f"You drew {drawn.name}."  # cast by the player, so the log reads "You"
     assert all(card is not bras for card in state.player.hand)  # spent, not banked
@@ -364,7 +375,7 @@ def test_use_power_on_the_gag_wu_fizzles_for_no_points():
     state.player.hand.append(ohwah)
     deck_before = len(state.card_deck)
 
-    message = use_power(state, ohwah)
+    message = use_power(state, ohwah, XiaolinSettings())
 
     assert message == FIZZLE_MESSAGE
     assert all(card is not ohwah for card in state.player.hand)  # discarded
@@ -395,7 +406,7 @@ def test_can_draw_respects_the_turns_one_action():
     state.player.deck.append(deepcopy(cat.card(6)))  # a Wu waiting to be drawn, hand has room
 
     assert can_draw(state, settings) is True
-    state.actions_taken = settings.actions_per_turn  # this turn's draw is spent
+    state.actions_taken = settings.actions_per_turn_player  # this turn's draw is spent
     assert can_draw(state, settings) is False
 
 
@@ -420,9 +431,9 @@ def test_usable_powers_respect_the_turns_one_action():
     bras = _named(cat, "Bras Finger")
     state.player.hand.append(bras)
 
-    assert any(card is bras for card in usable_powers(state, actions_per_turn=1))
+    assert any(card is bras for card in usable_powers(state, 1, XiaolinSettings()))
     state.actions_taken = 1  # the turn's deposit is spent → the deposit Wu is no longer usable
-    assert all(card is not bras for card in usable_powers(state, actions_per_turn=1))
+    assert all(card is not bras for card in usable_powers(state, 1, XiaolinSettings()))
 
 
 def test_the_opponent_rosters_are_disjoint():

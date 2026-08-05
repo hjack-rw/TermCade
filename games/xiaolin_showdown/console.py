@@ -131,18 +131,22 @@ def fill(ctx: GameContext, args: Sequence[str]) -> str:
     Yours waits for the stat pick (the temple offers it, or Train opens it); the opponent's is
     cashed by their own turn, exactly as a real full bar would be.
     """
-    from .logic.flow.training import TRAIN_LENGTH, add_progress, can_train
+    from .logic.config.settings import XiaolinSettings
+    from .logic.flow.training import add_progress, can_train
 
     state = _state(ctx)
+    settings = XiaolinSettings.from_settings(ctx.settings.current)
     who = args[0] if args else "me"
     if who not in (*_ME, *_THEM):
         raise ValueError("fill me | fill them")
-    player = state.bot if who in _THEM else state.player
+    is_player = who not in _THEM
+    player = state.player if is_player else state.bot
     if player.just_trained:
         return "the payout was just taken — that bar resets next turn"
-    if not can_train(player):
+    if not can_train(player, settings):
         return "nothing left to train — every stat is at the cap"
-    add_progress(player, TRAIN_LENGTH)
+    train_length = settings.train_length_player if is_player else settings.train_length_bot
+    add_progress(player, settings, train_length, is_player=is_player)
     return "their bar is full" if who in _THEM else "your bar is full — Train (5) picks the stat"
 
 

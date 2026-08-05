@@ -10,11 +10,14 @@ from termcade.core.rng import Rng
 
 from factories import duelist, wu
 
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow import bot
 from xiaolin_showdown.logic.characters import jack
 from xiaolin_showdown.logic.mechanics.powers import Mechanic
 from xiaolin_showdown.logic.schema.models import Character, Power
 from xiaolin_showdown.logic.flow.turn import _priority_deposit, counters_against, pick_deposit
+
+WEAR_LIMIT = XiaolinSettings().wear_limit
 
 
 def _character(name: str, mechanic: Mechanic) -> Character:
@@ -84,14 +87,14 @@ def test_priority_deposit_picks_jacks_own_counter():
     counter = wu(1, name="Sands of Time", mechanic=Mechanic.STEAL, points=5)
     ordinary = wu(5, name="Strong", points=8)
     player.hand = [ordinary, counter]
-    assert _priority_deposit(player) is counter
+    assert _priority_deposit(player, WEAR_LIMIT) is counter
 
 
 def test_priority_deposit_is_none_without_a_counter_in_hand():
     player = duelist(name="Jack_Spicer")
     player.character = _jack_character()
     player.hand = [wu(5, name="Strong", points=8)]
-    assert _priority_deposit(player) is None
+    assert _priority_deposit(player, WEAR_LIMIT) is None
 
 
 def test_priority_deposit_picks_chases_counter():
@@ -100,14 +103,14 @@ def test_priority_deposit_picks_chases_counter():
     counter = wu(0, name="Sphere of Jianyu", mechanic=Mechanic.NULLIFY_STATS, points=4)
     ordinary = wu(5, name="Strong", points=8)
     player.hand = [ordinary, counter]
-    assert _priority_deposit(player) is counter
+    assert _priority_deposit(player, WEAR_LIMIT) is counter
 
 
 def test_priority_deposit_is_none_for_a_boss_with_no_counter_set():
     player = duelist(name="Wuya")
     player.character = _plain_character()
     player.hand = [wu(0, name="Denshi Bunny", mechanic=Mechanic.HACK, points=4)]
-    assert _priority_deposit(player) is None
+    assert _priority_deposit(player, WEAR_LIMIT) is None
 
 
 def test_priority_deposit_falls_back_to_pick_deposit_when_no_counter_held():
@@ -117,5 +120,5 @@ def test_priority_deposit_falls_back_to_pick_deposit_when_no_counter_held():
     player.character = _jack_character()
     ordinary = wu(5, name="Strong", points=8)
     player.hand = [ordinary]
-    assert _priority_deposit(player) is None
-    assert pick_deposit(player.hand, Difficulty.BOSS) is ordinary
+    assert _priority_deposit(player, WEAR_LIMIT) is None
+    assert pick_deposit(player.hand, Difficulty.BOSS, WEAR_LIMIT) is ordinary

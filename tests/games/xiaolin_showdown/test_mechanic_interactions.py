@@ -17,17 +17,21 @@ from xiaolin_showdown.logic.flow.actions import use_power
 from xiaolin_showdown.logic.flow.battle import Round
 from xiaolin_showdown.logic.flow.duel import Amend, Duel, DuelState
 from xiaolin_showdown.logic.flow.outcome import final_score
-from xiaolin_showdown.logic.flow.training import LOSS_FILL, TRAIN_BOOST_STEP, TRAIN_LENGTH
-from xiaolin_showdown.logic.flow.wear import WEAR_LIMIT
+from xiaolin_showdown.logic.flow.training import train_boost_step
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.schema.constants import TOURNAMENT
 from xiaolin_showdown.logic.schema.state import XiaolinState
-from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.config.settings import XiaolinSettings, default_deal
 from xiaolin_showdown.logic.flow.setup import new_game
 
 CAT = load_catalog()
+DEFAULT = XiaolinSettings()
+WEAR_LIMIT = DEFAULT.wear_limit
+LOSS_FILL = DEFAULT.loss_fill_player
+TRAIN_LENGTH = DEFAULT.train_length_player
+TRAIN_BOOST_STEP = train_boost_step(0, DEFAULT)
 
 
 def _opponent(name: str):
@@ -202,12 +206,17 @@ async def test_a_won_hard_run_actually_opens_the_boss_ladder():
     assert duel.is_over
 
     outcome = final_score(state, Rng(1))
-    settings = Settings(difficulty=Difficulty.HARD, options={"boss_ladder": 0})
+    # The ladder gate refuses to advance on house rules (see `rules_modified`), so this needs Hard's
+    # own natural deal, not a bare options dict.
+    deck_size, point_limit = default_deal(Settings(difficulty=Difficulty.HARD))
+    hard_options = {"max_deck_size": deck_size, "point_limit": point_limit}
+    settings = Settings(difficulty=Difficulty.HARD, options={**hard_options, "boss_ladder": 0})
     updated = record_win(settings, difficulty=Difficulty.HARD, boss=None)
 
     if outcome.winner is state.player.character:
         assert unlocked_bosses(CAT.opponents("boss"), updated) == unlocked_bosses(
-            CAT.opponents("boss"), Settings(difficulty=Difficulty.HARD, options={"boss_ladder": 1})
+            CAT.opponents("boss"),
+            Settings(difficulty=Difficulty.HARD, options={**hard_options, "boss_ladder": 1}),
         )
         assert any(b.name == "Jack_Spicer" for b in unlocked_bosses(CAT.opponents("boss"), updated))
     else:
@@ -223,7 +232,7 @@ async def test_a_temple_summon_and_a_lost_showdown_stack_on_the_training_bar():
     state.player.hand.append(summon)
     assert state.player.training == 0
 
-    use_power(state, summon, is_player=True, rng=Rng(1))
+    use_power(state, summon, DEFAULT, is_player=True, rng=Rng(1))
     after_temple = state.player.training
     assert after_temple == TRAIN_BOOST_STEP
 
@@ -267,7 +276,7 @@ async def test_a_wu_won_through_the_lantern_swap_wears_fresh_not_from_memory():
     opponent = duelist(hand=[veteran])
     state = XiaolinState(catalog=CAT, player=player, bot=opponent, card_deck=[])  # type: ignore[arg-type]
 
-    use_power(state, lantern, is_player=True)
+    use_power(state, lantern, DEFAULT, is_player=True)
     taken = next(c for c in state.player.hand if c.name == "Veteran")
     assert taken.uses == 0 and taken.uses_memory == WEAR_LIMIT - 1
 

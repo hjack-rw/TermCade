@@ -266,7 +266,7 @@ async def test_drawing_with_a_full_hand_swaps_a_wu_through_a_picker(tmp_path):
         state = app.ctx.state
         cat = state.catalog
         # Fill the hand to the limit and stock the deck with a Wu to draw back.
-        limit = XiaolinSettings.from_settings(app.ctx.settings.current).max_hand_size
+        limit = XiaolinSettings.from_settings(app.ctx.settings.current).max_hand_size_player
         state.player.hand = [deepcopy(cat.card(6)) for _ in range(limit - len(state.player.inalienable_hand))]
         state.player.deck.append(deepcopy(cat.card(7)))
         full = len(state.player.whole_hand)
@@ -397,7 +397,8 @@ async def test_settings_flags_an_out_of_range_value_instead_of_saving(tmp_path):
         await pilot.click("#settings")
         await pilot.pause()
         settings_screen = app.screen
-        app.screen.query_one("#set-max_hand_size", Input).value = "4"  # below the 5-card starting hand
+        # below the 5-card starting hand
+        app.screen.query_one("#set-max_hand_size_player", Input).value = "4"
         await pilot.click("#save")
         await pilot.pause()
         assert app.screen is settings_screen  # rejected — stays on settings, doesn't pop
@@ -410,10 +411,11 @@ async def test_settings_rejected_value_is_not_persisted(tmp_path):
         await _boot(app, pilot)
         await pilot.click("#settings")
         await pilot.pause()
-        app.screen.query_one("#set-max_hand_size", Input).value = "4"
+        app.screen.query_one("#set-max_hand_size_player", Input).value = "4"
         await pilot.click("#save")
         await pilot.pause()
-        assert app.ctx.settings.current.options["max_hand_size"] == 6  # unchanged default, not saved
+        # unchanged default, not saved
+        assert app.ctx.settings.current.options["max_hand_size_player"] == 6
 
 
 async def test_settings_change_flows_into_a_new_game(tmp_path):

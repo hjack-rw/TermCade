@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from termcade.core.rng import Rng
 
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.actions import use_power
 from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.mechanics.powers import mechanic_of
@@ -15,6 +16,7 @@ from xiaolin_showdown.logic.schema.state import XiaolinState
 from factories import duelist, wu
 
 PROGNOSIS = Power(51, "Telepatheia", Mechanic.PROGNOSIS, "", 0)
+DEFAULT = XiaolinSettings()
 
 
 def _state(player, bot) -> XiaolinState:
@@ -25,7 +27,7 @@ def test_the_conch_pins_the_bots_challenge_and_hands_it_the_lead():
     conch = wu(0, 0, 4, mechanic=Mechanic.PROGNOSIS, name="Conch")
     # The bot is strongest in intellect, so that is the challenge it is pinned to.
     state = _state(duelist(hand=[conch]), duelist(stats={"force": 1, "agility": 1, "intellect": 5}))
-    use_power(state, conch, is_player=True, rng=Rng(0))
+    use_power(state, conch, DEFAULT, is_player=True, rng=Rng(0))
     assert state.forced_priority is False  # the opponent leads
     assert state.locked_challenge == "intellect"  # their strongest, read and set in stone
     assert state.conch_tiebreak is True  # the caster keeps the ground
@@ -59,7 +61,7 @@ def test_the_pin_and_ground_are_spent_when_the_showdown_ends():
     # After a showdown the Conch's promise is gone — the next duel is ordinary again.
     conch = wu(0, 0, 4, mechanic=Mechanic.PROGNOSIS, name="Conch")
     state = _state(duelist(hand=[conch, wu(1)]), duelist(stats={"force": 2, "agility": 2, "intellect": 2}))
-    use_power(state, conch, is_player=True, rng=Rng(0))
+    use_power(state, conch, DEFAULT, is_player=True, rng=Rng(0))
     assert state.locked_challenge is not None
     # Simulate the end-of-showdown reset (duel._end clears them).
     state.forced_priority = state.locked_challenge = state.conch_tiebreak = None

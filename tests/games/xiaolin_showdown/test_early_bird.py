@@ -22,7 +22,7 @@ from xiaolin_showdown.logic.mechanics.cards import is_one_of
 from xiaolin_showdown.logic.mechanics.scoring import initiative
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.turn import duel_value
-from xiaolin_showdown.logic.flow.temple_ai import choose_early_bird
+from xiaolin_showdown.logic.flow.temple_ai import EARLY_BIRD_GAP, choose_early_bird
 
 # Read by property, never by id — the pool is rebalanced constantly and these must survive it.
 
@@ -52,7 +52,7 @@ def _outrun(state, catalog):
     settings = XiaolinSettings()
     state.player.hand = [_by_bonus(catalog, 1), _by_bonus(catalog, 2), _plain(catalog)]
     state.bot.hand = [_plain(catalog)]
-    assert initiative_lead(state, is_player=True) >= settings.early_bird_gap
+    assert initiative_lead(state, is_player=True) >= EARLY_BIRD_GAP
     return settings
 
 
@@ -68,7 +68,7 @@ def test_a_lead_below_the_gap_does_not(state, catalog):
     state.player.hand = [_by_bonus(catalog, 1), _plain(catalog)]  # a lead of 1
     state.bot.hand = [_plain(catalog)]
 
-    assert initiative_lead(state, is_player=True) < settings.early_bird_gap
+    assert initiative_lead(state, is_player=True) < EARLY_BIRD_GAP
     assert not can_early_bird(state, settings)
     assert early_bird_blocked(state, settings)  # and it says why
 
@@ -79,7 +79,7 @@ def test_equal_bonuses_do_not_stack_into_a_lead(state, catalog):
     state.player.hand = [_by_bonus(catalog, 1), _by_bonus(catalog, 1), _by_bonus(catalog, 1)]
     state.bot.hand = [_plain(catalog)]
 
-    assert initiative_lead(state, is_player=True) < settings.early_bird_gap
+    assert initiative_lead(state, is_player=True) < EARLY_BIRD_GAP
     assert not can_early_bird(state, settings)
 
 
@@ -206,7 +206,7 @@ def test_the_opponent_flies_by_the_same_rule(state, catalog):
 def test_a_spent_turn_grounds_the_bird(state, catalog):
     """One action a turn, and this is one — it queues behind a deposit like everything else."""
     settings = _outrun(state, catalog)
-    state.actions_taken = settings.actions_per_turn
+    state.actions_taken = settings.actions_per_turn_player
 
     assert not can_early_bird(state, settings)
 
@@ -219,7 +219,6 @@ def test_you_can_never_outrun_them_on_a_wu_you_do_not_hold(state, catalog):
 
     Swept over every hand the pool can print, rather than argued.
     """
-    settings = XiaolinSettings()
     bonuses = sorted({c.power.initiative_bonus for c in catalog.cards if c.power.initiative_bonus})
 
     for mine in combinations_with_replacement([0, *bonuses], 3):
@@ -227,7 +226,7 @@ def test_you_can_never_outrun_them_on_a_wu_you_do_not_hold(state, catalog):
             state.player.hand = [_by_bonus(catalog, b) if b else _plain(catalog) for b in mine]
             state.bot.hand = [_by_bonus(catalog, b) if b else _plain(catalog) for b in theirs]
 
-            if initiative_lead(state, is_player=True) >= settings.early_bird_gap:
+            if initiative_lead(state, is_player=True) >= EARLY_BIRD_GAP:
                 assert early_bird_options(state), (
                     f"a lead of {initiative_lead(state, is_player=True)} with nothing to pay it with: "
                     f"mine={mine} theirs={theirs}"
@@ -280,7 +279,7 @@ def _bot_outruns(state, catalog):
     state.bot.hand = [_by_bonus(catalog, 1), _by_bonus(catalog, 2), _plain(catalog)]
     state.player.hand = [_plain(catalog)]
     settings = XiaolinSettings()
-    assert initiative_lead(state, is_player=False) >= settings.early_bird_gap
+    assert initiative_lead(state, is_player=False) >= EARLY_BIRD_GAP
     return settings
 
 
@@ -326,7 +325,7 @@ def test_the_opponent_does_not_fly_on_a_spent_turn(state, catalog):
     """One action a turn, and this is one — the opponent is held to the rule the player is."""
     settings = _bot_outruns(state, catalog)
     state.bot.points, state.player.points = 1, 9
-    state.bot_actions_taken = settings.actions_per_turn
+    state.bot_actions_taken = settings.actions_per_turn_bot
 
     assert choose_early_bird(state, settings) is None
 
@@ -347,5 +346,5 @@ def test_the_opponent_does_not_fly_without_the_lead(state, catalog):
     state.player.hand = [_plain(catalog)]
     state.bot.points, state.player.points = 1, 9
 
-    assert initiative_lead(state, is_player=False) < settings.early_bird_gap
+    assert initiative_lead(state, is_player=False) < EARLY_BIRD_GAP
     assert choose_early_bird(state, settings) is None

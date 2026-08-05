@@ -5,7 +5,6 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 
 from xiaolin_showdown.logic.flow.actions import use_power
-from xiaolin_showdown.logic.schema.constants import WEAR_LIMIT
 from xiaolin_showdown.logic.schema.models import Character, Mechanic, Power
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.schema.state import XiaolinState
@@ -16,6 +15,8 @@ from xiaolin_showdown.logic.flow.turn import RECALL, bank_value, bot_turn
 from factories import duelist, wu
 
 WITCHCRAFT = Power(-6, "Witchcraft", Mechanic.WITCHCRAFT, "", 0)
+DEFAULT = XiaolinSettings()
+WEAR_LIMIT = DEFAULT.wear_limit
 
 
 def _wuya(**kwargs):
@@ -35,7 +36,7 @@ def _state(player, bot, *, pile=(), lost=()) -> XiaolinState:
 def test_a_spent_wu_returns_to_her_worn_one_further():
     chrono = wu(1, mechanic=Mechanic.DRAW, name="Falcon's Eye", points=2)
     state = _state(_wuya(hand=[chrono]), duelist(), pile=[wu(1, name="Drawn")])
-    use_power(state, chrono, rng=Rng(0))
+    use_power(state, chrono, DEFAULT, rng=Rng(0))
     assert chrono in state.player.hand  # restored, not discarded
     assert chrono.uses == 1
 
@@ -44,7 +45,7 @@ def test_the_third_witchery_vaults_the_wu():
     chrono = wu(1, mechanic=Mechanic.DRAW, name="Falcon's Eye", points=2)
     chrono.uses = WEAR_LIMIT - 1
     state = _state(_wuya(hand=[chrono]), duelist(), pile=[wu(1, name="Drawn")])
-    use_power(state, chrono, rng=Rng(0))
+    use_power(state, chrono, DEFAULT, rng=Rng(0))
     assert chrono not in state.player.hand
     assert state.player.points == chrono.points  # banked by the wear rule, not lost
 
@@ -54,7 +55,7 @@ def test_her_action_calls_the_most_valuable_lost_wu_back():
     # best Wu, not the oldest: a scrap sits ahead of the prize in the pile and is left behind.
     prize = wu(WITCH_RECALL_MARGIN + 2, name="Prize")
     state = _state(duelist(), _wuya(hand=[wu(1)]), lost=[wu(WITCH_RECALL_MARGIN, name="Scrap"), prize])
-    moves = bot_turn(state, XiaolinSettings(actions_per_turn=1), rng=Rng(0))
+    moves = bot_turn(state, XiaolinSettings(actions_per_turn_bot=1), rng=Rng(0))
     assert [m.action for m in moves] == [RECALL]
     assert prize in state.bot.hand
     assert [c.name for c in state.lost] == ["Scrap"]
@@ -70,7 +71,7 @@ def test_the_witchcraft_runs_out_of_recalls():
     state = _state(duelist(), _wuya(hand=[wu(1)]), lost=list(worth))
     state.witch_recalls = WITCH_RECALL_LIMIT  # she has spent the run's allowance
 
-    moves = bot_turn(state, XiaolinSettings(actions_per_turn=1), rng=Rng(0))
+    moves = bot_turn(state, XiaolinSettings(actions_per_turn_bot=1), rng=Rng(0))
 
     assert all(m.action != RECALL for m in moves)
     assert len(state.lost) == len(worth), "the lost pile was raided past the allowance"
@@ -80,7 +81,7 @@ def test_each_recall_spends_one_of_the_allowance():
     """Guards the test above: the counter must actually climb, or the cap can never be reached."""
     state = _state(duelist(), _wuya(hand=[wu(1)]), lost=[wu(WITCH_RECALL_MARGIN, name="Oldest")])
 
-    bot_turn(state, XiaolinSettings(actions_per_turn=1), rng=Rng(0))
+    bot_turn(state, XiaolinSettings(actions_per_turn_bot=1), rng=Rng(0))
 
     assert state.witch_recalls == 1
 
@@ -98,12 +99,12 @@ def test_she_banks_at_everyone_elses_rate():
 
 def test_a_scrap_is_not_worth_her_action():
     state = _state(duelist(), _wuya(hand=[wu(1), wu(1)]), lost=[wu(1, name="Scrap")])
-    moves = bot_turn(state, XiaolinSettings(actions_per_turn=1), rng=Rng(0))
+    moves = bot_turn(state, XiaolinSettings(actions_per_turn_bot=1), rng=Rng(0))
     assert all(m.action != RECALL for m in moves)
 
 
 def test_six_across_the_board_is_still_master():
-    assert not can_train(_wuya())
+    assert not can_train(_wuya(), DEFAULT)
 
 
 def test_a_chosen_opponent_overrides_the_roster_pick(catalog):
@@ -118,5 +119,5 @@ def test_witchcraft_is_hers_alone() -> None:
     # A plain duelist's spent Wu still leaves the hand.
     chrono = wu(1, mechanic=Mechanic.DRAW, name="Falcon's Eye", points=2)
     state = _state(duelist(hand=[chrono]), duelist(), pile=[wu(1, name="Drawn")])
-    use_power(state, chrono, rng=Rng(0))
+    use_power(state, chrono, DEFAULT, rng=Rng(0))
     assert chrono not in state.player.hand and state.player.points == 0

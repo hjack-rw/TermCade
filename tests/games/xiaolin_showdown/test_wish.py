@@ -22,6 +22,7 @@ from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
 BOX = 67  # Treasurebox of the Blind Sword — wish
 FIST = 6  # Fist of Tebigong — a plain Wu
+DEFAULT = XiaolinSettings()
 
 
 def _has_wish(cards):
@@ -60,7 +61,7 @@ def test_depositing_a_treasurebox_still_pays_its_points(state):
 def test_a_wish_restores_a_vaulted_wu_to_hand(state):
     box = _seed_box(state)
     state.player.vault.append(deepcopy(state.catalog.card(FIST)))
-    use_power(state, box, is_player=True, target=state.player.vault[0], rng=Rng(1))
+    use_power(state, box, DEFAULT, is_player=True, target=state.player.vault[0], rng=Rng(1))
     assert any(c.id == FIST for c in state.player.hand)
 
 
@@ -69,7 +70,7 @@ def test_a_wish_steals_a_wu_from_the_opponents_vault(state):
     box = _seed_box(state)
     stolen = deepcopy(state.catalog.card(FIST))
     state.bot.vault.append(stolen)
-    use_power(state, box, is_player=True, target=stolen, rng=Rng(1))
+    use_power(state, box, DEFAULT, is_player=True, target=stolen, rng=Rng(1))
     assert any(c.id == FIST for c in state.player.hand)
     assert not state.bot.vault  # taken from them
 
@@ -85,14 +86,14 @@ def test_the_treasurebox_name_runs_through_the_five_element_colours(state):
 def test_a_spent_treasurebox_is_exiled_not_sent_to_the_used_pile(state):
     box = _seed_box(state)
     state.player.vault.append(deepcopy(state.catalog.card(FIST)))
-    use_power(state, box, is_player=True, target=state.player.vault[0], rng=Rng(1))
+    use_power(state, box, DEFAULT, is_player=True, target=state.player.vault[0], rng=Rng(1))
     assert not _has_wish(state.player.whole_hand)
     assert not _has_wish(state.used)  # gone for good — a Refresh cannot call it back
 
 
 def test_the_treasurebox_is_hidden_with_an_empty_vault(state):
     _seed_box(state)
-    assert not [c for c in usable_powers(state, 3) if mechanic_of(c.power) is Mechanic.WISH]
+    assert not [c for c in usable_powers(state, 3, DEFAULT) if mechanic_of(c.power) is Mechanic.WISH]
 
 
 # --- the duel wish: field it to win -----------------------------------------------
@@ -148,5 +149,5 @@ def test_the_bot_never_banks_a_treasurebox():
 
     cat = load_catalog()
     hand = [deepcopy(cat.card(BOX)), deepcopy(cat.card(16))]  # Bras Finger, worth points
-    banked = pick_deposit(hand, Difficulty.HARD)
+    banked = pick_deposit(hand, Difficulty.HARD, DEFAULT.wear_limit)
     assert banked is not None and mechanic_of(banked.power) is not Mechanic.WISH

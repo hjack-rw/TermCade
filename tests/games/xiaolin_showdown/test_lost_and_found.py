@@ -34,27 +34,27 @@ FIST_OF_TEBIGONG = 6
 HELMET_OF_JONG = 7
 
 
-def test_the_rooster_calls_back_the_oldest_lost_wu(state, card):
+def test_the_rooster_calls_back_the_oldest_lost_wu(state, card, settings):
     """First lost, first back — not the best, and not a roll."""
     first, second = card(FIST_OF_TEBIGONG), card(HELMET_OF_JONG)
     state.lost = [first, second]
     rooster = card(ROOSTER_BOOSTER)
     state.player.hand.append(rooster)
 
-    use_power(state, rooster)
+    use_power(state, rooster, settings)
 
     assert is_one_of(first, state.player.hand)  # the one lost first
     assert state.lost == [second]  # the other still waits
 
 
-def test_the_rooster_gifts_the_wu_to_whoever_spent_it(state, card):
+def test_the_rooster_gifts_the_wu_to_whoever_spent_it(state, card, settings):
     """It comes back into a *hand*, not onto the pile — so it is yours, not up for grabs."""
     lost = card(FIST_OF_TEBIGONG)
     state.lost = [lost]
     rooster = card(ROOSTER_BOOSTER)
     state.bot.hand.append(rooster)
 
-    use_power(state, rooster, is_player=False)
+    use_power(state, rooster, settings, is_player=False)
 
     assert is_one_of(lost, state.bot.hand)
     assert not is_one_of(lost, state.player.hand)
@@ -67,14 +67,14 @@ def test_the_rooster_is_not_offered_while_nothing_has_been_lost(state, card, set
     state.player.hand.append(rooster)
     state.lost = []
 
-    assert not is_one_of(rooster, usable_powers(state, settings.actions_per_turn))
+    assert not is_one_of(rooster, usable_powers(state, settings.actions_per_turn_player, settings))
 
     state.lost = [card(FIST_OF_TEBIGONG)]
 
-    assert is_one_of(rooster, usable_powers(state, settings.actions_per_turn))
+    assert is_one_of(rooster, usable_powers(state, settings.actions_per_turn_player, settings))
 
 
-def test_the_rooster_fizzles_if_it_is_fired_at_an_empty_pile_anyway(state, card):
+def test_the_rooster_fizzles_if_it_is_fired_at_an_empty_pile_anyway(state, card, settings):
     """Gated at the vault, but the rule stands on its own: fired over nothing, it brings nothing back.
 
     The Wu is still spent and the turn is still gone — a fizzle is a cost, not a refund.
@@ -84,31 +84,31 @@ def test_the_rooster_fizzles_if_it_is_fired_at_an_empty_pile_anyway(state, card)
     state.lost = []
     hand_before, points_before = len(state.player.hand), state.player.points
 
-    message = use_power(state, rooster)
+    message = use_power(state, rooster, settings)
 
     assert message == FIZZLE_MESSAGE  # nothing came back
     assert len(state.player.hand) == hand_before - 1  # and the Rooster itself is gone
     assert state.player.points == points_before  # spending a power never pays
 
 
-def test_the_rooster_costs_the_turns_action(state, card):
+def test_the_rooster_costs_the_turns_action(state, card, settings):
     state.lost = [card(FIST_OF_TEBIGONG)]
     rooster = card(ROOSTER_BOOSTER)
     state.player.hand.append(rooster)
 
-    use_power(state, rooster)
+    use_power(state, rooster, settings)
 
     assert state.actions_taken == 1
 
 
-def test_the_rooster_is_spent_not_banked(state, card):
+def test_the_rooster_is_spent_not_banked(state, card, settings):
     """A power used is discarded for no points — the Wu it brought back is the whole payment."""
     state.lost = [card(FIST_OF_TEBIGONG)]
     rooster = card(ROOSTER_BOOSTER)
     state.player.hand.append(rooster)
     before = state.player.points
 
-    use_power(state, rooster)
+    use_power(state, rooster, settings)
 
     assert not is_one_of(rooster, state.player.hand)
     assert state.player.points == before

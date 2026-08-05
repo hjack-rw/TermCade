@@ -24,7 +24,8 @@ from ...logic.mechanics.powers import (
 )
 from ...logic.schema.models import Card, Character, Power
 from ...logic.content.naming import display_name  # moved to logic (the duel needs it too); screens import it here
-from ...logic.flow.training import TRAIN_BOOST_STEP
+from ...logic.config.settings import XiaolinSettings
+from ...logic.flow.training import train_boost_step
 
 # element -> colour, as explicit hex so the theme's ANSI palette can't remap it.
 COLORS = {
@@ -288,10 +289,14 @@ EFFECTS = {
 _WUDAI_MECHANICS = frozenset({Mechanic.DRAGON, Mechanic.MORPH, Mechanic.BOT})
 
 
-def effect_line(power: Power, *, is_card: bool = True) -> str | None:
+def effect_line(
+    power: Power, *, is_card: bool = True, settings: XiaolinSettings | None = None
+) -> str | None:
     """The one-liner under a Wu's flavour, or ``None`` for the ones that do not earn one.
 
     ``is_card`` distinguishes the Wu from the character who holds it — text differs between the two.
+    ``settings`` is the run's current rules; omitted falls back to the shipped defaults (the number a
+    card's own tooltip states in the abstract, outside any particular run).
     """
     mechanic = mechanic_of(power)
     if not is_card:
@@ -312,7 +317,7 @@ def effect_line(power: Power, *, is_card: bool = True) -> str | None:
     if is_uncontrolled(power):
         return "Temple only: train a whole level at once. Fielded, it loses the Showdown for you."
     if mechanic is Mechanic.TRAIN_BOOST:  # the number is per-card, not baked per mechanic
-        step = power.train_step or TRAIN_BOOST_STEP
+        step = train_boost_step(power.train_step, settings or XiaolinSettings())
         return f"Spend it to summon help to train against: +{step} to your training bar, once."
     return EFFECTS.get(mechanic)
 

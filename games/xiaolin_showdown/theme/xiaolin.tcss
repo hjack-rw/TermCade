@@ -165,27 +165,25 @@ DuelScreen.-narrow > BoxedPanel {
 }
 
 /* --- Settings ------------------------------------------------------------ */
+/* The screen itself scrolls (the engine default) once GENERAL + GAME SETTINGS + Save outgrow it —
+   panels stay their natural `auto` height, so nothing stretches to fill space it doesn't need. */
 SettingsScreen BoxedPanel {
-    width: 44;  /* wider than the rows so align-horizontal has room to centre them */
+    width: 50;  /* wider than the rows so align-horizontal has room to centre them */
     height: auto;
-    /* Leaves room for Save, which lives outside the panel now — at 90% a short screen gave the
-       panel everything and pushed the button off the bottom, which is the problem it was moved
-       out to solve. */
-    max-height: 80%;
-    overflow-y: auto;
     align-horizontal: center;  /* centre the setting rows */
+    margin-bottom: 1;  /* a gap between GENERAL and GAME SETTINGS reads as two sections, not one */
 }
 SettingsScreen .setting-row {
     height: 1;
     width: auto;
 }
 SettingsScreen .setting-label {
-    width: 24;
+    width: 27;  /* fits the longest label ("Win Prize Stat Threshold", 25 chars) with room to spare */
     height: 1;
     content-align: left middle;
 }
 SettingsScreen .setting-hint {
-    width: 28;
+    width: 34;  /* fits "Beat HARD to unlock BOSS stages." (32 chars) on one line */
     height: auto;
     color: $text-muted;
     text-align: center;
@@ -195,19 +193,47 @@ SettingsScreen Input {
     width: 6;
     height: 1;
     border: none;
+    /* Textual's own Input pads 2 columns each side by default — on a 6-wide field that left only 2
+       columns for the actual digits, so a 2-digit value scrolled and showed one digit at a time.
+       Input never centres its own text (no CSS text-align support), so the 2-column left inset below
+       is what stands in for centring: a 1-2 digit value starting there lands close to the middle of
+       the 6-wide column instead of flush against the label. */
+    padding: 0 0 0 2;
     background: $boost;
+    margin-right: 1;  /* a player/bot pair's two Inputs sit side by side (see `_PAIRS`) — keep them apart */
+}
+/* The "Player"/"Bot" column heading above a paired row (see `_PAIRS`) — same width as the Input below
+   it so the words centre over their own column. */
+SettingsScreen .pair-heading {
+    width: 6;
+    height: 1;
+    text-align: center;
+    color: $text-muted;
+    margin-right: 1;  /* matches the Input's own margin-right below it, so the "|" lines up under itself */
+}
+/* The player/bot pair's own Input width — centres the typed number in its column, matching the
+   heading above it. */
+SettingsScreen .pair-input {
+    text-align: center;
+}
+/* The "|" between a paired row's two columns (and the heading above it). */
+SettingsScreen .pair-divider {
+    width: 1;
+    height: 1;
+    color: $text-muted;
+    margin-right: 1;
 }
 /* The toggles sit under the numeric rows, at the end of the panel; they cycle rather than submit.
    One width for both, wide enough for the longer label — auto-sizing them would size each to its own
    text and leave two buttons of different lengths stacked on each other. */
 SettingsScreen #difficulty,
+SettingsScreen #background,
 SettingsScreen #music,
 SettingsScreen #sfx {
     width: 28;
     margin-top: 1;
 }
-/* Sits below the panel, not in it, so scrolling the settings never takes it away. Same width as the
-   toggles so the column still reads as one stack despite the border between them. */
+/* Directly under GAME SETTINGS, left-aligned with the panels above it rather than centred. */
 SettingsScreen #save {
     width: 28;
     margin-top: 1;
@@ -294,6 +320,7 @@ SettingsScreen.-touch BoxedPanel {
     /* Five options: each is a bordered button three rows tall, plus the panel's own border and its
        "Choose a card" line. Eleven rows fitted exactly one of them. */
     max-height: 24;
+    overflow-y: auto;
 }
 
 /* --- Rules --------------------------------------------------------------- */

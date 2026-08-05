@@ -1,8 +1,8 @@
 """Frozen game data — the element wheel and the card-layout constants.
 
-Not player knobs: hand sizes, deck size, point limit, draw/deposit limits and starting points are
-tunable and live in :mod:`settings` as ``XiaolinSettings``. Everything here is fixed by the rules or
-by the shape of the bundled card DB.
+Not player knobs: hand sizes, deck size, point limit, draw/deposit limits, starting points, the wear
+limit, and the training bar's shape are all tunable and live in :mod:`settings` as
+``XiaolinSettings``. Everything here is fixed by the rules or by the shape of the bundled card DB.
 """
 
 from __future__ import annotations
@@ -21,11 +21,6 @@ TOURNAMENT_BATTLES = 3
 # battle, all three stats weighed at once, majority wins. A sentinel in `DuelState.challenge` the
 # same way TOURNAMENT is, not a real stat.
 BRAWL = "brawl"
-
-# "Three Times in a Row": the showdown that brings a Wu's wear here vaults it, free (see wear.py).
-# Lives HERE rather than in wear.py so the bot's deposit policy (turn.py, which wear imports) can
-# read it without a cycle.
-WEAR_LIMIT = 3
 
 # water⇄fire and wind⇄earth oppose each other; ``metal`` is neutral and has no opposite. In a duel a
 # card scores +1 with a matching background, −1 against its opposite (or when the background is

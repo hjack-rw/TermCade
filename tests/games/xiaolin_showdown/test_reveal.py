@@ -24,6 +24,7 @@ GLOVE_OF_JISAKU = 30
 RUBY_OF_RAMSES = 31
 
 DEPOSIT_LIMIT = 1
+DEFAULT = XiaolinSettings()
 
 
 @pytest.fixture
@@ -42,7 +43,7 @@ def test_the_scope_names_the_next_wu_in_the_pile(state, held):
     scope = held(EAGLE_SCOPE)
     coming = state.card_deck[:SCOPE_DEPTH]
 
-    message = use_power(state, scope)
+    message = use_power(state, scope, DEFAULT)
 
     for wu in coming:
         assert wu.name in message.toast
@@ -52,7 +53,7 @@ def test_the_scope_sees_exactly_three_deep(state, held):
     scope = held(EAGLE_SCOPE)
     fourth = state.card_deck[SCOPE_DEPTH]
 
-    message = use_power(state, scope)
+    message = use_power(state, scope, DEFAULT)
 
     assert fourth.name not in message.toast, "the scope showed a Wu it should not reach"
 
@@ -62,7 +63,7 @@ def test_the_scope_does_not_draw_the_wu_it_shows(state, held):
     scope = held(EAGLE_SCOPE)
     before = [wu.id for wu in state.card_deck]
 
-    use_power(state, scope)
+    use_power(state, scope, DEFAULT)
 
     assert [wu.id for wu in state.card_deck] == before
 
@@ -71,7 +72,7 @@ def test_the_eye_reads_the_whole_opponent_deck(state, held, card):
     eye = held(FALCONS_EYE)
     state.bot.deck = [card(6), card(7)]
 
-    message = use_power(state, eye)
+    message = use_power(state, eye, DEFAULT)
 
     assert "Fist of Tebigong" in message.toast
     assert "Helmet of Jong" in message.toast
@@ -83,21 +84,21 @@ def test_the_eye_is_not_offered_against_an_empty_deck(state, held):
     eye = held(FALCONS_EYE)
     state.bot.deck = []
 
-    assert not is_one_of(eye, usable_powers(state, DEPOSIT_LIMIT))
+    assert not is_one_of(eye, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
 
 
 def test_the_eye_is_offered_once_the_opponent_holds_a_deck(state, held, card):
     eye = held(FALCONS_EYE)
     state.bot.deck = [card(6)]
 
-    assert is_one_of(eye, usable_powers(state, DEPOSIT_LIMIT))
+    assert is_one_of(eye, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
 
 
 def test_the_scope_is_not_offered_against_a_drained_pile(state, held):
     scope = held(EAGLE_SCOPE)
     state.card_deck = []
 
-    assert not is_one_of(scope, usable_powers(state, DEPOSIT_LIMIT))
+    assert not is_one_of(scope, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
 
 
 # --- the Mind Reader Conch: a look, and then an answer ----------------------------
@@ -116,7 +117,7 @@ def test_the_conch_shows_the_one_wu_that_comes_next(state, held):
 
     assert [wu.id for wu in coming_wu(state)] == [next_up.id]
 
-    use_power(state, glasses, priority=True)
+    use_power(state, glasses, DEFAULT, priority=True)
 
 
 def test_taking_initiative_beats_a_losing_sum(state, held):
@@ -129,7 +130,7 @@ def test_taking_initiative_beats_a_losing_sum(state, held):
 
     assert _priority_of(state) is False  # without the Conch, theirs
 
-    use_power(state, glasses, priority=True)
+    use_power(state, glasses, DEFAULT, priority=True)
 
     assert _priority_of(state) is True
 
@@ -138,7 +139,7 @@ def test_refusing_initiative_gives_it_away(state, held):
     """It cuts both ways, and that is the choice: sometimes you want them to commit first."""
     glasses = held(CALEIDO_GLASSES)
 
-    use_power(state, glasses, priority=False)
+    use_power(state, glasses, DEFAULT, priority=False)
 
     assert _priority_of(state) is False
 
@@ -148,7 +149,7 @@ def test_the_conch_overrules_a_tie_without_a_coin(state, held):
     glasses = held(CALEIDO_GLASSES)
     state.player.hand, state.bot.hand = [], []  # nobody holds an initiative Wu: 0 against 0
 
-    use_power(state, glasses, priority=True)
+    use_power(state, glasses, DEFAULT, priority=True)
 
     assert _priority_of(state) is True
 
@@ -158,7 +159,7 @@ def test_the_conch_cannot_be_spent_without_an_answer(state, held):
     glasses = held(CALEIDO_GLASSES)
 
     with pytest.raises(ValueError, match="without an answer"):
-        use_power(state, glasses)
+        use_power(state, glasses, DEFAULT)
 
 
 def test_a_look_is_paid_for_with_the_wu(state, held):
@@ -166,7 +167,7 @@ def test_a_look_is_paid_for_with_the_wu(state, held):
     scope = held(EAGLE_SCOPE)
     points = state.player.points
 
-    use_power(state, scope)
+    use_power(state, scope, DEFAULT)
 
     assert not is_one_of(scope, state.player.whole_hand)
     assert state.player.points == points
@@ -180,7 +181,7 @@ def test_the_glove_pulls_the_wu_you_named_out_of_your_deck(state, held, card):
     wanted, other = card(6), card(7)
     state.player.deck = [other, wanted]
 
-    use_power(state, glove, target=wanted)
+    use_power(state, glove, DEFAULT, target=wanted)
 
     assert is_one_of(wanted, state.player.hand)
     assert not is_one_of(wanted, state.player.deck)
@@ -193,7 +194,7 @@ def test_the_glove_leaves_the_hand_no_bigger_than_it_found_it(state, held, card)
     state.player.deck = [card(6)]
     before = len(state.player.hand)
 
-    use_power(state, glove, target=state.player.deck[0])
+    use_power(state, glove, DEFAULT, target=state.player.deck[0])
 
     assert len(state.player.hand) == before
 
@@ -202,7 +203,7 @@ def test_the_glove_is_not_offered_against_an_empty_deck(state, held):
     glove = held(GLOVE_OF_JISAKU)
     state.player.deck = []
 
-    assert not is_one_of(glove, usable_powers(state, DEPOSIT_LIMIT))
+    assert not is_one_of(glove, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
 
 
 def test_the_ruby_banks_the_wu_you_named_from_their_hand(state, held, card):
@@ -211,7 +212,7 @@ def test_the_ruby_banks_the_wu_you_named_from_their_hand(state, held, card):
     state.bot.hand = [victim, card(7)]
     before = state.bot.points
 
-    use_power(state, ruby, target=victim, rng=Rng(1))
+    use_power(state, ruby, DEFAULT, target=victim, rng=Rng(1))
 
     assert not is_one_of(victim, state.bot.hand)
     assert state.bot.points == before + victim.points, "they were not paid for the Wu"
@@ -222,7 +223,7 @@ def test_the_ruby_never_empties_their_hand(state, held, card):
     ruby = held(RUBY_OF_RAMSES)
     state.bot.hand = [card(6)]
 
-    assert not is_one_of(ruby, usable_powers(state, DEPOSIT_LIMIT))
+    assert not is_one_of(ruby, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
 
 
 def test_the_ruby_hands_you_nothing_but_the_shove(state, held, card):
@@ -232,7 +233,7 @@ def test_the_ruby_hands_you_nothing_but_the_shove(state, held, card):
     state.bot.hand = [victim, card(7)]
     mine = state.player.points
 
-    use_power(state, ruby, target=victim, rng=Rng(1))
+    use_power(state, ruby, DEFAULT, target=victim, rng=Rng(1))
 
     assert state.player.points == mine
 
@@ -245,7 +246,7 @@ def test_shoving_a_wu_to_their_deck_pays_them_nothing(state, held, card):
     state.bot.hand = [victim, card(7)]
     before = state.bot.points
 
-    use_power(state, ruby, target=victim, to_deck=True, rng=Rng(1))
+    use_power(state, ruby, DEFAULT, target=victim, to_deck=True, rng=Rng(1))
 
     assert not is_one_of(victim, state.bot.hand)  # gone from their hand
     assert is_one_of(victim, state.bot.deck)  # onto their shelf, not banked

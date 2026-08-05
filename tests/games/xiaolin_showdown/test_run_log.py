@@ -10,6 +10,7 @@ from __future__ import annotations
 from termcade.ui.screens.dialog import ChoiceModal
 from termcade.ui.screens.log import GameLogScreen
 
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.schema.constants import TOURNAMENT
 from xiaolin_showdown.logic.flow.duel import DuelState
 from xiaolin_showdown.logic.mechanics.powers import is_gamble, trigger_of
@@ -134,7 +135,7 @@ def test_a_stat_challenge_names_the_price_and_who_named_it(state, catalog):
         prize_route=PrizeRoute.DECISIVE_BLOW,
     )
 
-    story = _showdown_story(duel, state).plain
+    story = _showdown_story(duel, state, wear_limit=XiaolinSettings().wear_limit).plain
 
     opponent = display_name(state.bot.character.name)
     # Read the wager's shape off the helper that prints it, never restated — one place decides whether
@@ -153,7 +154,7 @@ def test_a_tournament_asks_nobody_for_a_price(state, catalog):
         player_priority=True,
     )
 
-    assert "requested" not in _showdown_story(duel, state).plain
+    assert "requested" not in _showdown_story(duel, state, wear_limit=XiaolinSettings().wear_limit).plain
 
 
 def test_a_theft_names_what_was_taken(state, catalog):
@@ -170,7 +171,7 @@ def test_a_theft_names_what_was_taken(state, catalog):
         jack_stolen="Shroud of Shadows",
     )
 
-    story = _showdown_story(duel, state).plain
+    story = _showdown_story(duel, state, wear_limit=XiaolinSettings().wear_limit).plain
 
     opponent = display_name(state.bot.character.name)
     assert f"{opponent} stole Shroud of Shadows!" in story

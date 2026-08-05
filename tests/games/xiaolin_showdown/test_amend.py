@@ -11,11 +11,13 @@ from copy import deepcopy
 
 from termcade.core.rng import Rng
 
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.actions import deposit, usable_powers, use_power
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
 
 MOUSE = 66  # Hodoku Mouse — amend/use
 GAMBLE = 13  # Ohwah Tegu Saim — its deposit rolls the hidden stream
+DEFAULT = XiaolinSettings()
 
 
 def _seed_mouse(state):
@@ -33,7 +35,7 @@ def test_amend_puts_the_points_back(state):
 
     deposit(state, victim, rng=rng)  # banks the victim, and stashes the board first
     assert state.player.points != before  # sanity: the deposit moved points
-    use_power(state, mouse, is_player=True, rng=rng)
+    use_power(state, mouse, DEFAULT, is_player=True, rng=rng)
 
     assert state.player.points == before
 
@@ -43,7 +45,7 @@ def test_amend_puts_the_spent_wu_back_in_hand(state):
     mouse, victim = _seed_mouse(state)
 
     deposit(state, victim, rng=rng)
-    use_power(state, mouse, is_player=True, rng=rng)
+    use_power(state, mouse, DEFAULT, is_player=True, rng=rng)
 
     assert any(c.id == victim.id for c in state.player.hand)
 
@@ -53,7 +55,7 @@ def test_amend_spends_the_mouse(state):
     mouse, victim = _seed_mouse(state)
 
     deposit(state, victim, rng=rng)
-    use_power(state, mouse, is_player=True, rng=rng)
+    use_power(state, mouse, DEFAULT, is_player=True, rng=rng)
 
     assert not any(mechanic_of(c.power) is Mechanic.AMEND for c in state.player.whole_hand)
 
@@ -63,7 +65,7 @@ def test_the_undone_mouse_lands_in_the_used_pile(state):
     mouse, victim = _seed_mouse(state)
 
     deposit(state, victim, rng=rng)
-    use_power(state, mouse, is_player=True, rng=rng)
+    use_power(state, mouse, DEFAULT, is_player=True, rng=rng)
 
     assert any(c.id == MOUSE for c in state.used)
 
@@ -80,7 +82,7 @@ def test_amend_restores_the_rng_stream(state):
 
     deposit(state, gamble, rng=rng)  # rolls: advances the stream
     assert rng.get_state() != before  # sanity: the gamble consumed the stream
-    use_power(state, mouse, is_player=True, rng=rng)
+    use_power(state, mouse, DEFAULT, is_player=True, rng=rng)
 
     assert rng.get_state() == before
 
@@ -90,7 +92,7 @@ def test_the_mouse_is_hidden_with_nothing_to_undo(state):
     what keeps it useless in a one-action turn: the stash is only ever set by an action already spent."""
     _seed_mouse(state)
 
-    offered = [c for c in usable_powers(state, 3) if mechanic_of(c.power) is Mechanic.AMEND]
+    offered = [c for c in usable_powers(state, 3, DEFAULT) if mechanic_of(c.power) is Mechanic.AMEND]
 
     assert not offered
 
@@ -101,6 +103,6 @@ def test_the_mouse_is_offered_once_an_action_can_be_undone(state):
     _mouse, victim = _seed_mouse(state)
 
     deposit(state, victim, rng=rng)  # spends action 1 of the turn, stashing the board
-    offered = [c for c in usable_powers(state, 3) if mechanic_of(c.power) is Mechanic.AMEND]
+    offered = [c for c in usable_powers(state, 3, DEFAULT) if mechanic_of(c.power) is Mechanic.AMEND]
 
     assert offered

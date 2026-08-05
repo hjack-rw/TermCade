@@ -19,10 +19,13 @@ from xiaolin_showdown.logic.flow.actions import (
 from xiaolin_showdown.logic.flow.battle import Round
 from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.schema.constants import YANG_YOYO_ID, YING_YOYO_ID, YIN_YANG_YOYO_ID
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.duel import Duel
 from xiaolin_showdown.logic.flow.setup import new_game
 from xiaolin_showdown.logic.schema.state import XiaolinState
 from xiaolin_showdown.logic.flow.training import raise_stat, trainable_stats
+
+DEFAULT = XiaolinSettings()
 
 
 def _duel() -> Duel:
@@ -112,21 +115,21 @@ def test_good_jack_cannot_be_sent_as_a_bot_form():
 
 def test_evil_jack_trains_force_and_agility_not_intellect():
     duel = _jack_duel()
-    stats = trainable_stats(duel.state.bot)
+    stats = trainable_stats(duel.state.bot, DEFAULT)
     assert set(stats) == {"force", "agility"}
 
 
 def test_good_jack_trains_only_his_own_intellect():
     duel = _jack_duel()
     duel.state.bot.yoyo_flipped = True
-    assert trainable_stats(duel.state.bot) == ["intellect"]
+    assert trainable_stats(duel.state.bot, DEFAULT) == ["intellect"]
 
 
 def test_good_jack_intellect_stops_training_at_the_cap():
     duel = _jack_duel()
     duel.state.bot.yoyo_flipped = True
     duel.state.bot.good_jack_intellect = 5
-    assert trainable_stats(duel.state.bot) == []
+    assert trainable_stats(duel.state.bot, DEFAULT) == []
 
 
 def test_raising_good_jacks_intellect_also_raises_evils_real_one():

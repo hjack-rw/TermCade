@@ -15,7 +15,8 @@ from rich.table import Table
 from rich.text import Text
 from termcade.ui.widgets import BoxedPanel, TooltipStatic, render_bar
 
-from ...logic.flow.training import TRAIN_LENGTH
+from ...logic.config.settings import XiaolinSettings
+from ...logic.flow.training import can_train
 from ...logic.mechanics.scoring import initiative_sources
 from ...logic.schema.models import Card, Player
 from ...logic.schema.state import XiaolinState
@@ -54,6 +55,9 @@ def _state_grid(
     init_player: int,
     init_bot: int,
     *,
+    train_length_player: int,
+    train_length_bot: int,
+    settings: XiaolinSettings,
     compact: bool = False,
     short_names: bool = False,
 ) -> Table:
@@ -78,10 +82,10 @@ def _state_grid(
         ("P", "Dk", "Init") if compact else ("Player ", "Deck", "Initiative")
     )
     rows = (
-        (f"{player_label}1", player, init_player, player_sources),
-        (f"{player_label}2", bot, init_bot, bot_sources),
+        (f"{player_label}1", player, init_player, player_sources, train_length_player),
+        (f"{player_label}2", bot, init_bot, bot_sources, train_length_bot),
     )
-    for label, duelist, init, sources in rows:
+    for label, duelist, init, sources, train_length in rows:
         char = duelist.character
         name = Text(f"{affiliation_icon(char)} ")
         name.append(display_name(char.name, upper=True, short=short_names), style="bold")
@@ -96,7 +100,7 @@ def _state_grid(
             Text(f"{label}:", style="dim"),
             name,
             Text(""),  # flex spacer
-            _training_cell(duelist, compact=compact),
+            _training_cell(duelist, train_length, settings, compact=compact),
             Text(""),  # flex spacer
             labelled(deck_label, str(len(duelist.deck))),
             Text(""),  # gap before Initiative
@@ -105,21 +109,24 @@ def _state_grid(
     return grid
 
 
-def _training_cell(duelist: Player, *, compact: bool = False) -> Text:
-    """A duelist's training bar. A boss is at the stat cap and *cannot* train: it reads MASTER,
-    centred in a dashed ruler as wide as the bar, tooltip ``-/-``."""
+def _training_cell(
+    duelist: Player, train_length: int, settings: XiaolinSettings, *, compact: bool = False
+) -> Text:
+    """A duelist's training bar. Every stat at the cap and it *cannot* train: it reads MASTER,
+    centred in a dashed ruler as wide as the bar, tooltip ``-/-``. A boss is usually there by
+    design, but the cap is a player setting now — read the real state, not the tier."""
     cell = Text("Train: " if compact else "Training: ", style="dim")
-    if duelist.character.tier == "boss":
+    if not can_train(duelist, settings):
         # Measured off the real bar (not a hand-derived segment count), so MASTER centres against the
         # actual rendered width.
-        width = cell_len(render_bar(0.0, TRAIN_LENGTH, segments=not compact))
+        width = cell_len(render_bar(0.0, train_length, segments=not compact))
         word = " MASTER "
         dashes = (width - len(word)) // 2  # the same run both sides: symmetry beats exact width
         cell.append("-" * dashes + word + "-" * dashes)
         cell.stylize(Style(meta={"tooltip": "-/-"}))
         return cell
-    cell.append(render_bar(duelist.training / TRAIN_LENGTH, TRAIN_LENGTH, segments=not compact))
-    cell.stylize(Style(meta={"tooltip": f"{duelist.training}/{TRAIN_LENGTH}"}))
+    cell.append(render_bar(duelist.training / train_length, train_length, segments=not compact))
+    cell.stylize(Style(meta={"tooltip": f"{duelist.training}/{train_length}"}))
     return cell
 
 

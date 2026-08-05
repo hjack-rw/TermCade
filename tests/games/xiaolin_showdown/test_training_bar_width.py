@@ -12,10 +12,14 @@ from rich.cells import cell_len
 
 from termcade.ui.widgets import render_bar
 
+from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.screens.run.temple import TempleScreen
 from xiaolin_showdown.screens.display.temple_render import _training_cell
 
 pytestmark = pytest.mark.slow
+
+DEFAULT = XiaolinSettings()
+TRAIN_LENGTH = DEFAULT.train_length_player
 
 # A phone held upright, in COLUMNS. Not 80: an xterm cell is about half its font size, so a 390px
 # screen reports 97 and a larger one reports more than 100 — which is why the stylesheet's `-wide`
@@ -25,8 +29,8 @@ _PORTRAIT = 97
 
 def test_the_compact_cell_is_much_narrower(state) -> None:
     state.player.training = 4
-    full = cell_len(_training_cell(state.player, compact=False).plain)
-    compact = cell_len(_training_cell(state.player, compact=True).plain)
+    full = cell_len(_training_cell(state.player, TRAIN_LENGTH, DEFAULT, compact=False).plain)
+    compact = cell_len(_training_cell(state.player, TRAIN_LENGTH, DEFAULT, compact=True).plain)
 
     assert compact < full / 2, f"compact saved almost nothing: {compact} vs {full}"
     # The row also carries a name and a Deck count, so the bar taking two fifths of the width on its
@@ -37,20 +41,21 @@ def test_the_compact_cell_is_much_narrower(state) -> None:
 def test_the_compact_cell_still_says_the_same_thing(state) -> None:
     """Losing the bar must not lose the number — it is the only remaining reading of progress."""
     state.player.training = 4
-    compact = _training_cell(state.player, compact=True).plain
+    compact = _training_cell(state.player, TRAIN_LENGTH, DEFAULT, compact=True).plain
 
     assert "40%" in compact
     assert "▰" not in compact and "▱" not in compact
 
 
 def test_a_boss_reads_master_either_way(state) -> None:
-    """A boss is at the stat cap and cannot train; the cell says so instead of showing a full bar,
-    and the compact form must not turn that into a misleading percentage."""
+    """A duelist with every stat at the cap cannot train; the cell says so instead of showing a full
+    bar, and the compact form must not turn that into a misleading percentage."""
     boss = state.bot
     boss.character.tier = "boss"
+    boss.character.stats = dict.fromkeys(boss.character.stats, DEFAULT.stat_cap)
 
     for compact in (False, True):
-        assert "MASTER" in _training_cell(boss, compact=compact).plain
+        assert "MASTER" in _training_cell(boss, TRAIN_LENGTH, DEFAULT, compact=compact).plain
 
 
 def test_the_bar_itself_can_drop_its_segments() -> None:

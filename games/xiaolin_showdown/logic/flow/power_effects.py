@@ -15,7 +15,8 @@ from termcade.core.rng import Rng
 from ..characters import jong
 from ..mechanics.cards import index_of, is_one_of
 from ..mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of
-from .training import TRAIN_BOOST_STEP, add_progress
+from ..config.settings import XiaolinSettings
+from .training import add_progress, train_boost_step
 from ..schema.models import Card, Player
 from ..schema.state import XiaolinState
 from .turn import bank_value, shelve
@@ -157,6 +158,7 @@ class _Spend:
 
     state: XiaolinState
     card: Card
+    settings: XiaolinSettings
     is_player: bool = True
     priority: bool | None = None
     target: Card | None = None
@@ -339,12 +341,11 @@ def _amend(spend: _Spend) -> _Fill | None:
 
 
 def _train_boost(spend: _Spend) -> _Fill | None:
-    """A summon Wu (Tongue of Saiping and kin) spent at the temple: shove ``TRAIN_BOOST_STEP`` into the
-    caster's training bar at once. ``usable_powers`` only offers it while a stat can still climb, so the
-    fill is always real — it never fizzles. A higher-tier Wu carries its own ``train_step``; 0 means the
-    base."""
-    step = spend.card.power.train_step or TRAIN_BOOST_STEP
-    add_progress(spend.me, step)
+    """A summon Wu (Tongue of Saiping and kin) spent at the temple: shove a share of the training bar
+    (see :func:`.training.train_boost_step`) into the caster's at once. ``usable_powers`` only offers
+    it while a stat can still climb, so the fill is always real — it never fizzles."""
+    step = train_boost_step(spend.card.power.train_step, spend.settings, is_player=spend.is_player)
+    add_progress(spend.me, spend.settings, step, is_player=spend.is_player)
     return {"step": step}
 
 
