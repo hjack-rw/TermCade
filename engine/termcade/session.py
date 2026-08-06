@@ -34,16 +34,29 @@ from textual_serve.server import Server, to_int
 from termcade import asset
 from termcade.web_driver import DRIVER
 
+try:
+    import resource  # POSIX only — absent on Windows dev boxes
+except ImportError:
+    resource = None  # type: ignore[assignment]
+
 log = logging.getLogger("termcade.session")
 
 TOUCH_ENV = "TERMCADE_TOUCH"
 
-# The most players served at once. Each is a full Textual render process, so on a CPU-metered host
-# too many at once trips the governor and the box is killed for EVERYONE — better to turn the next
-# player away than lose it for all. Raise TERMCADE_MAX_SESSIONS in the environment to lift the cap
-# with no redeploy. The default is a guess until one player's steady CPU is measured on the box.
+# The most players served at once. Each is a full Textual render process, so on a RAM-metered host
+# too many at once trips the OOM killer and the box goes down for EVERYONE, with no auto-restart on
+# the free Pterodactyl tier — one session over budget costs every player until someone hits Restart
+# in the panel. Better to turn the next player away than lose it for all. Raise TERMCADE_MAX_SESSIONS
+# in the environment to lift the cap with no redeploy.
+#
+# 6 was the original guess and OOM-killed the box in production. A settled session measures ~64 MB
+# (24 MB interpreter/import baseline -> 64 MB after mount, Windows-measured so if anything an
+# overestimate of Linux). But steady-state isn't the peak: several players joining at once each pay
+# a boot-time import burst, and input triggers a frame-diffing spike — neither captured by a settled
+# reading. 3 is the floor this product needs and leaves real headroom under the 512 MB ceiling; raise
+# it only after production RSS logging (see ``_log_child_rss``) shows the headroom is real.
 MAX_SESSIONS_ENV = "TERMCADE_MAX_SESSIONS"
-DEFAULT_MAX_SESSIONS = 6
+DEFAULT_MAX_SESSIONS = 3
 
 # The page a visitor gets when the arcade is full — a real styled page (see ``web/full.html``), served
 # through the same asset reader as the beta door, not a terminal that loads and then cannot connect.
@@ -75,6 +88,21 @@ def is_touch(user_agent: str) -> bool:
     """Whether ``user_agent`` belongs to a device with no keyboard, so its session gets a Back
     button. See :data:`_TOUCH_UA` for why the terminal's own size cannot answer this."""
     return bool(_TOUCH_UA.search(user_agent))
+
+
+def _log_child_rss(active_at_end: int) -> None:
+    """Log the peak RSS the OS has ever recorded for a reaped session subprocess, so
+    :data:`DEFAULT_MAX_SESSIONS` can eventually be tuned from real numbers off this box instead of
+    the Windows-measured estimate in its comment. POSIX only.
+
+    ``RUSAGE_CHILDREN`` is a running high-water mark across every child reaped since this process
+    started, not this one session's own number — that is what capacity planning actually needs: the
+    worst single session this box has ever had to hold.
+    """
+    if resource is None:
+        return
+    peak_kb = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss  # type: ignore[attr-defined]
+    log.info("session ended (was %d concurrent); worst child RSS seen so far: %.1f MB", active_at_end, peak_kb / 1024)
 
 
 class TermCadeAppService(AppService):
@@ -220,5 +248,6 @@ class TermCadeServer(Server):
         finally:
             if app_service is not None:
                 await app_service.stop()
+            _log_child_rss(self._active)
             self._active -= 1
         return websocket
