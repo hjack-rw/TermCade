@@ -18,7 +18,10 @@ from enum import StrEnum
 
 from termcade.core.rng import Rng
 
+from ..schema.catalog import load_mechanic_config
 from ..schema.models import Mechanic, Power
+
+_CONFIG = load_mechanic_config()
 
 
 class Timing(StrEnum):
@@ -53,35 +56,41 @@ class Rule:
 #
 # The only randomness a duelist cannot see coming, and it belongs to exactly one Wu — a second card
 # that rolls would make this one ordinary. If you are about to give another Wu a random anything: don't.
-GAMBLE_SPREAD = (-2, 5)
+GAMBLE_SPREAD = (_CONFIG["gamble"]["low"], _CONFIG["gamble"]["high"])
 
 # What the Orb and the Curse pour into the one stat their caster names. Both print `? ? ?` — the mark
 # of a Wu whose stats are resolved when it is played — so the magnitude lives here, not in the row.
-NAMED_STAT_VALUE = 3
+NAMED_STAT_VALUE = _CONFIG["buff"]["value"]
 
 # How many cards ahead Teleskopia reveals in the draw pile.
-SCOPE_DEPTH = 3
+SCOPE_DEPTH = _CONFIG["scry"]["depth"]
 
 # What the Morpher becomes when it is played. It prints `? ? ?` and takes these instead: the full
 # value on the two stats the battle is *not* fought over, and less on the one it is — it chooses the
 # element it counts as, so the elemental bonus can land on the contested stat alone.
-MORPH_ASIDE = 2
+MORPH_ASIDE = _CONFIG["morph"]["aside"]
 # The contested stat gives up exactly the elemental boost's own weight (the ±1 element match/mismatch
 # swing in `battle.score_battle`) — the Morpher's chosen element lands everywhere else, never on the
-# stat it picked the fight over. Not an independent balance number.
+# stat it picked the fight over. Not an independent balance number, and not its own DB row.
 MORPH_CONTESTED = MORPH_ASIDE - 1
 
 # What a Morpher lends when it is spent as a *boost* instead of fielded — a flat 1/1/1, in the element
 # its caster names. This is the mode a wudai Moby Morpher (Hannibal's, or any found in the pool and
 # laid as a boost) takes, since the inalienable slot can only ever boost.
-MORPH_BOOST = 1
+MORPH_BOOST = _CONFIG["morph"]["boost"]
 
 # What the Heart of Jong's animated form takes in every stat when it comes alive **in the boost slot** —
 # a flat shape, no Morpher dip, always the arena's own element.
-ANIMATE_STAT = 3
+ANIMATE_STAT = _CONFIG["animate"]["stat"]
 # Fielded as a plain Wu instead of boosted, the Heart is a weaker middling body — no summon, no arena
 # element (it rests metal). The boost is the point; the field is a fallback.
-ANIMATE_FIELD_STAT = 2
+ANIMATE_FIELD_STAT = _CONFIG["animate"]["field_stat"]
+
+# Chase Young's Beast Form bonus on the contested stat, and how far above parity Chamelon-Bot closes
+# the gap when the player leads (see `duel._chamelon_boost_card`). Both live here, not in `flow.duel`,
+# so every `mechanic_config` read happens in one place — `duel` already imports this module.
+BEAST_BOOST = _CONFIG["beast_form"]["boost"]
+CHAMELON_MARGIN = _CONFIG["bot"]["chamelon_margin"]
 
 
 # Keyed by the mechanic itself — which is what the card DB stores. Nothing here is an integer, so
@@ -443,22 +452,24 @@ def is_gamble(power: Power) -> bool:
     return mechanic_of(power) is Mechanic.GAMBLE
 
 
-SAPPHIRE_DRAGON = 69  # Agalmatosis — the one Wu a duelist cannot command; fielded, it loses the showdown
+SAPPHIRE_DRAGON = 75  # Agalmatosis — the one Wu a duelist cannot command; fielded, it loses the showdown
 
 
 def is_uncontrolled(power: Power) -> bool:
     """The Sapphire Dragon. Fielded, it loses the showdown outright for its own summoner, and its
     stats never count (reads ``?`` like the Gamble's). Keyed to the power *id*: the name is flavour
-    and has changed more than once, the id is stable."""
+    and has changed more than once, the id is stable. WEAK POINT: stable across renames, but a future
+    renumber still breaks it — update SAPPHIRE_DRAGON when that happens."""
     return power.id == SAPPHIRE_DRAGON
 
 
-EMPEROR_SCORPION = 29  # Subjugation — Mala Mala Jong's bane
+EMPEROR_SCORPION = 55  # Subjugation — Mala Mala Jong's bane
 
 
 def is_jong_bane(power: Power) -> bool:
     """Emperor Scorpion. Fielded against Mala Mala Jong it wins that BATTLE outright (a tournament
-    leg, not the whole showdown). Id-keyed, like the Sapphire Dragon."""
+    leg, not the whole showdown). Id-keyed, like the Sapphire Dragon. WEAK POINT: same renumber
+    exposure — update EMPEROR_SCORPION when that happens."""
     return power.id == EMPEROR_SCORPION
 
 

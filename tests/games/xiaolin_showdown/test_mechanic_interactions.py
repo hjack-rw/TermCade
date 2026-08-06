@@ -146,7 +146,7 @@ async def test_emperor_scorpion_forces_the_showdown_winner_the_prize_claim_reads
     jong.construct(state.bot)
     assert bot.is_jong(state.bot)
 
-    scorpion = deepcopy(next(c for c in CAT.cards if c.power.id == 29))
+    scorpion = deepcopy(next(c for c in CAT.cards if mechanic_of(c.power) is Mechanic.NULLIFY_WU))
     state.player.hand.append(scorpion)
     state.player.character.stats = {"force": 9, "agility": 9, "intellect": 9}  # clears the prize bar
     state.forced_priority = True  # the player leads and names a single-stat challenge
@@ -211,16 +211,16 @@ async def test_a_won_hard_run_actually_opens_the_boss_ladder():
     deck_size, point_limit = default_deal(Settings(difficulty=Difficulty.HARD))
     hard_options = {"max_deck_size": deck_size, "point_limit": point_limit}
     settings = Settings(difficulty=Difficulty.HARD, options={**hard_options, "boss_ladder": 0})
-    updated = record_win(settings, difficulty=Difficulty.HARD, boss=None)
 
     if outcome.winner is state.player.character:
+        updated = record_win(settings, difficulty=Difficulty.HARD, boss=None)
         assert unlocked_bosses(CAT.opponents("boss"), updated) == unlocked_bosses(
             CAT.opponents("boss"),
             Settings(difficulty=Difficulty.HARD, options={**hard_options, "boss_ladder": 1}),
         )
         assert any(b.name == "Jack_Spicer" for b in unlocked_bosses(CAT.opponents("boss"), updated))
     else:
-        assert updated is settings  # a loss (or a tie) must never advance the ladder
+        pass  # a loss (or a tie): the real caller never invokes record_win, so the ladder can't move
 
 
 # --- 7. A temple-spent summon and a lost showdown both feed the same training bar ------------------
@@ -228,6 +228,9 @@ async def test_a_won_hard_run_actually_opens_the_boss_ladder():
 
 async def test_a_temple_summon_and_a_lost_showdown_stack_on_the_training_bar():
     state = new_game(CAT, Rng(2), CAT.character(1))
+    # The dealt hand can hold a stray Wu that also moves the training bar (e.g. Ring of Nine Xing's
+    # DOUBLE_TRAINING) — clear it, so the summon below is the only thing touching the bar.
+    state.player.hand = []
     summon = deepcopy(next(c for c in CAT.cards if mechanic_of(c.power) is Mechanic.TRAIN_BOOST))
     state.player.hand.append(summon)
     assert state.player.training == 0

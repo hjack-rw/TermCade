@@ -10,6 +10,7 @@ from __future__ import annotations
 from xiaolin_showdown.logic.flow.battle import Ground
 from xiaolin_showdown.logic.schema.constants import TOURNAMENT_BATTLES
 from xiaolin_showdown.logic.flow.duel import END, DuelChoices
+from xiaolin_showdown.logic.mechanics.powers import mechanic_of
 from xiaolin_showdown.logic.schema.models import Card, Character, Mechanic, Player, Power
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
@@ -115,3 +116,51 @@ def auto_choices() -> DuelChoices:
         challenge=first, background=first, wager=one_wu,
         boost=no_boost, card=first_card, element=water, stat=first,
     )
+
+
+# --- real catalog Wu that share a mechanic with siblings ------------------------------------------
+# `card_ids.py` is generated from the DB and only covers a mechanic exactly one pool Wu carries — see
+# its own docstring. These mechanics have several Wu; a test that needs one SPECIFIC one (not just
+# "any Wu with this mechanic") picks it here, by whatever actually singles it out, so the reason is
+# written down in one place instead of re-derived in every test file that needs it.
+
+
+def plain_wu(catalog) -> Card:
+    """INNATE has six plain Wu (a Wu whose stats ARE its power, no queued effect). This is the one
+    with a positive force stat — Fist of Tebigong today, whatever a DB edit renames it to tomorrow."""
+    return next(
+        c for c in catalog.cards if mechanic_of(c.power) is Mechanic.INNATE and c.stats["force"] > 0
+    )
+
+
+def plain_wu_agility(catalog) -> Card:
+    """The same INNATE family, positive agility instead — a second plain Wu distinct from
+    :func:`plain_wu`, for tests that need two."""
+    return next(
+        c for c in catalog.cards if mechanic_of(c.power) is Mechanic.INNATE and c.stats["agility"] > 0
+    )
+
+
+def cursed_wu(catalog) -> Card:
+    """The INNATE Wu with negative force — a curse baked into its own stats, not a queued power."""
+    return next(
+        c for c in catalog.cards if mechanic_of(c.power) is Mechanic.INNATE and c.stats["force"] < 0
+    )
+
+
+def initiative_wu(catalog, bonus: int, *, exclude: Card | None = None) -> Card:
+    """An INITIATIVE Wu at exactly ``bonus`` — several share any given magnitude, so pass ``exclude``
+    (a Wu already picked) when a test needs two *distinct* Wu at the same bonus."""
+    return next(
+        c
+        for c in catalog.cards
+        if mechanic_of(c.power) is Mechanic.INITIATIVE
+        and c.power.initiative_bonus == bonus
+        and c is not exclude
+    )
+
+
+def summon_wu(catalog, summon: str) -> Card:
+    """A TRAIN_BOOST Wu by its ``power.summon`` template — the six share the mechanic, but each names
+    a different thing when it is spent (``"{beast}"``, ``"a Horde of Zombies"``, ...)."""
+    return next(c for c in catalog.cards if c.power.summon == summon)

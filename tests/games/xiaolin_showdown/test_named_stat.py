@@ -11,14 +11,13 @@ from __future__ import annotations
 
 import pytest
 
+from card_ids import BUFF, MISFORTUNE
+
 from xiaolin_showdown.logic.flow.battle import Ground, Round, score_battle
 from xiaolin_showdown.logic.flow.bot import choose_stat
 from xiaolin_showdown.logic.mechanics.powers import NAMED_STAT_VALUE
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from factories import ground
-
-ORB_OF_TORNAMI = 28
-KAIJINS_CURSE = 29
 
 def _ground(stat_totals: dict[str, int] | None = None, background: str = "metal") -> Ground:
     """A board with the elemental bonus switched off, so only the pour is being measured.
@@ -33,7 +32,7 @@ def _ground(stat_totals: dict[str, int] | None = None, background: str = "metal"
 def test_the_orb_pours_everything_into_the_named_stat(card):
     duel = Round()
 
-    resolve_played_power(duel, card(ORB_OF_TORNAMI), is_player=True, element="water", stat="agility")
+    resolve_played_power(duel, card(BUFF), is_player=True, element="water", stat="agility")
 
     assert duel.player.queue[0].stats["agility"] == NAMED_STAT_VALUE
 
@@ -41,7 +40,7 @@ def test_the_orb_pours_everything_into_the_named_stat(card):
 def test_the_orb_leaves_the_stats_it_was_not_named(card):
     duel = Round()
 
-    resolve_played_power(duel, card(ORB_OF_TORNAMI), is_player=True, element="water", stat="agility")
+    resolve_played_power(duel, card(BUFF), is_player=True, element="water", stat="agility")
 
     played = duel.player.queue[0]
     assert (played.stats["force"], played.stats["intellect"]) == (0, 0)
@@ -51,7 +50,7 @@ def test_the_curse_wounds_the_opponent_in_the_named_stat(card):
     """Its stats *become the enemy's debuffs*: the mirror lands on their side of the table."""
     duel = Round()
 
-    resolve_played_power(duel, card(KAIJINS_CURSE), is_player=True, element="metal", stat="force")
+    resolve_played_power(duel, card(MISFORTUNE), is_player=True, element="metal", stat="force")
 
     assert duel.bot.queue[0].stats["force"] == -NAMED_STAT_VALUE
 
@@ -60,7 +59,7 @@ def test_the_curse_costs_its_caster_the_wu_it_spends(card):
     """A curse empties the caster's own copy — the wound is dealt opposite, not held."""
     duel = Round()
 
-    resolve_played_power(duel, card(KAIJINS_CURSE), is_player=True, element="metal", stat="force")
+    resolve_played_power(duel, card(MISFORTUNE), is_player=True, element="metal", stat="force")
 
     assert duel.player.queue[0].stats["force"] == 0
 
@@ -68,7 +67,7 @@ def test_the_curse_costs_its_caster_the_wu_it_spends(card):
 def test_a_named_stat_wu_played_without_a_stat_raises(card):
     """It prints `? ? ?`. Played unasked it would pour into nothing and quietly do nothing at all."""
     with pytest.raises(ValueError, match="without naming a stat"):
-        resolve_played_power(Round(), card(ORB_OF_TORNAMI), is_player=True, element="water")
+        resolve_played_power(Round(), card(BUFF), is_player=True, element="water")
 
 
 # --- why the naming is a choice ---------------------------------------------------
@@ -76,7 +75,7 @@ def test_a_named_stat_wu_played_without_a_stat_raises(card):
 
 def test_pouring_into_the_contested_stat_takes_the_double_point(card):
     battle = Round(stat="force")
-    resolve_played_power(battle, card(ORB_OF_TORNAMI), is_player=True, element="metal", stat="force")
+    resolve_played_power(battle, card(BUFF), is_player=True, element="metal", stat="force")
 
     score_battle(battle, _ground())
 
@@ -87,7 +86,7 @@ def test_pouring_into_one_side_stat_takes_only_a_single_point(card):
     """The cost of ignoring the challenge: a side stat pays 1, not 2."""
     battle = Round(stat="force")
     resolve_played_power(
-        battle, card(ORB_OF_TORNAMI), is_player=True, element="metal", stat="agility"
+        battle, card(BUFF), is_player=True, element="metal", stat="agility"
     )
 
     score_battle(battle, _ground())
@@ -100,7 +99,7 @@ def test_the_bot_pours_into_the_contested_stat_when_nothing_argues_otherwise(car
     the contested one, because it scores double."""
     battle = Round(stat="intellect")
 
-    assert choose_stat(battle, _ground(), card(ORB_OF_TORNAMI)) == "intellect"
+    assert choose_stat(battle, _ground(), card(BUFF)) == "intellect"
 
 
 def test_the_bot_abandons_the_contested_stat_when_it_cannot_win_it(card):
@@ -110,4 +109,4 @@ def test_the_bot_abandons_the_contested_stat_when_it_cannot_win_it(card):
     battle = Round(stat="force")
     ground = _ground({"force": 99, "agility": 0, "intellect": 0})
 
-    assert choose_stat(battle, ground, card(ORB_OF_TORNAMI)) != "force"
+    assert choose_stat(battle, ground, card(BUFF)) != "force"

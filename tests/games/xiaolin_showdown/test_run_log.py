@@ -27,6 +27,7 @@ from xiaolin_showdown.screens.display.headline import (
     your_move,
 )
 from xiaolin_showdown.screens.run.temple import TempleScreen
+from factories import plain_wu
 
 
 def _log(app) -> str:
@@ -52,7 +53,7 @@ async def test_the_vault_opens_the_log(open_vault, state):
 
 async def test_a_drawn_wu_reaches_the_log(open_vault, state, card):
     """The toast path, end to end in the real game: what the vault says, the log keeps."""
-    state.player.deck.append(card(6))
+    state.player.deck.append(card(plain_wu(state.catalog).id))
     wanted = state.player.deck[-1].name
 
     async with open_vault(state) as (app, pilot):
@@ -124,7 +125,7 @@ def test_a_stat_challenge_names_the_price_and_who_named_it(state, catalog):
     """You set the terms, I set the price — so the duelist who did NOT call the challenge is the one
     who asks for a 2v2. A tournament prices itself, and says nothing."""
     duel = DuelState(
-        stakes=catalog.card(6),
+        stakes=plain_wu(catalog),
         challenge="force",
         background="water",
         background_name="Snowy Slope",
@@ -146,7 +147,7 @@ def test_a_stat_challenge_names_the_price_and_who_named_it(state, catalog):
 
 def test_a_tournament_asks_nobody_for_a_price(state, catalog):
     duel = DuelState(
-        stakes=catalog.card(6),
+        stakes=plain_wu(catalog),
         challenge=TOURNAMENT,
         background="water",
         background_name="Snowy Slope",
@@ -159,7 +160,7 @@ def test_a_tournament_asks_nobody_for_a_price(state, catalog):
 
 def test_a_theft_names_what_was_taken(state, catalog):
     duel = DuelState(
-        stakes=catalog.card(6),
+        stakes=plain_wu(catalog),
         challenge="force",
         background="water",
         background_name="Snowy Slope",

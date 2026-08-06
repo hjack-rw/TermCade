@@ -25,6 +25,15 @@ from xiaolin_showdown.logic.mechanics.powers import (
 from xiaolin_showdown.logic.mechanics.resolve import as_boost, resolve_played_power
 from xiaolin_showdown.logic.schema.models import Power
 
+from card_ids import BOOST, DRAGON, MORPH, NULLIFY_ELEMENT, REVERSE_ELEMENT
+from factories import cursed_wu, plain_wu
+from xiaolin_showdown.logic.schema.catalog import load_catalog
+
+_CAT = load_catalog()
+SILVER_MANTA_RAY = 1  # Omi's dragon — a signature Wu, never renumbered
+PLAIN_WU = plain_wu(_CAT).id
+CURSED_WU = cursed_wu(_CAT).id
+
 
 def test_every_power_in_the_card_db_has_a_mechanic(catalog):
     for power in catalog.powers:
@@ -117,19 +126,11 @@ def test_every_mechanic_a_player_can_meet_has_a_blurb():
 
 # --- the in-duel mechanics, resolved through the real card DB --------------------
 
-SILVER_MANTA_RAY = 1  # boost/0, dragon element
-MOBY_MORPHER = 5  # play/+1
-FIST_OF_TEBIGONG = 6  # a plain Wu — its stats ARE its power
-WUSHU_BRACELET = 14  # boost/+1
-TWO_TON_TUNIC = 17  # a plain Wu with negative force: a curse
-SERPENTS_TAIL = 24  # play/-1, Intangibility
-CELESTIAL_DIAL = 45  # play, Dissonance
-
 
 def test_a_plain_wu_contributes_its_innate(card):
     """Whatever it prints — the rule is *printed*, so the card is asked, never assumed."""
     duel = Round()
-    fist = card(FIST_OF_TEBIGONG)
+    fist = card(PLAIN_WU)
 
     resolve_played_power(duel, fist, is_player=True, element="metal")
 
@@ -138,7 +139,7 @@ def test_a_plain_wu_contributes_its_innate(card):
 
 def test_a_morpher_is_worth_less_on_the_stat_the_battle_contests(card):
     duel = Round(stat="agility")
-    resolve_played_power(duel, card(MOBY_MORPHER), is_player=True, element="fire")
+    resolve_played_power(duel, card(MORPH), is_player=True, element="fire")
 
     stats = duel.player.queue[0].stats
     assert stats["agility"] == MORPH_CONTESTED
@@ -148,20 +149,20 @@ def test_a_morpher_is_worth_less_on_the_stat_the_battle_contests(card):
 def test_the_morphers_dip_follows_whichever_stat_is_contested(card):
     """The shape is not printed on the card — it is cut to the battle it is played into."""
     duel = Round(stat="intellect")
-    resolve_played_power(duel, card(MOBY_MORPHER), is_player=True, element="fire")
+    resolve_played_power(duel, card(MORPH), is_player=True, element="fire")
 
     assert duel.player.queue[0].stats["intellect"] == MORPH_CONTESTED
 
 
 def test_a_morpher_takes_the_element_its_caster_chose(card):
     duel = Round(stat="force")
-    resolve_played_power(duel, card(MOBY_MORPHER), is_player=True, element="fire")
+    resolve_played_power(duel, card(MORPH), is_player=True, element="fire")
     assert duel.player.queue[0].element == "fire"
 
 
 def test_a_negative_wu_mirrors_onto_the_opponent(card):
     duel = Round()
-    tunic = card(TWO_TON_TUNIC)
+    tunic = card(CURSED_WU)
 
     resolve_played_power(duel, tunic, is_player=True, element="metal")
 
@@ -170,7 +171,7 @@ def test_a_negative_wu_mirrors_onto_the_opponent(card):
 
 def test_a_negative_wu_is_spent_on_the_casters_side(card):
     duel = Round()
-    resolve_played_power(duel, card(TWO_TON_TUNIC), is_player=True, element="metal")
+    resolve_played_power(duel, card(CURSED_WU), is_player=True, element="metal")
     assert duel.player.queue[0].stats["force"] == 0
 
 
@@ -195,8 +196,8 @@ def test_an_all_negative_wu_still_curses_the_opponent():
 
 
 def test_a_booster_amplifies_the_card_played_after_it(card):
-    duel = Round(player=Side(queue=[card(WUSHU_BRACELET)]))  # queued at the power stage
-    resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="metal")
+    duel = Round(player=Side(queue=[card(BOOST)]))  # queued at the power stage
+    resolve_played_power(duel, card(PLAIN_WU), is_player=True, element="metal")
     assert duel.player.queue[0].stats["force"] == 1  # the booster took on the stat
 
 
@@ -207,27 +208,27 @@ def test_a_dragon_wu_is_not_a_booster(card):
     still read force 1 while losing agility — a force assertion cannot tell the two apart.
     """
     duel = Round(player=Side(queue=[card(SILVER_MANTA_RAY)]))
-    resolve_played_power(duel, card(FIST_OF_TEBIGONG), is_player=True, element="water")
+    resolve_played_power(duel, card(PLAIN_WU), is_player=True, element="water")
     assert duel.player.queue[0].stats["agility"] == 1  # printed stat kept, not zeroed by boosting
 
 
 def test_intangibility_voids_the_elemental_bonus(card):
-    assert resolve_played_power(Round(), card(SERPENTS_TAIL), is_player=True, element="metal") == "cancel"
+    assert resolve_played_power(Round(), card(NULLIFY_ELEMENT), is_player=True, element="metal") == "cancel"
 
 
 def test_intangibility_voids_it_for_both_duelists(card):
     """Whoever plays it, nobody earns the bonus — it is a condition of the showdown."""
-    assert resolve_played_power(Round(), card(SERPENTS_TAIL), is_player=False, element="metal") == "cancel"
+    assert resolve_played_power(Round(), card(NULLIFY_ELEMENT), is_player=False, element="metal") == "cancel"
 
 
 def test_a_celestial_dial_reverses_the_elemental_bonus(card):
     """The Dial signals the reverse for the showdown, whoever plays it."""
-    assert resolve_played_power(Round(), card(CELESTIAL_DIAL), is_player=True, element="metal") == "reverse"
-    assert resolve_played_power(Round(), card(CELESTIAL_DIAL), is_player=False, element="metal") == "reverse"
+    assert resolve_played_power(Round(), card(REVERSE_ELEMENT), is_player=True, element="metal") == "reverse"
+    assert resolve_played_power(Round(), card(REVERSE_ELEMENT), is_player=False, element="metal") == "reverse"
 
 
 def test_a_showdown_without_intangibility_keeps_the_bonus(card):
-    voided = resolve_played_power(Round(), card(FIST_OF_TEBIGONG), is_player=True, element="metal")
+    voided = resolve_played_power(Round(), card(PLAIN_WU), is_player=True, element="metal")
     assert not voided
 
 
@@ -248,7 +249,7 @@ def test_only_boost_slot_wu_may_take_the_boost_slot(catalog):
 
 def test_a_morpher_spent_as_a_boost_is_one_one_one_of_its_chosen_element(catalog):
     """The wudai mode: a flat 1/1/1 in the colour the caster names — a dragon that picks its element."""
-    moby = catalog.card(5)  # Moby Morpher, the Morpher — prints ?/?/? until it is played
+    moby = catalog.card(MORPH)  # Moby Morpher, the Morpher — prints ?/?/? until it is played
 
     boosted = as_boost(moby, "fire")
 
@@ -259,7 +260,7 @@ def test_a_morpher_spent_as_a_boost_is_one_one_one_of_its_chosen_element(catalog
 def test_a_morph_boost_prints_nothing_on_the_contested_stat(catalog):
     """The nerf that ended 1/1/1-plus-the-lift: in tune, the elemental bonus stands the contested
     column back up, so the boost NETS 1/1/1 — and a reversed bonus drags it below."""
-    moby = catalog.card(5)
+    moby = catalog.card(MORPH)
 
     boosted = as_boost(moby, "fire", "agility")
 
@@ -269,7 +270,7 @@ def test_a_morph_boost_prints_nothing_on_the_contested_stat(catalog):
 
 def test_a_dragon_boost_enters_the_queue_as_itself(catalog):
     """Only the Morpher has a boost mode; every other boost rides in unchanged, its own element kept."""
-    dragon = catalog.card(1)  # Silver Manta Ray — a dragon, 1/1/1 of water
+    dragon = catalog.card(SILVER_MANTA_RAY)  # Silver Manta Ray — a dragon, 1/1/1 of water
 
     boosted = as_boost(dragon, "fire")
 
@@ -394,15 +395,15 @@ def test_a_wudai_reads_as_possession_on_its_owner_and_as_the_weapons_rule_on_the
     assert "Boost" in (effect_line(found_dragon.power, is_card=True) or "")
 
     # The Morpher: fielded from the pool it is On Play and bankable; as a wudai it is On Boost, worth X.
-    pool = catalog.card(5)
+    pool = catalog.card(MORPH)
     wudai = held_as_wudai(deepcopy(pool))
     assert trigger_label(pool.power, is_card=True, card_type=pool.type) == "On Play"
     assert trigger_label(wudai.power, is_card=True, card_type=wudai.type) == "On Boost"
     assert points_label(wudai) == "X"
     assert points_label(pool) == str(pool.points)
 
-    # The Shimo Staff (card 44) is a wudai found in the pile — boost-only, but banked like any Wu.
-    shimo = catalog.card(44)
+    # The Shimo Staff (card 15) is a wudai found in the pile — boost-only, but banked like any Wu.
+    shimo = catalog.card(DRAGON)
     assert trigger_label(shimo.power, is_card=True, card_type=shimo.type) == "On Boost"
     assert points_label(shimo) == str(shimo.points)  # the exception: it shows its real points
-    assert points_label(catalog.card(1)) == "X"  # a born dragon never counts
+    assert points_label(catalog.card(SILVER_MANTA_RAY)) == "X"  # a born dragon never counts

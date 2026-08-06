@@ -15,16 +15,24 @@ import pytest
 from textual.color import Color
 from textual.widgets import Input, Static
 
+from card_ids import DRAGON, LUCK
+
 from termcade.ui.app import EngineApp
 from termcade.ui.screens.console import DEBUG_ENV, ConsoleScreen
 
 from xiaolin_showdown.console import COMMANDS
 from xiaolin_showdown.game import build_game
+from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
+from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.screens.run.temple import TempleScreen
 
-ROOSTER_BOOSTER = 43
-SHIMO_STAFF = 44
-FIST_OF_TEBIGONG = 6
+# These tests only care that the console can `give`/`pile`/`lose` SOME Wu and read the id back off
+# the hand/pile — any Wu works, so pick by the mechanic under test, never a card name.
+# INNATE has several plain Wu (a Wu whose stats ARE its power); the positive-force one is unambiguous
+# without naming it — the others are 0/+5/0, 0/0/+5, or negative (a curse), which these tests don't want.
+PLAIN_WU = next(
+    c for c in load_catalog().cards if mechanic_of(c.power) is Mechanic.INNATE and c.stats["force"] > 0
+).id
 
 
 @pytest.fixture(autouse=True)
@@ -125,9 +133,9 @@ def _ids(cards) -> set[int]:
 async def test_give_puts_a_wu_in_your_hand(console, state):
     """The command the whole console exists for."""
     async with console() as (app, run):
-        await run(f"give {ROOSTER_BOOSTER} {SHIMO_STAFF}")
+        await run(f"give {LUCK} {DRAGON}")
 
-    assert {ROOSTER_BOOSTER, SHIMO_STAFF} <= _ids(state.player.hand)
+    assert {LUCK, DRAGON} <= _ids(state.player.hand)
 
 
 async def test_a_conjured_wu_is_a_real_wu(console, state, catalog):
@@ -138,44 +146,44 @@ async def test_a_conjured_wu_is_a_real_wu(console, state, catalog):
     into it.
     """
     async with console() as (app, run):
-        await run(f"give {ROOSTER_BOOSTER}")
+        await run(f"give {LUCK}")
 
-    dealt = next(c for c in state.player.hand if c.id == ROOSTER_BOOSTER)
+    dealt = next(c for c in state.player.hand if c.id == LUCK)
 
-    assert dealt is not catalog.card(ROOSTER_BOOSTER)  # a copy
-    assert dealt.stats == catalog.card(ROOSTER_BOOSTER).stats  # ...of the real thing
+    assert dealt is not catalog.card(LUCK)  # a copy
+    assert dealt.stats == catalog.card(LUCK).stats  # ...of the real thing
 
 
 async def test_givebot_arms_the_opponent(console, state):
     """A Wu is only tested once it has been played *against* you."""
     async with console() as (app, run):
-        await run(f"givebot {SHIMO_STAFF}")
+        await run(f"givebot {DRAGON}")
 
-    assert SHIMO_STAFF in _ids(state.bot.hand)
+    assert DRAGON in _ids(state.bot.hand)
 
 
 async def test_pile_stacks_the_next_showdown(console, state):
     """So the next duel is fought over the Wu you want to see fought over."""
     async with console() as (app, run):
-        await run(f"pile {SHIMO_STAFF}")
+        await run(f"pile {DRAGON}")
 
-    assert state.card_deck[0].id == SHIMO_STAFF
+    assert state.card_deck[0].id == DRAGON
 
 
 async def test_deck_shelves_onto_the_opponents_personal_deck(console, state):
     """What the deck powers read and pull from — testable at last without waiting for a hand to overflow."""
     async with console() as (app, run):
-        await run(f"deck them {SHIMO_STAFF}")
+        await run(f"deck them {DRAGON}")
 
-    assert SHIMO_STAFF in _ids(state.bot.deck)
+    assert DRAGON in _ids(state.bot.deck)
 
 
 async def test_lose_feeds_the_lost_pile(console, state):
     """The Rooster Booster's whole reason to exist, and otherwise a wait for a showdown to end badly."""
     async with console() as (app, run):
-        await run(f"lose {FIST_OF_TEBIGONG}")
+        await run(f"lose {PLAIN_WU}")
 
-    assert FIST_OF_TEBIGONG in _ids(state.lost)
+    assert PLAIN_WU in _ids(state.lost)
 
 
 async def test_points_skips_to_the_end_of_a_run(console, state):
@@ -252,7 +260,7 @@ async def test_a_run_dependent_command_refuses_cleanly_with_no_run(tmp_path):
         await pilot.press("grave_accent")
         await pilot.pause()
 
-        app.screen.query_one("#console-input", Input).value = f"give {ROOSTER_BOOSTER}"
+        app.screen.query_one("#console-input", Input).value = f"give {LUCK}"
         await pilot.press("enter")
         await pilot.pause()
 

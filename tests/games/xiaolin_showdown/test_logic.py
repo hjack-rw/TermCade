@@ -24,6 +24,7 @@ from xiaolin_showdown.logic.flow.actions import (
 )
 from xiaolin_showdown.logic.flow.battle import Ground, Round
 from xiaolin_showdown.logic.flow.bot import choose_background, choose_boost, choose_card, choose_challenge
+from xiaolin_showdown.logic.mechanics.powers import mechanic_of
 from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.schema.constants import FIRST_DECK_CARD
@@ -33,7 +34,7 @@ from xiaolin_showdown.logic.flow.outcome import final_score
 from xiaolin_showdown.logic.config.settings import XiaolinSettings, deck_size_for, point_limit_for
 from xiaolin_showdown.logic.flow.setup import new_game
 from xiaolin_showdown.logic.schema.state import XiaolinState
-from factories import NO_STATS, STATS, duelist, ground, wu
+from factories import NO_STATS, STATS, duelist, ground, plain_wu, wu
 
 
 def _omi(catalog):
@@ -386,7 +387,7 @@ def test_use_power_on_the_gag_wu_fizzles_for_no_points():
 def test_draw_pulls_a_wu_from_the_personal_deck_into_the_hand():
     cat = load_catalog()
     state = new_game(cat, Rng(1), _omi(cat))
-    shelved = deepcopy(cat.card(6))
+    shelved = deepcopy(plain_wu(cat))
     state.player.deck.append(shelved)
     hand_before = len(state.player.hand)
 
@@ -403,7 +404,7 @@ def test_can_draw_respects_the_turns_one_action():
     cat = load_catalog()
     state = new_game(cat, Rng(1), _omi(cat))
     settings = XiaolinSettings()
-    state.player.deck.append(deepcopy(cat.card(6)))  # a Wu waiting to be drawn, hand has room
+    state.player.deck.append(deepcopy(plain_wu(cat)))  # a Wu waiting to be drawn, hand has room
 
     assert can_draw(state, settings) is True
     state.actions_taken = settings.actions_per_turn_player  # this turn's draw is spent
@@ -414,7 +415,7 @@ def test_swapping_from_a_full_hand_keeps_it_the_same_size_and_costs_the_action()
     cat = load_catalog()
     state = new_game(cat, Rng(1), _omi(cat))
     shelved = state.player.hand[0]
-    state.player.deck.append(deepcopy(cat.card(6)))  # something to draw back
+    state.player.deck.append(deepcopy(plain_wu(cat)))  # something to draw back
     hand_before = len(state.player.hand)
 
     drawn = swap_from_hand(state, shelved, rng=Rng(1))
@@ -475,20 +476,21 @@ def test_a_hard_game_only_deals_hard_opponents():
 
 
 def test_a_boss_game_deals_the_boss_and_grants_its_wudai():
-    """A CHOSEN Hannibal holds Moby Morpher (card 5) inalienably — off the pile."""
+    """A CHOSEN Hannibal holds Moby Morpher (MORPH) inalienably — off the pile."""
     catalog = load_catalog()
     omi = catalog.character(1)
+    moby_morpher = next(c for c in catalog.cards if mechanic_of(c.power) is Mechanic.MORPH)
 
     # Pinned, not rolled: with two on the boss roster, the roster pick could hand back either.
     state = new_game(catalog, Rng(7), omi, roster="boss", opponent=catalog.character(11))
 
     assert state.bot.character.name == "Hannibal_Roy_Bean"
-    assert [c.id for c in state.bot.inalienable_hand] == [5]  # Moby Morpher, granted not drawn
-    assert all(c.id != 5 for c in state.card_deck)  # reserved out of the pool
+    assert [c.id for c in state.bot.inalienable_hand] == [moby_morpher.id]  # granted not drawn
+    assert all(c.id != moby_morpher.id for c in state.card_deck)  # reserved out of the pool
 
     held = state.bot.inalienable_hand[0]
     assert held.type == "wudai"  # a held signature is a wudai...
-    assert catalog.card(5).type == "arms"  # ...but the pool copy keeps its printed 'arms'
+    assert moby_morpher.type == "arms"  # ...but the pool copy keeps its printed 'arms'
     assert XiaolinState.restore(state.snapshot(), None).bot.inalienable_hand[0].type == "wudai"
 
 

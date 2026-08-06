@@ -5,19 +5,22 @@ wear it costs, both generic ``WITCHCRAFT`` rules any card carrying it would foll
 
 from __future__ import annotations
 
+from ..schema.catalog import load_mechanic_config
 from ..schema.state import XiaolinState
 from ..flow.turn import duel_value
+
+_WITCHCRAFT = load_mechanic_config()["witchcraft"]
 
 # What the oldest lost Wu must be worth before Wuya's witchcraft spends her temple action on the
 # recall. She pays no Wu (unlike the Rooster), so the bar sits under the Rooster's own REVIVAL_MARGIN
 # (see temple_ai.py).
-WITCH_RECALL_MARGIN = 3
+WITCH_RECALL_MARGIN = _WITCHCRAFT["recall_margin"]
 
 # How many Wu the witchcraft may call back in a whole run — a capped resource, not a tap.
-WITCH_RECALL_LIMIT = 3
+WITCH_RECALL_LIMIT = _WITCHCRAFT["recall_limit"]
 
 # Wuya flies the Early Bird on a shorter initiative lead than anyone else needs.
-WITCH_EARLY_BIRD_GAP = 2
+WITCH_EARLY_BIRD_GAP = _WITCHCRAFT["early_bird_gap"]
 
 
 def recall_index(state: XiaolinState) -> int:

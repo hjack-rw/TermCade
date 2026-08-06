@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import pytest
 
+from factories import duelist, initiative_wu, plain_wu, plain_wu_agility, wu
+
 from xiaolin_showdown.logic.mechanics.scoring import initiative, initiative_sources
+from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.schema.models import Card, Mechanic, Player
 from xiaolin_showdown.screens.display.format import bonus_tooltip
-from factories import duelist, wu
 
-JETBOOTSU = 10  # +1, the player's own buff
-LONGHORN_TAURUS = 9  # +1, the bot's own buff
-TANGLE_WEB_COMB = 21  # -1, a debuff that lands on the *opponent*
+_CAT = load_catalog()
 
 
 def _wu(bonus: int) -> Card:
@@ -73,8 +73,8 @@ async def test_each_duelist_row_gets_its_own_initiative_tooltip(
     state, card, open_vault, hover_tooltip
 ):
     """Both rows live in one Static, so the bonuses ride on each row's own span, not the widget."""
-    state.player.hand = [card(JETBOOTSU)]
-    state.bot.hand = [card(TANGLE_WEB_COMB), card(LONGHORN_TAURUS)]
+    state.player.hand = [card(initiative_wu(_CAT, 1).id)]
+    state.bot.hand = [card(initiative_wu(_CAT, -1).id), card(initiative_wu(_CAT, 1).id)]
 
     async with open_vault(state) as (app, pilot):
         # From the right: the row's FIRST tooltip span is the training bar, initiative is rightmost.
@@ -85,8 +85,9 @@ async def test_each_duelist_row_gets_its_own_initiative_tooltip(
 
 
 async def test_a_duelist_with_no_bonuses_still_tooltips(state, card, open_vault, hover_tooltip):
-    state.player.hand = [card(6)]  # a plain Wu, no initiative bonus
-    state.bot.hand = [card(7)]
+    # Two interchangeable INNATE Wu (no queued power, no initiative bonus) — any two distinct ones do.
+    state.player.hand = [card(plain_wu(_CAT).id)]
+    state.bot.hand = [card(plain_wu_agility(_CAT).id)]
 
     async with open_vault(state) as (app, pilot):
         assert await hover_tooltip(app, pilot, "#state", row=0, from_right=True) == "(/)"

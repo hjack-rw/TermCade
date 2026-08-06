@@ -10,6 +10,7 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 
 from ..characters import jong
+from ..schema.catalog import load_mechanic_config
 from ..schema.constants import YANG_YOYO_ID, YIN_YANG_YOYO_ID, YING_YOYO_ID
 from ..mechanics.scoring import initiative
 from ..mechanics.powers import Mechanic, mechanic_of, trigger_of
@@ -21,10 +22,12 @@ from .training import add_progress, can_train, doubles_training, payout_ready
 from .turn import bank_value, duel_value, max_hand_size, shelve
 from .power_effects import FIZZLE_MESSAGE, PowerReport, _Spend, _fire
 
+_WITCHCRAFT = load_mechanic_config()["witchcraft"]
+
 # Whether Wuya's witchcraft-restored Wu wear out (vault on the third use) or reuse forever, and
 # whether it returns them at all.
-WITCHCRAFT_WEARS = True
-WITCHCRAFT_RETURNS = True
+WITCHCRAFT_WEARS = bool(_WITCHCRAFT["wears"])
+WITCHCRAFT_RETURNS = bool(_WITCHCRAFT["returns"])
 
 # Not a power: the Early Bird logs its own line, so it stays a plain one-form message.
 EARLY_BIRD_MESSAGE = "You outran your opponent to the next Wu: {taken} is yours. You gave up your {given} for it."

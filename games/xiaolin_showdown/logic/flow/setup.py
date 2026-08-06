@@ -16,6 +16,7 @@ from termcade.core.rng import Rng
 from ..schema.catalog import Catalog
 from ..schema.constants import in_pool
 from ..mechanics.cards import held_as_wudai
+from ..mechanics.powers import Mechanic, mechanic_of
 from ..schema.models import Card, Character, Player
 from ..config.settings import XiaolinSettings, deal_target, pile_size_for, point_limit_for
 from ..schema.state import XiaolinState
@@ -86,8 +87,8 @@ def new_game(
     bot = deepcopy(opponent) if opponent is not None else deepcopy(rng.choice(catalog.opponents(roster)))  # RNG call 2
 
     # Reserve each duelist's signature Wu out of the pile *before* either hand is dealt.
-    player_sig = _reserve_signature(draw_pile, player)
-    bot_sig = _reserve_signature(draw_pile, bot)
+    player_sig = _reserve_signature(draw_pile, player, catalog)
+    bot_sig = _reserve_signature(draw_pile, bot, catalog)
 
     player_duelist = _deal(
         draw_pile, catalog, player, player_sig,
@@ -106,14 +107,16 @@ def new_game(
 _NO_SIGNATURE_WU = frozenset({-6, -7})
 
 
-def _reserve_signature(draw_pile: list[Card], character: Character) -> int | None:
+def _reserve_signature(draw_pile: list[Card], character: Character, catalog: Catalog) -> int | None:
     """A signature power ties a character to one Wu, theirs by right — granted inalienably in `_deal`.
 
-    Pull that Wu out of the pool so it can never be drawn by anyone. The Wu's id is `abs(power_id)`
-    for the five characters built with one (ids -1..-5, cards 1..5 — those cards were free to be
-    numbered to match); Jack's card was not, since it appends after them (xs_game.sql never fills a
-    hole or renumbers a neighbour), so his card carries his power's id directly instead (-8, -8).
-    Either way the card sits below `FIRST_DECK_CARD` and never rides the pool on its own.
+    Pull that Wu out of the DEALT pile if it is there — a weighted deal may not have sampled it at
+    all — so it can never be drawn twice. The four dragons' Wu is `abs(power_id)` (ids -1..-4, cards
+    1..4 — those never move, see xs_game.sql's header). Jack's card was never free to match his
+    power's id either, so his carries it directly instead (-8, -8), and sits below `FIRST_DECK_CARD`
+    like the dragons'. Hannibal's Wu (Moby Morpher, MORPH) is different again: card 5 was only ever a
+    coincidence of dealing order, and a mechanic-grouped renumber moves it — so his signature is
+    found in the full catalog by mechanic, the one property a regroup preserves, not by id.
 
     Returns the Wu's id, or ``None`` when the character carries no signature (a positive power id, or
     one of ``_NO_SIGNATURE_WU``).
@@ -121,7 +124,10 @@ def _reserve_signature(draw_pile: list[Card], character: Character) -> int | Non
     power_id = character.power.id
     if power_id >= 0 or power_id in _NO_SIGNATURE_WU:
         return None
-    signature = abs(power_id) if power_id >= -5 else power_id
+    if power_id == -5:
+        signature = next(c.id for c in catalog.cards if mechanic_of(c.power) is Mechanic.MORPH)
+    else:
+        signature = abs(power_id) if power_id >= -4 else power_id
     for index, card in enumerate(draw_pile):
         if card.id == signature:
             del draw_pile[index]
@@ -177,8 +183,8 @@ def _weighted_game(
     player = deepcopy(player_character)
     bot = deepcopy(opponent) if opponent is not None else deepcopy(rng.choice(catalog.opponents(roster)))  # RNG call 2
 
-    player_sig = _reserve_signature(game_deck, player)
-    bot_sig = _reserve_signature(game_deck, bot)
+    player_sig = _reserve_signature(game_deck, player, catalog)
+    bot_sig = _reserve_signature(game_deck, bot, catalog)
     player_duelist = _deal(
         game_deck, catalog, player, player_sig,
         count=settings.starting_hand_player, points=settings.starting_points_player,

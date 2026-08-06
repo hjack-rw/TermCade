@@ -24,6 +24,7 @@ from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.setup import new_game
 from xiaolin_showdown.logic.flow.turn import refill_hands
+from card_ids import DRAGON
 from factories import (
     STATS,
     auto_choices as _auto_choices,
@@ -32,10 +33,12 @@ from factories import (
     first_card as _first_card,
     no_boost as _no_boost,
     one_wu as _one_wu,
+    plain_wu,
     run_showdown,
     water as _water,
     wu,
 )
+from xiaolin_showdown.logic.mechanics.powers import mechanic_of
 
 
 def _card(force, agility, intellect, *, element="water", mechanic=Mechanic.INITIATIVE) -> Card:
@@ -329,13 +332,17 @@ async def test_resolvement_negates_the_bonus_a_curse_would_have_earned_its_caste
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
     duel = _duel_over(state)
-    duel.duel.stakes = cat.card(6)
+    duel.duel.stakes = plain_wu(cat)
     duel.duel.challenge, duel.duel.background = "force", "water"
     base = state.player.character.stats["force"]
 
     # a water curse landed on the player: its resonance must count against them, and its own force
     # wound with it. Both read off the card — this test is about the *bonus*, not the card's balance.
-    spitter = cat.card(23)  # Silk Spitter, water
+    # Silk Spitter — the only water-elemental -1 INITIATIVE Wu.
+    spitter = next(
+        c for c in cat.cards if mechanic_of(c.power) is Mechanic.INITIATIVE
+        and c.power.initiative_bonus == -1 and c.element == "water"
+    )
     duel.duel.rounds.append(Round(stat="force"))  # the battle contests force
     resolve_played_power(duel.duel.round, spitter, is_player=False, element="water")
     duel._score_round(duel.duel.round)
@@ -403,7 +410,7 @@ async def test_a_wudai_weapon_you_found_is_at_stake_like_anything_else():
     """
     cat = load_catalog()
     state = new_game(cat, Rng(1), cat.character(1))
-    staff = deepcopy(cat.card(44))  # Shimo Staff — a dragon nobody was born holding
+    staff = deepcopy(cat.card(DRAGON))  # Shimo Staff — a dragon nobody was born holding
     state.player.hand.append(staff)
     duel = Duel(state, Rng(1), _auto_choices())
     duel.duel.rounds.append(Round())

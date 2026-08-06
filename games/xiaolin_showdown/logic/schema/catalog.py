@@ -12,6 +12,7 @@ The DB is a build artifact. ``xs_game.sql`` is the source a card is written into
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from dataclasses import dataclass
 from functools import cached_property
@@ -68,6 +69,61 @@ class Catalog:
     @cached_property
     def _chars_by_id(self) -> dict[int, Character]:
         return {c.id: c for c in self.characters}
+
+
+def load_mechanic_config(db_path: Path | str = DEFAULT_DB) -> dict[str, dict[str, int]]:
+    """The ``mechanic_config`` table, as ``{mechanic: {key: value}}`` — the balance knobs
+    :mod:`.mechanics.powers` reads at import, so a row edit changes the number with no code change."""
+    con = sqlite3.connect(str(db_path))
+    try:
+        rows = con.execute('SELECT "mechanic", "key", "value" FROM mechanic_config').fetchall()
+    finally:
+        con.close()
+    config: dict[str, dict[str, int]] = {}
+    for mechanic, key, value in rows:
+        config.setdefault(mechanic, {})[key] = value
+    return config
+
+
+def catalog_fingerprint(catalog: Catalog, config: dict[str, dict[str, int]]) -> str:
+    """A stable hash over every balance-relevant row — cards, powers, characters, ``mechanic_config``
+    — order-independent of how the DB returned them. Two DBs with identical rows hash identically; one
+    edited stat, power or knob changes it. Backgrounds are excluded: flavour only, never scored (see
+    ``flow.duel.DuelState.background_name``).
+
+    Compared against the canonical build's fingerprint (``catalog_fingerprint.CANONICAL``, generated
+    by ``generate_catalog_fingerprint.py``) by :func:`catalog_tampered`, so a hand-edited ``.db`` — as
+    opposed to one rebuilt from an honestly-edited ``xs_game.sql`` — can be told apart from a real
+    balance change and kept from counting toward the boss ladder (see
+    ``config.settings.rules_modified``).
+    """
+    parts: list[str] = []
+    for card in sorted(catalog.cards, key=lambda c: c.id):
+        stats = card.stats["force"], card.stats["agility"], card.stats["intellect"]
+        parts.append(f"card:{card.id}:{card.name}:{stats}:{card.power.id}:{card.element}:"
+                      f"{card.type}:{card.points}")
+    for character in sorted(catalog.characters, key=lambda c: c.id):
+        stats = character.stats["force"], character.stats["agility"], character.stats["intellect"]
+        parts.append(f"character:{character.id}:{character.name}:{stats}:{character.power.id}:"
+                      f"{character.affiliation}:{character.is_playable}:{character.tier}")
+    for power in sorted(catalog.powers, key=lambda p: p.id):
+        parts.append(f"power:{power.id}:{power.name}:{power.mechanic}:{power.initiative_bonus}:"
+                      f"{power.summon}:{power.train_step}")
+    for mechanic in sorted(config):
+        for key in sorted(config[mechanic]):
+            parts.append(f"config:{mechanic}:{key}:{config[mechanic][key]}")
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+
+def catalog_tampered(db_path: Path | str = DEFAULT_DB) -> bool:
+    """Whether ``db_path`` diverges from the canonical build — a ``.db`` hand-edited after the fact,
+    rather than rebuilt from an honestly-edited ``xs_game.sql`` (:func:`build_db` always regenerates
+    from empty, so a legitimate change always carries a matching, regenerated fingerprint)."""
+    from .catalog_fingerprint import CANONICAL  # generated — see generate_catalog_fingerprint.py
+
+    catalog = load_catalog(db_path)
+    config = load_mechanic_config(db_path)
+    return catalog_fingerprint(catalog, config) != CANONICAL
 
 
 def load_catalog(db_path: Path | str = DEFAULT_DB) -> Catalog:

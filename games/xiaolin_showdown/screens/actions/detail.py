@@ -27,7 +27,9 @@ from ..display.format import (
 
 # A handful of Wu carry a second name — shown as `aka "..."` in the detail. Too few to earn a
 # DB column; keyed by card id.
-_ALIASES = {64: "Sword of the Storm", 77: "Thorn of Thunderbolt"}  # Blade of the Nebula, Shard of Lightning
+# WEAK POINT: id-keyed, not structural — a future renumber will silently point these at the wrong
+# card. Blade of the Nebula, Shard of Lightning.
+_ALIASES = {13: "Sword of the Storm", 12: "Thorn of Thunderbolt"}
 
 
 class DetailScreen(EngineScreen):

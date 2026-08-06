@@ -11,6 +11,8 @@ from termcade.ui.widgets import TooltipStatic
 
 from textual.widgets import Button, Input, Static
 
+from factories import plain_wu, plain_wu_agility
+
 from xiaolin_showdown.game import build_game
 from termcade.core.rng import Rng
 from xiaolin_showdown.logic.schema.catalog import load_catalog
@@ -244,7 +246,7 @@ async def test_draw_pulls_a_wu_from_the_personal_deck(tmp_path):
         await _boot(app, pilot)
         await _new_game_at_vault(app, pilot)
         cat = app.ctx.state.catalog
-        app.ctx.state.player.deck.append(deepcopy(cat.card(6)))  # a Wu waiting in the personal deck
+        app.ctx.state.player.deck.append(deepcopy(plain_wu(cat)))  # a Wu waiting in the personal deck
         hand_before = len(app.ctx.state.player.hand)
 
         await pilot.press("2")  # Draw a card
@@ -267,8 +269,8 @@ async def test_drawing_with_a_full_hand_swaps_a_wu_through_a_picker(tmp_path):
         cat = state.catalog
         # Fill the hand to the limit and stock the deck with a Wu to draw back.
         limit = XiaolinSettings.from_settings(app.ctx.settings.current).max_hand_size_player
-        state.player.hand = [deepcopy(cat.card(6)) for _ in range(limit - len(state.player.inalienable_hand))]
-        state.player.deck.append(deepcopy(cat.card(7)))
+        state.player.hand = [deepcopy(plain_wu(cat)) for _ in range(limit - len(state.player.inalienable_hand))]
+        state.player.deck.append(deepcopy(plain_wu_agility(cat)))
         full = len(state.player.whole_hand)
 
         await pilot.press("2")  # Draw — a full hand, so a SWAP picker opens
@@ -286,7 +288,7 @@ async def test_drawing_with_a_full_hand_swaps_a_wu_through_a_picker(tmp_path):
 
         assert isinstance(app.screen, TempleScreen)
         assert len(state.player.whole_hand) == full  # a swap: net size unchanged
-        assert any(card.id == 7 for card in state.player.hand)  # the deck's Wu came in
+        assert any(card.id == plain_wu_agility(state.catalog).id for card in state.player.hand)  # the deck's Wu came in
 
 
 async def test_reaching_the_point_limit_ends_the_game_instead_of_dueling(tmp_path):

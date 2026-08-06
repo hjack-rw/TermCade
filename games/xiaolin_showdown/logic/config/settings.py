@@ -39,8 +39,8 @@ class XiaolinSettings:
     starting_hand_bot: int = 5
     # Derived from the pool (see `pool_fingerprint`), but written out so a bare `XiaolinSettings()`
     # still deals a real game. `test_settings_defaults_match_the_card_pool` fails when they fall stale.
-    max_deck_size: int = 75
-    point_limit: int = 61
+    max_deck_size: int = 83
+    point_limit: int = 69
     starting_points_player: int = 0
     starting_points_bot: int = 0
     # How many actions (deposit / power / draw) a temple turn buys.
@@ -264,11 +264,17 @@ def refreshed_for_pool(settings: Settings) -> Settings:
 
 
 def rules_modified(frozen: Settings) -> bool:
-    """True when the frozen settings' rule knobs differ from this difficulty's live default deal.
+    """True when the frozen settings' rule knobs differ from this difficulty's live default deal, or
+    the catalog itself has been hand-edited (:func:`~..schema.catalog.catalog_tampered`) — a doctored
+    ``.db`` is not the Hard/boss fight the ladder is measuring any more than a house-ruled deal is.
 
     Shared by :func:`save_note` (stars a customised save) and the boss ladder (:func:`ladder.record_win`
-    refuses to advance on a modified ruleset — that is not the Hard/boss fight the ladder is measuring).
+    refuses to advance on a modified ruleset).
     """
+    from ..schema.catalog import catalog_tampered  # local: settings must not drag the DB into every import
+
+    if catalog_tampered():
+        return True
     saved = XiaolinSettings.from_settings(frozen)
     deck_size, point_limit = default_deal(frozen)
     default = XiaolinSettings(max_deck_size=deck_size, point_limit=point_limit)

@@ -12,7 +12,8 @@ from termcade.core.rng import Rng
 
 from dataclasses import replace
 
-from factories import auto_choices, run_showdown
+from card_ids import AMEND, DRAW
+from factories import auto_choices, plain_wu, run_showdown
 
 from xiaolin_showdown.logic.flow.battle import Round
 from xiaolin_showdown.logic.schema.catalog import load_catalog
@@ -21,9 +22,7 @@ from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.flow.setup import new_game
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
-MOUSE = 66  # Hodoku Mouse — amend/play
-FIST = 6  # Fist of Tebigong — a plain Wu, no power of its own
-BRAS = 16  # Bras Finger — a plain 1/1/1, to swap in
+PLAIN_WU = plain_wu(load_catalog()).id
 
 
 def _duel_with_a_round(stat="force", background="metal"):
@@ -72,16 +71,16 @@ def test_amend_swaps_a_fielded_wu_for_one_in_hand():
     duel = Duel(state, rng, auto_choices())
     duel.duel.rounds.append(Round(stat="force"))
 
-    fielded = deepcopy(cat.card(FIST))  # already down this battle
+    fielded = deepcopy(cat.card(PLAIN_WU))  # already down this battle
     duel.duel.player.stakes.append(fielded)
     resolve_played_power(duel.duel.round, fielded, is_player=True, element="metal")
-    bench = deepcopy(cat.card(BRAS))
+    bench = deepcopy(cat.card(DRAW))
     state.player.hand.append(bench)
 
     duel._apply_amend(Amend("swap", swap_out=fielded, swap_in=bench))
 
-    assert any(c.id == BRAS for c in duel.duel.round.player.queue)  # the new Wu took the field
-    assert any(c.id == FIST for c in state.player.hand)  # the pulled Wu is back in hand
+    assert any(c.id == DRAW for c in duel.duel.round.player.queue)  # the new Wu took the field
+    assert any(c.id == PLAIN_WU for c in state.player.hand)  # the pulled Wu is back in hand
 
 
 def test_amend_options_exclude_the_terms_already_set():
@@ -102,7 +101,7 @@ async def test_a_fielded_mouse_rewrites_the_round_it_is_played_in():
     cat = load_catalog()
     rng = Rng(1)
     state = new_game(cat, rng, cat.character(1))
-    state.player.hand = [deepcopy(cat.card(MOUSE)), deepcopy(cat.card(FIST))]
+    state.player.hand = [deepcopy(cat.card(AMEND)), deepcopy(cat.card(PLAIN_WU))]
     state.forced_priority = True  # the player leads and names the challenge
 
     async def _challenge(_options):
@@ -111,7 +110,7 @@ async def test_a_fielded_mouse_rewrites_the_round_it_is_played_in():
     async def _play_the_mouse(playable):
         # The bot names the wager (the player leads), so there may be a second Wu to field — play the
         # Mouse whenever it is still in hand, the Fist otherwise.
-        return next((c for c in playable if c.id == MOUSE), playable[0])
+        return next((c for c in playable if c.id == AMEND), playable[0])
 
     async def _amend(_options):
         return Amend("challenge", "agility")

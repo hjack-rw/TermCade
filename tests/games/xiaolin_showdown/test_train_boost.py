@@ -10,7 +10,7 @@ from termcade.core.rng import Rng
 
 from dataclasses import replace
 
-from factories import auto_choices, run_showdown
+from factories import auto_choices, plain_wu, run_showdown, summon_wu
 
 from xiaolin_showdown.logic.flow.actions import usable_powers, use_power
 from xiaolin_showdown.logic.flow.battle import Round
@@ -25,15 +25,17 @@ DEFAULT = XiaolinSettings()
 STAT_CAP = DEFAULT.stat_cap
 TRAIN_BOOST_STEP = train_boost_step(0, DEFAULT)  # the base (weakest) tier's step, at the shipped bar length
 
-FIST = 6  # Fist of Tebigong — a plain Wu that fights on its stats, to stand against the dragon
-
-TONGUE = 68  # Tongue of Saiping — summon "{beast}"
-IMO = 69  # Imo Gazer — summon "a Drawing of {beast}"
-ZING = 70  # Zing Zom-Bone — summon "a Horde of Zombies" (fixed), and a curse
-MONARCH = 71  # Monarch Wings — +6 tier, summon "{spirit}" (keyed to the caster's side)
-MOONSTONE = 72  # Moonstone Cat's Eye — +6 tier, summon "{desire}" (keyed to the character)
-SAPPHIRE = 73  # Sapphire Dragon — a full bar in one shove (instant level); rests metal, scores nothing
-SHADOW_OF_FEAR = 42  # summon "{fear}" — keyed to the TARGET (the caster's opponent), not the caster
+# TRAIN_BOOST has six Wu; each is genuinely specific here — the summon template is what each test is
+# actually about (a plain "{beast}" vs a fixed non-template curse vs a higher tier), so pick by that.
+_CAT = load_catalog()
+PLAIN_WU = plain_wu(_CAT).id
+TONGUE = summon_wu(_CAT, "{beast}").id
+IMO = summon_wu(_CAT, "{drawing}").id
+ZING = summon_wu(_CAT, "a Horde of Zombies").id
+MONARCH = summon_wu(_CAT, "{spirit}").id
+MOONSTONE = summon_wu(_CAT, "{desire}").id
+SAPPHIRE = summon_wu(_CAT, "the Sapphire Dragon").id
+SHADOW_OF_FEAR = summon_wu(_CAT, "{fear}").id
 
 
 def _seed(state, cid):
@@ -53,6 +55,9 @@ def test_spending_a_summon_shoves_the_training_bar(state):
 
 
 def test_a_spent_summon_leaves_the_hand(state):
+    # The dealt hand can hold a stray TRAIN_BOOST Wu of its own — strip it, so only the seeded one
+    # is in play and its removal is what the assertion below is actually checking.
+    state.player.hand = [c for c in state.player.hand if mechanic_of(c.power) is not Mechanic.TRAIN_BOOST]
     tongue = _seed(state, TONGUE)
     use_power(state, tongue, DEFAULT, is_player=True, rng=Rng(1))
     assert not any(mechanic_of(c.power) is Mechanic.TRAIN_BOOST for c in state.player.whole_hand)
@@ -175,7 +180,7 @@ def test_the_bot_spends_the_sapphire_dragon_to_train():
     """It can never field it, so the temple is the only use — and its full-bar boost is a free level."""
     from xiaolin_showdown.logic.flow.temple_ai import choose_temple_power
 
-    play = choose_temple_power(_bot_temple_state([SAPPHIRE, FIST], 0), XiaolinSettings(), is_player=False)
+    play = choose_temple_power(_bot_temple_state([SAPPHIRE, PLAIN_WU], 0), XiaolinSettings(), is_player=False)
     assert play is not None and play.card.id == SAPPHIRE
 
 
@@ -184,8 +189,8 @@ def test_the_bot_feeds_a_summon_only_when_it_completes_a_level():
     from xiaolin_showdown.logic.flow.temple_ai import choose_temple_power
 
     settings = XiaolinSettings()
-    low = choose_temple_power(_bot_temple_state([TONGUE, FIST], 2), settings, is_player=False)
-    high = choose_temple_power(_bot_temple_state([TONGUE, FIST], 8), settings, is_player=False)
+    low = choose_temple_power(_bot_temple_state([TONGUE, PLAIN_WU], 2), settings, is_player=False)
+    high = choose_temple_power(_bot_temple_state([TONGUE, PLAIN_WU], 8), settings, is_player=False)
     assert low is None  # 2 + 3 falls short of a full bar
     assert high is not None and high.card.id == TONGUE  # 8 + 3 completes it
 
@@ -194,7 +199,7 @@ def _duel_where_the_player_fields_the_dragon():
     cat = load_catalog()
     rng = Rng(1)
     state = new_game(cat, rng, cat.character(1))
-    state.player.hand = [deepcopy(cat.card(SAPPHIRE)), deepcopy(cat.card(FIST))]
+    state.player.hand = [deepcopy(cat.card(SAPPHIRE)), deepcopy(cat.card(PLAIN_WU))]
     state.forced_priority = True  # the player leads and names the challenge
 
     async def _play_dragon(playable):
@@ -219,7 +224,7 @@ def test_the_bot_holds_the_sapphire_dragon_back():
 
     cat = load_catalog()
     dragon = deepcopy(cat.card(SAPPHIRE))
-    fist = deepcopy(cat.card(FIST))
+    fist = deepcopy(cat.card(PLAIN_WU))
     chosen = choose_card(Round(stat="force"), ground(), [fist, dragon], Rng(1))
     assert chosen.id != SAPPHIRE
 

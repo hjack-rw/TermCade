@@ -37,7 +37,8 @@ from ..schema.constants import BRAWL, ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from .battle import Duelist, Ground, Round, score_battle, score_brawl
 from ..mechanics.cards import excluding, is_one_of
 from ..mechanics.powers import (
-    Mechanic, is_boost_slot, is_jong_bane, is_uncontrolled, mechanic_of, names_a_stat,
+    BEAST_BOOST, CHAMELON_MARGIN, Mechanic, is_boost_slot, is_jong_bane, is_uncontrolled, mechanic_of,
+    names_a_stat,
 )
 from ..mechanics.prize import PrizeRoute, claim_route
 from ..mechanics.resolve import as_boost, curse_from_boost, resolve_played_power, stand_in
@@ -61,10 +62,11 @@ _CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET
 # characters and the arena, and shows the name they return in place of the Wu's own.
 
 # Chase Young's Beast Form bonus on the contested stat (see `_award_prize` for the prize side-effect).
-BEAST_BOOST = 1
+# Defined in `mechanics.powers` (`mechanic_config`'s `beast_form.boost`) and re-exported by the
+# import above, so the DB is read in one place.
 
 # How far above parity Chamelon-Bot closes the gap when the player leads (see `_chamelon_boost_card`).
-CHAMELON_MARGIN = 1
+# Defined in `mechanics.powers` and re-exported by the import above, so the DB is read in one place.
 
 
 @dataclass

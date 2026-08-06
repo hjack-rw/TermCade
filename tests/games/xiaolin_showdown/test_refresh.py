@@ -13,7 +13,7 @@ from xiaolin_showdown.logic.mechanics.cards import is_one_of
 from xiaolin_showdown.logic.schema.models import Mechanic
 from xiaolin_showdown.logic.schema.state import XiaolinState
 
-from factories import wu
+from factories import plain_wu, wu
 
 DEPOSIT_LIMIT = 1
 
@@ -89,8 +89,8 @@ def test_refresh_is_offered_only_with_a_used_wu(state, settings):
 
 
 def test_the_used_pile_round_trips_a_save(state):
-    state.used = [state.catalog.card(6)]
+    state.used = [plain_wu(state.catalog)]
 
     restored = XiaolinState.restore(state.snapshot(), None)
 
-    assert [c.id for c in restored.used] == [6]
+    assert [c.id for c in restored.used] == [plain_wu(state.catalog).id]

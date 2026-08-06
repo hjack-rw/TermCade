@@ -15,21 +15,32 @@ boss already sits at the cap on every stat — MASTER — while the player can s
 from __future__ import annotations
 
 from ..config.settings import XiaolinSettings
+from ..schema.catalog import load_mechanic_config
 from ..schema.models import Mechanic, Player
 from ..schema.state import XiaolinState
 
+_BOT = load_mechanic_config()["bot"]
+_TRAIN_BOOST = load_mechanic_config()["train_boost"]
+
 # Boss-run rule: a beating from a boss teaches DOUBLE `settings.loss_fill`. The boss sits at the cap,
-# so only the player can collect. See docs/design/BOSSES.md.
+# so only the player can collect. See docs/design/BOSSES.md. Not mechanic-tied (applies to any boss),
+# so it stays a plain constant rather than a `mechanic_config` row.
 _BOSS_LOSS_MULTIPLIER = 2
 # Jack's own ceiling on FORCE alone, one below the universal `settings.stat_cap` — agility trains all
 # the way to the cap, but force stops short. See docs/design/BOSSES.md.
-_JACK_FORCE_MARGIN = 1
+_JACK_FORCE_MARGIN = _BOT["jack_force_margin"]
 
 # `power.train_step` is calibrated against the shipped `XiaolinSettings.train_length` default (10): a
 # third of the bar, two thirds, or the whole thing at once (Agalmatosis, the Sapphire Dragon — the
 # strongest summon). Read back as that SHARE of the live setting, not the literal number, so a
 # house-ruled bar length keeps each summon's fraction of the bar rather than its old absolute step.
-_TRAIN_STEP_SHARE: dict[int, tuple[int, int]] = {3: (1, 3), 6: (2, 3), 10: (1, 1)}
+# The tiers (3/6/10, `power.train_step`'s own values) are structural, so they stay the dict's keys;
+# each fraction is a `mechanic_config` row under `train_boost`.
+_TRAIN_STEP_SHARE: dict[int, tuple[int, int]] = {
+    3: (_TRAIN_BOOST["tier1_num"], _TRAIN_BOOST["tier1_den"]),
+    6: (_TRAIN_BOOST["tier2_num"], _TRAIN_BOOST["tier2_den"]),
+    10: (_TRAIN_BOOST["tier3_num"], _TRAIN_BOOST["tier3_den"]),
+}
 
 
 def train_boost_step(card_train_step: int, settings: XiaolinSettings, *, is_player: bool = True) -> int:

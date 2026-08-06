@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ..schema.catalog import load_mechanic_config
 from ..schema.models import Mechanic, Player
 
 # Chase's one counter — a Sphere of Jianyu negates his character entirely, the whole Beast Form
@@ -16,7 +17,7 @@ counter = frozenset({Mechanic.NULLIFY_STATS})
 # Chase Young activates Beast Form only when a contested stat is close — his lead on it is under
 # `duel.BEAST_BOOST`, so the boost could decide the battle. Ahead by more he stays an ordinary
 # duelist: his Wu score, and a win GIFTS the prize to the duelist he beat.
-BEAST_MARGIN = 3
+BEAST_MARGIN = load_mechanic_config()["beast_form"]["margin"]
 
 
 def choose_beast_form(chase: Player, opponent: Player, stats: Sequence[str]) -> str | None:

@@ -50,9 +50,9 @@ FIRST_DECK_CARD = 5
 # The Yin/Yang Yo-Yo halves and their combined form (see logic/actions.combine_yoyo /
 # self_correct_yoyo) — matched by id, not `Mechanic.STAT_SWAP`/`CHI_SWAP` alone, since a mechanic
 # check can't tell "held a half" apart from "held the combined card" or from a future third Wu.
-YING_YOYO_ID = 78
-YANG_YOYO_ID = 79
-YIN_YANG_YOYO_ID = 80
+YING_YOYO_ID = 71
+YANG_YOYO_ID = 72
+YIN_YANG_YOYO_ID = 10
 
 
 def in_pool(card_id: int) -> bool:

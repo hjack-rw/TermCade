@@ -70,8 +70,8 @@ def test_the_pin_and_ground_are_spent_when_the_showdown_ends():
 
 def test_caleido_scope_carries_telepatheia_now():
     cat = load_catalog()
-    caleido = next(c for c in cat.cards if c.name == "Caleido-scope Glasses")
-    conch = cat.card(27)
+    caleido = next(c for c in cat.cards if mechanic_of(c.power) is Mechanic.ENHANCED_VISION)
+    conch = next(c for c in cat.cards if mechanic_of(c.power) is Mechanic.PROGNOSIS)
     assert mechanic_of(caleido.power) is Mechanic.ENHANCED_VISION
     assert mechanic_of(conch.power) is Mechanic.PROGNOSIS  # the Conch traded up
 

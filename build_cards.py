@@ -13,7 +13,7 @@ disagree. Run the matching script, commit both.
 
 from __future__ import annotations
 
-from xiaolin_showdown.logic.catalog import DEFAULT_SQL, build_db, load_catalog
+from xiaolin_showdown.logic.schema.catalog import DEFAULT_SQL, build_db, load_catalog
 
 
 def main() -> None:

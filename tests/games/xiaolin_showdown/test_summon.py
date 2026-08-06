@@ -12,7 +12,8 @@ from termcade.core.rng import Rng
 
 from dataclasses import replace
 
-from factories import auto_choices, run_showdown
+from card_ids import DOUBLE_TRAINING
+from factories import auto_choices, plain_wu, run_showdown
 
 from xiaolin_showdown.logic.flow.battle import Round
 from xiaolin_showdown.logic.schema.catalog import load_catalog
@@ -21,8 +22,7 @@ from xiaolin_showdown.logic.mechanics.resolve import resolve_played_power
 from xiaolin_showdown.logic.flow.setup import new_game
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
-RING = 60  # Ring of Nine Xing — summon "Clone of {caster}"
-FIST = 6  # Fist of Tebigong — a plain Wu, no summon
+PLAIN_WU = plain_wu(load_catalog()).id
 
 
 def _duel(character_id=1):
@@ -33,26 +33,26 @@ def _duel(character_id=1):
 
 def test_summon_display_names_a_clone_of_the_caster():
     state, duel = _duel(character_id=1)  # Omi
-    assert duel._summon_display(deepcopy(state.catalog.card(RING)), is_player=True) == "Clone of Omi"
+    assert duel._summon_display(deepcopy(state.catalog.card(DOUBLE_TRAINING)), is_player=True) == "Clone of Omi"
 
 
 def test_summon_display_uses_the_short_caster_name():
     """A long character goes by its first name in the clone — Chase Young -> Chase, not the mouthful."""
     state, duel = _duel()
     state.player.character = deepcopy(state.catalog.character(13))  # Chase_Young
-    assert duel._summon_display(deepcopy(state.catalog.card(RING)), is_player=True) == "Clone of Chase"
+    assert duel._summon_display(deepcopy(state.catalog.card(DOUBLE_TRAINING)), is_player=True) == "Clone of Chase"
 
 
 def test_a_plain_wu_has_no_summon_display():
     state, duel = _duel()
-    assert duel._summon_display(deepcopy(state.catalog.card(FIST)), is_player=True) is None
+    assert duel._summon_display(deepcopy(state.catalog.card(PLAIN_WU)), is_player=True) is None
 
 
 def test_a_summon_stand_in_takes_the_summoned_name_not_the_wu_name():
     cat = load_catalog()
     battle = Round()
     resolve_played_power(
-        battle, deepcopy(cat.card(RING)), is_player=True, element="metal", display_name="Clone of Omi"
+        battle, deepcopy(cat.card(DOUBLE_TRAINING)), is_player=True, element="metal", display_name="Clone of Omi"
     )
     assert battle.player.queue[0].name == "Clone of Omi"
 
@@ -60,19 +60,19 @@ def test_a_summon_stand_in_takes_the_summoned_name_not_the_wu_name():
 def test_a_plain_wu_keeps_its_own_name_on_the_board():
     cat = load_catalog()
     battle = Round()
-    resolve_played_power(battle, deepcopy(cat.card(FIST)), is_player=True, element="metal")
-    assert battle.player.queue[0].name == cat.card(FIST).name
+    resolve_played_power(battle, deepcopy(cat.card(PLAIN_WU)), is_player=True, element="metal")
+    assert battle.player.queue[0].name == cat.card(PLAIN_WU).name
 
 
 async def test_fielding_the_ring_shows_a_clone_of_omi_on_the_board():
     cat = load_catalog()
     rng = Rng(1)
     state = new_game(cat, rng, cat.character(1))  # Omi
-    state.player.hand = [deepcopy(cat.card(RING)), deepcopy(cat.card(FIST))]
+    state.player.hand = [deepcopy(cat.card(DOUBLE_TRAINING)), deepcopy(cat.card(PLAIN_WU))]
     state.forced_priority = True
 
     async def _play_the_ring(playable):
-        return next((c for c in playable if c.id == RING), playable[0])
+        return next((c for c in playable if c.id == DOUBLE_TRAINING), playable[0])
 
     choices = replace(auto_choices(), card=_play_the_ring)
     duel = Duel(state, rng, choices)

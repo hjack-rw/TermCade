@@ -52,7 +52,7 @@ class Mechanic(StrEnum):
     WARD = "ward"  # the -phylaxia four
     TRANSFER = "transfer"  # Sun Chi Lantern
     WITCHCRAFT = "witchcraft"  # Wuya's character power
-    BEAST_FORM = "beast_form"  # Chase Young's — see `duel.BEAST_BOOST`
+    BEAST_FORM = "beast_form"  # Chase Young's — see `powers.BEAST_BOOST`
     PROGNOSIS = "prognosis"  # the Mind Reader Conch
     TREASURE = "treasure"
     REFRESH = "refresh"

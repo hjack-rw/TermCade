@@ -36,6 +36,13 @@ def _duel() -> Duel:
     return duel
 
 
+def _clear_yoyo_halves(duel: Duel) -> None:
+    """The seeded deal can hand out a Yo-Yo half on its own; strip any so a test's own appends are
+    the only ones in play."""
+    stray = {YING_YOYO_ID, YANG_YOYO_ID, YIN_YANG_YOYO_ID}
+    duel.state.player.hand = [card for card in duel.state.player.hand if card.id not in stray]
+
+
 def _jack_duel() -> Duel:
     cat = load_catalog()
     jack_char = next(c for c in cat.characters if c.name == "Jack_Spicer")
@@ -161,6 +168,7 @@ def test_a_save_from_before_the_yoyo_ever_existed_restores_unflipped():
 
 def test_can_combine_yoyo_needs_both_halves_in_hand():
     duel = _duel()
+    _clear_yoyo_halves(duel)
     cat = load_catalog()
     duel.state.player.hand.append(deepcopy(cat.card(YING_YOYO_ID)))
     assert can_combine_yoyo(duel.state, 1) is False
@@ -170,6 +178,7 @@ def test_can_combine_yoyo_needs_both_halves_in_hand():
 
 def test_combine_yoyo_consumes_both_halves_and_spends_the_action():
     duel = _duel()
+    _clear_yoyo_halves(duel)
     cat = load_catalog()
     duel.state.player.hand.append(deepcopy(cat.card(YING_YOYO_ID)))
     duel.state.player.hand.append(deepcopy(cat.card(YANG_YOYO_ID)))

@@ -15,16 +15,28 @@ from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.actions import deposit, usable_powers, use_power
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
 
-MOUSE = 66  # Hodoku Mouse — amend/use
-GAMBLE = 13  # Ohwah Tegu Saim — its deposit rolls the hidden stream
 DEFAULT = XiaolinSettings()
 
 
+def _mouse_card(catalog):
+    """The Hodoku Mouse — the only AMEND-mechanic Wu, so the mechanic alone finds it."""
+    return next(c for c in catalog.cards if mechanic_of(c.power) is Mechanic.AMEND)
+
+
+def _gamble_card(catalog):
+    """Ohwah Tegu Saim — the only GAMBLE-mechanic Wu."""
+    return next(c for c in catalog.cards if mechanic_of(c.power) is Mechanic.GAMBLE)
+
+
 def _seed_mouse(state):
-    """Put a Mouse in hand and return (mouse, a non-Mouse card to spend)."""
-    mouse = deepcopy(state.catalog.card(MOUSE))
+    """Put a Mouse in hand and return (mouse, a non-Mouse card to spend).
+
+    The dealt hand can hold a stray Mouse of its own — strip it first, so the one seeded here is the
+    only AMEND card in play."""
+    state.player.hand = [c for c in state.player.hand if mechanic_of(c.power) is not Mechanic.AMEND]
+    mouse = deepcopy(_mouse_card(state.catalog))
     state.player.hand.append(mouse)
-    victim = next(c for c in state.player.hand if c.id != MOUSE)
+    victim = next(c for c in state.player.hand if mechanic_of(c.power) is not Mechanic.AMEND)
     return mouse, victim
 
 
@@ -67,16 +79,16 @@ def test_the_undone_mouse_lands_in_the_used_pile(state):
     deposit(state, victim, rng=rng)
     use_power(state, mouse, DEFAULT, is_player=True, rng=rng)
 
-    assert any(c.id == MOUSE for c in state.used)
+    assert any(mechanic_of(c.power) is Mechanic.AMEND for c in state.used)
 
 
 def test_amend_restores_the_rng_stream(state):
     """A gamble deposit rolls the hidden stream; undoing it must wind the stream back too, or the
     next roll comes out different from the one the undone action already saw."""
     rng = Rng(1)
-    gamble = deepcopy(state.catalog.card(GAMBLE))
+    gamble = deepcopy(_gamble_card(state.catalog))
     state.player.hand.append(gamble)
-    mouse = deepcopy(state.catalog.card(MOUSE))
+    mouse = deepcopy(_mouse_card(state.catalog))
     state.player.hand.append(mouse)
     before = rng.get_state()
 

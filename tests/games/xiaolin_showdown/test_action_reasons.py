@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import pytest
 
+from card_ids import DRAW
+from factories import plain_wu, plain_wu_agility
+
 from xiaolin_showdown.logic.flow.actions import (
     SPENT_MESSAGE,
     can_deposit,
@@ -20,10 +23,13 @@ from xiaolin_showdown.logic.flow.actions import (
     use_power_blocked,
 )
 from xiaolin_showdown.logic.config.settings import deposit_limit
+from xiaolin_showdown.logic.schema.catalog import load_catalog
 
-BRAS_FINGER = 16  # a `deposit`-trigger Wu: usable only while a deposit is still allowed
-PLAIN_WU = 6
-ANOTHER_PLAIN_WU = 7
+_CAT = load_catalog()
+# Two interchangeable "plain Wu" (INNATE, no queued power) — these tests only need two hand slots
+# filled with something inert, never a specific card.
+PLAIN_WU = plain_wu(_CAT).id
+ANOTHER_PLAIN_WU = plain_wu_agility(_CAT).id
 
 
 # --- the reason and the predicate never disagree --------------------------------
@@ -47,7 +53,7 @@ def test_a_deposit_reason_exists_exactly_when_the_deposit_is_blocked(state, sett
     assert (deposit_blocked(state, limit) is None) is can_deposit(state, limit)
 
 
-@pytest.mark.parametrize("hand_ids", [[PLAIN_WU, ANOTHER_PLAIN_WU], [BRAS_FINGER, PLAIN_WU]])
+@pytest.mark.parametrize("hand_ids", [[PLAIN_WU, ANOTHER_PLAIN_WU], [DRAW, PLAIN_WU]])
 def test_a_power_reason_exists_exactly_when_no_power_is_usable(state, settings, card, hand_ids):
     state.player.hand = [card(card_id) for card_id in hand_ids]
 
@@ -114,14 +120,14 @@ def test_a_hand_of_plain_wu_has_no_power_to_use(state, settings, card):
 
 def test_a_use_power_is_out_of_reach_once_the_action_is_spent(state, settings, card):
     """A `use`-trigger Wu only counts while the turn's action is unspent — say *that*, not "no power"."""
-    state.player.hand = [card(BRAS_FINGER), card(PLAIN_WU)]
+    state.player.hand = [card(DRAW), card(PLAIN_WU)]
     state.actions_taken = settings.actions_per_turn_player
 
     assert use_power_blocked(state, settings.actions_per_turn_player, settings) == SPENT_MESSAGE
 
 
 def test_a_usable_power_has_no_reason(state, settings, card):
-    state.player.hand = [card(BRAS_FINGER), card(PLAIN_WU)]
+    state.player.hand = [card(DRAW), card(PLAIN_WU)]
     assert use_power_blocked(state, settings.actions_per_turn_player, settings) is None
 
 

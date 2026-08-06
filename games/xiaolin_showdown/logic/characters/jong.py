@@ -15,16 +15,19 @@ duel and temple layers; this module holds the pure state and the queries they re
 from __future__ import annotations
 
 from ..mechanics.powers import mechanic_of
+from ..schema.catalog import load_mechanic_config
 from ..schema.models import Card, Mechanic, Player
+
+_JONG = load_mechanic_config()["jong"]
 
 # The construct's costume: the name and affiliation a screen shows, and the flat stat it fights at.
 # Never written onto the real character — read through :func:`battle_stats` / :func:`shown_name`.
 JONG_NAME = "Mala Mala Jong"
 JONG_AFFILIATION = "construct"
-JONG_STAT = 6
+JONG_STAT = _JONG["stat"]
 # The construct's own boost: a flat 1/1/1, element metal, one battle. Sourced from the exiled Heart,
 # so it is never staked and never wears (see duel._commit_boost).
-JONG_BOOST_STAT = 1
+JONG_BOOST_STAT = _JONG["boost_stat"]
 
 # The five assembly slots — one Wu of each ``type`` (any Wu of that type counts) plus the Heart is
 # the gate. The slot is otherwise cosmetic (see JONG.md); this is the one place that lists them.

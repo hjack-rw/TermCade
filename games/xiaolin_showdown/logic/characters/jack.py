@@ -11,7 +11,10 @@ from termcade.core.rng import Rng
 
 from ..flow.battle import Side
 from ..mechanics.powers import mechanic_of
+from ..schema.catalog import load_mechanic_config
 from ..schema.models import Card, Mechanic
+
+_BOT = load_mechanic_config()["bot"]
 
 # Jack-Bot's curse flavour (see :func:`choose_jack_bot`) — its own pool, separate from ATTACK_BOT_NAMES.
 JACK_BOT_NAMES = ("Jack-Bot", "Tickle-Bot", "Yes-Bot", "Chef-Bot", "Soda-Bot")
@@ -28,7 +31,7 @@ CHAMELON_BOOST_ID = -9
 # its own pool, separate from JACK_BOT_NAMES.
 ATTACK_NAME = "Jack-bots Attack!"
 # Flat, before the metal swing (see `duel.Duel._jack_base`).
-ATTACK_STAT = 3
+ATTACK_STAT = _BOT["attack_stat"]
 ATTACK_BOT_NAMES = (
     "Blade-Bots", "Gun-Bots", "Hound-Bots", "Giant Jack-Bot", "Wuya-Bot", "Chase-Bot", "Hannibal-Bot",
     "Winged-Bots", "Regenerating Jack-Bots", "Cheerleader-Bots", "Junk-Bots", "U-Bots", "Guard-Bots",
@@ -41,8 +44,8 @@ ATTACK_BOT_NAMES = (
 # (`Player.good_jack_intellect`), never derived from Evil's frozen real 7. Can't deploy any bot form
 # while worn (see `duel.Duel._choose_jack_mode`).
 GOOD_JACK_NAME = "Good Jack"
-GOOD_JACK_STAT = 4
-JACK_PRINTED_PHYSICAL = 3
+GOOD_JACK_STAT = _BOT["good_jack_stat"]
+JACK_PRINTED_PHYSICAL = _BOT["printed_physical"]
 
 # Jack's keyed counters (see docs/design/BOSSES.md). Read by `bot.steal_target`'s ``prefer`` and
 # `turn._priority_deposit`, via `turn.counters_against`.
@@ -67,23 +70,23 @@ def choose_jack_bot(opponent: Side) -> bool:
     return not opponent.defence_negated
 
 
-ATTACK_MIN_CHANCE = 5  # a floor: never fully vanishes, only fades
-ATTACK_MAX_CHANCE = 90  # a ceiling: even desperate, there is always some chance he stays himself
+ATTACK_MIN_CHANCE = _BOT["attack_min_chance"]  # a floor: never fully vanishes, only fades
+ATTACK_MAX_CHANCE = _BOT["attack_max_chance"]  # a ceiling: even desperate, there is some chance he stays himself
 
 # Attack! always transfers the full prize outright, no partial-credit ladder (`PrizeRoute.BRAWL_WON`)
 # — see BOSSES.md for the rates behind these two constants.
-ATTACK_CHANCE_WHEN_LEADING = 2  # percent — Jack leads, "himself"/AI Jack are already strong
+ATTACK_CHANCE_WHEN_LEADING = _BOT["attack_chance_when_leading"]  # percent — Jack leads, already strong
 
-ATTACK_CHANCE_WHEN_TRAILING = 5  # percent at momentum 0
+ATTACK_CHANCE_WHEN_TRAILING = _BOT["attack_chance_when_trailing"]  # percent at momentum 0
 # `jack_attack_momentum` (XiaolinState) shifts this with the run's recent record — losing a showdown
 # reaches for Attack! harder, winning one leaves it alone — clamped to +-ATTACK_MOMENTUM_CAP, a
 # fresh run starting at 0.
-ATTACK_MOMENTUM_STEP = 10  # percentage points shifted per showdown won/lost, applied only here
-ATTACK_MOMENTUM_CAP = 30  # how far a streak can push the trailing chance off its base, either way
+ATTACK_MOMENTUM_STEP = _BOT["attack_momentum_step"]  # percentage points shifted per showdown won/lost
+ATTACK_MOMENTUM_CAP = _BOT["attack_momentum_cap"]  # how far a streak can push the trailing chance
 
 # Fleeing a lost showdown: no route can claim the prize (it goes to lost, never to the winner), and
 # his wager stays his. No downside on any single use, so it is capped instead of tuned.
-JACK_FLEE_CAP = 3  # per run
+JACK_FLEE_CAP = _BOT["flee_cap"]  # per run
 
 
 def choose_to_flee(flees_used: int) -> bool:

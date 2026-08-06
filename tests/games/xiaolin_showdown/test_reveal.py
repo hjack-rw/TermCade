@@ -11,17 +11,19 @@ import pytest
 
 from termcade.core.rng import Rng
 
+from card_ids import BOUNCE, ENHANCED_VISION, FETCH, READ_DECK, SCRY
+
 from xiaolin_showdown.logic.flow.actions import coming_wu, usable_powers, use_power
 from xiaolin_showdown.logic.flow.duel import Duel, DuelChoices
 from xiaolin_showdown.logic.mechanics.powers import SCOPE_DEPTH
 from xiaolin_showdown.logic.mechanics.cards import is_one_of
+from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from factories import initiative_wu, plain_wu, plain_wu_agility
 
-FALCONS_EYE = 25
-EAGLE_SCOPE = 26
-CALEIDO_GLASSES = 55  # Caleido-scope Glasses now carries Oxyderkia (enhanced vision)
-GLOVE_OF_JISAKU = 30
-RUBY_OF_RAMSES = 31
+_CAT = load_catalog()
+PLAIN_WU = plain_wu(_CAT).id
+ANOTHER_PLAIN_WU = plain_wu_agility(_CAT).id
 
 DEPOSIT_LIMIT = 1
 DEFAULT = XiaolinSettings()
@@ -40,7 +42,7 @@ def held(state, card):
 
 
 def test_the_scope_names_the_next_wu_in_the_pile(state, held):
-    scope = held(EAGLE_SCOPE)
+    scope = held(SCRY)
     coming = state.card_deck[:SCOPE_DEPTH]
 
     message = use_power(state, scope, DEFAULT)
@@ -50,7 +52,7 @@ def test_the_scope_names_the_next_wu_in_the_pile(state, held):
 
 
 def test_the_scope_sees_exactly_three_deep(state, held):
-    scope = held(EAGLE_SCOPE)
+    scope = held(SCRY)
     fourth = state.card_deck[SCOPE_DEPTH]
 
     message = use_power(state, scope, DEFAULT)
@@ -60,7 +62,7 @@ def test_the_scope_sees_exactly_three_deep(state, held):
 
 def test_the_scope_does_not_draw_the_wu_it_shows(state, held):
     """It is a look, not a draw: the pile keeps its order and its cards."""
-    scope = held(EAGLE_SCOPE)
+    scope = held(SCRY)
     before = [wu.id for wu in state.card_deck]
 
     use_power(state, scope, DEFAULT)
@@ -69,33 +71,33 @@ def test_the_scope_does_not_draw_the_wu_it_shows(state, held):
 
 
 def test_the_eye_reads_the_whole_opponent_deck(state, held, card):
-    eye = held(FALCONS_EYE)
-    state.bot.deck = [card(6), card(7)]
+    eye = held(READ_DECK)
+    state.bot.deck = [card(PLAIN_WU), card(ANOTHER_PLAIN_WU)]
 
     message = use_power(state, eye, DEFAULT)
 
-    assert "Fist of Tebigong" in message.toast
-    assert "Helmet of Jong" in message.toast
+    assert card(PLAIN_WU).name in message.toast
+    assert card(ANOTHER_PLAIN_WU).name in message.toast
 
 
 def test_the_eye_is_not_offered_against_an_empty_deck(state, held):
     """The opponent's deck is empty most turns. A Wu spent to be told 'nothing' is a trap, not a
     choice — so the vault never offers the look in the first place."""
-    eye = held(FALCONS_EYE)
+    eye = held(READ_DECK)
     state.bot.deck = []
 
     assert not is_one_of(eye, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
 
 
 def test_the_eye_is_offered_once_the_opponent_holds_a_deck(state, held, card):
-    eye = held(FALCONS_EYE)
-    state.bot.deck = [card(6)]
+    eye = held(READ_DECK)
+    state.bot.deck = [card(PLAIN_WU)]
 
     assert is_one_of(eye, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
 
 
 def test_the_scope_is_not_offered_against_a_drained_pile(state, held):
-    scope = held(EAGLE_SCOPE)
+    scope = held(SCRY)
     state.card_deck = []
 
     assert not is_one_of(scope, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
@@ -112,7 +114,7 @@ def _priority_of(state) -> bool | None:
 
 def test_the_conch_shows_the_one_wu_that_comes_next(state, held):
     """It hears one thought, not three — the Scope is the Wu that reaches further."""
-    glasses = held(CALEIDO_GLASSES)
+    glasses = held(ENHANCED_VISION)
     next_up = state.card_deck[0]
 
     assert [wu.id for wu in coming_wu(state)] == [next_up.id]
@@ -122,11 +124,11 @@ def test_the_conch_shows_the_one_wu_that_comes_next(state, held):
 
 def test_taking_initiative_beats_a_losing_sum(state, held):
     """The point of the Wu: the hands say you lose the read, and you take it anyway."""
-    glasses = held(CALEIDO_GLASSES)
+    glasses = held(ENHANCED_VISION)
     # Both hands set outright: initiative is read off them, so a Wu the seed happened to deal could
     # otherwise tie the sums and hand priority to a coin toss instead of to the bot.
     state.player.hand = [glasses]
-    state.bot.hand = [state.catalog.card(9)]  # Longhorn Taurus, +1 — the bot out-reads the player
+    state.bot.hand = [initiative_wu(state.catalog, 1)]  # any +1 INITIATIVE Wu out-reads the player
 
     assert _priority_of(state) is False  # without the Conch, theirs
 
@@ -137,7 +139,7 @@ def test_taking_initiative_beats_a_losing_sum(state, held):
 
 def test_refusing_initiative_gives_it_away(state, held):
     """It cuts both ways, and that is the choice: sometimes you want them to commit first."""
-    glasses = held(CALEIDO_GLASSES)
+    glasses = held(ENHANCED_VISION)
 
     use_power(state, glasses, DEFAULT, priority=False)
 
@@ -146,7 +148,7 @@ def test_refusing_initiative_gives_it_away(state, held):
 
 def test_the_conch_overrules_a_tie_without_a_coin(state, held):
     """A tie is settled by a coin toss. An answered Conch means there is nothing left to toss for."""
-    glasses = held(CALEIDO_GLASSES)
+    glasses = held(ENHANCED_VISION)
     state.player.hand, state.bot.hand = [], []  # nobody holds an initiative Wu: 0 against 0
 
     use_power(state, glasses, DEFAULT, priority=True)
@@ -156,7 +158,7 @@ def test_the_conch_overrules_a_tie_without_a_coin(state, held):
 
 def test_the_conch_cannot_be_spent_without_an_answer(state, held):
     """A Wu that quietly does nothing is the bug this game keeps a whole test file about."""
-    glasses = held(CALEIDO_GLASSES)
+    glasses = held(ENHANCED_VISION)
 
     with pytest.raises(ValueError, match="without an answer"):
         use_power(state, glasses, DEFAULT)
@@ -164,7 +166,7 @@ def test_the_conch_cannot_be_spent_without_an_answer(state, held):
 
 def test_a_look_is_paid_for_with_the_wu(state, held):
     """Spent, not banked: the Wu leaves the hand and pays no points."""
-    scope = held(EAGLE_SCOPE)
+    scope = held(SCRY)
     points = state.player.points
 
     use_power(state, scope, DEFAULT)
@@ -177,8 +179,8 @@ def test_a_look_is_paid_for_with_the_wu(state, held):
 
 
 def test_the_glove_pulls_the_wu_you_named_out_of_your_deck(state, held, card):
-    glove = held(GLOVE_OF_JISAKU)
-    wanted, other = card(6), card(7)
+    glove = held(FETCH)
+    wanted, other = card(PLAIN_WU), card(ANOTHER_PLAIN_WU)
     state.player.deck = [other, wanted]
 
     use_power(state, glove, DEFAULT, target=wanted)
@@ -190,8 +192,8 @@ def test_the_glove_pulls_the_wu_you_named_out_of_your_deck(state, held, card):
 
 def test_the_glove_leaves_the_hand_no_bigger_than_it_found_it(state, held, card):
     """The Glove goes as the Wu arrives, so the hand limit is never a question."""
-    glove = held(GLOVE_OF_JISAKU)
-    state.player.deck = [card(6)]
+    glove = held(FETCH)
+    state.player.deck = [card(PLAIN_WU)]
     before = len(state.player.hand)
 
     use_power(state, glove, DEFAULT, target=state.player.deck[0])
@@ -200,16 +202,16 @@ def test_the_glove_leaves_the_hand_no_bigger_than_it_found_it(state, held, card)
 
 
 def test_the_glove_is_not_offered_against_an_empty_deck(state, held):
-    glove = held(GLOVE_OF_JISAKU)
+    glove = held(FETCH)
     state.player.deck = []
 
     assert not is_one_of(glove, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
 
 
 def test_the_ruby_banks_the_wu_you_named_from_their_hand(state, held, card):
-    ruby = held(RUBY_OF_RAMSES)
-    victim = card(6)  # Fist of Tebigong, 2 points
-    state.bot.hand = [victim, card(7)]
+    ruby = held(BOUNCE)
+    victim = card(PLAIN_WU)  # Fist of Tebigong, 2 points
+    state.bot.hand = [victim, card(ANOTHER_PLAIN_WU)]
     before = state.bot.points
 
     use_power(state, ruby, DEFAULT, target=victim, rng=Rng(1))
@@ -220,17 +222,17 @@ def test_the_ruby_banks_the_wu_you_named_from_their_hand(state, held, card):
 
 def test_the_ruby_never_empties_their_hand(state, held, card):
     """A deposit may never leave a duelist with nothing to field — theirs no more than yours."""
-    ruby = held(RUBY_OF_RAMSES)
-    state.bot.hand = [card(6)]
+    ruby = held(BOUNCE)
+    state.bot.hand = [card(PLAIN_WU)]
 
     assert not is_one_of(ruby, usable_powers(state, DEPOSIT_LIMIT, DEFAULT))
 
 
 def test_the_ruby_hands_you_nothing_but_the_shove(state, held, card):
     """You do not take the Wu, and you do not take its points. You only push it away."""
-    ruby = held(RUBY_OF_RAMSES)
-    victim = card(6)
-    state.bot.hand = [victim, card(7)]
+    ruby = held(BOUNCE)
+    victim = card(PLAIN_WU)
+    state.bot.hand = [victim, card(ANOTHER_PLAIN_WU)]
     mine = state.player.points
 
     use_power(state, ruby, DEFAULT, target=victim, rng=Rng(1))
@@ -241,9 +243,9 @@ def test_the_ruby_hands_you_nothing_but_the_shove(state, held, card):
 def test_shoving_a_wu_to_their_deck_pays_them_nothing(state, held, card):
     """The caster's other option: no points to them, but the Wu is shuffled into their deck to be
     drawn back — a delay, not the deposit's permanent removal."""
-    ruby = held(RUBY_OF_RAMSES)
-    victim = card(6)  # Fist of Tebigong, worth points
-    state.bot.hand = [victim, card(7)]
+    ruby = held(BOUNCE)
+    victim = card(PLAIN_WU)  # Fist of Tebigong, worth points
+    state.bot.hand = [victim, card(ANOTHER_PLAIN_WU)]
     before = state.bot.points
 
     use_power(state, ruby, DEFAULT, target=victim, to_deck=True, rng=Rng(1))

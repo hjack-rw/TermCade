@@ -18,7 +18,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from xiaolin_showdown.logic.catalog import DEFAULT_DB, DEFAULT_SQL
+from xiaolin_showdown.logic.schema.catalog import DEFAULT_DB, DEFAULT_SQL
 
 INSERT = re.compile(r'^INSERT INTO "?(\w+)"?\s')
 

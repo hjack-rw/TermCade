@@ -19,12 +19,36 @@
 --     *share* that power (Omi is the Dragon of Water). Moby Morpher (card 5) does not: Hannibal's
 --     own power is "Free Allomorphia" (-5), the Wu's is "Allomorphia" (30) — the character holds the
 --     Wu, it is not the Wu.
--- So a new Wu appends at the end. It never fills a hole and never renumbers a neighbour.
+-- Every card and power id 5+ (and 1+ for powers) is also grouped by mechanic, ascending — every Wu of
+-- the same mechanic sits together, so a browser scanning by id reads it as one balance pass. A new Wu
+-- of a mechanic already in the table is a REGROUP, not a bare append: renumber it in next to its
+-- siblings and shift every id after it forward by one, on both `card` and `power`, updating every
+-- hardcoded reference (see `tests/games/xiaolin_showdown/card_ids.py` and the signature/save-file
+-- notes above — a save on disk stores raw ids with no remap layer, so a renumber invalidates old
+-- saves). A new MECHANIC's first Wu still just appends at the end, since there is no group yet to
+-- join. The negative/zero ids (dragons, bosses, `blank`) are a separate space and never move.
 --
 -- A power NAMES its mechanic, and `mechanics.powers.RULES` says what that mechanic does, when it
 -- fires, and what it tells a player. A name nobody implemented fails at LOAD (`Mechanic(row)`),
 -- rather than becoming a Wu that quietly does nothing. There is no trigger column and no effect
 -- integer: when a power fires follows from what it is.
+--
+-- `mechanic_config` holds the numeric balance knobs a mechanic applies — a card mechanic's, to every
+-- Wu that carries it (the Gamble's payout spread, the Morpher's dip, the Heart's boosted/fielded
+-- stats), or a character's own power, whatever shape it takes (Beast Form's boost AND its trigger
+-- margin; Wuya's witchcraft recall margin/cap and her own Early Bird gap; Jack's whole `bot` persona
+-- system — stat, flee cap, Attack!'s odds and momentum — everything he *is*, not just what he prints).
+-- Excluded: `flow.temple_ai`'s generic opponent heuristics (ATTRACTION_MARGIN and friends) — those
+-- gate the bot's use of any Wu carrying a mechanic, not what one character's own power does, and stay
+-- code. `mala_mala_jong`'s construct stats sit under the synthetic key `jong` — no power names it (it
+-- is 5 typed Wu plus the Heart, not a single mechanic), but it is still made of cards, so it belongs.
+--
+-- Read once at import by `mechanics.powers` (`flow.duel` re-exports `BEAST_BOOST` from there so the
+-- DB is read in one place; `characters.chase/jack/jong/wuya` import their own knobs from it the same
+-- way) — editing a row here changes the number everywhere it is quoted, text included, with no code
+-- change. A row for a mechanic nothing reads is inert, not an error. `key` distinguishes multiple
+-- knobs on one mechanic (Gamble's `low`/`high`); `MORPH_CONTESTED` stays derived from `morph.aside` in
+-- code, not its own row, since it is not an independent number (see `mechanics.powers`).
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "power" (
@@ -38,177 +62,193 @@ CREATE TABLE "power" (
 	PRIMARY KEY("id")
 );
 
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-8, 'Jack-Bot', 'bot', 'Jack Spicer, evil boy genius, built himself a robotic army to fight his battles for him. Versatile and ALMOST infallible.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-7, 'Beast Form', 'beast_form', 'Going over to the dark side, Chase became infused with the power of a Heylin Demon. He refuses however to meddle in mere mortal affairs.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-6, 'Witchcraft', 'witchcraft', 'Wuya''s connection to the Shen Gong Wu runs both ways. She can call the lost Wu back into her hand, three times in a run, and a Wu she spends on its power returns to her hand. But the hunger that finds them is never fed.', 1);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-5, 'Elemental Manipulation', 'morph', 'Given his condition of being a literal Heylin Bean, Hannibal took a hold of Moby Morpher and never let it go - so he wields it as a free Wu. He is also capable of Elemental Deflection.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-4, 'Dragon of Earth', 'dragon', 'User has access to basic Earth-based attacks, and moves', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-3, 'Dragon of Fire', 'dragon', 'User has access to basic Fire-based attacks, and moves', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-2, 'Dragon of Wind', 'dragon', 'User has access to basic Wind-based attacks, and moves', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (-1, 'Dragon of Water', 'dragon', 'User has access to basic Water-based attacks, and moves', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (0, 'blank', 'filler', 'blank', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (1, 'Superhuman Strength', 'innate', 'Allows the user to punch with incredible force, capable of creating shock waves during the impact', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (2, 'Deflection', 'innate', 'Protects the user''s head by deflecting attacks and projectiles towards it', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (3, 'Photographic Memory', 'innate', 'Grants its user an instant memory recall. The memories are stored in bubbles inside the Wu and can be shared across users', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (4, 'Furious Charge', 'initiative', 'Bull horn that when blown blasts the user at rapid speeds forward at their target (aka a "DASH-i")', 1);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (5, 'Levitation', 'initiative', 'Allows the user to defy gravity, which enables them to walk vertically on walls and even float minimal above ground', 1);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (6, 'Camouflage', 'initiative', 'Helps its user blend into their surroundings like a chameleon', 1);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (7, 'Mégathoskinesis', 'initiative', 'Shrinks targeted objects or people to the size of a grain of rice. The size change is not permanent and requires the user to keep a hold of the Wu', 1);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (8, '? ? ?', 'gamble', '? ? ?', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (9, 'Power Augmentation', 'boost', 'Could greatly enhance the powers of other Wu that the user is holding. It combines with it, making it count as one in a duel.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (10, 'Temporary Appendage', 'hand_size', 'Acts like an extendable, strong, and durable third arm. Its moves are somewhat independent from the wearer, but always obey their commands', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (11, 'Chronokinesis', 'draw', 'Freezes anything it is pointed at in time and place for a short while', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (12, 'Impenetrable Defence', 'innate', 'Can temporarily transform into an armor capable of blocking all sorts of attacks, but its weight increases drastically while active', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (13, 'Umbrakinesis', 'innate', 'Allows for shadow manipulation that can influence a physical target. It can absorb and dissipate shadows at will, allowing the user to create shadow copies when it''s charged up', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (14, 'Mnenokinesis', 'innate', 'Erases memory for a short while, leaving its victim unable to recall what they knew', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (15, 'Self-conscious Rope', 'initiative', 'Rope that can fulfill simple orders, behaving like a snake while at it. Apart from that it possess all the abilities of an ordinary rope', -1);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (16, 'Extendable Tendrils', 'initiative', 'It shoots a stream of hair from the comb''s teeth at the intended target and binds it. However, it requires complete focus from the user as you need to control each hair separately', -1);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (17, 'Méllissakinesis', 'initiative', 'When opened, unleashes a swarm of insects (e.g. ants, flies, bees) at a desired target', -1);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (18, 'Metáxikinesis', 'initiative', 'Allows the user to fire strands of spider-like silk. The user himself is immune to its stickiness, but opponents will be rendered immobile for a short while. Can also be used to swing from place to place on the slik string', -1);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (19, 'Intangibility', 'nullify_element', 'Makes the user a ghost, allowing them to pass through solid objects and avoid physical attacks, but it doesn''t protect against non-physical attacks', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (20, 'Diaskopia', 'read_deck', 'Allows the user to see through solid objects. The user may enhance the ability further by using its sister Shen Gong Wu, the Eagle Scope', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (21, 'Teleskopia', 'scry', 'Transforms into a telescope, granting the user eagle-like long range vision. It is the sister Shen Gong Wu to the Falcon''s Eye', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (22, 'Oxyderkia', 'enhanced_vision', 'Alows for different kinds of vision (thermal or even sound).', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (23, 'Hydrokinesis', 'buff', 'Releases a large flood of water, that can also be frozen into ice', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (24, 'Misfortune', 'misfortune', 'Creates ironic or down-right unlucky situations for all of its user''s opponents', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (25, 'Attraction', 'fetch', 'Allows the user to attract any object toward themselves, including other Shen Gong Wu', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (26, 'Repulsion', 'bounce', 'Allows the user to telekinetically push targeted objects (opposite of the Glove of Jisaku)', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (27, 'Containment', 'nullify_stats', 'Traps the target in an impervious transparent sphere. It also copies authority and possessions from the prisoner to the user', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (28, 'Reversal', 'nullify_curse', 'Reverses the powers of anything that is binary, including other Shen Gong Wu (e.g. the Two-Ton Tunic becomes as light as a feather)', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (29, 'Subjugation', 'nullify_wu', 'Allows the user to control or disable all other Shen Gong Wu, including multiple Wu constructs like Mala Mala Jong', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (30, 'Astrapokinesis', 'initiative', 'For as long as the coin is in the air the user moves at the speed of light, and everything else is standing still', 2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (31, 'Supersonic Flight', 'initiative', 'Carries its user at supersonic speed', 2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (32, 'Invisibility', 'initiative', 'Renders its user unseen', 2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (33, 'Reality Cutting', 'initiative', 'Cuts through anything, reality included: a clawed portal opens onto any place the user names, and stays open a short while – long enough that others may follow, until reality mends itself', 2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (34, 'Blinding Glare', 'initiative', 'Throws up a glittering sphere of light that nobody can look away from and nobody can see past', -2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (35, 'Tongue Twister', 'initiative', 'Makes the user''s enemies babble nonsense non stop. The effect prevents them of taking coherent actions', -2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (36, 'Stupefaction', 'initiative', 'Releases a purple gas that leaves its victims confused and foolish, or drops them into a deep sleep outright', -2);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (37, 'Efiáltiskinesis', 'initiative', 'Walks into a sleeping mind and gives its worst fear a body. It has no hold on anyone awake', -2, '{fear}');
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (38, 'Euthymia', 'luck', 'Your good spirits turn fortune your way and a lost Wu finds its way back to you', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (39, 'Polymorphia', 'dragon', 'Transforms into any weapon the user requires', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (40, 'Allomorphia', 'morph', 'Allows the user to change their appearance into anything they choose - including the appearance of other beings', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (41, 'Lunarkinesis', 'reverse_element', 'Allows the user to control the sun, the stars and the moon, including their different phases - turning the arena''s favour against itself.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (42, 'Thermokinesis', 'nullify_boost', 'Shoots out sparks that generate heat and can light fires, the sudden bloom of warmth smothering an opponent''s boost.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (43, 'Metallaxis', 'cleanse', 'Transforms an object''s alchemical properties by changing its atoms - turning a rival Wu to inert metal.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (44, 'Chromakinesis', 'set_element', 'Shoots any random element from the center gem. Making Wu gain elemental powers. Also causes combustion.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (45, 'Anemokinesis', 'set_arena', 'Controls the weather, changing the arena''s element to the one the user calls.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (46, 'Pyrophylaxia', 'ward', 'Covers the user in a shell of black bug that protects the user from extreme heat. It can also be used as a raft.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (47, 'Hydrophylaxia', 'ward', 'Allows the user to breathe underwater, transforming them into a fish-like being in the process (still can''t talk with fish).', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (48, 'Anemophylaxia', 'ward', 'Grants the user the physical characteristics, as well as the acrobatic agility and balance of a monkey. If it stays active for too long it slowly transforms the user into a monkey.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (49, 'Geophylaxia', 'ward', 'Transforms the user hands into one large drill, allowing him to travel underground and break even diamonds.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (50, 'Metempsychosis', 'transfer', 'Allows the user to control chi: for example astral project or swap two person''s souls entirly. If used on multiple people all have to be illuminated by its light.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (51, 'Telepatheia', 'prognosis', 'Allows the user to hear the thoughts of other people whom the shell is aimed at.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (52, 'Chronomorphosis', 'treasure', 'Caused people to change age acording to the user (older/younger) rapidly. Can be used also to reverts a target back to its original form, such as turning oil into dinosaurs.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (53, 'Spirit Sealing', 'treasure', 'Traps spiritual bodies, such as Sibini or Wuya. There were multiple occurrences of this Wu.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (54, 'Fool''s Gold', 'treasure', 'Could produce laser beams of different colors, that could change everyone and everything color. Making people very enamoured by the object.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (55, 'Palingenesis', 'refresh', 'Heals any injury. Also regenerates aging over time.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon") VALUES (56, 'Klonogenesis', 'double_training', 'Multiplies the user into as many as nine people, but it also divides up the user''s skills (and mental prower is a skill) among all the clones.', 0, 'Clone of {caster}');
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (57, 'Hypersthenia', 'stat_shield', 'Grants the user super strength.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (58, 'Proaisthesis', 'stat_shield', 'It warned its user of impending danger.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (59, 'Gnoseokinesis', 'stat_shield', 'In form of a crown, grants the user infinite, but random knowledge. It can also grant perspective and sentience to an unintelligent beast. To gain specific knowledge use it with the Wushu Brcelet.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (60, 'Thyellokinesis', 'double_element', 'Allows the user to generate or manipulate strong winds and tornados (leting its user to become a walking hurricane), but the sword itself cannot be used for physical attacks as it phases through enemies.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (61, 'Seismokinesis', 'seize_ground', 'Grants the user seismic sense, and the power to open earthquakes or fissures at will - taking the ground itself, and the advantage of the one who called the challenge.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (62, 'Retrokinesis', 'amend', 'Winds a recent moment back a heartbeat, undoing the user''s last action so a mistake can be taken back and made afresh.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (63, 'Wish', 'wish', 'A mystical chest housing the spirit of a powerful yet blind swordsman in the guise of a genie; it grants a single wish to whoever holds it, and is spent forever in the granting.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (64, 'Zooglossia', 'train_boost', 'Grants the user the ability to talk to and understand animals, and to call a host of them to their side.', 0, '{beast}', 3);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (65, 'Empsychosis', 'train_boost', 'With just a look it could bring drawings to life, sketching a creature into being to fight at your side.', 0, '{drawing}', 3);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (66, 'Nekrokinesis', 'train_boost', 'Turns targets into mindless, obedient zombies, raising a shambling horde to do the user''s bidding.', 0, 'a Horde of Zombies', 3);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (67, 'Ensomatosis', 'train_boost', 'Calls spirits back from the Yin-Yang World and clothes them in temporary physical bodies, free to roam the Earth without possessing the living.', 0, '{spirit}', 6);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (68, 'Phantopoeia', 'train_boost', 'Turns the real unreal and the unreal real, shaping whatever the wielder imagines into being to fight at their side.', 0, '{desire}', 6);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (69, 'Agalmatosis', 'train_boost', 'Becomes a living sapphire dragon whose breath turns everyone - good, evil or indifferent - into sapphire statues, then raises them as its army. The most dangerous of all Shen Gong Wu, a last resort.', 0, 'the Sapphire Dragon', 10);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (70, 'Anthropomorphism', 'animate', 'Brings inanimate or dead objects to life - but only while it is active, a life on loan so to speak. Used to create powerful constructs like Mala Mala Jong.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (71, 'Jack-Bot', 'bot', 'Customary robots created and used by Jack. Building them comes naturally to him.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (72, 'Electrokinesis', 'hack', 'Transforms the user into electricity, meaning they can possess and control technology.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (73, 'Temporokinesis', 'steal', 'Manipulates time, allowing short-term time travel to explore outcomes not yet set in stone, or to temporarily summon oneself from another point in the timeline.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (74, 'Astrapokinesis', 'conduct', 'Shoots out thunderbolts. Can be used as a powerful energy source.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (75, 'Personality Reversal', 'stat_swap', 'When the Yo-Yo is broken into two parts, the user is still able to travel to the Yin-Yang World, but upon their return they will lose their predominant Chi and undergo a personality reversal.', 0);
-INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus") VALUES (76, 'Chi Exchange', 'chi_swap', 'Allows the user to travel into the Yin-Yang World. Can change someone else''s Chi at will.', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (-8, 'Jack-Bot', 'bot', 'Jack Spicer, evil boy genius, built himself a robotic army to fight his battles for him. Versatile and ALMOST infallible.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (-7, 'Beast Form', 'beast_form', 'Going over to the dark side, Chase became infused with the power of a Heylin Demon. He refuses however to meddle in mere mortal affairs.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (-6, 'Witchcraft', 'witchcraft', 'Wuya''s connection to the Shen Gong Wu runs both ways. She can call the lost Wu back into her hand, three times in a run, and a Wu she spends on its power returns to her hand. But the hunger that finds them is never fed.', 1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (-5, 'Elemental Manipulation', 'morph', 'Given his condition of being a literal Heylin Bean, Hannibal took a hold of Moby Morpher and never let it go - so he wields it as a free Wu. He is also capable of Elemental Deflection.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (-4, 'Dragon of Earth', 'dragon', 'User has access to basic Earth-based attacks, and moves', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (-3, 'Dragon of Fire', 'dragon', 'User has access to basic Fire-based attacks, and moves', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (-2, 'Dragon of Wind', 'dragon', 'User has access to basic Wind-based attacks, and moves', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (-1, 'Dragon of Water', 'dragon', 'User has access to basic Water-based attacks, and moves', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (0, 'blank', 'filler', 'blank', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (1, 'Retrokinesis', 'amend', 'Winds a recent moment back a heartbeat, undoing the user''s last action so a mistake can be taken back and made afresh.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (2, 'Anthropomorphism', 'animate', 'Brings inanimate or dead objects to life - but only while it is active, a life on loan so to speak. Used to create powerful constructs like Mala Mala Jong.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (3, 'Power Augmentation', 'boost', 'Could greatly enhance the powers of other Wu that the user is holding. It combines with it, making it count as one in a duel.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (4, 'Repulsion', 'bounce', 'Allows the user to telekinetically push targeted objects (opposite of the Glove of Jisaku)', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (5, 'Hydrokinesis', 'buff', 'Releases a large flood of water, that can also be frozen into ice', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (6, 'Chi Exchange', 'chi_swap', 'Allows the user to travel into the Yin-Yang World. Can change someone else''s Chi at will.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (7, 'Metallaxis', 'cleanse', 'Transforms an object''s alchemical properties by changing its atoms - turning a rival Wu to inert metal.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (8, 'Astrapokinesis', 'conduct', 'Shoots out thunderbolts. Can be used as a powerful energy source.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (9, 'Thyellokinesis', 'double_element', 'Allows the user to generate or manipulate strong winds and tornados (leting its user to become a walking hurricane), but the sword itself cannot be used for physical attacks as it phases through enemies.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (10, 'Klonogenesis', 'double_training', 'Multiplies the user into as many as nine people, but it also divides up the user''s skills (and mental prower is a skill) among all the clones.', 0, 'Clone of {caster}', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (11, 'Polymorphia', 'dragon', 'Transforms into any weapon the user requires', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (12, 'Chronokinesis', 'draw', 'Freezes anything it is pointed at in time and place for a short while', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (13, 'Oxyderkia', 'enhanced_vision', 'Alows for different kinds of vision (thermal or even sound).', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (14, 'Attraction', 'fetch', 'Allows the user to attract any object toward themselves, including other Shen Gong Wu', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (15, '? ? ?', 'gamble', '? ? ?', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (16, 'Electrokinesis', 'hack', 'Transforms the user into electricity, meaning they can possess and control technology.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (17, 'Temporary Appendage', 'hand_size', 'Acts like an extendable, strong, and durable third arm. Its moves are somewhat independent from the wearer, but always obey their commands', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (18, 'Furious Charge', 'initiative', 'Bull horn that when blown blasts the user at rapid speeds forward at their target (aka a "DASH-i")', 1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (19, 'Levitation', 'initiative', 'Allows the user to defy gravity, which enables them to walk vertically on walls and even float minimal above ground', 1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (20, 'Camouflage', 'initiative', 'Helps its user blend into their surroundings like a chameleon', 1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (21, 'Mégathoskinesis', 'initiative', 'Shrinks targeted objects or people to the size of a grain of rice. The size change is not permanent and requires the user to keep a hold of the Wu', 1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (22, 'Tongue Twister', 'initiative', 'Makes the user''s enemies babble nonsense non stop. The effect prevents them of taking coherent actions', -2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (23, 'Self-conscious Rope', 'initiative', 'Rope that can fulfill simple orders, behaving like a snake while at it. Apart from that it possess all the abilities of an ordinary rope', -1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (24, 'Extendable Tendrils', 'initiative', 'It shoots a stream of hair from the comb''s teeth at the intended target and binds it. However, it requires complete focus from the user as you need to control each hair separately', -1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (25, 'Méllissakinesis', 'initiative', 'When opened, unleashes a swarm of insects (e.g. ants, flies, bees) at a desired target', -1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (26, 'Metáxikinesis', 'initiative', 'Allows the user to fire strands of spider-like silk. The user himself is immune to its stickiness, but opponents will be rendered immobile for a short while. Can also be used to swing from place to place on the slik string', -1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (27, 'Astrapokinesis', 'initiative', 'For as long as the coin is in the air the user moves at the speed of light, and everything else is standing still', 2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (28, 'Supersonic Flight', 'initiative', 'Carries its user at supersonic speed', 2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (29, 'Invisibility', 'initiative', 'Renders its user unseen', 2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (30, 'Reality Cutting', 'initiative', 'Cuts through anything, reality included: a clawed portal opens onto any place the user names, and stays open a short while – long enough that others may follow, until reality mends itself', 2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (31, 'Blinding Glare', 'initiative', 'Throws up a glittering sphere of light that nobody can look away from and nobody can see past', -2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (32, 'Stupefaction', 'initiative', 'Releases a purple gas that leaves its victims confused and foolish, or drops them into a deep sleep outright', -2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (33, 'Efiáltiskinesis', 'initiative', 'Walks into a sleeping mind and gives its worst fear a body. It has no hold on anyone awake', -2, '{fear}', 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (34, 'Shadow Jump', 'initiative', 'Allows the user to jump between shadows or dark places.', 2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (35, 'Vaporization', 'initiative', 'Lets its user turn into a cloud of dust or even liquid, able to pass through narrow openings. It can also create the type of gas or liquid at will.', 1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (36, 'Elasticity', 'initiative', 'Allows the user''s body to stretch and twist like rubber, making them extremely flexible.', -1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (37, 'Polar Guard', 'initiative', 'Wraps its user in a polar bear fur suit that withstands extremely cold temperatures and resists physical damage.', -2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (38, 'Avian Flight', 'initiative', 'Grants the user the power to fly like a hawk.', 2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (39, 'Hyperjump', 'initiative', 'Allows the user to jump incredible heights and distances like a kangaroo.', 1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (40, 'Insect Form', 'initiative', 'Transforms the user into a tiny fly, also giving them a craving for sugar.', -1, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (41, 'Bat Sense', 'initiative', 'Lets its user hang upside down like a bat without nausea, and lets them see well in darkness.', -2, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (42, 'Superhuman Strength', 'innate', 'Allows the user to punch with incredible force, capable of creating shock waves during the impact', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (43, 'Deflection', 'innate', 'Protects the user''s head by deflecting attacks and projectiles towards it', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (44, 'Photographic Memory', 'innate', 'Grants its user an instant memory recall. The memories are stored in bubbles inside the Wu and can be shared across users', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (45, 'Impenetrable Defence', 'innate', 'Can temporarily transform into an armor capable of blocking all sorts of attacks, but its weight increases drastically while active', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (46, 'Umbrakinesis', 'innate', 'Allows for shadow manipulation that can influence a physical target. It can absorb and dissipate shadows at will, allowing the user to create shadow copies when it''s charged up', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (47, 'Mnenokinesis', 'innate', 'Erases memory for a short while, leaving its victim unable to recall what they knew', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (48, 'Euthymia', 'luck', 'Your good spirits turn fortune your way and a lost Wu finds its way back to you', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (49, 'Misfortune', 'misfortune', 'Creates ironic or down-right unlucky situations for all of its user''s opponents', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (50, 'Allomorphia', 'morph', 'Allows the user to change their appearance into anything they choose - including the appearance of other beings', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (51, 'Thermokinesis', 'nullify_boost', 'Shoots out sparks that generate heat and can light fires, the sudden bloom of warmth smothering an opponent''s boost.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (52, 'Reversal', 'nullify_curse', 'Reverses the powers of anything that is binary, including other Shen Gong Wu (e.g. the Two-Ton Tunic becomes as light as a feather)', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (53, 'Intangibility', 'nullify_element', 'Makes the user a ghost, allowing them to pass through solid objects and avoid physical attacks, but it doesn''t protect against non-physical attacks', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (54, 'Containment', 'nullify_stats', 'Traps the target in an impervious transparent sphere. It also copies authority and possessions from the prisoner to the user', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (55, 'Subjugation', 'nullify_wu', 'Allows the user to control or disable all other Shen Gong Wu, including multiple Wu constructs like Mala Mala Jong', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (56, 'Telepatheia', 'prognosis', 'Allows the user to hear the thoughts of other people whom the shell is aimed at.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (57, 'Diaskopia', 'read_deck', 'Allows the user to see through solid objects. The user may enhance the ability further by using its sister Shen Gong Wu, the Eagle Scope', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (58, 'Palingenesis', 'refresh', 'Heals any injury. Also regenerates aging over time.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (59, 'Lunarkinesis', 'reverse_element', 'Allows the user to control the sun, the stars and the moon, including their different phases - turning the arena''s favour against itself.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (60, 'Teleskopia', 'scry', 'Transforms into a telescope, granting the user eagle-like long range vision. It is the sister Shen Gong Wu to the Falcon''s Eye', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (61, 'Seismokinesis', 'seize_ground', 'Grants the user seismic sense, and the power to open earthquakes or fissures at will - taking the ground itself, and the advantage of the one who called the challenge.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (62, 'Anemokinesis', 'set_arena', 'Controls the weather, changing the arena''s element to the one the user calls.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (63, 'Chromakinesis', 'set_element', 'Shoots any random element from the center gem. Making Wu gain elemental powers. Also causes combustion.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (64, 'Hypersthenia', 'stat_shield', 'Grants the user super strength.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (65, 'Proaisthesis', 'stat_shield', 'It warned its user of impending danger.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (66, 'Gnoseokinesis', 'stat_shield', 'In form of a crown, grants the user infinite, but random knowledge. It can also grant perspective and sentience to an unintelligent beast. To gain specific knowledge use it with the Wushu Brcelet.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (67, 'Personality Reversal', 'stat_swap', 'When the Yo-Yo is broken into two parts, the user is still able to travel to the Yin-Yang World, but upon their return they will lose their predominant Chi and undergo a personality reversal.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (68, 'Temporokinesis', 'steal', 'Manipulates time, allowing short-term time travel to explore outcomes not yet set in stone, or to temporarily summon oneself from another point in the timeline.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (69, 'Zooglossia', 'train_boost', 'Grants the user the ability to talk to and understand animals, and to call a host of them to their side.', 0, '{beast}', 3);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (70, 'Empsychosis', 'train_boost', 'With just a look it could bring drawings to life, sketching a creature into being to fight at your side.', 0, '{drawing}', 3);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (71, 'Jack-Bot', 'bot', 'Customary robots created and used by Jack. Building them comes naturally to him.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (72, 'Nekrokinesis', 'train_boost', 'Turns targets into mindless, obedient zombies, raising a shambling horde to do the user''s bidding.', 0, 'a Horde of Zombies', 3);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (73, 'Ensomatosis', 'train_boost', 'Calls spirits back from the Yin-Yang World and clothes them in temporary physical bodies, free to roam the Earth without possessing the living.', 0, '{spirit}', 6);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (74, 'Phantopoeia', 'train_boost', 'Turns the real unreal and the unreal real, shaping whatever the wielder imagines into being to fight at their side.', 0, '{desire}', 6);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (75, 'Agalmatosis', 'train_boost', 'Becomes a living sapphire dragon whose breath turns everyone - good, evil or indifferent - into sapphire statues, then raises them as its army. The most dangerous of all Shen Gong Wu, a last resort.', 0, 'the Sapphire Dragon', 10);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (76, 'Metempsychosis', 'transfer', 'Allows the user to control chi: for example astral project or swap two person''s souls entirly. If used on multiple people all have to be illuminated by its light.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (77, 'Chronomorphosis', 'treasure', 'Caused people to change age acording to the user (older/younger) rapidly. Can be used also to reverts a target back to its original form, such as turning oil into dinosaurs.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (78, 'Spirit Sealing', 'treasure', 'Traps spiritual bodies, such as Sibini or Wuya. There were multiple occurrences of this Wu.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (79, 'Fool''s Gold', 'treasure', 'Could produce laser beams of different colors, that could change everyone and everything color. Making people very enamoured by the object.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (80, 'Pyrophylaxia', 'ward', 'Covers the user in a shell of black bug that protects the user from extreme heat. It can also be used as a raft.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (81, 'Hydrophylaxia', 'ward', 'Allows the user to breathe underwater, transforming them into a fish-like being in the process (still can''t talk with fish).', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (82, 'Anemophylaxia', 'ward', 'Grants the user the physical characteristics, as well as the acrobatic agility and balance of a monkey. If it stays active for too long it slowly transforms the user into a monkey.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (83, 'Geophylaxia', 'ward', 'Transforms the user hands into one large drill, allowing him to travel underground and break even diamonds.', 0, NULL, 0);
+INSERT INTO power ("id", "name", "mechanic", "description", "initiative_bonus", "summon", "train_step") VALUES (84, 'Wish', 'wish', 'A mystical chest housing the spirit of a powerful yet blind swordsman in the guise of a genie; it grants a single wish to whoever holds it, and is spent forever in the granting.', 0, NULL, 0);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE card (id INTEGER, name TEXT, force INTEGER, agility INTEGER, intellect INTEGER, power_id INTEGER NOT NULL REFERENCES power (id), element TEXT, type TEXT, points INTEGER, PRIMARY KEY (id AUTOINCREMENT));
 
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (-8, 'Jack-Bot', -1, -1, -1, 71, 'metal', 'wudai', 0);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (0, 'blank', 0, 0, 0, 0, 'metal', 'item', 0);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (1, 'Silver Manta Ray', 1, 1, 1, -1, 'water', 'wudai', 0);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (2, 'Crest of a Sparrow', 1, 1, 1, -2, 'wind', 'wudai', 0);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (3, 'Longi Sash', 1, 1, 1, -3, 'fire', 'wudai', 0);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (4, 'Iron Bear Charm', 1, 1, 1, -4, 'earth', 'wudai', 0);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (5, 'Moby Morpher', NULL, NULL, NULL, 40, 'metal', 'arms', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (6, 'Fist of Tebigong', 5, 0, 0, 1, 'metal', 'arms', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (7, 'Helmet of Jong', 0, 5, 0, 2, 'metal', 'head', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (8, 'Bubble Brains', 0, 0, 5, 3, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (9, 'Longhorn Taurus', 3, 0, 0, 4, 'wind', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (10, 'Jetbootsu', 0, 3, 0, 5, 'fire', 'boots', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (11, 'Mask of Rio', 0, 0, 3, 6, 'earth', 'head', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (12, 'Changing Chopsticks', 0, 1, 1, 7, 'water', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (13, 'Ohwah Tegu Saim', NULL, NULL, NULL, 8, 'metal', 'item', 1);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (14, 'Wushu Bracelet', NULL, NULL, NULL, 9, 'metal', 'amulet', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (15, 'Third-Arm Sash', 0, 3, 0, 10, 'metal', 'arms', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (16, 'Bras Finger', 1, 1, 1, 11, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (17, 'Two-Ton Tunic', -5, 0, 0, 12, 'metal', 'torso', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (18, 'Shadow Slicer', 0, -5, 0, 13, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (19, 'Pearl of LiBai', 0, 0, -4, 35, 'metal', 'amulet', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (20, 'Lasso Boa-Boa', -3, 0, 0, 15, 'earth', 'arms', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (21, 'Tangle Web Comb', 0, -3, 0, 16, 'fire', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (22, 'Ju-Ju Flytrap', 0, 0, -3, 17, 'wind', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (23, 'Silk Spitter', -1, -1, 0, 18, 'water', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (24, 'Serpent''s Tail', 1, 2, 1, 19, 'metal', 'item', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (25, 'Falcon''s Eye', 0, 1, 2, 20, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (26, 'Eagle Scope', 0, 2, 1, 21, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (27, 'Mind Reader Conch', 0, 0, 4, 51, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (28, 'Orb of Tornami', NULL, NULL, NULL, 23, 'water', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (29, 'Kaijin''s Curse', NULL, NULL, NULL, 24, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (30, 'Glove of Jisaku', 1, 1, 2, 25, 'metal', 'arms', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (31, 'Ruby of Ramses', 2, 1, 1, 26, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (32, 'Sphere of Jianyu', 0, 0, 0, 27, 'metal', 'item', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (33, 'Reversing Mirror', 0, 0, 0, 28, 'metal', 'item', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (34, 'Emperor Scorpion', 0, 0, 0, 29, 'metal', 'item', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (35, 'Raijin''s Flip Coin', 0, 4, 0, 30, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (36, 'Winged Feet', 1, 3, 0, 31, 'metal', 'boots', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (37, 'Shroud of Shadows', 0, 2, 2, 32, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (38, 'Golden Tiger Claws', 2, 2, 0, 33, 'metal', 'arms', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (39, 'Culver Crystal', -2, -2, 0, 34, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (40, 'Wushan Geyser', 0, 0, -5, 14, 'metal', 'head', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (41, 'Woozy Shooter', 0, -1, -3, 36, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (42, 'Shadow of Fear', -2, 0, -2, 37, 'metal', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (43, 'Rooster Booster', 1, 1, 1, 38, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (44, 'Shimo Staff', 1, 1, 1, 39, 'metal', 'wudai', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (45, 'Celestial Dial Locket', 1, 1, 1, 41, 'metal', 'amulet', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (46, 'Star Hanabi', 2, 2, 0, 42, 'fire', 'amulet', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (47, 'Kuzusu Atom', 2, 1, 1, 43, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (48, 'Eye of Dashi', 2, 2, 2, 44, 'metal', 'amulet', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (49, 'Monsoon Sandals', 1, 1, 1, 45, 'metal', 'boots', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (50, 'Black Beetle', 0, 1, 2, 46, 'fire', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (51, 'Gills of Hamachi', 0, 2, 1, 47, 'water', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (52, 'Monkey Staff', 1, 2, 0, 48, 'wind', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (53, 'Tunnel Armadillo', 2, 1, 0, 49, 'earth', 'item', 2);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (54, 'Sun Chi Lantern', 0, 0, 0, 50, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (55, 'Caleido-scope Glasses', 0, 2, 2, 22, 'metal', 'head', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (56, 'Sweet Baby Among Us', 1, 0, 0, 52, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (57, 'Mosaic Scale Puzzlebox', 0, 1, 0, 53, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (58, 'Prism of Genesis', 0, 0, 1, 54, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (59, 'Tong ku Reverso', 0, 0, 0, 55, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (60, 'Ring of Nine Xing', 2, 2, 1, 56, 'metal', 'amulet', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (61, 'Mikado Arms', 3, 0, 0, 57, 'metal', 'amulet', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (62, 'Ninja Tabi', 0, 3, 0, 58, 'metal', 'torso', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (63, 'Fountain of Hui', 0, 0, 3, 59, 'metal', 'head', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (64, 'Blade of the Nebula', 0, 2, 2, 60, 'wind', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (5, 'Hodoku Mouse', 1, 1, 1, 1, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (6, 'Heart of Jong', NULL, NULL, NULL, 2, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (7, 'Wushu Bracelet', NULL, NULL, NULL, 3, 'metal', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (8, 'Ruby of Ramses', 2, 1, 1, 4, 'metal', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (9, 'Orb of Tornami', NULL, NULL, NULL, 5, 'water', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (10, 'Ying-Yang Yo-Yo', NULL, NULL, NULL, 6, 'metal', 'item', 7);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (11, 'Kuzusu Atom', 2, 1, 1, 7, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (12, 'Shard of Lightning', 0, 0, 0, 8, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (13, 'Blade of the Nebula', 0, 2, 2, 9, 'wind', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (14, 'Ring of Nine Xing', 2, 2, 1, 10, 'metal', 'amulet', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (15, 'Shimo Staff', 1, 1, 1, 11, 'metal', 'wudai', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (16, 'Bras Finger', 1, 1, 1, 12, 'metal', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (17, 'Caleido-scope Glasses', 0, 2, 2, 13, 'metal', 'head', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (18, 'Glove of Jisaku', 1, 1, 2, 14, 'metal', 'arms', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (19, 'Ohwah Tegu Saim', NULL, NULL, NULL, 15, 'metal', 'item', 1);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (20, 'Denshi Bunny', 1, 0, 1, 16, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (21, 'Third-Arm Sash', 0, 3, 0, 17, 'metal', 'arms', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (22, 'Longhorn Taurus', 3, 0, 0, 18, 'metal', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (23, 'Jetbootsu', 0, 3, 0, 19, 'fire', 'boots', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (24, 'Mask of Rio', 0, 0, 3, 20, 'earth', 'head', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (25, 'Changing Chopsticks', 0, 1, 1, 21, 'water', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (26, 'Pearl of LiBai', 0, 0, -4, 22, 'metal', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (27, 'Lasso Boa-Boa', -3, 0, 0, 23, 'earth', 'arms', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (28, 'Tangle Web Comb', 0, -3, 0, 24, 'fire', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (29, 'Ju-Ju Flytrap', 0, 0, -3, 25, 'wind', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (30, 'Silk Spitter', -1, -1, 0, 26, 'water', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (31, 'Raijin''s Flip Coin', 0, 4, 0, 27, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (32, 'Winged Feet', 1, 3, 0, 28, 'metal', 'boots', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (33, 'Shroud of Shadows', 0, 2, 2, 29, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (34, 'Golden Tiger Claws', 2, 2, 0, 30, 'metal', 'arms', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (35, 'Culver Crystal', -2, -2, 0, 31, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (36, 'Woozy Shooter', 0, -1, -3, 32, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (37, 'Shadow of Fear', -2, 0, -2, 33, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (38, 'Crouching Cougar', 3, 0, 1, 34, 'fire', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (39, 'Crowd of Yun', 0, 2, 0, 35, 'wind', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (40, 'Lotus Twister', -1, -2, 0, 36, 'metal', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (41, 'Polar Paws', -3, -1, 0, 37, 'water', 'boots', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (42, 'Wings of Tinabi', 0, 4, 1, 38, 'wind', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (43, 'Shen-Ga-Roo', 2, 0, 0, 39, 'metal', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (44, 'Manchurian Musca', -1, 0, -2, 40, 'metal', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (45, 'Vest of Komori', -1, 0, -3, 41, 'earth', 'torso', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (46, 'Fist of Tebigong', 5, 0, 0, 42, 'metal', 'arms', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (47, 'Helmet of Jong', 0, 5, 0, 43, 'metal', 'head', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (48, 'Bubble Brains', 0, 0, 5, 44, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (49, 'Two-Ton Tunic', -5, 0, 0, 45, 'metal', 'torso', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (50, 'Shadow Slicer', 0, -5, 0, 46, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (51, 'Wushan Geyser', 0, 0, -5, 47, 'metal', 'head', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (52, 'Rooster Booster', 1, 1, 1, 48, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (53, 'Kaijin''s Curse', NULL, NULL, NULL, 49, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (54, 'Moby Morpher', NULL, NULL, NULL, 50, 'metal', 'arms', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (55, 'Star Hanabi', 2, 2, 0, 51, 'fire', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (56, 'Reversing Mirror', 0, 0, 0, 52, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (57, 'Serpent''s Tail', 1, 2, 1, 53, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (58, 'Sphere of Jianyu', 0, 0, 0, 54, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (59, 'Emperor Scorpion', 0, 0, 0, 55, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (60, 'Mind Reader Conch', 0, 0, 4, 56, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (61, 'Falcon''s Eye', 0, 1, 2, 57, 'metal', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (62, 'Tong ku Reverso', 0, 0, 0, 58, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (63, 'Celestial Dial Locket', 1, 1, 1, 59, 'metal', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (64, 'Eagle Scope', 0, 2, 1, 60, 'metal', 'item', 2);
 INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (65, 'Cube of Haniku', 2, 1, 0, 61, 'earth', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (66, 'Hodoku Mouse', 1, 1, 1, 62, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (67, 'Treasurebox of the Blind Swordsman', 0, 0, 0, 63, 'metal', 'item', 10);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (68, 'Tongue of Saiping', 2, 0, 2, 64, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (69, 'Imo Gazer', -1, 3, 1, 65, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (70, 'Zing Zom-Bone', 0, -2, -1, 66, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (71, 'Monarch Wings', 2, 2, -1, 67, 'metal', 'item', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (72, 'Moonstone Cat''s Eye', 1, -1, 3, 68, 'metal', 'item', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (73, 'Sapphire Dragon', NULL, NULL, NULL, 69, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (74, 'Heart of Jong', NULL, NULL, NULL, 70, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (-8, 'Jack-Bot', -1, -1, -1, 71, 'metal', 'wudai', 0);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (75, 'Denshi Bunny', 1, 0, 1, 72, 'metal', 'item', 4);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (76, 'Sands of Time', 2, 0, 2, 73, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (77, 'Shard of Lightning', 0, 0, 0, 74, 'metal', 'item', 5);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (78, 'Ying Yo-Yo', NULL, NULL, NULL, 75, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (79, 'Yang Yo-Yo', NULL, NULL, NULL, 75, 'metal', 'item', 3);
-INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (80, 'Ying-Yang Yo-Yo', NULL, NULL, NULL, 76, 'metal', 'item', 7);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (66, 'Monsoon Sandals', 1, 1, 1, 62, 'metal', 'boots', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (67, 'Eye of Dashi', 2, 2, 2, 63, 'metal', 'amulet', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (68, 'Mikado Arms', 3, 0, 0, 64, 'metal', 'amulet', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (69, 'Ninja Tabi', 0, 3, 0, 65, 'metal', 'torso', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (70, 'Fountain of Hui', 0, 0, 3, 66, 'metal', 'head', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (71, 'Ying Yo-Yo', NULL, NULL, NULL, 67, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (72, 'Yang Yo-Yo', NULL, NULL, NULL, 67, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (73, 'Sands of Time', 2, 0, 2, 68, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (74, 'Tongue of Saiping', 2, 0, 2, 69, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (75, 'Imo Gazer', -1, 3, 1, 70, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (76, 'Zing Zom-Bone', 0, -2, -1, 72, 'metal', 'item', 3);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (77, 'Monarch Wings', 2, 2, -1, 73, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (78, 'Moonstone Cat''s Eye', 1, -1, 3, 74, 'metal', 'item', 4);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (79, 'Sapphire Dragon', NULL, NULL, NULL, 75, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (80, 'Sun Chi Lantern', 0, 0, 0, 76, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (81, 'Sweet Baby Among Us', 1, 0, 0, 77, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (82, 'Mosaic Scale Puzzlebox', 0, 1, 0, 78, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (83, 'Prism of Genesis', 0, 0, 1, 79, 'metal', 'item', 5);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (84, 'Black Beetle', 0, 1, 2, 80, 'fire', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (85, 'Gills of Hamachi', 0, 2, 1, 81, 'water', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (86, 'Monkey Staff', 1, 2, 0, 82, 'wind', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (87, 'Tunnel Armadillo', 2, 1, 0, 83, 'earth', 'item', 2);
+INSERT INTO card ("id", "name", "force", "agility", "intellect", "power_id", "element", "type", "points") VALUES (88, 'Treasurebox of the Blind Swordsman', 0, 0, 0, 84, 'metal', 'item', 10);
 
 -- ----------------------------------------------------------------------------
 CREATE TABLE "character" (
@@ -335,3 +375,49 @@ INSERT INTO background ("id", "name", "element", "sec_element") VALUES (83, 'Cha
 INSERT INTO background ("id", "name", "element", "sec_element") VALUES (84, 'Firefly Swamp', 'fire', 'water');
 INSERT INTO background ("id", "name", "element", "sec_element") VALUES (85, 'Hall of Candles', 'fire', NULL);
 INSERT INTO background ("id", "name", "element", "sec_element") VALUES (86, 'Brimstone Steps', 'fire', NULL);
+
+-- ----------------------------------------------------------------------------
+CREATE TABLE "mechanic_config" (
+	"id"	INTEGER,
+	"mechanic"	TEXT NOT NULL,
+	"key"	TEXT NOT NULL,
+	"value"	INTEGER NOT NULL,
+	PRIMARY KEY("id" AUTOINCREMENT),
+	UNIQUE("mechanic", "key")
+);
+
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (1, 'gamble', 'low', -2);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (2, 'gamble', 'high', 5);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (3, 'buff', 'value', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (4, 'scry', 'depth', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (5, 'morph', 'aside', 2);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (6, 'morph', 'boost', 1);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (7, 'animate', 'stat', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (8, 'animate', 'field_stat', 2);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (9, 'beast_form', 'boost', 1);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (10, 'beast_form', 'margin', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (11, 'bot', 'attack_stat', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (12, 'bot', 'good_jack_stat', 4);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (13, 'bot', 'printed_physical', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (14, 'jong', 'stat', 6);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (15, 'jong', 'boost_stat', 1);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (16, 'witchcraft', 'recall_margin', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (17, 'witchcraft', 'recall_limit', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (18, 'witchcraft', 'early_bird_gap', 2);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (19, 'bot', 'flee_cap', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (20, 'bot', 'attack_min_chance', 5);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (21, 'bot', 'attack_max_chance', 90);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (22, 'bot', 'attack_chance_when_leading', 2);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (23, 'bot', 'attack_chance_when_trailing', 5);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (24, 'bot', 'attack_momentum_step', 10);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (25, 'bot', 'attack_momentum_cap', 30);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (26, 'bot', 'chamelon_margin', 1);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (27, 'bot', 'jack_force_margin', 1);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (28, 'witchcraft', 'wears', 1);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (29, 'witchcraft', 'returns', 1);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (30, 'train_boost', 'tier1_num', 1);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (31, 'train_boost', 'tier1_den', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (32, 'train_boost', 'tier2_num', 2);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (33, 'train_boost', 'tier2_den', 3);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (34, 'train_boost', 'tier3_num', 1);
+INSERT INTO mechanic_config ("id", "mechanic", "key", "value") VALUES (35, 'train_boost', 'tier3_den', 1);

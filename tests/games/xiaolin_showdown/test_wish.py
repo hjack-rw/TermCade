@@ -11,7 +11,8 @@ from dataclasses import replace
 
 from termcade.core.rng import Rng
 
-from factories import auto_choices, run_showdown
+from card_ids import DRAW, WISH
+from factories import auto_choices, plain_wu, run_showdown
 
 from xiaolin_showdown.logic.flow.actions import deposit, usable_powers, use_power
 from xiaolin_showdown.logic.schema.catalog import load_catalog
@@ -20,9 +21,8 @@ from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
 from xiaolin_showdown.logic.flow.setup import new_game
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 
-BOX = 67  # Treasurebox of the Blind Sword — wish
-FIST = 6  # Fist of Tebigong — a plain Wu
 DEFAULT = XiaolinSettings()
+PLAIN_WU = plain_wu(load_catalog()).id
 
 
 def _has_wish(cards):
@@ -30,7 +30,7 @@ def _has_wish(cards):
 
 
 def _seed_box(state):
-    box = deepcopy(state.catalog.card(BOX))
+    box = deepcopy(state.catalog.card(WISH))
     state.player.hand.append(box)
     return box
 
@@ -60,32 +60,32 @@ def test_depositing_a_treasurebox_still_pays_its_points(state):
 
 def test_a_wish_restores_a_vaulted_wu_to_hand(state):
     box = _seed_box(state)
-    state.player.vault.append(deepcopy(state.catalog.card(FIST)))
+    state.player.vault.append(deepcopy(state.catalog.card(PLAIN_WU)))
     use_power(state, box, DEFAULT, is_player=True, target=state.player.vault[0], rng=Rng(1))
-    assert any(c.id == FIST for c in state.player.hand)
+    assert any(c.id == PLAIN_WU for c in state.player.hand)
 
 
 def test_a_wish_steals_a_wu_from_the_opponents_vault(state):
     """The strong wish: reach into the opponent's Vault and take a Wu they had deposited."""
     box = _seed_box(state)
-    stolen = deepcopy(state.catalog.card(FIST))
+    stolen = deepcopy(state.catalog.card(PLAIN_WU))
     state.bot.vault.append(stolen)
     use_power(state, box, DEFAULT, is_player=True, target=stolen, rng=Rng(1))
-    assert any(c.id == FIST for c in state.player.hand)
+    assert any(c.id == PLAIN_WU for c in state.player.hand)
     assert not state.bot.vault  # taken from them
 
 
 def test_the_treasurebox_name_runs_through_the_five_element_colours(state):
     from xiaolin_showdown.screens.display.format import COLORS, card_name_text
 
-    text = card_name_text(deepcopy(state.catalog.card(BOX)))
+    text = card_name_text(deepcopy(state.catalog.card(WISH)))
     styles = " ".join(span.style for span in text.spans)
     assert all(hex_colour in styles for hex_colour in COLORS.values())
 
 
 def test_a_spent_treasurebox_is_exiled_not_sent_to_the_used_pile(state):
     box = _seed_box(state)
-    state.player.vault.append(deepcopy(state.catalog.card(FIST)))
+    state.player.vault.append(deepcopy(state.catalog.card(PLAIN_WU)))
     use_power(state, box, DEFAULT, is_player=True, target=state.player.vault[0], rng=Rng(1))
     assert not _has_wish(state.player.whole_hand)
     assert not _has_wish(state.used)  # gone for good — a Refresh cannot call it back
@@ -103,11 +103,11 @@ def _duel_where_the_player_fields_the_box():
     cat = load_catalog()
     rng = Rng(1)
     state = new_game(cat, rng, cat.character(1))
-    state.player.hand = [deepcopy(cat.card(BOX)), deepcopy(cat.card(FIST))]
+    state.player.hand = [deepcopy(cat.card(WISH)), deepcopy(cat.card(PLAIN_WU))]
     state.forced_priority = True  # the player leads and names the challenge
 
     async def _play_the_box(playable):
-        return next((c for c in playable if c.id == BOX), playable[0])
+        return next((c for c in playable if c.id == WISH), playable[0])
 
     choices = replace(auto_choices(), card=_play_the_box)
     return state, Duel(state, rng, choices)
@@ -136,8 +136,8 @@ def test_the_bot_fields_a_treasurebox_over_anything_scored_on_stats():
     from xiaolin_showdown.logic.flow.bot import choose_card
 
     cat = load_catalog()
-    box = deepcopy(cat.card(BOX))
-    fist = deepcopy(cat.card(FIST))
+    box = deepcopy(cat.card(WISH))
+    fist = deepcopy(cat.card(PLAIN_WU))
     chosen = choose_card(Round(stat="force"), ground(), [fist, box], Rng(1))
     assert mechanic_of(chosen.power) is Mechanic.WISH  # the auto-win, not the 1/1/1
 
@@ -148,6 +148,6 @@ def test_the_bot_never_banks_a_treasurebox():
     from xiaolin_showdown.logic.flow.turn import pick_deposit
 
     cat = load_catalog()
-    hand = [deepcopy(cat.card(BOX)), deepcopy(cat.card(16))]  # Bras Finger, worth points
+    hand = [deepcopy(cat.card(WISH)), deepcopy(cat.card(DRAW))]  # worth points
     banked = pick_deposit(hand, Difficulty.HARD, DEFAULT.wear_limit)
     assert banked is not None and mechanic_of(banked.power) is not Mechanic.WISH

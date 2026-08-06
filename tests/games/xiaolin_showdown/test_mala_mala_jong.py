@@ -255,8 +255,10 @@ def test_the_heart_boost_is_a_flat_metal_body_with_no_counter():
 
 def test_emperor_scorpion_is_the_bane_the_heart_is_not():
     cat = load_catalog()
-    assert is_jong_bane(cat.card(34).power)  # Emperor Scorpion
-    assert not is_jong_bane(cat.card(74).power)  # the Heart of Jong is not
+    scorpion = next(c for c in cat.cards if mechanic_of(c.power) is Mechanic.NULLIFY_WU)
+    heart = next(c for c in cat.cards if mechanic_of(c.power) is Mechanic.ANIMATE)
+    assert is_jong_bane(scorpion.power)
+    assert not is_jong_bane(heart.power)
 
 
 def test_the_bane_wins_the_battle_whatever_the_score():
