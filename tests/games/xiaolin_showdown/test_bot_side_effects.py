@@ -1,5 +1,6 @@
 """choose_card/_after playing STEAL, CONDUCT and SEIZE_GROUND for their effect, not just their
-printed stats — the gap this project's own comments used to call out by name.
+printed stats — the gap this project's own comments used to call out by name. Also `choose_element`
+(MORPH/SET_ELEMENT/SET_ARENA), the same shape of gap for the element a Wu asks its caster to name.
 
 CONDUCT is folded straight into `_after`'s trial score: its swing is derivable purely from what's
 already on the table, including a Shard fielded earlier in the same multi-Wu battle. STEAL/
@@ -9,9 +10,14 @@ pick would have claimed.
 
 HACK (Denshi Bunny) is deliberately absent — checked, not built: its whole value is denying Jack a
 bot identity, and Jack is never player-selectable (`is_playable=0`), so the bot can never face him as
-an opponent and a "prefer HACK" heuristic would have no live trigger. SET_ARENA (Monsoon Sandals)
-stays untouched too: the bot never actually chooses an element for a card that asks for one (see
-`Duel._resolve_bot`), so simulating its own recolour would be a no-op today.
+an opponent and a "prefer HACK" heuristic would have no live trigger.
+
+AMEND (Hodoku Mouse) is absent too, checked on both its paths. At the temple it undoes the caster's
+OWN last move (Retrokinesis) — every bot action is already play-it-out-best when taken, so there is
+nothing of its own for it to retroactively fix. Fielded into a duel instead, `Duel`'s own dispatch
+never offers the bot's side the rewrite at all ("the bot never amends", `duel.py`) — a hardcoded,
+already-shipped exclusion, not a missing heuristic, so `choose_card` prices it by its printed 1/1/1
+like any plain Wu.
 """
 
 from __future__ import annotations
@@ -22,7 +28,7 @@ from factories import ground, wu
 
 from xiaolin_showdown.logic.flow import bot as bot_module
 from xiaolin_showdown.logic.flow.battle import Round
-from xiaolin_showdown.logic.flow.bot import choose_card
+from xiaolin_showdown.logic.flow.bot import choose_card, choose_element
 from xiaolin_showdown.logic.mechanics.powers import Mechanic
 
 FULL = {"force": 0, "agility": 0, "intellect": 0}
@@ -166,3 +172,46 @@ def test_seize_ground_is_not_preferred_when_the_bot_already_holds_it():
     picked = choose_card(battle, dominant, [seize, strong], Rng(1), is_player=False)
 
     assert picked is strong
+
+
+# --- choose_element: MORPH/SET_ELEMENT/SET_ARENA, each optimised for a different target ------------
+
+
+def test_morph_takes_whatever_element_the_current_arena_already_favours():
+    """The Morpher's own shape is fixed regardless of element — only its bonus on the contested
+    stat moves, and only if its own chosen element matches the arena it lands in."""
+    battle = Round(stat="force")
+    morpher = wu(0, 0, 0, mechanic=Mechanic.MORPH, name="Moby Morpher")
+
+    assert choose_element(battle, ground(background="earth"), morpher, is_player=False) == "earth"
+
+
+def test_set_element_recolors_the_casters_own_queue_to_match_the_arena():
+    """Eye of Dashi overrides what the caster's ALREADY-FIELDED Wu count as — so the right pick is
+    whatever the CURRENT arena rewards, regardless of what element those Wu actually carry.
+
+    ``force=1`` (not 0) on the filler Wu: an all-zero-stat card earns no background bonus at all —
+    ``Side.contributors()`` drops it as silent (see ``contributing`` in ``mechanics.scoring``) — so a
+    stat-less filler would make every element tie and hide the very effect this test measures.
+    """
+    battle = Round(stat="force")
+    battle.bot.queue.append(wu(1, 0, 0, element="water", name="Bot water"))
+    battle.bot.queue.append(wu(1, 0, 0, element="wind", name="Bot wind"))
+    eye = wu(0, 0, 0, mechanic=Mechanic.SET_ELEMENT, element="", name="Eye of Dashi")
+
+    assert choose_element(battle, ground(background="fire"), eye, is_player=False) == "fire"
+
+
+def test_set_arena_recolors_the_arena_to_match_the_casters_own_queue():
+    """Monsoon Sandals moves the OTHER way from Eye of Dashi above: it changes the arena itself for
+    the rest of the battle, so the right pick is whatever the caster's queue already carries, not
+    what the current arena happens to reward. Filler Wu carry ``force=1`` for the same reason as
+    above — a silent, all-zero card earns no background bonus to actually show the effect."""
+    battle = Round(stat="force")
+    battle.bot.queue.append(wu(1, 0, 0, element="fire", name="Bot fire A"))
+    battle.bot.queue.append(wu(1, 0, 0, element="fire", name="Bot fire B"))
+    sandals = wu(0, 0, 0, mechanic=Mechanic.SET_ARENA, element="", name="Monsoon Sandals")
+
+    chosen = choose_element(battle, ground(background="water"), sandals, is_player=False)
+
+    assert chosen == "fire"

@@ -490,6 +490,15 @@ def names_a_stat(power: Power) -> bool:
     return mechanic_of(power) in (Mechanic.BUFF, Mechanic.MISFORTUNE, Mechanic.STAT_SWAP, Mechanic.CHI_SWAP)
 
 
+def chooses_element(power: Power) -> bool:
+    """Does this Wu ask its caster which element to count as, for this battle's background bonus?
+
+    The Morpher, Eye of Dashi and Monsoon Sandals all ask the same question of whoever plays them,
+    so the duel and the bot's own evaluation ask it in one place.
+    """
+    return mechanic_of(power) in (Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET_ARENA)
+
+
 def is_boost_slot(power: Power) -> bool:
     """Can this Wu be played *in addition* to the card, at the power stage?
 

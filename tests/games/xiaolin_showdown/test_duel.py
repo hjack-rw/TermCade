@@ -75,7 +75,9 @@ def test_a_morpher_dips_on_the_contested_stat_and_takes_the_chosen_element():
     assert stand_in.element == "earth"
 
 
-def test_a_bot_morpher_falls_back_to_the_background_element():
+def test_a_bot_morpher_takes_whatever_element_it_is_given():
+    """Pure-resolution level: whichever element the caller decides on (a human's choice, or the
+    bot's own `choose_element` — see `test_bot_side_effects.py`) is what the stand-in wears."""
     duel = Round(stat="force")
     morpher = _card(None, None, None, element="metal", mechanic=Mechanic.MORPH)
 

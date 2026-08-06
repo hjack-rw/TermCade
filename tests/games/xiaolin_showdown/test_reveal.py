@@ -13,12 +13,14 @@ from termcade.core.rng import Rng
 
 from card_ids import BOUNCE, ENHANCED_VISION, FETCH, READ_DECK, SCRY
 
+from xiaolin_showdown.logic.flow import temple_ai
 from xiaolin_showdown.logic.flow.actions import coming_wu, usable_powers, use_power
 from xiaolin_showdown.logic.flow.duel import Duel, DuelChoices
 from xiaolin_showdown.logic.mechanics.powers import SCOPE_DEPTH
 from xiaolin_showdown.logic.mechanics.cards import is_one_of
 from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
+from xiaolin_showdown.logic.schema.state import XiaolinState
 from factories import initiative_wu, plain_wu, plain_wu_agility
 
 _CAT = load_catalog()
@@ -70,6 +72,16 @@ def test_the_scope_does_not_draw_the_wu_it_shows(state, held):
     assert [wu.id for wu in state.card_deck] == before
 
 
+def test_the_scope_leaves_reveal_memory_of_what_it_showed(state, held):
+    """Firing Teleskopia is not just a toast — the caster actually remembers it (reveal-memory)."""
+    scope = held(SCRY)
+    coming = {wu.id for wu in state.card_deck[:SCOPE_DEPTH]}
+
+    use_power(state, scope, DEFAULT)
+
+    assert state.player.known_upcoming_pile == coming
+
+
 def test_the_eye_reads_the_whole_opponent_deck(state, held, card):
     eye = held(READ_DECK)
     state.bot.deck = [card(PLAIN_WU), card(ANOTHER_PLAIN_WU)]
@@ -78,6 +90,26 @@ def test_the_eye_reads_the_whole_opponent_deck(state, held, card):
 
     assert card(PLAIN_WU).name in message.toast
     assert card(ANOTHER_PLAIN_WU).name in message.toast
+
+
+def test_the_eye_leaves_reveal_memory_of_what_it_showed(state, held, card):
+    """Firing Diaskopia is not just a toast — the caster actually remembers it (reveal-memory)."""
+    eye = held(READ_DECK)
+    state.bot.deck = [card(PLAIN_WU), card(ANOTHER_PLAIN_WU)]
+
+    use_power(state, eye, DEFAULT)
+
+    assert state.player.known_of_opponent_deck == {PLAIN_WU, ANOTHER_PLAIN_WU}
+
+
+def test_the_eyes_memory_does_not_cross_sides(state, held, card):
+    """It is what the CASTER learned — the target of the reveal gains nothing from being read."""
+    eye = held(READ_DECK)
+    state.bot.deck = [card(PLAIN_WU)]
+
+    use_power(state, eye, DEFAULT)
+
+    assert state.bot.known_of_opponent_deck == frozenset()
 
 
 def test_the_eye_is_not_offered_against_an_empty_deck(state, held):
@@ -254,3 +286,55 @@ def test_shoving_a_wu_to_their_deck_pays_them_nothing(state, held, card):
     assert is_one_of(victim, state.bot.deck)  # onto their shelf, not banked
     assert state.bot.points == before  # and they were paid nothing for it
     assert not is_one_of(victim, state.player.whole_hand)
+
+
+# --- Teleskopia's bot policy: fire when the memory of the pile's front has gone stale -------------
+
+
+def test_worth_scrying_fires_with_no_memory_yet(state):
+    assert temple_ai._worth_scrying(state, is_player=False) is True
+
+
+def test_worth_scrying_does_not_fire_once_the_front_is_known(state):
+    state.bot.known_upcoming_pile = frozenset({state.card_deck[0].id})
+
+    assert temple_ai._worth_scrying(state, is_player=False) is False
+
+
+def test_worth_scrying_fires_again_once_the_known_card_leaves_the_front(state):
+    """The window is perishable — unlike Diaskopia's one-time scout, a stale memory re-fires."""
+    stale = state.card_deck[0]
+    state.bot.known_upcoming_pile = frozenset({stale.id})
+    state.card_deck.pop(0)  # drawn, wagered as a prize, or taken by an Early Bird — any of them move it
+
+    assert temple_ai._worth_scrying(state, is_player=False) is True
+
+
+def test_worth_scrying_needs_a_pile_to_look_at(state):
+    state.card_deck.clear()
+
+    assert temple_ai._worth_scrying(state, is_player=False) is False
+
+
+def test_choose_temple_power_offers_the_scope(state, held):
+    """End to end: the real Eagle Scope card, held, actually gets picked by the shared dispatcher —
+    not just the predicate in isolation."""
+    scope = held(SCRY)
+
+    play = temple_ai.choose_temple_power(state, DEFAULT, is_player=True)
+
+    assert play is not None
+    assert play.card is scope
+
+
+def test_save_and_restore_round_trips_the_pile_memory(state):
+    state.player.known_upcoming_pile = frozenset({3, 7})
+    restored = XiaolinState.restore(state.snapshot(), None)
+    assert restored.player.known_upcoming_pile == frozenset({3, 7})
+
+
+def test_a_save_from_before_the_scope_ever_existed_restores_with_no_memory(state):
+    snapshot = state.snapshot()
+    del snapshot["player"]["known_upcoming_pile"]
+    restored = XiaolinState.restore(snapshot, None)
+    assert restored.player.known_upcoming_pile == frozenset()

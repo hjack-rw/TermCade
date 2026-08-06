@@ -169,6 +169,17 @@ class Player:
     # logic/flow/training.py); a gain here also raises the real `character.stats["intellect"]`
     # permanently. Meaningless off of Jack.
     good_jack_intellect: int = 4
+    # Reveal-memory: card ids this duelist has actually been told are in the OPPONENT's deck, from
+    # personally firing a Diaskopia (see logic/flow/temple_ai.py). A snapshot at reveal time, not a
+    # live view — a consumer intersects it against the opponent's current deck ids at read time, since
+    # a once-seen card may since have been drawn out.
+    known_of_opponent_deck: frozenset[int] = field(default_factory=frozenset)
+    # Reveal-memory: card ids this duelist has actually been told are coming up next in the SHARED
+    # pile, from personally firing a Teleskopia (see logic/flow/temple_ai.py). Same shape as
+    # ``known_of_opponent_deck`` for the same reason — a consumer intersects it against the pile's
+    # current front at read time, since the window shifts as either side draws, wins a prize, or
+    # flies the Early Bird.
+    known_upcoming_pile: frozenset[int] = field(default_factory=frozenset)
 
     @property
     def initiative(self) -> list[int]:

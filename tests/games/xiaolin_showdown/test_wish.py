@@ -12,8 +12,9 @@ from dataclasses import replace
 from termcade.core.rng import Rng
 
 from card_ids import DRAW, WISH
-from factories import auto_choices, plain_wu, run_showdown
+from factories import auto_choices, plain_wu, run_showdown, wu
 
+from xiaolin_showdown.logic.flow import temple_ai
 from xiaolin_showdown.logic.flow.actions import deposit, usable_powers, use_power
 from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.flow.duel import Duel
@@ -151,3 +152,52 @@ def test_the_bot_never_banks_a_treasurebox():
     hand = [deepcopy(cat.card(WISH)), deepcopy(cat.card(DRAW))]  # worth points
     banked = pick_deposit(hand, Difficulty.HARD, DEFAULT.wear_limit)
     assert banked is not None and mechanic_of(banked.power) is not Mechanic.WISH
+
+
+# --- the temple wish's bot policy: spend it on the single best Wu either Vault holds --------------
+
+
+def test_worth_wishing_declines_with_both_vaults_empty(state):
+    assert temple_ai._worth_wishing(state, is_player=False) is False
+
+
+def test_worth_wishing_fires_on_a_strong_wu_in_the_bots_own_vault(state):
+    state.bot.vault.append(wu(3, 3, 3, name="Strong", id=1))
+    assert temple_ai._worth_wishing(state, is_player=False) is True
+
+
+def test_worth_wishing_declines_on_a_weak_vault(state):
+    state.bot.vault.append(wu(1, 0, 0, name="Weak", id=1))
+    assert temple_ai._worth_wishing(state, is_player=False) is False
+
+
+def test_worth_wishing_fires_on_a_strong_wu_in_the_opponents_vault(state):
+    """Reaching into the opponent's Vault is the card's real strength, not just its own."""
+    state.player.vault.append(wu(3, 3, 3, name="Strong", id=1))
+    assert temple_ai._worth_wishing(state, is_player=False) is True
+
+
+def test_best_wishable_picks_the_stronger_wu_across_both_vaults(state):
+    weak = wu(1, 0, 0, name="Weak", id=1)
+    strong = wu(3, 3, 3, name="Strong", id=2)
+    state.bot.vault.append(weak)
+    state.player.vault.append(strong)
+    assert temple_ai._best_wishable(state, is_player=False) is strong
+
+
+def test_choose_temple_power_wishes_for_the_best_vault_wu(state):
+    box = deepcopy(state.catalog.card(WISH))
+    state.bot.hand = [box]
+    target = wu(3, 3, 3, name="Strong", id=1)
+    state.player.vault.append(target)
+    play = temple_ai.choose_temple_power(state, DEFAULT, is_player=False)
+    assert play is not None
+    assert play.card.id == box.id
+    assert play.target is target
+
+
+def test_choose_temple_power_does_not_wish_on_an_empty_vault(state):
+    box = deepcopy(state.catalog.card(WISH))
+    state.bot.hand = [box]
+    play = temple_ai.choose_temple_power(state, DEFAULT, is_player=False)
+    assert play is None or mechanic_of(play.card.power) is not Mechanic.WISH

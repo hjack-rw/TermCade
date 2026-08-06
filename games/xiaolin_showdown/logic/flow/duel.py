@@ -37,8 +37,8 @@ from ..schema.constants import BRAWL, ELEMENTS, TOURNAMENT, TOURNAMENT_BATTLES
 from .battle import Duelist, Ground, Round, score_battle, score_brawl
 from ..mechanics.cards import excluding, is_one_of
 from ..mechanics.powers import (
-    BEAST_BOOST, CHAMELON_MARGIN, Mechanic, is_boost_slot, is_jong_bane, is_uncontrolled, mechanic_of,
-    names_a_stat,
+    BEAST_BOOST, CHAMELON_MARGIN, Mechanic, chooses_element, is_boost_slot, is_jong_bane,
+    is_uncontrolled, mechanic_of, names_a_stat,
 )
 from ..mechanics.prize import PrizeRoute, claim_route
 from ..mechanics.resolve import as_boost, curse_from_boost, resolve_played_power, stand_in
@@ -54,9 +54,6 @@ from .wear import hand_over
 
 END, COMMITMENT, SETUP, BOOST, CARD, RESOLVEMENT = range(6)
 LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD repeats per Wu wagered
-
-# Wu that ask their caster to name an element (see :mod:`.mechanics.powers`).
-_CHOOSES_ELEMENT = frozenset({Mechanic.MORPH, Mechanic.SET_ELEMENT, Mechanic.SET_ARENA})
 
 # The summon-flavour pools and their resolvers live in :mod:`.summons`; the duel passes the two
 # characters and the arena, and shows the name they return in place of the Wu's own.
@@ -769,13 +766,26 @@ class Duel:
             base[contested] += bonus
         return base
 
+    def _blind_deck_pick(self, mine: Player, theirs: Player) -> Card | None:
+        """A steal's empty-hand fallback: rank whatever ``mine`` actually knows is in ``theirs``'s
+        deck (see ``Player.known_of_opponent_deck``), or pick uniformly at random from the rest.
+        Lives here, not in `bot.py` — the "AI" surface is only ever handed the pre-filtered known
+        subset (`bot.best_known_deck_card`), never the real deck, so it cannot rank by content even
+        by accident. ``None`` when the deck itself is empty too."""
+        if not theirs.deck:
+            return None
+        known = [c for c in theirs.deck if c.id in mine.known_of_opponent_deck]
+        return bot.best_known_deck_card(known) if known else self.rng.choice(theirs.deck)
+
     def _steal_wu(self, is_player: bool) -> None:
-        """Takes the opponent's strongest hand Wu, or a random deck card if their hand is empty — the
-        same policy AI Jack's own steal already uses (see `bot.steal_target`), open to whoever plays
-        the card."""
+        """Takes the opponent's strongest hand Wu, or a known/random deck card if their hand is
+        empty — the same policy AI Jack's own steal already uses (see `bot.steal_target`), open to
+        whoever plays the card."""
         mine = self.state.player if is_player else self.state.bot
         theirs = self.state.bot if is_player else self.state.player
-        target = bot.steal_target(theirs.hand, theirs.deck, self.rng)
+        target = bot.steal_target(theirs.hand)
+        if target is None:
+            target = self._blind_deck_pick(mine, theirs)
         if target is None:
             return
         theirs.remove_card(target)
@@ -819,9 +829,14 @@ class Duel:
 
     def _resolve_bot(self, current: Round, card: Card) -> None:
         stat = bot.choose_stat(current, self._ground(), card) if names_a_stat(card.power) else None
+        element = (
+            bot.choose_element(current, self._ground(), card)
+            if chooses_element(card.power)
+            else self.duel.background or ""
+        )
         self._apply_elemental(
             resolve_played_power(
-                current, card, is_player=False, element=self.duel.background or "", stat=stat,
+                current, card, is_player=False, element=element, stat=stat,
                 display_name=self._summon_display(card, is_player=False),
             )
         )
@@ -973,9 +988,9 @@ class Duel:
             current.winner = current.bane_winner
 
     async def _element_for(self, card: Card) -> str:
-        """Wu in `_CHOOSES_ELEMENT` let the player name an element; any other card takes the
-        background."""
-        if mechanic_of(card.power) in _CHOOSES_ELEMENT:
+        """Wu that choose an element (`chooses_element`) let the player name one; any other card
+        takes the background."""
+        if chooses_element(card.power):
             return await self.choices.element(self.duel.background or "")
         return self.duel.background or ""
 
@@ -1168,16 +1183,16 @@ class Duel:
         self._resolve_ai_jack_steal()
 
     def _resolve_ai_jack_steal(self) -> None:
-        """AI Jack's theft: the strongest Wu in the opponent's hand, or a random deck card if empty —
-        fires the moment his mode is picked, before either side has chosen a Wu. No-op if nothing
-        qualifies or Jack isn't in AI Jack mode.
+        """AI Jack's theft: the strongest Wu in the opponent's hand, or a known/random deck card if
+        empty — fires the moment his mode is picked, before either side has chosen a Wu. No-op if
+        nothing qualifies or Jack isn't in AI Jack mode.
 
         A counter Wu (`jack.is_counter`) is taken outright, ahead of a stronger ordinary one."""
         if self.duel.jack_mode != jack.AI_JACK_NAME:
             return
-        target = bot.steal_target(
-            self.state.player.hand, self.state.player.deck, self.rng, prefer=jack.is_counter
-        )
+        target = bot.steal_target(self.state.player.hand, prefer=jack.is_counter)
+        if target is None:
+            target = self._blind_deck_pick(self.state.bot, self.state.player)
         if target is None:
             return
         self.state.player.remove_card(target)

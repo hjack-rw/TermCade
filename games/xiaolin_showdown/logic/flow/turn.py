@@ -151,12 +151,15 @@ _MECHANIC_VALUE: dict[Mechanic, int] = {
     # Prints 0/0/0; its swing is board-dependent and uncapped (see `duel.Duel._conduct_bonus`), so
     # the bot can't know its true value at decision time. Priced level with NULLIFY_CURSE.
     Mechanic.CONDUCT: 4,
-    # The bot has no spend policy for this yet (temple_ai) — priced only to keep it from banking as junk.
+    # `temple_ai._worth_swapping` decides when it's worth spending; priced here for what it's worth
+    # banked instead, when that policy passes it up.
     Mechanic.TRANSFER: 5,
-    # Prints 0/0/0 — no spend policy yet, priced as a modest utility so it isn't banked as junk.
+    # `temple_ai._worth_refreshing` decides when it's worth spending; priced here for what it's worth
+    # banked instead, when that policy passes it up.
     Mechanic.REFRESH: 3,
     # Prints 0/0/0 but FIELDED it wins the showdown outright (see `bot.choose_card`, which always
-    # fields it). No policy to field or wish it deliberately; priced only against banking it as junk.
+    # fields it). Spending it deliberately is `temple_ai._worth_wishing`; this price is what it's
+    # worth held or banked as junk, not what a chosen Vault pull is worth.
     # (Deposited it is worth its 10 printed points, counted the ordinary way.)
     Mechanic.WISH: 10,
     # Prints ? ? ? but in the boost slot comes alive as a flat ANIMATE_STAT form — priced off that so
@@ -230,8 +233,8 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         # Prints real stats; its shield (no curse on the stat it boosts) is contextual, read by the
         # bot's play-it-out eval, not priced here.
         Mechanic.STAT_SHIELD,
-        # Prints real stats; its seize only decides level battles, and the bot has no policy to field
-        # it for the seize — excused until it does.
+        # Prints real stats; its seize is contextual, read by the bot's play-it-out eval
+        # (`bot._worth_the_side_effect`, `_SIDE_EFFECT_MECHANICS`), not priced here.
         Mechanic.SEIZE_GROUND,
         # Prints real stats; its win-vs-construct is entirely contextual — worth nothing outside a
         # Jack fight, and even then only in two of his four states. Read by the bot's play-it-out
@@ -241,11 +244,13 @@ _STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | 
         # `bot.steal_target` to weigh the hand it would take), not priced flat here — a steal against
         # an empty hand and deck is worth nothing, and no fixed number captures that.
         Mechanic.STEAL,
-        # Prints real stats; its undo is a temple ``use`` the bot never spends (no policy), so on the
-        # table it is only ever the 1/1/1 it wagers. Excused, not priced.
+        # Prints real stats; its temple undo (Retrokinesis) has nothing to fix — every bot action is
+        # already play-it-out-best when taken. Fielded into a duel, its rewrite power is player-only
+        # by a hardcoded dispatch check ("the bot never amends", duel.py) — not a missing heuristic.
         Mechanic.AMEND,
         # A summon: on the table it is just its printed stats (the fielded horde/clone). Its extra worth
-        # is the temple +training, a use the bot has no policy for — so table value is the stats alone.
+        # is the temple +training, a use `temple_ai._worth_summoning_to_train` decides — so table value
+        # is the stats alone; the training value is weighed separately, at spend time.
         Mechanic.TRAIN_BOOST,
         # Prints real stats; its doubled elemental bonus is contextual (great in tune, awful against),
         # read by the bot's play-it-out eval, not priced here.
@@ -269,8 +274,8 @@ def duel_value(card: Card) -> int:
     worth nothing to the opponent, and it will cheerfully bank an Emperor Scorpion for two points.
     """
     # The Sapphire Dragon prints no stats and LOSES the showdown if fielded — its whole worth is the
-    # temple level it grants. Priced so the bot holds it over junk rather than banking it away; like the
-    # WISH above, temple_ai has no policy to actually spend it. (Deposited, it is its printed points.)
+    # temple level it grants. Priced so the bot holds it over junk rather than banking it away;
+    # temple_ai has no policy to actually spend it. (Deposited, it is its printed points.)
     if is_uncontrolled(card.power):
         return 8
     stats = sum(abs(v) for v in card.stats.values() if v is not None)
@@ -538,6 +543,27 @@ def _construct_jong(
     return BotMove(POWER, f"{name} assembled Mala Mala Jong — race it to the end.")
 
 
+def _combine_yoyo(
+    state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
+) -> BotMove | None:
+    """Fuse the two Yo-Yo halves into the Ying-Yang Yo-Yo the moment both are held — open to any
+    duelist, not just Jack (see `_self_correct_good_jack` for his own extra step once it's his).
+    A strict upgrade held: the combined Wu prints the same stats and adds a stronger power (its
+    CHI_SWAP flips the OPPONENT's affiliation, where either half's own STAT_SWAP only flips the
+    caster's) — worth the turn's action ahead of training, a thin-hand draw, or banking, all of
+    which are just as available next turn and none of which this opportunity is."""
+    from copy import deepcopy
+
+    from ..schema.constants import YIN_YANG_YOYO_ID
+    from .actions import can_combine_yoyo, combine_yoyo
+
+    if not can_combine_yoyo(state, settings.actions_per_turn_bot, is_player=False):
+        return None
+    combined = deepcopy(state.catalog.card(YIN_YANG_YOYO_ID))
+    combine_yoyo(state, combined, is_player=False)
+    return BotMove(POWER, f"{name} fused their Yo-Yo halves into the Ying-Yang Yo-Yo.")
+
+
 def _self_correct_good_jack(
     state: XiaolinState, settings: XiaolinSettings, rng: Rng, difficulty: Difficulty, name: str
 ) -> BotMove | None:
@@ -567,11 +593,13 @@ _BOSS_ORDER = (
     _bank_surplus,
 )
 
-# The generic order: a power first (when one beats banking), then the pile raid, the recall, the
-# training cash-in, a thin-hand draw, and banking last.
+# The generic order: a power first (when one beats banking), then the Yo-Yo fusion (a one-time
+# upgrade, not a use-it-or-lose-it play), the pile raid, the recall, the training cash-in, a
+# thin-hand draw, and banking last.
 _GENERIC_ORDER = (
     _construct_jong,
     _play_power,
+    _combine_yoyo,
     _fly_early_bird,
     _recall_witchcraft,
     _cash_training,

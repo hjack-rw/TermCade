@@ -1,14 +1,18 @@
 """The opponent's temple-power decisions — and it is fair: it reads only what a player across the table
 could (both hands, both scores, pile size), never inside the pile or a personal deck.
 
-Diaskopia and Teleskopia are always banked, never spent: no decision here turns on the player's shelf,
-and a one-action turn cannot look *and* act. Give either one a decision and it wakes up.
+Diaskopia is spent only by Jack, and only once (see `_worth_scouting`) — everyone else always banks
+it, since nothing else yet reads reveal-memory of an opponent's deck. Teleskopia is different: every
+duelist may fire it, and it re-fires as its own memory goes stale (see `_worth_scrying`) — the shared
+pile's front card turns over fast, from either side's draw, prize, or Early Bird, so a one-time reveal
+like Jack's would go stale almost immediately. `choose_early_bird` is its one consumer today.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from . import bot
 from ..characters.wuya import WITCH_EARLY_BIRD_GAP
 from ..mechanics.powers import GAMBLE_SPREAD, Mechanic, is_gamble, mechanic_of
 from ..mechanics.scoring import initiative
@@ -83,6 +87,9 @@ def choose_temple_power(
         if mechanic is Mechanic.LUCK and _worth_reviving(state):
             return TemplePlay(card)
 
+        if mechanic is Mechanic.WISH and _worth_wishing(state, is_player):
+            return TemplePlay(card, target=_best_wishable(state, is_player))
+
         if mechanic is Mechanic.TRANSFER and _worth_swapping(state, is_player):
             return TemplePlay(card)
 
@@ -93,6 +100,12 @@ def choose_temple_power(
             return TemplePlay(card)
 
         if mechanic is Mechanic.TRAIN_BOOST and _worth_summoning_to_train(state, settings, card, is_player):
+            return TemplePlay(card)
+
+        if mechanic is Mechanic.READ_DECK and _worth_scouting(state, is_player):
+            return TemplePlay(card)
+
+        if mechanic is Mechanic.SCRY and _worth_scrying(state, is_player):
             return TemplePlay(card)
 
     return None
@@ -114,6 +127,29 @@ def _worth_summoning_to_train(
     step = train_boost_step(card.power.train_step, settings, is_player=is_player)
     train_length = settings.train_length_player if is_player else settings.train_length_bot
     return me.training + step >= train_length
+
+
+def _worth_scouting(state: XiaolinState, is_player: bool = False) -> bool:
+    """Diaskopia, for Jack alone: fire it once, early, purely to seed reveal-memory for his own
+    steal — not gated on his hand thinning out, just the first turn he holds one and still knows
+    nothing. The reveal itself writes `known_of_opponent_deck` (see `power_effects._read_deck`); once
+    that is non-empty this stops re-triggering on its own. Every other duelist still always banks it —
+    nothing else reads reveal-memory yet, so scouting would only cost them the card's points for
+    nothing (see the module docstring)."""
+    me, them = state.duelist(is_player), state.opponent(is_player)
+    return bot.is_jack(me) and not me.known_of_opponent_deck and bool(them.deck)
+
+
+def _worth_scrying(state: XiaolinState, is_player: bool = False) -> bool:
+    """Teleskopia, for any duelist: fire whenever the memory of the pile's front has gone stale.
+
+    Unlike Diaskopia's one-time scout, this re-fires — the shared pile's front card turns over fast
+    (either side's draw, prize, or Early Bird can consume it), so a single reveal would go stale almost
+    immediately. The reveal writes `known_upcoming_pile` (see `power_effects._scan_pile`);
+    `choose_early_bird` is what reads it, and stops this re-triggering for as long as it still holds.
+    """
+    me = state.duelist(is_player)
+    return bool(state.card_deck) and state.card_deck[0].id not in me.known_upcoming_pile
 
 
 def _worth_swapping(state: XiaolinState, is_player: bool = False) -> bool:
@@ -268,7 +304,9 @@ def choose_early_bird(
     """The Wu surrendered to outrun the other duelist, or ``None``.
 
     Flown only as a comeback (behind on points): it costs a real Wu, the initiative lead that names
-    the challenge, and the turn's action — and points are the win condition.
+    the challenge, and the turn's action — and points are the win condition. Blind by default (the
+    prize taken is never weighed, only what's given up) — a Teleskopia already fired legitimately
+    turns that into a known quantity, and a confirmed worse trade is vetoed (see `known_upcoming_pile`).
     """
     from .actions import early_bird_options, initiative_lead  # local: actions imports this module
 
@@ -292,6 +330,11 @@ def choose_early_bird(
     cheapest = min(options, key=duel_value)
     if duel_value(cheapest) > EARLY_BIRD_CEILING:
         return None  # its fastest Wu is also a weapon: keep it, and win the Wu the honest way
+
+    front = state.card_deck[0]
+    if front.id in me.known_upcoming_pile and duel_value(front) < duel_value(cheapest):
+        return None  # Teleskopia already showed what's there — a known worse Wu isn't the honest trade
+
     return cheapest
 
 
@@ -314,6 +357,33 @@ def _worth_reviving(state: XiaolinState) -> bool:
     if not state.lost:
         return False
     return duel_value(state.lost[0]) >= REVIVAL_MARGIN
+
+
+# --- The Blind Swordsman's Treasurebox: a chosen Wu, pulled from either Vault -----------------------
+
+# How good the best Vault target must be before the Treasurebox is worth spending on it. Set a step
+# above REVIVAL_MARGIN: unlike Euthymia's blind pull off a modest Rooster, this pull is CHOSEN — the
+# single best Wu in either Vault — but the Wu spent to buy it is a real 10-point Treasurebox, not a
+# booster nobody would miss.
+WISH_MARGIN = 6
+
+
+def _best_wishable(state: XiaolinState, is_player: bool = False) -> Card:
+    """The strongest Wu either Vault holds — the caster's own, or the one the opponent already
+    banked. Reaching into the opponent's is the card's real strength (see `power_effects._restore`);
+    reaching into your own is just undoing an already-paid deposit, so this never prefers one Vault
+    over the other on its own — only whichever single Wu fights best."""
+    me, them = state.duelist(is_player), state.opponent(is_player)
+    return max(me.vault + them.vault, key=duel_value)
+
+
+def _worth_wishing(state: XiaolinState, is_player: bool = False) -> bool:
+    """Spend the Treasurebox only when the best Wu either Vault holds is a real weapon — fizzles with
+    nothing to reach for in either Vault."""
+    me, them = state.duelist(is_player), state.opponent(is_player)
+    if not (me.vault or them.vault):
+        return False
+    return duel_value(_best_wishable(state, is_player)) >= WISH_MARGIN
 
 
 # --- Chronokinesis: a Wu off the pile, sight unseen --------------------------------

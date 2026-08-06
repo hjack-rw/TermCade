@@ -23,6 +23,7 @@ from xiaolin_showdown.logic.mechanics.scoring import initiative
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.turn import duel_value
 from xiaolin_showdown.logic.flow.temple_ai import EARLY_BIRD_GAP, choose_early_bird
+from factories import wu
 
 # Read by property, never by id — the pool is rebalanced constantly and these must survive it.
 
@@ -348,3 +349,50 @@ def test_the_opponent_does_not_fly_without_the_lead(state, catalog):
 
     assert initiative_lead(state, is_player=False) < EARLY_BIRD_GAP
     assert choose_early_bird(state, settings) is None
+
+
+# --- Teleskopia, once fired, turns the blind gamble into a known one ------------------------------
+
+
+def test_the_opponent_declines_a_confirmed_worse_trade(state, catalog):
+    """A Teleskopia already fired means the worm is no longer sight unseen — giving up a real Wu for
+    a confirmed worse one is not the honest trade the flight is supposed to be.
+
+    The worm is a controlled, inserted card, not whatever the seed happened to deal: the front of
+    the pile can land on a DRAGON or another mechanic priced by something other than its raw stats
+    (`turn.duel_value`), which would make a stats-only "confirmed worse" setup meaningless.
+    """
+    settings = _bot_outruns(state, catalog)
+    state.bot.points, state.player.points = 1, 9
+    cheapest = min(early_bird_options(state, is_player=False), key=duel_value)
+    worm = wu(0, 0, 0, name="Confirmed worthless", id=9001)
+    state.card_deck.insert(0, worm)
+    state.bot.known_upcoming_pile = frozenset({worm.id})
+
+    assert duel_value(worm) < duel_value(cheapest)
+    assert choose_early_bird(state, settings) is None
+
+
+def test_the_opponent_still_flies_for_a_confirmed_good_trade(state, catalog):
+    """The veto only blocks a KNOWN worse trade — told the worm is worth taking, it still flies."""
+    settings = _bot_outruns(state, catalog)
+    state.bot.points, state.player.points = 1, 9
+    cheapest = min(early_bird_options(state, is_player=False), key=duel_value)
+    worm = wu(5, 5, 5, name="Confirmed strong", id=9001)
+    state.card_deck.insert(0, worm)
+    state.bot.known_upcoming_pile = frozenset({worm.id})
+
+    assert duel_value(worm) >= duel_value(cheapest)
+    assert choose_early_bird(state, settings) is cheapest
+
+
+def test_an_unrelated_known_card_does_not_veto_the_flight(state, catalog):
+    """Reveal-memory of a DIFFERENT card (already drawn past, or the wrong end of the window) says
+    nothing about the worm actually at the front — the veto only reads what the front card IS."""
+    settings = _bot_outruns(state, catalog)
+    state.bot.points, state.player.points = 1, 9
+    cheapest = min(early_bird_options(state, is_player=False), key=duel_value)
+    # Known-worthless, but not the id at the front of the pile.
+    state.bot.known_upcoming_pile = frozenset({state.card_deck[1].id})
+
+    assert choose_early_bird(state, settings) is cheapest

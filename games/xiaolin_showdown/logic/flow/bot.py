@@ -20,8 +20,8 @@ from dataclasses import replace
 from termcade.core.rng import Rng
 
 from .battle import Ground, Round, score_battle
-from ..schema.constants import OPPOSITES, TOURNAMENT
-from ..mechanics.powers import Mechanic, is_uncontrolled, mechanic_of, names_a_stat
+from ..schema.constants import ELEMENTS, OPPOSITES, TOURNAMENT
+from ..mechanics.powers import Mechanic, chooses_element, is_uncontrolled, mechanic_of, names_a_stat
 from ..mechanics.resolve import as_boost, resolve_played_power
 from ..schema.models import Card, Player
 from .turn import duel_value
@@ -52,22 +52,29 @@ def is_jong(player: Player) -> bool:
 
 
 def steal_target(
-    hand: Sequence[Card], deck: Sequence[Card], rng: Rng, *, prefer: Callable[[Card], bool] | None = None
+    hand: Sequence[Card], *, prefer: Callable[[Card], bool] | None = None
 ) -> Card | None:
     """AI Jack's steal: the strongest Wu in the opponent's hand — fully known, so judged like any
-    other bot decision. An empty hand falls back to a random deck card: nothing is known about it
-    (see the deferred reveal-memory note in ``docs/PLAN.md``), so there is nothing to rank it by.
+    other bot decision. ``None`` on an empty hand: the opponent's deck is never handed to this
+    function at all, so a blind fallback can't be ranked by content even by accident — the caller
+    (``duel._resolve_ai_jack_steal``) picks blind from the deck itself when this returns ``None``.
 
     ``prefer`` narrows the field before ranking, when it matches anything — Jack's own steal passes
     ``jack.is_counter`` so a Denshi Bunny in hand is taken outright, even over a numerically stronger
     Wu; Sands of Time (open to anyone) leaves it unset and ranks the whole hand as before.
     """
-    if hand:
-        pool = [c for c in hand if prefer(c)] if prefer is not None else []
-        return max(pool or hand, key=duel_value)
-    if deck:
-        return rng.choice(list(deck))
-    return None
+    if not hand:
+        return None
+    pool = [c for c in hand if prefer(c)] if prefer is not None else []
+    return max(pool or hand, key=duel_value)
+
+
+def best_known_deck_card(known: Sequence[Card]) -> Card:
+    """The steal's blind-fallback ranking: the best of a set of deck cards already confirmed real —
+    never guessed at (see ``Player.known_of_opponent_deck``). Takes only the pre-filtered subset the
+    caller has already confirmed is known, the same way ``steal_target`` never sees a whole deck: this
+    module ranks what it is handed, and is never the one deciding what counts as known."""
+    return max(known, key=duel_value)
 
 
 def choose_challenge(
@@ -337,8 +344,26 @@ def _stat_options(ground: Ground, card: Card) -> list[str]:
     return list(ground.stats) or list(card.stats)
 
 
+def choose_element(battle: Round, ground: Ground, card: Card, *, is_player: bool = False) -> str:
+    """Which element the Morpher, Eye of Dashi or Monsoon Sandals names.
+
+    Played out exactly like ``choose_stat``: every element is fielded in a trial battle and the one
+    that leaves the board best is taken, rather than defaulting to the arena already in play.
+    """
+    return min(
+        ELEMENTS,
+        key=lambda element: _after(battle, ground, card, is_player=is_player, element=element),
+    )
+
+
 def _after(
-    battle: Round, ground: Ground, card: Card, *, is_player: bool, stat: str | None = None
+    battle: Round,
+    ground: Ground,
+    card: Card,
+    *,
+    is_player: bool,
+    stat: str | None = None,
+    element: str | None = None,
 ) -> tuple[int, int]:
     """How the battle stands once ``card`` is fielded. Lower is better *for the duelist fielding it*.
 
@@ -347,27 +372,31 @@ def _after(
     signed from the player's side, so the player maximises it and the bot minimises it.
 
     A Wu that names a stat is worth what its *best* stat is worth — so weighing whether to play it at
-    all (``choose_card``) asks this without a stat, and gets the best line it could take.
-
-    A Monsoon Sandals or any other element-asking card is NOT played out for its own choice of
-    element here — ``element=ground.background`` below always passes the *current* arena, mirroring
-    ``Duel._resolve_bot``'s own hardcoded choice for the bot's real card resolution (it never asks
-    which element; see ``_element_for``). So a SET_ARENA card's own effect always resolves to the
-    arena it is already in — a real, separate gap (the bot has no element-choice policy at all yet),
-    not something this function could paper over without one existing upstream.
+    all (``choose_card``) asks this without a stat, and gets the best line it could take. A Wu that
+    names an element (``chooses_element``) is weighed the same way, over every element in turn.
     """
     if stat is None and names_a_stat(card.power):
         return min(
-            _after(battle, ground, card, is_player=is_player, stat=option)
+            _after(battle, ground, card, is_player=is_player, stat=option, element=element)
             for option in _stat_options(ground, card)
+        )
+    if element is None and chooses_element(card.power):
+        return min(
+            _after(battle, ground, card, is_player=is_player, stat=stat, element=option)
+            for option in ELEMENTS
         )
 
     trial = deepcopy(battle)
     effect = resolve_played_power(
-        trial, card, is_player=is_player, element=ground.background, stat=stat
+        trial, card, is_player=is_player,
+        element=element if element is not None else ground.background, stat=stat,
     )
+    background = ground.background
+    if effect and effect.startswith("background:"):
+        background = effect.split(":", 1)[1]  # a Monsoon Sandals candidate recolours the arena
     terms = replace(
         ground,
+        background=background,
         bonus_cancelled=ground.bonus_cancelled or effect == "cancel",
         bonus_reversed=ground.bonus_reversed or effect == "reverse",
     )

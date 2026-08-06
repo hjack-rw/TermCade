@@ -3,19 +3,22 @@
 from __future__ import annotations
 
 import unittest.mock
+from copy import deepcopy
 
 from rich.text import Text
 from termcade.core.rng import Rng
 
+from card_ids import READ_DECK
 from factories import auto_choices, duelist, wu
 
-from xiaolin_showdown.logic.flow import bot
+from xiaolin_showdown.logic.flow import bot, temple_ai
 from xiaolin_showdown.logic.characters import jack
 from xiaolin_showdown.logic.flow.battle import Round, Side
 from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.flow.duel import Duel, DuelState
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.setup import new_game
+from xiaolin_showdown.logic.schema.state import XiaolinState
 from xiaolin_showdown.screens.display.duel_board import _jack_stats, _side_line
 
 
@@ -71,16 +74,111 @@ def test_attack_chance_is_higher_when_the_player_leads():
 def test_steal_target_takes_the_strongest_hand_card():
     weak = wu(0, name="Weak", points=1)
     strong = wu(3, name="Strong", points=3)
-    assert bot.steal_target([weak, strong], [], Rng(0)) is strong
+    assert bot.steal_target([weak, strong]) is strong
 
 
-def test_steal_target_falls_back_to_a_random_deck_card_when_hand_is_empty():
+def test_steal_target_is_none_on_an_empty_hand():
+    # The deck fallback is no longer this function's concern at all — it never receives the
+    # opponent's deck, so a caller with an empty hand and a full deck still gets None here (see
+    # `test_resolve_ai_jack_steal_falls_back_to_a_random_deck_card_when_hand_is_empty` for where
+    # the blind pick actually happens now: the duel resolver, not the AI surface).
+    assert bot.steal_target([]) is None
+
+
+def test_resolve_ai_jack_steal_falls_back_to_a_random_deck_card_when_hand_is_empty():
+    duel = _jack_duel(player_priority=False)
+    duel.duel.jack_mode = jack.AI_JACK_NAME
+    duel.state.player.hand = []
     deck_card = wu(1, name="Deck")
-    assert bot.steal_target([], [deck_card], Rng(0)) is deck_card
+    duel.state.player.deck = [deck_card]
+    duel._resolve_ai_jack_steal()
+    assert deck_card in duel.state.bot.hand
+    assert deck_card not in duel.state.player.deck
 
 
-def test_steal_target_is_none_when_nothing_is_available():
-    assert bot.steal_target([], [], Rng(0)) is None
+def test_resolve_ai_jack_steal_ranks_a_known_deck_card_over_a_blind_pick():
+    """Reveal-memory changes the pick: with two cards known, the stronger one is taken on
+    purpose — not whichever the blind roll would have landed on."""
+    duel = _jack_duel(player_priority=False)
+    duel.duel.jack_mode = jack.AI_JACK_NAME
+    duel.state.player.hand = []
+    weak_known = wu(0, name="Weak", points=1, id=1)
+    strong_known = wu(5, name="Strong", points=5, id=2)
+    duel.state.player.deck = [weak_known, strong_known]
+    duel.state.bot.known_of_opponent_deck = frozenset({1, 2})
+    duel._resolve_ai_jack_steal()
+    assert strong_known in duel.state.bot.hand
+
+
+def test_resolve_ai_jack_steal_ignores_memory_for_a_card_no_longer_in_the_deck():
+    """`known_of_opponent_deck` is a snapshot at reveal time, not a live view — a known id that
+    has since left the deck (drawn, shelved elsewhere) is simply not there to find."""
+    duel = _jack_duel(player_priority=False)
+    duel.duel.jack_mode = jack.AI_JACK_NAME
+    duel.state.player.hand = []
+    only_card = wu(0, name="Only", id=1)
+    duel.state.player.deck = [only_card]
+    duel.state.bot.known_of_opponent_deck = frozenset({99})  # not this deck's card
+    duel._resolve_ai_jack_steal()
+    assert only_card in duel.state.bot.hand  # blind pick — the only card there is
+
+
+# --- Jack's own Diaskopia scout (`temple_ai._worth_scouting`) ----------------------
+
+
+def test_worth_scouting_fires_for_jack_with_empty_memory_and_a_readable_deck():
+    duel = _jack_duel(player_priority=False)
+    duel.state.player.deck = [wu(1, name="Deck")]
+    assert temple_ai._worth_scouting(duel.state, is_player=False) is True
+
+
+def test_worth_scouting_never_fires_twice():
+    duel = _jack_duel(player_priority=False)
+    duel.state.player.deck = [wu(1, name="Deck")]
+    duel.state.bot.known_of_opponent_deck = frozenset({1})
+    assert temple_ai._worth_scouting(duel.state, is_player=False) is False
+
+
+def test_worth_scouting_needs_something_in_the_deck_to_read():
+    duel = _jack_duel(player_priority=False)
+    duel.state.player.deck = []
+    assert temple_ai._worth_scouting(duel.state, is_player=False) is False
+
+
+def test_worth_scouting_never_fires_for_a_non_jack_bot():
+    cat = load_catalog()
+    state = new_game(cat, Rng(5), cat.character(1), opponent=cat.character(2))
+    state.player.deck = [wu(1, name="Deck")]
+    assert temple_ai._worth_scouting(state, is_player=False) is False
+
+
+def test_choose_temple_power_offers_jacks_diaskopia_scout():
+    """End to end: the real Falcon's Eye card, held by Jack, actually gets picked by the shared
+    dispatcher — not just the predicate in isolation."""
+    duel = _jack_duel(player_priority=False)
+    eye = deepcopy(load_catalog().card(READ_DECK))
+    duel.state.bot.hand = [eye]
+    duel.state.player.deck = [wu(1, name="Deck")]
+
+    play = temple_ai.choose_temple_power(duel.state, XiaolinSettings(), is_player=False)
+
+    assert play is not None
+    assert play.card is eye
+
+
+def test_save_and_restore_round_trips_reveal_memory():
+    duel = _jack_duel(player_priority=False)
+    duel.state.bot.known_of_opponent_deck = frozenset({3, 7})
+    restored = XiaolinState.restore(duel.state.snapshot(), None)
+    assert restored.bot.known_of_opponent_deck == frozenset({3, 7})
+
+
+def test_a_save_from_before_reveal_memory_ever_existed_restores_empty():
+    duel = _jack_duel(player_priority=False)
+    snapshot = duel.state.snapshot()
+    del snapshot["bot"]["known_of_opponent_deck"]
+    restored = XiaolinState.restore(snapshot, None)
+    assert restored.bot.known_of_opponent_deck == frozenset()
 
 
 async def test_commitment_picks_chamelon_bot_whenever_the_player_leads():

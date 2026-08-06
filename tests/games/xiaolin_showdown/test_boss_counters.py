@@ -6,8 +6,6 @@ empty set, not a gap."""
 
 from __future__ import annotations
 
-from termcade.core.rng import Rng
-
 from factories import duelist, wu
 
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
@@ -68,16 +66,14 @@ def test_counters_against_a_boss_with_none_is_empty():
 def test_steal_target_prefers_a_counter_over_a_stronger_ordinary_card():
     weak_counter = wu(0, name="Denshi Bunny", mechanic=Mechanic.HACK, points=4)
     strong_ordinary = wu(5, name="Strong", points=3)
-    target = bot.steal_target(
-        [strong_ordinary, weak_counter], [], Rng(1), prefer=jack.is_counter
-    )
+    target = bot.steal_target([strong_ordinary, weak_counter], prefer=jack.is_counter)
     assert target is weak_counter
 
 
 def test_steal_target_without_prefer_ranks_the_whole_hand():
     weak_counter = wu(0, name="Denshi Bunny", mechanic=Mechanic.HACK, points=4)
     strong_ordinary = wu(5, name="Strong", points=3)
-    target = bot.steal_target([strong_ordinary, weak_counter], [], Rng(1))
+    target = bot.steal_target([strong_ordinary, weak_counter])
     assert target is strong_ordinary
 
 

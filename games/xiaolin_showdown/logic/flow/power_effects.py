@@ -198,15 +198,23 @@ def _draw(spend: _Spend) -> _Fill | None:
 
 
 def _read_deck(spend: _Spend) -> _Fill | None:
-    """Diaskopia: everything the opponent has shelved."""
+    """Diaskopia: everything the opponent has shelved — and now the caster actually remembers it
+    (see `Player.known_of_opponent_deck`), a real reveal rather than a one-line toast that vanishes."""
     deck = spend.them.deck
-    return {"cards": _names(deck)} if deck else None
+    if not deck:
+        return None
+    spend.me.known_of_opponent_deck = spend.me.known_of_opponent_deck | {c.id for c in deck}
+    return {"cards": _names(deck)}
 
 
 def _scan_pile(spend: _Spend) -> _Fill | None:
-    """Teleskopia: as far down the pile as the Wu can see."""
+    """Teleskopia: as far down the pile as the Wu can see — and now the caster actually remembers it
+    (see `Player.known_upcoming_pile`), same as Diaskopia's own reveal-memory."""
     coming = spend.state.card_deck[:SCOPE_DEPTH]
-    return {"cards": _names(coming)} if coming else None
+    if not coming:
+        return None
+    spend.me.known_upcoming_pile = spend.me.known_upcoming_pile | {c.id for c in coming}
+    return {"cards": _names(coming)}
 
 
 def _already_answered(state: XiaolinState) -> bool:

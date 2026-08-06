@@ -259,6 +259,12 @@ def _player_dict(p: Player) -> dict[str, Any]:
         # persists across showdowns too, and Good Jack's own separately trained intellect with it.
         "yoyo_flipped": p.yoyo_flipped,
         "good_jack_intellect": p.good_jack_intellect,
+        # Reveal-memory (logic/flow/temple_ai.py): card ids this duelist has actually been told are
+        # in the opponent's deck, from firing a Diaskopia. Sorted for a stable, diffable save file.
+        "known_of_opponent_deck": sorted(p.known_of_opponent_deck),
+        # Reveal-memory: card ids told to be coming up next in the shared pile, from firing a
+        # Teleskopia. Sorted for a stable, diffable save file.
+        "known_upcoming_pile": sorted(p.known_upcoming_pile),
     }
 
 
@@ -282,6 +288,9 @@ def _player_from_dict(data: dict[str, Any], catalog: Catalog) -> Player:
     # Yin/Yang Yo-Yo: absent in a save from before it — never flipped, Good Jack's intellect untrained.
     player.yoyo_flipped = data.get("yoyo_flipped", False)
     player.good_jack_intellect = data.get("good_jack_intellect", 4)
+    # Reveal-memory: absent in a save from before it — nothing known yet.
+    player.known_of_opponent_deck = frozenset(data.get("known_of_opponent_deck", ()))
+    player.known_upcoming_pile = frozenset(data.get("known_upcoming_pile", ()))
     for card, uses in zip(player.hand, data.get("hand_uses", ())):
         card.uses = uses
     for card, uses in zip(player.deck, data.get("deck_uses", ())):

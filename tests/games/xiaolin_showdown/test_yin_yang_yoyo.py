@@ -216,3 +216,37 @@ def test_yin_yang_yoyo_is_never_dealt_into_a_run():
         assert all(c.id != YIN_YANG_YOYO_ID for c in state.card_deck)
         assert all(c.id != YIN_YANG_YOYO_ID for c in state.player.hand)
         assert all(c.id != YIN_YANG_YOYO_ID for c in state.bot.hand)
+
+
+# --- the bot policy --------------------------------------------------------------------------------
+
+
+def test_the_bot_fuses_both_halves_the_moment_it_holds_them():
+    from termcade.core.settings import Difficulty
+
+    from xiaolin_showdown.logic.flow.turn import bot_turn
+
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1), opponent=cat.character(2))
+    state.bot.hand = [deepcopy(cat.card(YING_YOYO_ID)), deepcopy(cat.card(YANG_YOYO_ID))]
+    state.bot_actions_taken = 0
+    bot_turn(state, XiaolinSettings(), rng=Rng(1), difficulty=Difficulty.HARD)
+    ids = [c.id for c in state.bot.hand]
+    assert YING_YOYO_ID not in ids
+    assert YANG_YOYO_ID not in ids
+    assert YIN_YANG_YOYO_ID in ids
+
+
+def test_the_bot_does_not_fuse_holding_only_one_half():
+    from termcade.core.settings import Difficulty
+
+    from xiaolin_showdown.logic.flow.turn import bot_turn
+
+    cat = load_catalog()
+    state = new_game(cat, Rng(1), cat.character(1), opponent=cat.character(2))
+    state.bot.hand = [deepcopy(cat.card(YING_YOYO_ID))]
+    state.bot_actions_taken = 0
+    bot_turn(state, XiaolinSettings(), rng=Rng(1), difficulty=Difficulty.HARD)
+    ids = [c.id for c in state.bot.hand]
+    assert YING_YOYO_ID in ids
+    assert YIN_YANG_YOYO_ID not in ids
