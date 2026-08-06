@@ -8,7 +8,7 @@ That makes the win rate mean something.
 The only thing that can answer "is this fair?" — the test suite proves the rules are obeyed, not
 that the game is worth playing. Every balance claim in this project's history came from here.
 
-    python docs/balance.py . 150
+    python scripts/balance.py . 150
 
 Reports, per difficulty: the player's win rate, average points, showdown count, hand sizes, which
 wagers got called, and which were even fieldable. Both sides play with the same decision functions,
@@ -113,7 +113,7 @@ from xiaolin_showdown.logic.flow.training import (  # noqa: E402
 )
 
 # (The XS_STICKY_WEAR knob is retired: per-wearer wear memory measured identical to reset-on-every-
-# transfer at 200/tier and is now the SHIPPED rule — see BALANCE.md.)
+# transfer at 200/tier and is now the SHIPPED rule — see BALANCE-HISTORY.md.)
 
 # Sweep knob: a lost showdown teaches +N instead of +1 (XS_LOSS_FILL=2). Patched on the DUEL's
 # bound name — it imported `record_showdown` at module load, so patching training alone misses it.

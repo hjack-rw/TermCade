@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xiaolin Showdown — Live knobs</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<h1>Xiaolin Showdown — Live knobs</h1>
+<p class="sub">Every live <code>mechanic_config</code> row, one per key, generated straight from <code>xs_game.db</code>. Values can never go stale; the descriptions are curated in <code>scripts/generate_knobs_page.py</code> and won't rename or renumber themselves &mdash; if a key looks undocumented, that script is where to fix it.</p>
+
+<div class="controls">
+  <input id="search" type="search" data-filter="knobs" data-count="count"
+         placeholder="Filter by mechanic, key, or what it does&hellip;">
+  <span class="count" id="count">29 shown</span>
+</div>
+<div class="tablewrap">
+<table id="knobs" data-sortable>
+  <thead><tr><th>Mechanic</th><th>Key</th><th>Value</th><th>What it does</th></tr></thead>
+  <tbody>
+  <tr><td class='mech'>animate</td><td>field_stat</td><td data-sort='2'>2</td><td class='wrap'>Heart of Jong&#x27;s fielded-alone stat</td></tr>
+  <tr><td class='mech'>animate</td><td>stat</td><td data-sort='3'>3</td><td class='wrap'>Heart of Jong construct stat</td></tr>
+  <tr><td class='mech'>beast_form</td><td>boost</td><td data-sort='1'>1</td><td class='wrap'>Chase&#x27;s Beast Form stat boost on the contested stat</td></tr>
+  <tr><td class='mech'>beast_form</td><td>margin</td><td data-sort='3'>3</td><td class='wrap'>how far behind Chase must be to beast</td></tr>
+  <tr><td class='mech'>bot</td><td>attack_chance_when_leading</td><td data-sort='2'>2</td><td class='wrap'>Jack-bots Attack!&#x27;s base trigger chance while Jack leads</td></tr>
+  <tr><td class='mech'>bot</td><td>attack_chance_when_trailing</td><td data-sort='5'>5</td><td class='wrap'>Jack-bots Attack!&#x27;s base trigger chance while Jack trails</td></tr>
+  <tr><td class='mech'>bot</td><td>attack_max_chance</td><td data-sort='90'>90</td><td class='wrap'>Attack!&#x27;s trigger-chance ceiling</td></tr>
+  <tr><td class='mech'>bot</td><td>attack_min_chance</td><td data-sort='5'>5</td><td class='wrap'>Attack!&#x27;s trigger-chance floor</td></tr>
+  <tr><td class='mech'>bot</td><td>attack_momentum_cap</td><td data-sort='30'>30</td><td class='wrap'>how far a loss/win streak can drift Attack!&#x27;s chance</td></tr>
+  <tr><td class='mech'>bot</td><td>attack_momentum_step</td><td data-sort='10'>10</td><td class='wrap'>how much each streak step moves it</td></tr>
+  <tr><td class='mech'>bot</td><td>attack_stat</td><td data-sort='3'>3</td><td class='wrap'>which stat Jack-bots Attack! contests</td></tr>
+  <tr><td class='mech'>bot</td><td>chamelon_margin</td><td data-sort='0'>0</td><td class='wrap'>Jack&#x27;s Chamelon-Bot: 0 = ties the player&#x27;s lead, never beats it</td></tr>
+  <tr><td class='mech'>bot</td><td>flee_cap</td><td data-sort='3'>3</td><td class='wrap'>Jack&#x27;s free flees per run</td></tr>
+  <tr><td class='mech'>bot</td><td>good_jack_stat</td><td data-sort='4'>4</td><td class='wrap'>Good Jack&#x27;s base stat (dumber than Evil Jack&#x27;s 3/3/7, not derived)</td></tr>
+  <tr><td class='mech'>bot</td><td>jack_force_margin</td><td data-sort='1'>1</td><td class='wrap'>how far below STAT_CAP Jack&#x27;s trained force stops (tops at 4)</td></tr>
+  <tr><td class='mech'>bot</td><td>printed_physical</td><td data-sort='3'>3</td><td class='wrap'>Evil Jack&#x27;s baseline force/agility, for training-delta math</td></tr>
+  <tr><td class='mech'>buff</td><td>value</td><td data-sort='3'>3</td><td class='wrap'>Orb of Tornami&#x27;s stat swing (+3) — Kaijin&#x27;s Curse (misfortune) reads the same row negated, no separate row needed</td></tr>
+  <tr><td class='mech'>gamble</td><td>high</td><td data-sort='5'>5</td><td class='wrap'></td></tr>
+  <tr><td class='mech'>gamble</td><td>low</td><td data-sort='-2'>-2</td><td class='wrap'></td></tr>
+  <tr><td class='mech'>jong</td><td>boost_stat</td><td data-sort='1'>1</td><td class='wrap'>the Heart&#x27;s boost-alone stat, as Jong</td></tr>
+  <tr><td class='mech'>jong</td><td>stat</td><td data-sort='6'>6</td><td class='wrap'>Mala Mala Jong&#x27;s base stat</td></tr>
+  <tr><td class='mech'>morph</td><td>aside</td><td data-sort='2'>2</td><td class='wrap'>Hannibal&#x27;s Morpher fielded-alone stat</td></tr>
+  <tr><td class='mech'>morph</td><td>boost</td><td data-sort='1'>1</td><td class='wrap'>Hannibal&#x27;s Morpher boost stat</td></tr>
+  <tr><td class='mech'>scry</td><td>depth</td><td data-sort='3'>3</td><td class='wrap'>how many pile cards a scry reveals</td></tr>
+  <tr><td class='mech'>witchcraft</td><td>early_bird_gap</td><td data-sort='2'>2</td><td class='wrap'>Wuya&#x27;s own Early Bird flies at a reduced initiative gap</td></tr>
+  <tr><td class='mech'>witchcraft</td><td>recall_limit</td><td data-sort='3'>3</td><td class='wrap'>Wuya&#x27;s lost-Wu recalls per run</td></tr>
+  <tr><td class='mech'>witchcraft</td><td>recall_margin</td><td data-sort='3'>3</td><td class='wrap'>minimum value a recalled Wu must clear</td></tr>
+  <tr><td class='mech'>witchcraft</td><td>returns</td><td data-sort='1'>1</td><td class='wrap'>a spent Witchcraft Wu returns to hand</td></tr>
+  <tr><td class='mech'>witchcraft</td><td>wears</td><td data-sort='1'>1</td><td class='wrap'>...and wears once for it</td></tr>
+  </tbody>
+</table>
+</div>
+<footer>
+Not DB-backed but still live (Settings-screen fields, deal weights, wager rules):
+<a href="BALANCE.md">BALANCE.md</a>. Click any <code>Mechanic</code> value for what it does and when
+it fires. Never hand-edit this page &mdash; regenerate with
+<code>python scripts/generate_knobs_page.py</code> after any <code>mechanic_config</code> change.
+</footer>
+<script type="application/json" id="mechanic-rules">{"filler": "Deck filler. Does nothing.", "initiative": "Adds its initiative bonus while held. Equal bonuses don't stack; different ones do, and your opponent's negatives land on you.", "hand_size": "Raises your hand limit by one while held.", "hand_fizzle": "Can be spent at the temple, but its power fizzles \u2014 it is discarded for no points.", "draw": "Spend it to draw a Wu from the pile. Depositing it forfeits that.", "read_deck": "Spend it to read your opponent's personal deck. Only offered while they hold one.", "scry": "Spend it to look at the next 3 Wu in the draw pile, in the order they will come.", "enhanced_vision": "Spend it to see the next Wu in the pile, then take or refuse initiative in the next showdown \u2014 whatever the two hands add up to.", "fetch": "Spend it to pull any one Wu out of your own deck and into your hand.", "bounce": "Spend it to shove one Wu out of your opponent's hand \u2014 deposit it (they keep the points) or bury it in their Deck (no points, but they draw it back).", "luck": "Spend it at the temple to bring the oldest lost Wu back \u2014 into your hand, not the pile.", "prognosis": "Spend it to let your opponent lead the next Showdown \u2014 but you read the challenge before they play , and keep the challenger's ground after the battle.", "seize_ground": "Field it and its caster holds the challenger's ground for the rest of the Showdown, winning every level battle \u2014 overriding a Prognosis set at the temple. Both duelists fielding one cancels it, and the ground goes back to whoever leads.", "transfer": "Spend it to swap your entire hand with your opponent's \u2014 a Wudai weapon stays with its soul's owner.", "amend": "Spend it to take back your previous action this turn \u2014 a fumbled deposit, draw, or power, put right. One undo, and the Mouse is spent doing it; in a one-action turn there is nothing to fix.", "wish": "One wish, then gone for good \u2014 no power brings it back. Deposit it for a heap of points, spend it to wish a Wu back from your Vault, or field it in a Showdown to win outright.", "train_boost": "Spend it at the temple to summon help to train against \u2014 a one-time shove forward on your training bar, then it is gone. Useless once every base stat is capped.", "witchcraft": "Witchcraft: a Wu she spends returns to her hand, worn one further by the sorcery \u2014 the third use vaults it. Her temple turn can also call the oldest lost Wu back.", "beast_form": "Beast Form: once a showdown, +1 to the contested stat \u2014 element-free, beyond the reach of any counter. His Wu score nothing while it holds; he wagers them, never wields them.", "dragon": "A wudai weapon: it lends its stats every showdown from the boost slot, and is never fielded as a Wu. The one your character was born holding can never be staked or lost \u2014 one found in the pile can be both.", "boost": "Lends no stats of its own; amplifies the card you play after it by 1 per stat that card contributes.", "bot": "A construct: it lends its stats every showdown from the boost slot, and is never fielded as a Wu. Jack built it himself, so it can never be staked or lost.", "innate": "Contributes its printed stats.", "morph": "Becomes 2 in the two stats the battle is not fought over and 1 in the one it is \u2014 and you choose the element it counts as.", "animate": "Fielded, a middling 2/2/2 body. Laid in the boost slot it wakes a separate 3/3/3 summon in the arena's element \u2014 and the opponent may field one extra Wu to answer it.", "buff": "Prints no stats. Name one when you play it, and it pours +3 into that stat alone.", "misfortune": "Prints no stats. Name one when you play it, and your opponent suffers \u22123 in that stat.", "nullify_stats": "Traps your opponent for this battle: their own stats count for nothing, and only the Wu they played answer for them.", "nullify_curse": "Turns every curse laid on you aside for this battle. Your Defensive line counts for nothing.", "nullify_wu": "Disarms your opponent for this battle: every Wu they played counts for nothing, and only they themselves answer for it.", "nullify_element": "Voids the elemental bonus for the rest of the showdown \u2014 for both duelists, whoever played it.", "reverse_element": "Reverses the elemental bonus for the rest of the showdown, for both duelists: a resonant Wu now costs, an opposed one now pays.", "nullify_boost": "Smothers your opponent's boost for this battle: its stats count for nothing.", "hack": "If your opponent faces you as a robot construct, you win the showdown outright. Unless it is Mala Mala Jong.", "steal": "Takes your opponent's strongest hand Wu into your own hand \u2014 or a random Wu from their Deck if their hand is empty.", "conduct": "The stat this battle contests gets +1 for every metal Wu fielded this battle \u2014 yours or your opponent's, boosts included \u2014 and -1 for every non-metal one. The arena itself counts the same way. Can go negative. Uncapped either way.", "stat_swap": "Names a stat: swaps it between your Character and your opponent's for the rest of this Showdown. Also flips your shown affiliation for the rest of the run, until you play another Yo-Yo.", "chi_swap": "Names a stat: swaps it between your Character and your opponent's for the rest of this Showdown. Also flips your OPPONENT'S shown affiliation for the rest of the run. Held at the temple, it may instead correct your own affiliation back \u2014 exiled either way, for good.", "cleanse": "Turns your opponent's Wu to metal for this battle \u2014 they read as metal for the background bonus, favoured nowhere but a metal arena.", "set_element": "You choose the element your own Wu count as for this battle's background bonus.", "set_arena": "You choose the arena's element for the rest of the showdown.", "ward": "Wards its own element for this battle: your Wu of that element ignore every negative background bonus \u2014 the lift still lands.", "treasure": "Worth a bunch of points \u2014 deposit it for the windfall. It has no power to spend, and its printed stats are all it brings to a showdown.", "refresh": "Spend it to bring the Wu you most recently used back into your hand, ready to spend again.", "double_training": "While it is in your hand, every point of training you gain counts double \u2014 a lost showdown teaches twice, if it is still in your hand once the showdown ends.", "stat_shield": "Field it for its printed stats, and take no curse on the stat it boosts this battle \u2014 a debuff landed on that stat counts nothing.", "double_element": "Its own elemental bonus counts double \u2014 twice the lift in tune, twice the drag against it."}</script>
+
+<script src="../assets/docs.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 """Build ``games/xiaolin_showdown/data/xs_game.db`` from ``xs_game.sql`` — the card catalog.
 
-    python build_cards.py
+    python scripts/build_cards.py
 
 Run this after editing the seed. Its inverse is ``dump_seed.py``, which writes the seed back out
 from the ``.db`` — the two files hold the same rows and either may be edited, whichever is easier.

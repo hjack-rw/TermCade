@@ -39,7 +39,7 @@ _BASE_WEIGHTS = _DealWeights(base=1, points=2, duel=1)
 # Boss-only in practice — a scenario needs the opponent known before the deal, which holds only for a
 # CHOSEN opponent (bosses are picked, never dealt); a randomly dealt roster gets the default. Same
 # dial for every boss (base/points/duel/counter) — only the values differ, not the mechanism.
-# See docs/balance/BALANCE.md §15 for why Wuya's is tuned as it is.
+# See docs/design/BALANCE-HISTORY.md §15 for why Wuya's is tuned as it is.
 _SCENARIOS: dict[str, _DealWeights] = {
     "Chase_Young": replace(_BASE_WEIGHTS, counter=-8),
     "Wuya": replace(_BASE_WEIGHTS, points=4),

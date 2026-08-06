@@ -1,0 +1,147 @@
+/* Shared look for generated docs pages (docs/xs_game/CARDS.html, docs/xs_game/KNOBS.html) — same "arcade"
+   palette as the engine's other standalone pages (engine/termcade/web/css/theme.css): amber on
+   black, monospace. One file, linked, so a re-theme or a new generated page is one edit, not a
+   copy-pasted <style> block per file. */
+:root {
+  --amber: #f2c14e;
+  --amber-dim: #c9a23e;
+  --bg: #000;
+  --panel: #111;
+  --line: #332a12;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  background: var(--bg);
+  color: var(--amber);
+  font-family: monospace;
+  margin: 0;
+  padding: 24px clamp(12px, 4vw, 48px) 64px;
+}
+h1 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+}
+.sub {
+  color: var(--amber-dim);
+  margin: 0 0 20px;
+  max-width: 72ch;
+}
+.sub code {
+  color: var(--amber);
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+  align-items: center;
+}
+input,
+select {
+  background: var(--panel);
+  color: var(--amber);
+  border: 1px solid var(--line);
+  font-family: monospace;
+  padding: 6px 10px;
+  font-size: 0.95rem;
+}
+input {
+  flex: 1 1 220px;
+}
+.tablewrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 640px;
+}
+th,
+td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+td.wrap {
+  white-space: normal;
+  min-width: 22ch;
+}
+th {
+  cursor: pointer;
+  user-select: none;
+  color: var(--amber);
+  background: var(--panel);
+  position: sticky;
+  top: 0;
+}
+th:hover {
+  color: #fff;
+}
+th.sorted::after {
+  content: ' \25BE';
+}
+th.sorted.desc::after {
+  content: ' \25B4';
+}
+tr:hover td {
+  background: #1a1200;
+}
+.count {
+  color: var(--amber-dim);
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+.mech {
+  color: var(--amber-dim);
+}
+.mech-clickable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.mech-popup {
+  position: absolute;
+  z-index: 10;
+  max-width: 320px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+.mech-popup p {
+  margin: 0;
+  color: var(--amber);
+  white-space: normal;
+}
+.pagelist {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.pagelist li {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.pagelist a {
+  color: var(--amber);
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+.pagelist p {
+  margin: 4px 0 0;
+  color: var(--amber-dim);
+}
+footer {
+  margin-top: 28px;
+  color: var(--amber-dim);
+  font-size: 0.9rem;
+}
+footer a,
+.sub a {
+  color: var(--amber);
+}

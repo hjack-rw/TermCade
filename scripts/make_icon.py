@@ -1,7 +1,7 @@
 """Draw ``engine/termcade/assets/termcade.ico`` — the cabinet, mid-blast, as a Windows icon.
 
     pip install -e ".[build]"
-    python make_icon.py
+    python scripts/make_icon.py
 
 The cabinet (``assets/cabinet.png``) is a transparent PNG. Behind it goes a white pixel halo,
 generated here rather than stored: it is drawn on a coarse grid and scaled up with NEAREST, which
@@ -26,7 +26,7 @@ from pathlib import Path
 
 from PIL import Image
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent
 CABINET = ROOT / "engine" / "termcade" / "assets" / "cabinet.png"
 OUT = ROOT / "engine" / "termcade" / "assets" / "termcade.ico"
 

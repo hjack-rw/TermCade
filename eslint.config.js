@@ -28,7 +28,10 @@ const PLACEHOLDERS = [
 
 module.exports = [
   {
-    files: ['engine/termcade/web/*.js'],
+    // `*.js`, not a bare directory, matched nothing under `web/js/` — every real script lives one
+    // level deeper than this glob reached, so `npm run lint` was linting an empty set with 0 custom
+    // rules applied. `**/*.js` is the fix; confirmed against `--print-config` before relying on it.
+    files: ['engine/termcade/web/**/*.js'],
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'script',
@@ -44,6 +47,22 @@ module.exports = [
       // AudioBufferSource stopped twice. Every one of them is a path that must not take the page
       // down with it.
       'no-empty': ['error', { allowEmptyCatch: true }],
+      eqeqeq: 'error',
+      'no-implicit-globals': 'error',
+    },
+  },
+  {
+    // The docs generator's shared script (docs/assets/docs.js) — plain browser JS, no Python
+    // template placeholders to declare, so its own block rather than folding into the one above.
+    files: ['docs/assets/*.js'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'script',
+      globals: { ...globals.browser },
+    },
+    rules: {
+      'no-undef': 'error',
+      'no-unused-vars': ['error', { caughtErrors: 'none' }],
       eqeqeq: 'error',
       'no-implicit-globals': 'error',
     },

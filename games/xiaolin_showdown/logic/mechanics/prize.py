@@ -1,5 +1,5 @@
 """Who takes the revealed Wu — the four ways to claim it, tried in order, and what happens when
-nobody does. See docs/design/CIRCULATION.md for the full rationale.
+nobody does. See docs/xs_game/CIRCULATION.md for the full rationale.
 
 1. **a decisive blow** — one stat at or above ``N``
 2. **a broad win** — two stats at ``N-1``

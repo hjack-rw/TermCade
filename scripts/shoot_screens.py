@@ -1,6 +1,6 @@
 """Regenerate the README screenshots from the real app, headless.
 
-    python shoot_screens.py
+    python scripts/shoot_screens.py
 
 Textual renders a screen to SVG, so a screenshot is reproducible rather than a photograph of
 somebody's terminal — rerun it after a UI change and the README stops lying. A fixed seed keeps the
@@ -29,7 +29,7 @@ from termcade.ui.app import EngineApp
 from xiaolin_showdown.game import build_game
 from xiaolin_showdown.screens.run.start import StartScreen
 
-OUT = Path(__file__).parent / "screenshots"
+OUT = Path(__file__).resolve().parent.parent / "screenshots"
 # Per screen: the board is laid out for 140 wide (what `serve.py` auto-fits the browser to) and
 # truncates if shot narrower, while shooting the short screens that tall leaves empty frame.
 # Tall enough that NOTHING scrolls: a screen shot shorter than its content grows a scrollbar and the

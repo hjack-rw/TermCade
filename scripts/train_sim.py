@@ -15,7 +15,7 @@ import statistics
 import sys
 
 sys.argv = ["train_sim", "."]  # balance.py reads its repo path off argv
-sys.path[:0] = ["engine", "games", "docs/balance"]
+sys.path[:0] = ["engine", "games", "scripts"]
 
 from termcade.core.rng import Rng  # noqa: E402
 from termcade.core.settings import Difficulty, Settings  # noqa: E402

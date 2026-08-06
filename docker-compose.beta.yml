@@ -8,7 +8,7 @@
 # page loads to a dead terminal. Hand testers <that URL>/?code=<their code>.
 services:
   serve:
-    profiles: ["beta"]
+    profiles: ['beta']
     environment:
       # The gate: present means every request needs a passcode. Remove it and the server is open.
       TERMCADE_CODES: /data/codes.txt
@@ -20,7 +20,7 @@ services:
       - ./codes.txt:/data/codes.txt:ro
 
   tunnel:
-    profiles: ["beta"]
+    profiles: ['beta']
     image: cloudflare/cloudflared:latest
     # A quick tunnel: no account, no DNS, a throwaway hostname printed to this container's log.
     # For a URL that survives a restart, swap this for `tunnel run` with a named tunnel token.

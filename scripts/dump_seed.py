@@ -1,6 +1,6 @@
 """Write ``games/xiaolin_showdown/data/xs_game.sql`` back out from ``xs_game.db`` — the other way.
 
-    python dump_seed.py
+    python scripts/dump_seed.py
 
 The inverse of ``build_cards.py``, and the reason both exist: a card table is far easier to *edit*
 in a DB browser than as forty columns of INSERT, so the ``.db`` is a legitimate place to work. What

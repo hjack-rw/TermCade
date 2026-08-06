@@ -7,7 +7,7 @@ Everything that knows what a row looks like lives here: column order, the ``powe
 and the ``~`` suffix that encodes an initiative bonus. :mod:`models` stays plain data.
 
 The DB is a build artifact. ``xs_game.sql`` is the source a card is written into, and
-:func:`build_db` turns it into the file the game reads — see ``build_cards.py``.
+:func:`build_db` turns it into the file the game reads — see ``scripts/build_cards.py``.
 """
 
 from __future__ import annotations
@@ -98,7 +98,7 @@ def catalog_fingerprint(catalog: Catalog, config: dict[str, dict[str, int]]) -> 
     ``flow.duel.DuelState.background_name``).
 
     Compared against the canonical build's fingerprint (``catalog_fingerprint.CANONICAL``, generated
-    by ``generate_catalog_fingerprint.py``) by :func:`catalog_tampered`, so a hand-edited ``.db`` — as
+    by ``scripts/generate_catalog_fingerprint.py``) by :func:`catalog_tampered`, so a hand-edited ``.db`` — as
     opposed to one rebuilt from an honestly-edited ``xs_game.sql`` — can be told apart from a real
     balance change and kept from counting toward the boss ladder (see
     ``config.settings.rules_modified``).
@@ -125,7 +125,7 @@ def catalog_tampered(db_path: Path | str = DEFAULT_DB) -> bool:
     """Whether ``db_path`` diverges from the canonical build — a ``.db`` hand-edited after the fact,
     rather than rebuilt from an honestly-edited ``xs_game.sql`` (:func:`build_db` always regenerates
     from empty, so a legitimate change always carries a matching, regenerated fingerprint)."""
-    from .catalog_fingerprint import CANONICAL  # generated — see generate_catalog_fingerprint.py
+    from .catalog_fingerprint import CANONICAL  # generated — see scripts/generate_catalog_fingerprint.py
 
     catalog = load_catalog(db_path)
     config = load_mechanic_config(db_path)

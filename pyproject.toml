@@ -29,8 +29,9 @@ dev = [
     # the whole tree once). Pin, so `ruff check .` means the same thing on both sides. Bump deliberately.
     "pytest", "pytest-asyncio", "textual-dev", "ruff==0.15.20", "mypy==2.1.0", "textual-serve~=1.1", "fonttools", "pytest-playwright", "pillow",
 ]
-# Build the standalone double-click executable (see build_launcher.py). Pillow is also in dev now that
-# `ui/pixels.py` imports it — the type check needs the stubs, and `make_icon.py` needs it to build.
+# Build the standalone double-click executable (see scripts/build_launcher.py). Pillow is also in dev
+# now that `ui/pixels.py` imports it — the type check needs the stubs, and `scripts/make_icon.py`
+# needs it to build.
 build = ["pyinstaller>=6.0", "textual-serve~=1.1", "pillow"]
 
 [project.scripts]

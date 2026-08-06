@@ -1,7 +1,7 @@
 """Build the standalone, double-click TermCade executable with PyInstaller.
 
     pip install -e ".[build]"
-    python build_launcher.py
+    python scripts/build_launcher.py
 
 Produces a single file, ``dist/TermCade.exe`` — hand it to anyone, put it anywhere, double-click. No
 Python, no Docker, no terminal: it starts the browser build locally and opens it. A small console
@@ -21,16 +21,17 @@ from pathlib import Path
 
 import PyInstaller.__main__
 
-ICON = Path(__file__).parent / "engine" / "termcade" / "assets" / "termcade.ico"
+ROOT = Path(__file__).resolve().parent.parent
+ICON = ROOT / "engine" / "termcade" / "assets" / "termcade.ico"
 
 PyInstaller.__main__.run(
     [
-        "TermCade.py",
+        str(ROOT / "TermCade.py"),
         "--name=TermCade",
         "--onefile",
         "--noconfirm",
         "--console",  # prints the URL; closing it stops the server
-        f"--icon={ICON}",  # the cabinet; regenerate it with `python make_icon.py`
+        f"--icon={ICON}",  # the cabinet; regenerate it with `python scripts/make_icon.py`
         "--collect-all=textual",
         "--collect-all=textual_serve",
         "--collect-all=aiohttp",

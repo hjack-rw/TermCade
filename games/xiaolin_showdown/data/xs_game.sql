@@ -4,8 +4,8 @@
 -- WHICHEVER IS EASIER — a card table is far nicer to work in through a DB browser than as forty
 -- columns of INSERT — then regenerate the other one:
 --
---   edited the .sql  ->  python build_cards.py   (writes the .db)
---   edited the .db   ->  python dump_seed.py     (writes this file)
+--   edited the .sql  ->  python scripts/build_cards.py   (writes the .db)
+--   edited the .db   ->  python scripts/dump_seed.py     (writes this file)
 --
 -- Both are committed: the seed so a new Wu is a readable line in a diff, the .db because the
 -- packaged exe and the wheel bundle it as package data and neither runs a build step. Two committed

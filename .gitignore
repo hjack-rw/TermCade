@@ -29,8 +29,12 @@ build/
 # Local, kept out of the repo
 .claude/
 docs/*
-!docs/balance/
-docs/balance/*.bak
+!docs/assets/
+!docs/xs_game/
+!docs/README.md
+!docs/index.html
+!docs/.nojekyll
+docs/xs_game/*.bak
 
 # JS tooling for the page assets (engine/termcade/web). The lockfile IS committed, so CI can
 # `npm ci` and get the exact linters this was checked with.

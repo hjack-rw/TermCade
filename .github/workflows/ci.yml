@@ -13,7 +13,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install (editable + dev extras)
         run: pip install -e ".[dev]"
@@ -29,7 +29,7 @@ jobs:
       # the browser silently did less than it used to, with no error and no failing test.
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
           cache: npm
 
       - name: Install the asset linters

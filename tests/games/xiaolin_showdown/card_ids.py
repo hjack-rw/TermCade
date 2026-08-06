@@ -1,6 +1,6 @@
 """Named cards the test suite reaches for, one constant per mechanic that only one pool Wu carries.
 
-GENERATED — do not hand-edit. Run ``python generate_card_ids.py`` after any card DB change (a
+GENERATED — do not hand-edit. Run ``python scripts/generate_card_ids.py`` after any card DB change (a
 renumber, a rename, a new or removed Wu) to bring this back in sync; ``test_seed.py``'s sibling check
 fails the build the moment it drifts. Import from here instead of a bare integer:
 

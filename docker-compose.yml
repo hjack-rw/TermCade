@@ -5,7 +5,7 @@ services:
   play:
     build: .
     image: termcade
-    profiles: ["play"]
+    profiles: ['play']
     stdin_open: true
     tty: true
     volumes:
@@ -14,10 +14,10 @@ services:
   serve:
     build: .
     image: termcade
-    profiles: ["serve"]
-    command: ["serve"]
+    profiles: ['serve']
+    command: ['serve']
     ports:
-      - "8000:8000"
+      - '8000:8000'
     volumes:
       - tc_saves:/data
 

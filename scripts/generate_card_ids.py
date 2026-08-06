@@ -1,7 +1,7 @@
 """Write ``tests/games/xiaolin_showdown/card_ids.py`` from ``xs_game.db`` — every mechanic that only
 one pool Wu (``card.id >= FIRST_DECK_CARD``) carries becomes one constant, named after the mechanic.
 
-    python generate_card_ids.py
+    python scripts/generate_card_ids.py
 
 Run this any time the card DB changes — a renumber, a rename, a new or removed Wu. Cards are tied to
 their mechanic, not to a printed name or an id that a balance pass can move: a mechanic with exactly
@@ -20,11 +20,11 @@ from pathlib import Path
 from xiaolin_showdown.logic.schema.catalog import DEFAULT_DB
 from xiaolin_showdown.logic.schema.constants import FIRST_DECK_CARD
 
-OUT = Path(__file__).resolve().parent / "tests" / "games" / "xiaolin_showdown" / "card_ids.py"
+OUT = Path(__file__).resolve().parent.parent / "tests" / "games" / "xiaolin_showdown" / "card_ids.py"
 
 HEADER = '''"""Named cards the test suite reaches for, one constant per mechanic that only one pool Wu carries.
 
-GENERATED — do not hand-edit. Run ``python generate_card_ids.py`` after any card DB change (a
+GENERATED — do not hand-edit. Run ``python scripts/generate_card_ids.py`` after any card DB change (a
 renumber, a rename, a new or removed Wu) to bring this back in sync; ``test_seed.py``'s sibling check
 fails the build the moment it drifts. Import from here instead of a bare integer:
 
