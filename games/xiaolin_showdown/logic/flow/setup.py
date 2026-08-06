@@ -20,7 +20,7 @@ from ..mechanics.powers import Mechanic, mechanic_of
 from ..schema.models import Card, Character, Player
 from ..config.settings import XiaolinSettings, deal_target, pile_size_for, point_limit_for
 from ..schema.state import XiaolinState
-from .turn import duel_value
+from .turn import counters_against, duel_value
 
 # Deal weight = how likely a Wu is dealt into a run. Points (so the deck can reach the target) and duel
 # strength (so the fights stay sharp) both pull it up; the base keeps every Wu reachable. Points lead,
@@ -30,16 +30,20 @@ class _DealWeights:
     base: int
     points: int
     duel: int
+    counter: int = 0  # bonus weight for a Wu whose mechanic keys the opponent's own counter set
 
 
 _BASE_WEIGHTS = _DealWeights(base=1, points=2, duel=1)
 
 # Per-opponent scenario overrides: some opponents are beaten by a different deck than the default deals.
 # Boss-only in practice — a scenario needs the opponent known before the deal, which holds only for a
-# CHOSEN opponent (bosses are picked, never dealt); a randomly dealt roster gets the default.
+# CHOSEN opponent (bosses are picked, never dealt); a randomly dealt roster gets the default. Same
+# dial for every boss (base/points/duel/counter) — only the values differ, not the mechanism.
 # See docs/balance/BALANCE.md §15 for why Wuya's is tuned as it is.
 _SCENARIOS: dict[str, _DealWeights] = {
+    "Chase_Young": replace(_BASE_WEIGHTS, counter=-8),
     "Wuya": replace(_BASE_WEIGHTS, points=4),
+    "Hannibal_Roy_Bean": replace(_BASE_WEIGHTS, counter=14),
 }
 
 
@@ -178,7 +182,8 @@ def _weighted_game(
     # A scenario needs the opponent known before the deal; that holds only for a CHOSEN opponent, which
     # bosses always are. A randomly dealt roster (opponent is None) has no scenario and takes the default.
     weights = _SCENARIOS.get(opponent.name, _BASE_WEIGHTS) if opponent is not None else _BASE_WEIGHTS
-    game_deck = _weighted_sample(poolable, min(wanted, len(poolable)), rng, weights)  # RNG call 1
+    counter_mechanics = counters_against(opponent) if opponent is not None else frozenset()
+    game_deck = _weighted_sample(poolable, min(wanted, len(poolable)), rng, weights, counter_mechanics)  # RNG call 1
     dealt = settings.starting_hand_player + settings.starting_hand_bot
     target = point_limit_for(game_deck, dealt=dealt)  # off the whole subset, before dealing thins it
 
@@ -201,13 +206,16 @@ def _weighted_game(
     return state
 
 
-def _weighted_sample(cards: list[Card], k: int, rng: Rng, deal_weights: _DealWeights) -> list[Card]:
+def _weighted_sample(
+    cards: list[Card], k: int, rng: Rng, deal_weights: _DealWeights,
+    counter_mechanics: frozenset[Mechanic] = frozenset(),
+) -> list[Card]:
     """Draw ``k`` distinct Wu by weight (cumulative-weight roulette): the heavier a card, the likelier
     it lands, and the earlier. Uses only :meth:`Rng.randint`, so the draw rides the seeded stream and a
     save replays it exactly. With uniform weights this is a plain shuffle-and-take.
     """
     pool = list(cards)
-    weights = [_deck_weight(card, deal_weights) for card in pool]
+    weights = [_deck_weight(card, deal_weights, counter_mechanics) for card in pool]
     drawn: list[Card] = []
     for _ in range(min(k, len(pool))):
         roll = rng.randint(1, sum(weights))
@@ -221,12 +229,18 @@ def _weighted_sample(cards: list[Card], k: int, rng: Rng, deal_weights: _DealWei
     return drawn
 
 
-def _deck_weight(card: Card, weights: _DealWeights) -> int:
+def _deck_weight(
+    card: Card, weights: _DealWeights, counter_mechanics: frozenset[Mechanic] = frozenset(),
+) -> int:
     """A Wu's odds of being dealt into a run: point-rich and duel-strong Wu are likelier, so a dealt
     deck can reach its target and still field sharp fights, while the base keeps every Wu reachable.
-    The blend is the matchup's :class:`_DealWeights`.
+    A Wu that keys the opponent's own counter set gets ``weights.counter`` on top — so the player is
+    likelier to be dealt an answer to a boss that has one (or, with a negative ``counter``, starved
+    out of the deck instead). The blend is the matchup's :class:`_DealWeights`; floored at 1 so a
+    strongly negative ``counter`` still leaves every Wu reachable, matching ``base``'s own promise.
     """
-    return weights.base + weights.points * card.points + weights.duel * duel_value(card)
+    bonus = weights.counter if mechanic_of(card.power) in counter_mechanics else 0
+    return max(1, weights.base + weights.points * card.points + weights.duel * duel_value(card) + bonus)
 
 
 def _player_set_their_own_deal(settings: XiaolinSettings, cards: list[Card], roster: str) -> bool:

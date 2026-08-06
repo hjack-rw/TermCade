@@ -28,7 +28,9 @@ build/
 
 # Local, kept out of the repo
 .claude/
-docs/
+docs/*
+!docs/balance/
+docs/balance/*.bak
 
 # JS tooling for the page assets (engine/termcade/web). The lockfile IS committed, so CI can
 # `npm ci` and get the exact linters this was checked with.
