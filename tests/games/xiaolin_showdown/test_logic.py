@@ -113,7 +113,8 @@ def test_new_game_hand_sizes():
 
 
 def test_new_game_never_pads_the_deck_with_blanks():
-    """A ``max_deck_size`` set beyond the pool caps at the pool, not blank card 0 filler."""
+    """A ``max_deck_size`` set beyond the pool caps at the pool, not padded with card 0 (below
+    ``FIRST_DECK_CARD``, and never in the pool regardless of what it is — Jack-Bot, today)."""
     cat = load_catalog()
     huge = XiaolinSettings(max_deck_size=deck_size_for(cat.cards) * 10)
     state = new_game(cat, Rng(1), _omi(cat), settings=huge)

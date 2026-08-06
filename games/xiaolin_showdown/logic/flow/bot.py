@@ -29,7 +29,7 @@ from .turn import duel_value
 
 def is_jack(player: Player) -> bool:
     """Whether this duelist holds a permanent Jack-Bot boost — Jack Spicer, and only him: the
-    mechanic is his alone (see ``xs_game.sql``'s powers -8 and 71 — his character and his card,
+    mechanic is his alone (see ``xs_game.sql``'s powers -8 and 0 — his character and his card,
     the same split as Hannibal's Elemental Manipulation and Moby Morpher)."""
     return mechanic_of(player.character.power) is Mechanic.BOT
 

@@ -7,4 +7,4 @@ fails the build the moment it drifts. See :func:`~xiaolin_showdown.logic.schema.
 
 from __future__ import annotations
 
-CANONICAL = "566aface59450e03cf1cfdfd6ab02b4e061d84d3d903b5a8b56b7706d6a9b24e"
+CANONICAL = "964a5f664239972bd23d30062c907256175e02fe1951f40875f86320167cf78a"

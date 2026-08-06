@@ -36,14 +36,12 @@ OPPOSITES = {
 # every OTHER card (`setup.new_game`/`_weighted_game` filter on `card.id >= FIRST_DECK_CARD`, not on
 # position, so a signature card's id only needs to be negative or small; it never has to occupy a
 # hole in the pool's own contiguous run):
-#   0     blank — the template/dummy card and deck filler/padding
+#   0     Jack-Bot, Jack's wudai — never in the pool. Resolved by mechanic (BOT), not by id, since a
+#         mechanic-grouped renumber moves the card an id would have named (see `setup._reserve_signature`).
 #   1..4  the four playable characters' signature Wu — never in the draw pool; granted on pick.
 #         Each *shares* its character's power (the dragon), so power_id is -1..-4 too.
 #   5     Moby Morpher, Hannibal's wudai — IN the pool by default, removed only when Hannibal is in
 #         play. Its power is its own ("Allomorphia", 30); Hannibal's is "Free Allomorphia" (-5).
-#   -8    Jack-Bot, Jack's wudai — never in the pool. Appended after Moby Morpher, so it could not
-#         reuse a low positive id the way 1-4 do; it carries its power's id directly instead (see
-#         `setup._reserve_signature`).
 # So the shuffled draw pile starts at card 5 (Moby Morpher included).
 FIRST_DECK_CARD = 5
 

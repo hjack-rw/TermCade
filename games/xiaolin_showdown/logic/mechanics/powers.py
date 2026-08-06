@@ -418,9 +418,11 @@ RULES: dict[Mechanic, Rule] = {
 
 
 # Mechanics no printed card names. `actions.usable_powers` has a branch waiting for HAND_FIZZLE,
-# and nothing in the card DB satisfies it — the branch is unreachable today. Listed here
-# so the "every mechanic is reachable" test stays a guard rather than a permanent failure.
-UNPRINTED: frozenset[Mechanic] = frozenset({Mechanic.HAND_FIZZLE})
+# and nothing in the card DB satisfies it — the branch is unreachable today. FILLER is a rule with
+# nothing left to apply it to: an ordinary opponent's "no power" is `catalog.NO_POWER`, a synthetic
+# stand-in never read from a DB row (see its own comment). Listed here so the "every mechanic is
+# reachable" test stays a guard rather than a permanent failure.
+UNPRINTED: frozenset[Mechanic] = frozenset({Mechanic.HAND_FIZZLE, Mechanic.FILLER})
 
 
 def rule_of(power: Power) -> Rule:
@@ -452,7 +454,7 @@ def is_gamble(power: Power) -> bool:
     return mechanic_of(power) is Mechanic.GAMBLE
 
 
-SAPPHIRE_DRAGON = 75  # Agalmatosis — the one Wu a duelist cannot command; fielded, it loses the showdown
+SAPPHIRE_DRAGON = 74  # Agalmatosis — the one Wu a duelist cannot command; fielded, it loses the showdown
 
 
 def is_uncontrolled(power: Power) -> bool:

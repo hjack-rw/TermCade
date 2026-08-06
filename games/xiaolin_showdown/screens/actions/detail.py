@@ -9,7 +9,7 @@ from textual.widgets import Footer, Header, Static
 from termcade.ui.screens.base import EngineScreen
 from termcade.ui.widgets import BoxedPanel
 
-from ...logic.schema.models import Card, Character
+from ...logic.schema.models import Card, Character, Mechanic
 from ...logic.config.settings import XiaolinSettings
 from ...logic.mechanics.powers import is_gamble
 from ..display.format import (
@@ -62,7 +62,9 @@ class DetailScreen(EngineScreen):
 
             # An inalienable player Wu (power id −5..−1) keeps its power hidden.
             hidden = self._is_card and -5 < power.id < 0
-            if power.id and not hidden:
+            # `Mechanic.FILLER` is the real "no power" signal — id 0 no longer is, now that a real
+            # power (Robotics) lives there too (see `catalog.NO_POWER`).
+            if power.mechanic is not Mechanic.FILLER and not hidden:
                 power_line = Text("Power: ")
                 power_line.append_text(power_name_text(power))
                 # The joke Wu's name, timing and text are the same three question marks. Printing all

@@ -143,13 +143,15 @@ def points_label(card: Card) -> str:
     return str(card.points)
 
 
-# Born wudai: negative power id (the dragons, Jack-Bot), or MORPH (Hannibal's Morpher, whose power id
-# is positive so it can't use the negative-id rule).
+# Born wudai: power id <= 0 (the dragons at -1..-4, Jack-Bot's Robotics at 0) — except FILLER, the
+# "no power" sentinel's own id (see `catalog.NO_POWER`), never a real Wu — or MORPH (Hannibal's
+# Morpher, whose power id is positive — 30 — so it can't use the id rule at all).
 def _is_born_wudai(card: Card) -> bool:
     """A signature wudai a duelist holds from the start, never banked."""
     if card.type != "wudai":
         return False
-    return card.power.id < 0 or mechanic_of(card.power) is Mechanic.MORPH
+    mechanic = mechanic_of(card.power)
+    return (card.power.id <= 0 and mechanic is not Mechanic.FILLER) or mechanic is Mechanic.MORPH
 
 
 def display_type(card: Card) -> str:

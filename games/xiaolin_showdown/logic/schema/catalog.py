@@ -29,6 +29,12 @@ DEFAULT_SQL = DATA / "xs_game.sql"
 # A card/character row's 6th column is a *power id*; resolution is a lookup.
 ResolvePower = Callable[[int], Power]
 
+# An ordinary opponent (Tubbimura, Vlad, ...) has no signature power at all — `power_id` is ``NULL``,
+# not a row pointing at a "does nothing" placeholder, so the DB never has to reserve an id nobody's
+# card or power ever collides with. A synthetic stand-in, never read from a row — like `resolve.
+# _NEUTRAL_POWER`, which is why it shares that convention's `id=0`.
+NO_POWER = Power(id=0, name="No power", mechanic=Mechanic.FILLER, description="")
+
 
 @dataclass(frozen=True)
 class Catalog:
@@ -190,7 +196,7 @@ def _character(row: tuple, resolve_power: ResolvePower) -> Character:
         cid,
         name,
         stats,
-        resolve_power(power_id),
+        NO_POWER if power_id is None else resolve_power(power_id),
         affiliation,
         bool(is_playable),
         tier,

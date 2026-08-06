@@ -112,11 +112,11 @@ def _reserve_signature(draw_pile: list[Card], character: Character, catalog: Cat
 
     Pull that Wu out of the DEALT pile if it is there — a weighted deal may not have sampled it at
     all — so it can never be drawn twice. The four dragons' Wu is `abs(power_id)` (ids -1..-4, cards
-    1..4 — those never move, see xs_game.sql's header). Jack's card was never free to match his
-    power's id either, so his carries it directly instead (-8, -8), and sits below `FIRST_DECK_CARD`
-    like the dragons'. Hannibal's Wu (Moby Morpher, MORPH) is different again: card 5 was only ever a
-    coincidence of dealing order, and a mechanic-grouped renumber moves it — so his signature is
-    found in the full catalog by mechanic, the one property a regroup preserves, not by id.
+    1..4 — those never move, see xs_game.sql's header). Hannibal's Wu (Moby Morpher, MORPH) and
+    Jack's (Jack-Bot, BOT) are both found in the full catalog by mechanic instead: a mechanic-grouped
+    renumber moves the card their id would have named (card 5 for Hannibal was only ever a coincidence
+    of dealing order; Jack-Bot moved from -8 to 0 in the same spirit), and mechanic is the one property
+    a regroup preserves.
 
     Returns the Wu's id, or ``None`` when the character carries no signature (a positive power id, or
     one of ``_NO_SIGNATURE_WU``).
@@ -126,8 +126,10 @@ def _reserve_signature(draw_pile: list[Card], character: Character, catalog: Cat
         return None
     if power_id == -5:
         signature = next(c.id for c in catalog.cards if mechanic_of(c.power) is Mechanic.MORPH)
+    elif power_id == -8:
+        signature = next(c.id for c in catalog.cards if mechanic_of(c.power) is Mechanic.BOT)
     else:
-        signature = abs(power_id) if power_id >= -4 else power_id
+        signature = abs(power_id)
     for index, card in enumerate(draw_pile):
         if card.id == signature:
             del draw_pile[index]
