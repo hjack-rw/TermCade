@@ -13,7 +13,6 @@ from termcade.ui.widgets import BoxedPanel, Button
 
 from ..display._logo import SUBTITLE_ART, TITLE_ART, TITLE_ART_STACKED
 from .character_select import CharacterSelectScreen
-from ..reference.lore import LoreScreen
 from ..reference.rules import RulesScreen
 from ..reference.settings import SettingsScreen
 from .temple import TempleScreen
@@ -54,6 +53,10 @@ class StartScreen(EngineScreen):
         elif event.button.id == "settings":
             self.app.push_screen(SettingsScreen())
         elif event.button.id == "lore":
+            # Deferred: rich.markdown/markdown_it are ~65ms of import cost every session pays at
+            # boot if this sits at module level, for a screen most sessions never open.
+            from ..reference.lore import LoreScreen
+
             self.app.push_screen(LoreScreen())
         elif event.button.id == "quit":
             self.app.exit()
