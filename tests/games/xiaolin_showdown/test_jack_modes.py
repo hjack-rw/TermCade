@@ -16,6 +16,7 @@ from xiaolin_showdown.logic.characters import jack
 from xiaolin_showdown.logic.flow.battle import Round, Side
 from xiaolin_showdown.logic.schema.catalog import load_catalog
 from xiaolin_showdown.logic.flow.duel import Duel, DuelState
+from xiaolin_showdown.logic.mechanics.powers import CHAMELON_MARGIN
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.setup import new_game
 from xiaolin_showdown.logic.schema.state import XiaolinState
@@ -274,8 +275,8 @@ def test_chamelon_boost_card_bumps_only_the_contested_stat():
     duel.state.player.character.stats = {"force": 9, "agility": 2, "intellect": 2}
     card = duel._chamelon_boost_card()
     assert card is not None
-    # 9 - his own 3, plus CHAMELON_MARGIN (1) past parity, not just up to it
-    assert card.stats == {"force": 7, "agility": 0, "intellect": 0}
+    # 9 - his own 3, plus CHAMELON_MARGIN past parity, not just up to it
+    assert card.stats == {"force": 6 + CHAMELON_MARGIN, "agility": 0, "intellect": 0}
     assert card.element == ""  # never resonates or suffers — precisely the bump, nothing else
 
 

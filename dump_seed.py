@@ -33,12 +33,16 @@ def _literal(value: object) -> str:
 
 
 def _rows(con: sqlite3.Connection, table: str) -> list[str]:
-    """Every row of one table, as the INSERT lines the seed holds — ordered by id, so the file is
-    stable: dumping the same DB twice must produce the same bytes, or the diff is noise."""
-    columns = [row[1] for row in con.execute(f'PRAGMA table_info("{table}")')]
+    """Every row of one table, as the INSERT lines the seed holds — ordered by the table's own
+    primary key (whatever it is, not assumed to be a column named ``id``), so the file is stable:
+    dumping the same DB twice must produce the same bytes, or the diff is noise."""
+    info = list(con.execute(f'PRAGMA table_info("{table}")'))
+    columns = [row[1] for row in info]
+    pk = [row[1] for row in sorted((r for r in info if r[5]), key=lambda r: r[5])]
+    order_by = ", ".join(f'"{column}"' for column in (pk or columns))
     names = ", ".join(f'"{column}"' for column in columns)
     lines = []
-    for row in con.execute(f'SELECT {names} FROM "{table}" ORDER BY id'):
+    for row in con.execute(f'SELECT {names} FROM "{table}" ORDER BY {order_by}'):
         values = ", ".join(_literal(value) for value in row)
         lines.append(f"INSERT INTO {table} ({names}) VALUES ({values});")
     return lines
