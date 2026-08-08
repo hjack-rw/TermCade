@@ -13,7 +13,7 @@ async def test_a_headless_session_keeps_its_device_player() -> None:
     """The test driver has no ``write_meta`` — same shape as a real terminal session."""
     app = EngineApp()
     async with app.run_test():
-        assert not isinstance(app._player, BrowserPlayer)
+        assert not isinstance(app._music.player, BrowserPlayer)
 
 
 async def test_a_driver_with_a_meta_channel_gets_a_browser_player(monkeypatch) -> None:
@@ -30,4 +30,4 @@ async def test_a_driver_with_a_meta_channel_gets_a_browser_player(monkeypatch) -
 
         app._use_browser_audio()
 
-        assert isinstance(app._player, BrowserPlayer)
+        assert isinstance(app._music.player, BrowserPlayer)

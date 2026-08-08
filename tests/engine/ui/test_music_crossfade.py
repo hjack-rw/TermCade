@@ -14,9 +14,9 @@ from termcade.ui.app import EngineApp
 async def test_a_crossfade_into_an_unrendered_tune_reaches_start_theme(monkeypatch):
     app = EngineApp()
     async with app.run_test():
-        app._tunes.clear()  # boot's own on_mount already rendered the attract theme — force a re-render
+        app._music._tunes.clear()  # boot's own on_mount already rendered the attract theme — force a re-render
         started = []
-        monkeypatch.setattr(app, "_start_theme", lambda: started.append(app._crossfade))
+        monkeypatch.setattr(app._music, "_start_theme", lambda: started.append(app._music._crossfade))
 
         app.apply_music_setting(crossfade=2.5)
 
@@ -26,9 +26,9 @@ async def test_a_crossfade_into_an_unrendered_tune_reaches_start_theme(monkeypat
 async def test_no_crossfade_requested_leaves_it_at_zero(monkeypatch):
     app = EngineApp()
     async with app.run_test():
-        app._tunes.clear()
+        app._music._tunes.clear()
         started = []
-        monkeypatch.setattr(app, "_start_theme", lambda: started.append(app._crossfade))
+        monkeypatch.setattr(app._music, "_start_theme", lambda: started.append(app._music._crossfade))
 
         app.apply_music_setting()
 
