@@ -37,10 +37,21 @@ def render_bar(fraction: float, width: int = 10, *, segments: bool = True) -> st
 class ProgressBar(Static):
     """A bar showing a 0..1 fraction. ``set_progress`` redraws it in place."""
 
-    def __init__(self, fraction: float = 0.0, *, width: int = 10, **kwargs) -> None:
+    def __init__(
+        self,
+        fraction: float = 0.0,
+        *,
+        width: int = 10,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+    ) -> None:
         self._fraction = fraction
         self._width = width
-        super().__init__(render_bar(fraction, width), **kwargs)
+        super().__init__(
+            render_bar(fraction, width), name=name, id=id, classes=classes, disabled=disabled
+        )
 
     def set_progress(self, fraction: float) -> None:
         self._fraction = max(0.0, min(1.0, fraction))

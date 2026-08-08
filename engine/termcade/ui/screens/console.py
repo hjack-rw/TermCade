@@ -22,6 +22,7 @@ because only the cartridge knows what a Wu is.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import cast
@@ -49,8 +50,6 @@ def debug_enabled() -> bool:
 
         TERMCADE_DEBUG=1 xiaolin
     """
-    import os
-
     return os.environ.get(DEBUG_ENV, "").strip().lower() in ("1", "true", "yes", "on")
 
 

@@ -11,7 +11,8 @@ from __future__ import annotations
 import hashlib
 import random
 import secrets
-from typing import Any, MutableSequence, Sequence, TypeVar
+from collections.abc import MutableSequence, Sequence
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 

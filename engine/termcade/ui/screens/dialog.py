@@ -8,6 +8,7 @@ value, so ``await``-ing it yields the option's type with no cast. The convenienc
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 
 from typing import TypeVar
@@ -31,8 +32,8 @@ class ChoiceModal(ModalScreen[T]):
         # A modal is not an `EngineScreen`, so it misses the touch class the rest of the game gets —
         # and the post-duel "let a Wu go" picker is a modal listing a whole hand, which ran off a
         # phone exactly like Look Up did.
-        import os
-
+        # Local: `base.py` imports `ChoiceModal` from this module at module level, so a module-level
+        # `from .base import TOUCH_ENV` here would cycle.
         from .base import TOUCH_ENV
 
         if os.environ.get(TOUCH_ENV):

@@ -7,9 +7,18 @@ game reskins it by overriding CSS variables.
 from __future__ import annotations
 
 from textual.containers import Vertical
+from textual.widget import Widget
 
 
 class BoxedPanel(Vertical):
-    def __init__(self, *children, title: str = "", **kwargs) -> None:
-        super().__init__(*children, **kwargs)
+    def __init__(
+        self,
+        *children: Widget,
+        title: str = "",
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+    ) -> None:
+        super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
         self.border_title = title

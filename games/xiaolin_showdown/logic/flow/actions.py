@@ -1,4 +1,5 @@
-"""Pure temple actions between duels — no I/O: deposit, use-power, and draw.
+"""Pure temple actions between duels — no I/O: deposit, use-power, draw, train, and the assembly
+moves (Mala Mala Jong, the Yin-Yang Yo-Yo, Farsight).
 
 Draw pulls from the player's *personal* deck, which fills when they shelve surplus cards over the
 hand limit. Together, shelving a card and drawing a fresh one is how the player cycles their hand.
