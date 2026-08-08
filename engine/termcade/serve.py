@@ -195,7 +195,11 @@ def _descriptor_sizes() -> tuple[tuple[int, int], tuple[int, int] | None, tuple[
 def main() -> None:
     port = int(os.environ.get("PORT", "8000"))
     public_url = os.environ.get("PUBLIC_URL", f"http://localhost:{port}")
-    game = os.environ.get("GAME", "xiaolin")
+    game = os.environ.get("GAME")
+    if not game:
+        # No engine-level default: which console command to run is a per-cartridge decision, and a
+        # silent guess here would serve the WRONG game rather than fail — worse than a crash at boot.
+        raise SystemExit("GAME is not set — which console command should `serve` run?")
     fit_size, min_size, touch_fit = _descriptor_sizes()
     make_server(
         port=port, public_url=public_url, game=game,

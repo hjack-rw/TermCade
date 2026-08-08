@@ -267,17 +267,18 @@ class BrowserPlayer:
         self.stop()
 
 
-def browser_player(app: object) -> AudioPlayer | None:
-    """A :class:`BrowserPlayer` for ``app`` if it is being served, else ``None``.
+def browser_player(write_meta: Callable[[dict[str, object]], None] | None) -> AudioPlayer | None:
+    """A :class:`BrowserPlayer` wired to ``write_meta`` if given, else ``None``.
 
-    The driver having a meta channel *is* the question — a real terminal has no such thing, and
-    nothing else distinguishes a served session from a local one as reliably. ``TERMCADE_MUTE``
-    still wins, so the test suite does not start narrating over the browser either.
+    Having a meta channel *is* the question — a real terminal has no such thing, and nothing else
+    distinguishes a served session from a local one as reliably. Resolving ``write_meta`` off the
+    running app is the caller's job: only the UI layer knows Textual's driver, and core does not
+    import Textual to go looking for it. ``TERMCADE_MUTE`` still wins, so the test suite does not
+    start narrating over the browser either.
     """
-    if os.environ.get(MUTE_ENV):
+    if os.environ.get(MUTE_ENV) or write_meta is None:
         return None
-    write_meta = getattr(getattr(app, "_driver", None), "write_meta", None)
-    return BrowserPlayer(write_meta) if callable(write_meta) else None
+    return BrowserPlayer(write_meta)
 
 
 def make_player(*, enabled: bool = True) -> AudioPlayer:

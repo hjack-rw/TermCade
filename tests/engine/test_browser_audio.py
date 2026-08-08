@@ -144,36 +144,27 @@ def test_a_crossfade_survives_the_trip_to_the_page() -> None:
     assert meta.of("loop")[-1]["crossfade"] == 0.6
 
 
-def test_a_terminal_gets_no_browser_player() -> None:
-    """No meta channel means nobody is watching through a page — that is the whole question."""
-
-    class _Terminal:
-        _driver = object()
-
-    assert browser_player(_Terminal()) is None
-    assert browser_player(object()) is None
+def test_no_write_meta_means_no_browser_player() -> None:
+    """No meta channel means nobody is watching through a page — that is the whole question.
+    Resolving it off an app's driver is the UI layer's job (see ``EngineApp._use_browser_audio``);
+    this function only ever sees the already-resolved callable, or the absence of one."""
+    assert browser_player(None) is None
 
 
 def test_a_served_session_gets_one(monkeypatch) -> None:
     monkeypatch.delenv("TERMCADE_MUTE", raising=False)  # the suite mutes itself; see conftest
 
-    class _Served:
-        class _driver:
-            @staticmethod
-            def write_meta(message: dict[str, object]) -> None:
-                return None
+    def write_meta(message: dict[str, object]) -> None:
+        return None
 
-    assert isinstance(browser_player(_Served()), BrowserPlayer)
+    assert isinstance(browser_player(write_meta), BrowserPlayer)
 
 
 def test_the_mute_switch_still_wins(monkeypatch) -> None:
     """Otherwise the test suite narrates into every browser it opens."""
     monkeypatch.setenv("TERMCADE_MUTE", "1")
 
-    class _Served:
-        class _driver:
-            @staticmethod
-            def write_meta(message: dict[str, object]) -> None:
-                return None
+    def write_meta(message: dict[str, object]) -> None:
+        return None
 
-    assert browser_player(_Served()) is None
+    assert browser_player(write_meta) is None

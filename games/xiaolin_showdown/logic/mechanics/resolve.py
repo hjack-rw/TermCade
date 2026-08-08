@@ -26,9 +26,9 @@ choice, or the background for the bot).
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import TYPE_CHECKING
 
 from ..schema.models import Card, Mechanic, Power
+from .battle_types import RoundLike, SideLike
 from .cards import index_of
 from .powers import (
     ANIMATE_FIELD_STAT,
@@ -40,15 +40,12 @@ from .powers import (
     mechanic_of,
 )
 
-if TYPE_CHECKING:
-    from ..flow.battle import Round, Side
-
 # A played card joins the queue wearing this, so `_booster_at_head` never mistakes a stand-in for a
 # live booster and no power re-triggers.
 _NEUTRAL_POWER = Power(id=0, name="", mechanic=Mechanic.FILLER, description="")
 
 def resolve_played_power(
-    round_: "Round", card: Card, *, is_player: bool, element: str, stat: str | None = None,
+    round_: RoundLike, card: Card, *, is_player: bool, element: str, stat: str | None = None,
     display_name: str | None = None,
 ) -> str | None:
     """Resolve ``card`` into this round's scoring queues; return the elemental flag it raised, if any.
@@ -125,13 +122,13 @@ def as_boost(card: Card, element: str, contested: str | None = None) -> Card:
     return queued
 
 
-def _curse(victim: "Side", mirror: Card) -> None:
+def _curse(victim: SideLike, mirror: Card) -> None:
     """Land ``mirror`` on the opponent. It scores against them, and the board credits its caster."""
     victim.queue.append(_inert(mirror))
     victim.suffered.append(mirror)
 
 
-def curse_from_boost(victim: "Side", mirror: Card) -> None:
+def curse_from_boost(victim: SideLike, mirror: Card) -> None:
     """Land Jack-Bot's boost-slot curse on the opponent — his construct, never his own reach.
 
     A played card's curse always lands on an untouched queue; a boost's does not — the victim's OWN
@@ -155,7 +152,7 @@ def curse_from_boost(victim: "Side", mirror: Card) -> None:
     victim.jack_bot.append(mirror)
 
 
-def _amplify(victim: "Side", mirror: Card) -> None:
+def _amplify(victim: SideLike, mirror: Card) -> None:
     """A booster's share of the curse it just doubled.
 
     Slotted *left* of that curse, the way a booster precedes the card it boosts everywhere else.
@@ -179,7 +176,7 @@ def _inert(mirror: Card) -> Card:
     return mirror
 
 
-def _set_element_as(side: "Side", element: str) -> None:
+def _set_element_as(side: SideLike, element: str) -> None:
     """One Wu decrees what a side's Wu count as, for the background bonus. Two decrees that disagree
     (a Set-Element and a Cleanse both landing here) cancel: the side keeps its Wu's own elements, and
     the clash is flagged so the story can say why. Last-writer-wins would let play order decide it."""
@@ -194,8 +191,8 @@ def _apply_mechanic(
     mechanic: Mechanic,
     card: Card,
     played: Card,
-    caster: "Side",
-    opponent: "Side",
+    caster: SideLike,
+    opponent: SideLike,
     element: str,
     stat: str | None,
     contested: str | None = None,
@@ -255,7 +252,7 @@ _NEGATIONS: dict[Mechanic, tuple[bool, str]] = {
 }
 
 
-def _negate(mechanic: Mechanic, caster: "Side", opponent: "Side") -> None:
+def _negate(mechanic: Mechanic, caster: SideLike, opponent: SideLike) -> None:
     """Take a line off the board for the rest of this battle."""
     lands_opposite, line = _NEGATIONS[mechanic]
     setattr(opponent if lands_opposite else caster, line, True)
@@ -301,7 +298,7 @@ def _booster_at_head(own_queue: list[Card]) -> Card | None:
     return None
 
 
-def _apply_booster(booster: Card, played: Card, opponent: "Side", *, cursed: bool) -> None:
+def _apply_booster(booster: Card, played: Card, opponent: SideLike, *, cursed: bool) -> None:
     """The booster takes on 1 per stat the played card contributes — or −1, mirrored onto the
     opponent, when the played card was a curse, which also spends the booster."""
     if cursed:

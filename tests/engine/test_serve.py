@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import jinja2
+import pytest
 
 from termcade import page, serve
 
@@ -474,6 +475,34 @@ def test_serve_reads_the_sizes_off_the_game_descriptor(monkeypatch) -> None:
 def test_serve_falls_back_to_engine_defaults_without_a_factory(monkeypatch) -> None:
     monkeypatch.delenv("GAME_FACTORY", raising=False)
     assert serve._descriptor_sizes() == (serve.DEFAULT_FIT_SIZE, serve.DEFAULT_MIN_SIZE, None)
+
+
+def test_main_refuses_to_guess_which_game_to_run(monkeypatch) -> None:
+    """No engine-level default: a second cartridge that forgot to set GAME must not silently get
+    Xiaolin Showdown instead of its own game."""
+    monkeypatch.delenv("GAME", raising=False)
+    with pytest.raises(SystemExit):
+        serve.main()
+
+
+def test_main_passes_the_configured_game_through(monkeypatch) -> None:
+    monkeypatch.setenv("GAME", "some-other-cartridge")
+    monkeypatch.delenv("GAME_FACTORY", raising=False)
+    captured: dict[str, object] = {}
+
+    class _StubServer:
+        def serve(self) -> None:
+            pass
+
+    def _fake_make_server(**kwargs: object) -> _StubServer:
+        captured.update(kwargs)
+        return _StubServer()
+
+    monkeypatch.setattr(serve, "make_server", _fake_make_server)
+
+    serve.main()
+
+    assert captured["game"] == "some-other-cartridge"
 
 
 def test_a_phone_is_offered_the_games_own_touch_grid() -> None:

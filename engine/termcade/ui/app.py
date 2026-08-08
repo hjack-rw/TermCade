@@ -7,7 +7,7 @@ import queue
 import threading
 from array import array
 from pathlib import Path, PurePath
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -214,8 +214,15 @@ class EngineApp(App[None]):
         for a local run is released rather than left holding a stream — under ``xiaolin-play`` the
         server and the browser are the *same* machine, so leaving it open would play the soundtrack
         twice, once out of each.
+
+        Resolving ``write_meta`` off ``self._driver`` here, not in ``core.audio``: only this
+        (Textual-aware) layer knows the driver's shape, and core's own contract is to never import
+        Textual to go looking for it.
         """
-        player = audio.browser_player(self)
+        write_meta = getattr(getattr(self, "_driver", None), "write_meta", None)
+        player = audio.browser_player(
+            cast("Callable[[dict[str, object]], None] | None", write_meta) if callable(write_meta) else None
+        )
         if player is None:
             return
         self._player.close()
