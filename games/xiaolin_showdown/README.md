@@ -57,7 +57,12 @@ page instead of tapping an arrow.
 ```bash
 xiaolin                                    # needs a real terminal
 xiaolin-play                               # play in the browser — serve + auto-open (needs the [serve] extra)
+xiaolin-play --lan                         # also reachable from other devices on the same wifi
 ```
+
+`--lan` prints a second URL (e.g. `http://192.168.1.23:51234`) — open that on a phone or laptop on
+the same network to play there too. The double-click `.exe` takes the same flag from a shortcut or
+a command prompt (`TermCade.exe --lan`); double-clicking with no flag stays localhost-only.
 
 For a no-Python, no-terminal way to play, or for hosting a closed beta for testers, see the
 [engine README](../../README.md).

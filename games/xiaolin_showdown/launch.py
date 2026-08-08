@@ -51,6 +51,38 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
+def _lan_ip() -> str | None:
+    """This machine's LAN-facing address, or ``None`` off a network. No packet is actually sent —
+    UDP ``connect`` only asks the OS which local interface would carry traffic to that destination,
+    which is the standard trick for finding the outbound address without depending on hostname
+    resolution (that answers ``127.0.1.1`` on plenty of machines)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+        except OSError:
+            return None
+
+
+def _bind_address(port: int) -> tuple[str, str]:
+    """The ``(host, url)`` pair to serve on. ``--lan`` trades the loopback-only address for the
+    machine's LAN one, and binds all interfaces instead of just it, so a phone or laptop on the
+    same wifi can open the same URL. Plain 127.0.0.1 stays the default: nothing should be reachable
+    off the machine unless asked for. ``public_url`` is baked into the served page as the websocket
+    target (see ``termcade.serve``'s module docstring) — every client uses the one address, so this
+    can't be "localhost for me, LAN for everyone else"; the LAN address answers on both.
+    """
+    if "--lan" not in sys.argv:
+        # 127.0.0.1, not "localhost": Windows resolves localhost to IPv6 ::1 first, but the server
+        # binds IPv4 — the mismatch leaves the browser on a blank page. A literal IPv4 URL avoids it.
+        return "127.0.0.1", f"http://127.0.0.1:{port}"
+    lan_ip = _lan_ip()
+    if lan_ip is None:
+        _log("--lan requested but no network interface found; falling back to localhost")
+        return "127.0.0.1", f"http://127.0.0.1:{port}"
+    return "0.0.0.0", f"http://{lan_ip}:{port}"
+
+
 def _chromium_exe() -> str | None:
     """Path to Edge or Chrome for a clean maximized app window, or ``None``. Resolved from the
     Windows registry's ``App Paths`` — where every browser's installer records its exe — so it holds
@@ -129,10 +161,8 @@ def main() -> None:
         from termcade import serve
 
         port = int(os.environ["PORT"]) if os.environ.get("PORT") else _free_port()
-        # 127.0.0.1, not "localhost": Windows resolves localhost to IPv6 ::1 first, but the server
-        # binds IPv4 — the mismatch leaves the browser on a blank page. A literal IPv4 URL avoids it.
-        url = f"http://127.0.0.1:{port}"
-        _log(f"port={port} frozen={getattr(sys, 'frozen', False)}")
+        host, url = _bind_address(port)
+        _log(f"port={port} host={host} frozen={getattr(sys, 'frozen', False)}")
         # Frozen exe: textual-serve re-invokes this same exe (via the shell) to run each session's
         # game. From source: the installed ``xiaolin`` console script.
         # The child inherits this process's environment, so TERMCADE_DEBUG reaches it — but the flag
@@ -147,6 +177,8 @@ def main() -> None:
         if not os.environ.get("TERMCADE_NO_BROWSER"):  # the flag lets tests serve headlessly
             threading.Thread(target=_open_when_ready, args=(url, port), daemon=True).start()
         print(f"TermCade is starting — your browser will open at {url}")
+        if host == "0.0.0.0":
+            print(f"Other devices on this wifi can also play at {url}")
         print("Keep this window open while you play; close it to stop.")
         _log("serving")
         # Size the page from the cartridge's own descriptor, so the browser can't disagree with it.
@@ -157,7 +189,7 @@ def main() -> None:
             port=port,
             public_url=url,
             game=game,
-            host="127.0.0.1",
+            host=host,
             fit_size=card.fit_size or serve.DEFAULT_FIT_SIZE,
             min_size=card.min_size,
         ).serve()
