@@ -52,9 +52,11 @@ if os.environ.get('XS_BEAST_BOOST'):
 # OFF — the non-challenger picks the background again — for the A/B against the default. Applied per run
 # in `play`, where the settings are built.
 if os.environ.get('XS_WITCH_RECALL'):
-    temple_ai.WITCH_RECALL_MARGIN = int(os.environ['XS_WITCH_RECALL'])
+    from xiaolin_showdown.logic.characters import wuya as _wuya_recall
+    _wuya_recall.WITCH_RECALL_MARGIN = int(os.environ['XS_WITCH_RECALL'])
 if os.environ.get('XS_WITCH_LIMIT'):
-    temple_ai.WITCH_RECALL_LIMIT = int(os.environ['XS_WITCH_LIMIT'])
+    from xiaolin_showdown.logic.characters import wuya as _wuya_limit
+    _wuya_limit.WITCH_RECALL_LIMIT = int(os.environ['XS_WITCH_LIMIT'])
 if os.environ.get('XS_WITCH_NOWEAR'):
     from xiaolin_showdown.logic.flow import actions as _actions_witch
     _actions_witch.WITCHCRAFT_WEARS = False
@@ -119,14 +121,14 @@ from xiaolin_showdown.logic.flow.training import (  # noqa: E402
 # Sweep knob: a lost showdown teaches +N instead of +1 (XS_LOSS_FILL=2). Patched on the DUEL's
 # bound name — it imported `record_showdown` at module load, so patching training alone misses it.
 if os.environ.get("XS_LOSS_FILL"):
-    from xiaolin_showdown.logic import duel as _duel_mod
+    from xiaolin_showdown.logic.flow import duel as _duel_mod
 
     _FILL = int(os.environ["XS_LOSS_FILL"])
 
-    def _record(state, *, player_won):
+    def _record(state, settings, *, player_won):
         loser = state.bot if player_won else state.player
-        if add_progress(loser, _FILL) and loser is state.bot:
-            stat = pick_stat(loser)
+        if add_progress(loser, settings, _FILL) and loser is state.bot:
+            stat = pick_stat(loser, settings)
             raise_stat(loser, stat)
             return stat
         return None
