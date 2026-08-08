@@ -22,9 +22,11 @@ made under, as in Docker).
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 import os
 import re
+import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -38,6 +40,11 @@ log = logging.getLogger("termcade.beta")
 CODES_ENV = "TERMCADE_CODES"
 DATA_DIR_ENV = "TERMCADE_DATA_DIR"
 COOKIE = "termcade_beta"
+
+# Bad-guess lockout: enough to blunt a naive brute force against a handful of short codes, not a
+# defense against a distributed attacker — this gate was never sized for that threat model.
+_MAX_ATTEMPTS = 20
+_LOCKOUT_WINDOW = 300.0  # seconds
 
 # Passcodes are hashed into filesystem paths and put in a child's environment, so the safe set is
 # the one that cannot mean anything anywhere: no dots, no slashes, no shell metacharacters, no
@@ -71,6 +78,38 @@ def is_well_formed(code: str) -> bool:
     return bool(_CODE_RE.match(code))
 
 
+def _matches(code: str, codes: frozenset[str]) -> bool:
+    """Whether ``code`` is one of ``codes`` — every candidate compared, not short-circuited, so a
+    guess's timing carries no signal about which valid code it came closest to."""
+    return any(hmac.compare_digest(code, valid) for valid in codes)
+
+
+class _RateLimiter:
+    """Sliding-window lockout for repeated bad passcode guesses, keyed by remote address.
+
+    In-memory and per-process: a restart clears it, and it does not share state across workers in a
+    multi-process deployment. Sized for blunting a naive brute force against a handful of short
+    testers' codes, not a distributed attacker.
+    """
+
+    def __init__(self, *, max_attempts: int = _MAX_ATTEMPTS, window: float = _LOCKOUT_WINDOW) -> None:
+        self._max_attempts = max_attempts
+        self._window = window
+        self._attempts: dict[str, list[float]] = {}
+
+    def record_failure(self, key: str) -> None:
+        self._recent(key).append(time.monotonic())
+
+    def is_locked(self, key: str) -> bool:
+        return len(self._recent(key)) >= self._max_attempts
+
+    def _recent(self, key: str) -> list[float]:
+        now = time.monotonic()
+        kept = [t for t in self._attempts.get(key, []) if now - t < self._window]
+        self._attempts[key] = kept
+        return kept
+
+
 def player_dir(base: Path, code: str) -> Path:
     """The data dir belonging to ``code``, under ``base``.
 
@@ -94,6 +133,7 @@ class BetaServer(TermCadeServer):
         super().__init__(*args, **kwargs)
         self._codes_path = codes_path
         self._data_dir = data_dir
+        self._limiter = _RateLimiter()
 
     def authorized_code(self, request: web.Request) -> str | None:
         """The valid passcode carried by ``request``, or ``None``. Re-read per request, so removing
@@ -101,7 +141,7 @@ class BetaServer(TermCadeServer):
         code = request.cookies.get(COOKIE, "")
         if not is_well_formed(code):
             return None
-        return code if code in load_codes(self._codes_path) else None
+        return code if _matches(code, load_codes(self._codes_path)) else None
 
     async def _make_app(self) -> web.Application:
         app = await super()._make_app()
@@ -122,17 +162,31 @@ class BetaServer(TermCadeServer):
         if self.authorized_code(request) is not None:
             return await handler(request)
 
+        remote = request.remote or "unknown"
+        if self._limiter.is_locked(remote):
+            return web.Response(
+                status=429, text="Too many attempts. Try again later.",
+                headers={"Retry-After": str(int(_LOCKOUT_WINDOW))},
+            )
+
         offered = request.query.get("code", "")
-        if is_well_formed(offered) and offered in load_codes(self._codes_path):
+        if is_well_formed(offered) and _matches(offered, load_codes(self._codes_path)):
             # Raised rather than returned: aiohttp deprecated returning an HTTPException, and the
             # cookie set on it survives being raised.
             redirect = web.HTTPFound(request.path)
             redirect.set_cookie(
                 COOKIE, offered, httponly=True, samesite="Lax",
-                secure=self.public_url.startswith("https://"),
+                # Either signal saying HTTPS is enough — a proxy that terminates TLS in front of us
+                # means our own view of the request scheme is plain http even in production, so
+                # public_url alone has to be trusted there; a bare request.scheme check alone would
+                # have broken exactly that deployment.
+                secure=self.public_url.startswith("https://") or request.scheme == "https",
                 max_age=60 * 60 * 24 * 30,
             )
             raise redirect
+
+        if offered:  # a guess was made and it was wrong — just visiting the door is not an attempt
+            self._limiter.record_failure(remote)
 
         if request.path == "/":
             return web.Response(

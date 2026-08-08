@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
@@ -117,6 +119,22 @@ async def test_a_valid_code_is_moved_out_of_the_url_into_a_cookie(client) -> Non
     assert response.cookies[beta.COOKIE].value == _CODE
 
 
+async def test_the_cookie_is_not_marked_secure_over_plain_http(client) -> None:
+    response = await client.get("/", params={"code": _CODE}, allow_redirects=False)
+    assert not response.cookies[beta.COOKIE]["secure"]
+
+
+async def test_the_cookie_is_marked_secure_when_the_public_url_is_https(codes_file, tmp_path) -> None:
+    """The proxy-terminated-TLS case: our own view of the request is plain http, so public_url is
+    what has to carry the signal — this is what production actually runs under."""
+    server = beta.BetaServer(
+        "true", codes_path=codes_file, data_dir=tmp_path, public_url="https://example.com"
+    )
+    async with TestClient(TestServer(await server._make_app())) as https_client:
+        response = await https_client.get("/", params={"code": _CODE}, allow_redirects=False)
+        assert response.cookies[beta.COOKIE]["secure"]
+
+
 async def test_the_page_assets_are_behind_the_gate_too(client) -> None:
     """An unauthenticated fetch of anything, not just the index."""
     assert (await client.get("/static/js/textual.js", allow_redirects=False)).status == 403
@@ -141,6 +159,53 @@ async def test_removing_a_line_locks_that_tester_out(client, codes_file) -> None
     codes_file.write_text(_OTHER, encoding="utf-8")
 
     assert (await client.get("/", allow_redirects=False)).status == 401
+
+
+async def test_repeated_bad_guesses_from_one_address_get_locked_out(client) -> None:
+    """A naive brute force against a short code must eventually stop getting an answer at all."""
+    for _ in range(beta._MAX_ATTEMPTS):
+        response = await client.get("/", params={"code": "wrong-guess-1"}, allow_redirects=False)
+        assert response.status == 401
+
+    locked = await client.get("/", params={"code": _CODE}, allow_redirects=False)
+    assert locked.status == 429
+
+
+async def test_the_lockout_does_not_trip_on_plain_visits_with_no_code(client) -> None:
+    """Just loading the login page must never count as a guess — only an offered, wrong code does."""
+    for _ in range(beta._MAX_ATTEMPTS + 5):
+        response = await client.get("/", allow_redirects=False)
+        assert response.status == 401
+
+    still_open = await client.get("/", params={"code": _CODE}, allow_redirects=False)
+    assert still_open.status == 302
+
+
+def test_matches_accepts_a_code_on_the_list() -> None:
+    assert beta._matches(_CODE, frozenset({_CODE, _OTHER}))
+
+
+def test_matches_refuses_a_code_off_the_list() -> None:
+    assert not beta._matches("not-a-real-code", frozenset({_CODE, _OTHER}))
+
+
+def test_the_rate_limiter_forgets_attempts_outside_its_window() -> None:
+    limiter = beta._RateLimiter(max_attempts=2, window=0.05)
+    limiter.record_failure("1.2.3.4")
+    limiter.record_failure("1.2.3.4")
+    assert limiter.is_locked("1.2.3.4")
+
+    time.sleep(0.5)  # comfortably past the window even under a loaded test run
+
+    assert not limiter.is_locked("1.2.3.4")
+
+
+def test_the_rate_limiter_tracks_addresses_independently() -> None:
+    limiter = beta._RateLimiter(max_attempts=1, window=60.0)
+    limiter.record_failure("1.2.3.4")
+
+    assert limiter.is_locked("1.2.3.4")
+    assert not limiter.is_locked("5.6.7.8")
 
 
 def test_the_session_subprocess_is_told_its_own_data_dir(tmp_path) -> None:

@@ -181,6 +181,7 @@ class TermCadeServer(Server):
         """
         app = await super()._make_app()
         app.middlewares.append(self._no_store)
+        app.middlewares.append(self._security_headers)
         app.middlewares.append(self._full_gate)
         return app
 
@@ -206,6 +207,23 @@ class TermCadeServer(Server):
         response = await handler(request)
         if response.content_type == "text/html":
             response.headers["Cache-Control"] = "no-store, must-revalidate"
+        return response
+
+    @staticmethod
+    @web.middleware
+    async def _security_headers(
+        request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    ) -> web.StreamResponse:
+        """Two headers with no functional risk: MIME-sniffing and framing get shut off site-wide.
+
+        A Content-Security-Policy is deliberately NOT set here — the page :mod:`termcade.serve`
+        renders carries the engine's own inline script (the meta channel), and upstream's own
+        terminal bundle is unverified against any policy; a wrong CSP breaks the game rather than
+        hardening it, which is worse than the gap it would close.
+        """
+        response = await handler(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
         return response
 
     def session_env(self, request: web.Request) -> dict[str, str]:

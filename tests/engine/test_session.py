@@ -168,6 +168,20 @@ def test_a_garbage_cap_falls_back_to_the_default(monkeypatch) -> None:
     assert session._max_sessions() == session.DEFAULT_MAX_SESSIONS
 
 
+async def test_security_headers_are_set_on_every_response() -> None:
+    server = session.TermCadeServer("true", public_url="http://localhost:8000")
+    served = web.Response(text="the game")
+
+    async def _handler(_req: web.Request) -> web.StreamResponse:
+        return served
+
+    response = await server._security_headers(make_mocked_request("GET", "/"), _handler)
+
+    assert response is served
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
+
+
 @pytest.mark.parametrize(
     "value, clamped",
     [
