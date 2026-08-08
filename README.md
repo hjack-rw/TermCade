@@ -15,7 +15,7 @@ The engine layers with a one-directional purity boundary — `core` (TUI-agnosti
 
 ## Games on the cabinet
 
-- **[Xiaolin Showdown](games/xiaolin_showdown/README.md)** _(1.3, beta)_ — a terminal card duel. See its own README for how to play, the card list, and the lore.
+- **[Xiaolin Showdown](games/xiaolin_showdown/README.md)** _(1.4, beta)_ — a terminal card duel. See its own README for how to play, the card list, and the lore.
 
 ## Controls
 

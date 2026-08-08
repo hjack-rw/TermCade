@@ -1,6 +1,6 @@
 # Xiaolin Showdown
 
-_(1.3, beta)_ — a terminal Deck builder, running on the [TermCade engine](../../README.md).
+_(1.4, beta)_ — a terminal Deck builder, running on the [TermCade engine](../../README.md).
 
 **Non-commercial fan project** — not affiliated with, endorsed, sponsored, or approved by Warner
 Bros., Cartoon Network, or any rights holder. _Xiaolin Showdown_, its characters, and the Shen Gong
