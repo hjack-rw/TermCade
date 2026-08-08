@@ -176,7 +176,7 @@ def _board_text(duel: DuelState, state: XiaolinState) -> RenderableType:
             # `attack_bot_name` instead — see `DuelState.jack_mode`. Attack! and Good Jack's headers
             # read what they actually score as (`shown_stats`), not the printed base stats.
             shown_name=duel.attack_bot_name if duel.jack_mode == jack.ATTACK_NAME else duel.jack_mode,
-            shown_stats=_jack_stats(duel, state.bot, state.player),
+            shown_stats=_jack_stats(duel, state.bot),
         ),
     ]
     if duel.winner_character:
@@ -197,27 +197,15 @@ def _beast_for(duel: DuelState, live: Round) -> str | None:
     return duel.beast_stat if duel.beast_stat and live.stat == duel.beast_stat else None
 
 
-def _jack_stats(
-    duel: DuelState, jack_player: Player, opponent: Player
-) -> dict[str, int] | None:
-    """His shown stats when they diverge from his own printed base, mirroring `duel.Duel._jack_base`.
-    ``None`` for AI Jack, plain Jack, or Chamelon-Bot — Chamelon-Bot's denial is a boost, already on
-    the Offensive line, so baking it into the header too would double-count it. Attack! is flat
-    ATTACK_STAT plus the same metal resonance swing `_jack_base` applies; Good Jack is GOOD_JACK_STAT
-    on force/agility plus his separately trained intellect. Duplicated here rather than shared with
-    `duel.py` (same as `_beast_for`): this module only ever reads `DuelState`, never a live `Duel`.
+def _jack_stats(duel: DuelState, jack_player: Player) -> dict[str, int] | None:
+    """His shown stats when they diverge from his own printed base, or ``None`` (AI Jack, plain
+    Jack, or Chamelon-Bot — Chamelon-Bot's denial is a boost, already on the Offensive line, so
+    baking it into the header too would double-count it).
+
+    `jack.jack_stat_override` — shared with the duel's own scoring (`Duel._jack_base`), so the
+    board can never price him differently from what the showdown actually scores.
     """
-    if duel.jack_mode == jack.ATTACK_NAME:
-        swing = element_score("metal", duel.background) if duel.background else 0
-        return {stat: jack.ATTACK_STAT + swing for stat in jong.battle_stats(opponent)}
-    if mechanic_of(jack_player.character.power) is Mechanic.BOT and jack_player.yoyo_flipped:
-        real = jack_player.character.stats
-        return {
-            "force": jack.GOOD_JACK_STAT + (real["force"] - jack.JACK_PRINTED_PHYSICAL),
-            "agility": jack.GOOD_JACK_STAT + (real["agility"] - jack.JACK_PRINTED_PHYSICAL),
-            "intellect": jack_player.good_jack_intellect,
-        }
-    return None
+    return jack.jack_stat_override(duel.jack_mode, duel.background, jack_player)
 
 
 def _beast_offensive(stat: str, cards: list[Card], challenge: str | None) -> _CardsLine:

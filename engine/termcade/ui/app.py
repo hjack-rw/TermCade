@@ -143,7 +143,7 @@ class EngineApp(App[None]):
         if action == "toggle_focus":
             # Hides the key. It does NOT disable it — this binding is priority, and a priority
             # binding runs without asking. The action itself refuses; see action_toggle_focus.
-            if os.environ.get(TOUCH_ENV):
+            if self.is_touch:
                 return False
             return True if self.screen.focus_chain else None
         return True
@@ -167,6 +167,11 @@ class EngineApp(App[None]):
         )
         self._min_size = game.min_size if game is not None else None
         self._resize_timer: Timer | None = None
+        # Read once, at boot: a session's subprocess is told this in its environment at spawn (see
+        # `termcade.session`) and it never changes for the life of the process. Reading it fresh at
+        # every call site is what made it awkward to override in a test without monkeypatching the
+        # environment 7 times over; every other site below reads this attribute instead.
+        self.is_touch = bool(os.environ.get(TOUCH_ENV))
         # With no game there is no context to own the player, but the empty cabinet still hums.
         self._player = self.ctx.audio if self.ctx is not None else make_player()
         self._closing = False
@@ -248,7 +253,7 @@ class EngineApp(App[None]):
         Nothing else is lost. A tap is routed by what is under it, not by what is hovered, and a
         tooltip is a thing you get by resting a pointer you do not have.
         """
-        if os.environ.get(TOUCH_ENV):
+        if self.is_touch:
             return
         super()._set_mouse_over(widget, hover_widget)
 
@@ -370,10 +375,9 @@ class EngineApp(App[None]):
         self._prerendering.add(name)
 
         def render() -> None:
-            track = music.compose(seed, style)
-            rendered = music.wav_bytes(music.render(track, echo=echo))
+            rendered, step_seconds = music.theme_track(seed, style, echo=echo)
             self._tunes[name] = rendered
-            self._tune_step_seconds[name] = track.step_seconds
+            self._tune_step_seconds[name] = step_seconds
             self._prerendering.discard(name)
 
         self._render_jobs.put(render)
@@ -405,16 +409,15 @@ class EngineApp(App[None]):
         echo = self._tune_echo if self._tune_echo is not None else (
             self.game.music_echo if self.game is not None else False
         )
-        track = music.compose(seed, style)
-        rendered = music.wav_bytes(music.render(track, echo=echo))
+        rendered, step_seconds = music.theme_track(seed, style, echo=echo)
         self._tunes[name] = rendered
-        self._tune_step_seconds[name] = track.step_seconds
+        self._tune_step_seconds[name] = step_seconds
         # The render outlives a fast quit, and a player who muted while it ran wants silence, not a
         # late start — both would otherwise leave the OS looping a sound nobody asked for. It also
         # outlives a switch: by the time it lands the player may already be on another tune.
         if not self._closing and self.music_on and self._tune == name:
             self._player.play_loop(
-                rendered, crossfade=self._crossfade, step_seconds=track.step_seconds, sync=self._tune_sync
+                rendered, crossfade=self._crossfade, step_seconds=step_seconds, sync=self._tune_sync
             )
         self._crossfade = 0.0
 
@@ -477,7 +480,7 @@ class EngineApp(App[None]):
         from a tablet's keyboard case it would drop a player into a mode with no visible way out,
         since the footer no longer advertises the key that leaves it.
         """
-        if os.environ.get(TOUCH_ENV):
+        if self.is_touch:
             return
         if self.screen.focused is None:
             self.screen.focus_next()
@@ -486,12 +489,12 @@ class EngineApp(App[None]):
 
     def action_focus_next(self) -> None:
         """The arrows move *within* focus mode, so they are off wherever the mode is."""
-        if os.environ.get(TOUCH_ENV):
+        if self.is_touch:
             return
         self.screen.focus_next()
 
     def action_focus_previous(self) -> None:
-        if os.environ.get(TOUCH_ENV):
+        if self.is_touch:
             return
         self.screen.focus_previous()
 

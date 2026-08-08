@@ -378,17 +378,16 @@ def test_jack_stats_display_helper_hides_chamelon_denial_its_a_boost_not_a_base(
     # Chamelon-Bot's denial is a boost now (see `_chamelon_boost_card`), already shown on the
     # Offensive line — the header must not bake it in too, or the printed total double-counts it.
     jack_player = duelist(stats={"force": 3, "agility": 3, "intellect": 7})
-    opponent = duelist(stats={"force": 9, "agility": 9, "intellect": 2})
     duel_state = DuelState()
 
     duel_state.jack_mode = jack.CHAMELON_NAME
-    assert _jack_stats(duel_state, jack_player, opponent) is None
+    assert _jack_stats(duel_state, jack_player) is None
 
     duel_state.jack_mode = jack.AI_JACK_NAME
-    assert _jack_stats(duel_state, jack_player, opponent) is None
+    assert _jack_stats(duel_state, jack_player) is None
 
     duel_state.jack_mode = None
-    assert _jack_stats(duel_state, jack_player, opponent) is None
+    assert _jack_stats(duel_state, jack_player) is None
 
 
 def test_jack_stats_display_helper_shows_good_jacks_override():
@@ -396,17 +395,26 @@ def test_jack_stats_display_helper_shows_good_jacks_override():
     # it silently falls back to Evil Jack's raw stats mid-fight.
     duel = _jack_duel(player_priority=True)
     jack_player = duel.state.bot
-    opponent = duel.state.player
     jack_player.yoyo_flipped = True
     real = jack_player.character.stats
 
-    shown = _jack_stats(duel.duel, jack_player, opponent)
+    shown = _jack_stats(duel.duel, jack_player)
 
     assert shown == {
         "force": jack.GOOD_JACK_STAT + (real["force"] - jack.JACK_PRINTED_PHYSICAL),
         "agility": jack.GOOD_JACK_STAT + (real["agility"] - jack.JACK_PRINTED_PHYSICAL),
         "intellect": jack_player.good_jack_intellect,
     }
+
+
+def test_the_board_and_the_duel_price_attack_identically():
+    """`Duel._jack_base` (what the showdown actually scores) and `duel_board._jack_stats` (what the
+    header shows) must never diverge — both go through `jack.jack_stat_override` now."""
+    duel = _jack_duel(player_priority=False)
+    duel.duel.jack_mode = jack.ATTACK_NAME
+    duel.duel.background = "water"
+
+    assert duel._jack_base() == _jack_stats(duel.duel, duel.state.bot)
 
 
 def test_is_construct_true_for_jong():

@@ -18,6 +18,7 @@ Fail all four and the Wu is **lost** — not destroyed. It goes out of play, and
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import StrEnum
 
 from .battle_types import RoundLike
@@ -37,7 +38,7 @@ class PrizeRoute(StrEnum):
 
 
 def claim_route(
-    rounds: list[RoundLike],
+    rounds: Sequence[RoundLike],
     *,
     winner_is_player: bool,
     background: str,
@@ -68,7 +69,7 @@ def claim_route(
     return None
 
 
-def _elemental_surplus(rounds: list[RoundLike], winner_is_player: bool, background: str) -> int:
+def _elemental_surplus(rounds: Sequence[RoundLike], winner_is_player: bool, background: str) -> int:
     """How far the winner's Wu belonged on the ground they fought on, across the whole showdown.
 
     +1 for a Wu of the ground's element, −1 for its opposite — and −1 for metal on any coloured

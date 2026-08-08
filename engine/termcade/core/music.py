@@ -374,7 +374,20 @@ def wav_bytes(pcm: bytes) -> bytes:
 
 def theme(seed: int | str | None = None, style: Style = ARCADE, *, echo: bool = False) -> bytes:
     """The one call a game needs: seed in, loopable WAV out."""
-    return wav_bytes(render(compose(seed, style), echo=echo))
+    return theme_track(seed, style, echo=echo)[0]
+
+
+def theme_track(
+    seed: int | str | None = None, style: Style = ARCADE, *, echo: bool = False
+) -> tuple[bytes, float]:
+    """As :func:`theme`, plus the composed ``Track``'s own ``step_seconds`` alongside the WAV bytes.
+
+    For a caller that needs both, so the (cheap) ``Track`` is not composed twice to get the second
+    value — the render pipeline in ``EngineApp`` (``prerender_tune``/``_start_theme``) is the reason
+    this exists rather than just ``theme()``.
+    """
+    track = compose(seed, style)
+    return wav_bytes(render(track, echo=echo)), track.step_seconds
 
 
 CLICK = "click"

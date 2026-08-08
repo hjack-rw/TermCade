@@ -11,8 +11,10 @@ from termcade.core.rng import Rng
 
 from ..flow.battle import Side
 from ..mechanics.powers import mechanic_of
+from ..mechanics.scoring import element_score
 from ..schema.catalog import load_mechanic_config
-from ..schema.models import Card, Mechanic
+from ..schema.models import Card, Mechanic, Player
+from . import jong
 
 _BOT = load_mechanic_config()["bot"]
 
@@ -46,6 +48,37 @@ ATTACK_BOT_NAMES = (
 GOOD_JACK_NAME = "Good Jack"
 GOOD_JACK_STAT = _BOT["good_jack_stat"]
 JACK_PRINTED_PHYSICAL = _BOT["printed_physical"]
+
+
+def jack_stat_override(
+    jack_mode: str | None, background: str | None, jack_player: Player
+) -> dict[str, int] | None:
+    """The stats Jack fights this showdown with, when they diverge from his own printed base — else
+    ``None`` (plain battle stats apply).
+
+    Attack! is a flat ``ATTACK_STAT`` on every stat, metal, plus the same resonance/suffer swing a
+    metal Wu gets for free — ``Character`` carries no element of its own, so it's added here, same
+    shape as ``BEAST_BOOST``. The swing needs a decided ``background``; it reads as neutral (0)
+    while one is still being picked.
+
+    Good Jack (``Player.yoyo_flipped``) is a flat ``GOOD_JACK_STAT`` on force/agility plus whatever
+    training delta Evil Jack has already banked on them; intellect is his own separately trained
+    value (``Player.good_jack_intellect``), never derived from Evil's.
+
+    The one seam every bot-stats read of him passes through, on both sides that need it: the duel's
+    own scoring (``Duel._jack_base``) and the board's live header (``duel_board._jack_stats``).
+    """
+    if jack_mode == ATTACK_NAME:
+        swing = element_score("metal", background) if background else 0
+        return {stat: ATTACK_STAT + swing for stat in jong.battle_stats(jack_player)}
+    if mechanic_of(jack_player.character.power) is Mechanic.BOT and jack_player.yoyo_flipped:
+        real = jack_player.character.stats
+        return {
+            "force": GOOD_JACK_STAT + (real["force"] - JACK_PRINTED_PHYSICAL),
+            "agility": GOOD_JACK_STAT + (real["agility"] - JACK_PRINTED_PHYSICAL),
+            "intellect": jack_player.good_jack_intellect,
+        }
+    return None
 
 # Jack's keyed counters (see docs/design/BOSSES.md). Read by `bot.steal_target`'s ``prefer`` and
 # `turn._priority_deposit`, via `turn.counters_against`.

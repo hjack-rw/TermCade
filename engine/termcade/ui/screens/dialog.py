@@ -8,10 +8,9 @@ value, so ``await``-ing it yields the option's type with no cast. The convenienc
 
 from __future__ import annotations
 
-import os
 from collections.abc import Sequence
 
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar, cast
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -20,6 +19,9 @@ from textual.screen import ModalScreen
 from textual.widgets import Static
 
 from termcade.ui.widgets import BoxedPanel, Button
+
+if TYPE_CHECKING:
+    from ..app import EngineApp
 
 T = TypeVar("T")
 
@@ -32,11 +34,7 @@ class ChoiceModal(ModalScreen[T]):
         # A modal is not an `EngineScreen`, so it misses the touch class the rest of the game gets —
         # and the post-duel "let a Wu go" picker is a modal listing a whole hand, which ran off a
         # phone exactly like Look Up did.
-        # Local: `base.py` imports `ChoiceModal` from this module at module level, so a module-level
-        # `from .base import TOUCH_ENV` here would cycle.
-        from .base import TOUCH_ENV
-
-        if os.environ.get(TOUCH_ENV):
+        if cast("EngineApp", self.app).is_touch:
             self.add_class("-touch")
 
     # No pre-selected option on open — same rule as EngineScreen, but ModalScreen doesn't inherit it.

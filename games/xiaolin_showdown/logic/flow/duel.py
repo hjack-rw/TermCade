@@ -42,7 +42,7 @@ from ..mechanics.powers import (
 )
 from ..mechanics.prize import PrizeRoute, claim_route
 from ..mechanics.resolve import as_boost, curse_from_boost, resolve_played_power, stand_in
-from ..mechanics.scoring import element_score, initiative
+from ..mechanics.scoring import initiative
 from ..schema.models import Card, Player, Power
 from ..config.settings import XiaolinSettings
 from .summons import jong_form, summon_name
@@ -903,30 +903,12 @@ class Duel:
         live in `_bot_base` — they only touch the one contested stat, and need to know which battle
         that is, which this method does not).
 
-        Attack! is a flat ATTACK_STAT on every stat, metal, plus the same resonance/suffer swing a
-        metal Wu gets for free — `Character` carries no element of its own, so it's added here, same
-        shape as `BEAST_BOOST`. The swing needs a decided ground; it reads as neutral (0) while one
-        is still being picked (see `_setup_brawl`, which calls this to choose it).
-
-        Good Jack (`Player.yoyo_flipped`) is a flat GOOD_JACK_STAT on force/agility plus whatever
-        training delta Evil Jack has already banked on them; intellect is his own separately trained
-        value (`Player.good_jack_intellect`), never derived from Evil's. Otherwise his plain printed
-        stats.
-
-        The one seam every bot-stats read of him passes through, so all three modes are real, not
-        cosmetic.
+        Attack!/Good Jack's overrides are `jack.jack_stat_override` — shared with the board's live
+        header (`duel_board._jack_stats`), so the two can never price him differently. `None` (no
+        override) falls back to his plain battle stats.
         """
-        if self.duel.jack_mode == jack.ATTACK_NAME:
-            swing = element_score("metal", self.duel.background) if self.duel.background else 0
-            return {stat: jack.ATTACK_STAT + swing for stat in jong.battle_stats(self.state.bot)}
-        if bot.is_jack(self.state.bot) and self.state.bot.yoyo_flipped:
-            real = self.state.bot.character.stats
-            return {
-                "force": jack.GOOD_JACK_STAT + (real["force"] - jack.JACK_PRINTED_PHYSICAL),
-                "agility": jack.GOOD_JACK_STAT + (real["agility"] - jack.JACK_PRINTED_PHYSICAL),
-                "intellect": self.state.bot.good_jack_intellect,
-            }
-        return jong.battle_stats(self.state.bot)
+        override = jack.jack_stat_override(self.duel.jack_mode, self.duel.background, self.state.bot)
+        return override if override is not None else jong.battle_stats(self.state.bot)
 
     def _swapped_bases(self) -> tuple[dict[str, int], dict[str, int]]:
         """Both sides' own current stats — Good Jack's override already resolved — after the

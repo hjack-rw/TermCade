@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Sequence
 
 from typing import TYPE_CHECKING, TypeVar, cast
@@ -123,7 +122,7 @@ class EngineScreen(Screen[None]):
         # `-touch` says the player is on a phone. The width breakpoints cannot: a phone in landscape
         # reports 154 columns — wider than a laptop — while having only 36 rows, so `-narrow` never
         # fires there and the desktop layout lands on a 6cm screen. The device tells us instead.
-        if os.environ.get(TOUCH_ENV):
+        if self.engine_app.is_touch:
             self.add_class("-touch")
         self.call_after_refresh(self.announce_back)
 

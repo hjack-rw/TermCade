@@ -93,6 +93,15 @@ def test_theme_is_a_riff_wav():
     assert wav[:4] == b"RIFF" and wav[8:12] == b"WAVE"
 
 
+def test_theme_track_matches_theme_plus_the_composed_step_seconds():
+    """The one thing `theme_track` exists for: the render pipeline gets both the bytes `theme()`
+    hands out and the `Track.step_seconds` it would otherwise have to compose all over again."""
+    wav, step_seconds = music.theme_track("termcade")
+
+    assert wav == music.theme("termcade")
+    assert step_seconds == music.compose("termcade").step_seconds
+
+
 @pytest.mark.parametrize("seed", SEEDS)
 def test_the_render_is_exactly_one_loop_long(seed):
     """Any samples past the loop point are a silent gap the player hits every time it wraps —
