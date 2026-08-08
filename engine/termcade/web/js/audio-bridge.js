@@ -60,7 +60,14 @@
     s.connect(g);
     g.connect(ctx.destination);
     s.start(0, offset || 0);
-    return { src: s, gain: g, buffer: a, stepSeconds: stepSeconds, startedAt: startedAt, offset: offset || 0 };
+    return {
+      src: s,
+      gain: g,
+      buffer: a,
+      stepSeconds: stepSeconds,
+      startedAt: startedAt,
+      offset: offset || 0,
+    };
   };
 
   // Where the incoming tune should start so it lands on the same step of the bar the outgoing one
