@@ -20,3 +20,12 @@ def test_the_bar_is_all_filled_when_full():
 def test_out_of_range_fractions_clamp():
     assert render_bar(-0.5) == render_bar(0.0)
     assert render_bar(1.5) == render_bar(1.0)
+
+
+def test_segments_false_drops_the_bar_and_keeps_only_the_percent():
+    assert render_bar(0.7, width=10, segments=False) == "70%"
+
+
+def test_segments_false_still_clamps_and_rounds():
+    assert render_bar(-0.5, segments=False) == "0%"
+    assert render_bar(1.5, segments=False) == "100%"
