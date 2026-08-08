@@ -93,6 +93,16 @@ def test_stopping_one_voice_leaves_the_others():
     assert kept.pos == 2
 
 
+def test_pos_of_reads_the_playhead_the_same_as_the_attribute():
+    """``pos_of`` exists so a caller on another thread reads ``voice.pos`` under the same lock the
+    audio thread writes it with (see ``StreamPlayer._sync_start_pos``) — same value either way."""
+    mixer = Mixer()
+    voice = mixer.play(array("h", [1, 2, 3, 4]), loop=True)
+    mixer.fill(3)
+
+    assert mixer.pos_of(voice) == voice.pos == 3
+
+
 def test_silence_when_nothing_plays():
     assert list(samples(Mixer().fill(3))) == [0, 0, 0]
 

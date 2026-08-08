@@ -284,6 +284,7 @@ class EngineApp(App[None]):
                 sync=self._tune_sync,
             )
         else:
+            self._crossfade = crossfade
             # A thread worker here (`run_worker(self._start_theme, thread=True, group="theme")`)
             # hangs indefinitely when a second tune is rendered after the first — reproduced via
             # `test_reaching_the_point_limit_ends_the_game_instead_of_dueling` (the outcome screen's

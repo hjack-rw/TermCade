@@ -173,7 +173,7 @@ class StreamPlayer:
         """
         if self._music is None or not self._music_step_seconds or not step_seconds or not len(pcm):
             return 0
-        elapsed_steps = (self._music.pos / SAMPLE_RATE) / self._music_step_seconds
+        elapsed_steps = (self._mixer.pos_of(self._music) / SAMPLE_RATE) / self._music_step_seconds
         return int(elapsed_steps * step_seconds * SAMPLE_RATE) % len(pcm)
 
     def play_once(self, pcm: array) -> None:

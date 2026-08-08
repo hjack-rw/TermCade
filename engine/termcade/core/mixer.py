@@ -96,6 +96,12 @@ class Mixer:
         with self._lock:
             return len(self._voices)
 
+    def pos_of(self, voice: Voice) -> int:
+        """``voice.pos`` as of right now — locked, because the audio thread writes it under
+        ``fill`` while a caller here runs on the UI thread (see ``StreamPlayer._sync_start_pos``)."""
+        with self._lock:
+            return voice.pos
+
     def fill(self, frames: int) -> bytes:
         """Sum every live voice into one block of ``frames`` samples.
 

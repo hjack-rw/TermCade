@@ -124,7 +124,9 @@ def choose_background(
 ) -> str:
     """Pick the element that best boosts the bot; else counter the player's dominant element."""
     bot_hand, player_hand = hands
-    best_value = max(bot_stats.values())
+    # The baseline a candidate must beat: the bot's best opponent-adjusted edge with no elemental
+    # boost at all — the same quantity a candidate's own value is, so the two are comparable.
+    best_value = max(bot_stats[stat] - opponent_stats[stat] for stat in bot_stats)
     element: str | None = None
     for card in bot_hand:
         for stat in bot_stats:

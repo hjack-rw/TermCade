@@ -1022,9 +1022,12 @@ class Duel:
         return list(self.state.player.character.stats)
 
     async def _resolvement(self) -> None:
-        """Weigh the match; always names a winner. Three steps in order: rounds won decides first; a
-        level match falls to aggregate margin; only when nothing separates them does the challenger
-        hold the ground.
+        """Weigh the match; always names a winner on rounds won.
+
+        A showdown is always 1 round or a tournament's :data:`TOURNAMENT_BATTLES` (3) — both odd — so
+        the two round counts can never tie and the branch below never falls through to it in practice.
+        It stays as the tie-break a round count that COULD tie would need (aggregate margin, then the
+        challenger holding the ground), rather than silently reaching for one only if that ever changes.
         """
         player_rounds, bot_rounds = self.duel.rounds_won
         if player_rounds != bot_rounds:

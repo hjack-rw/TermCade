@@ -205,6 +205,19 @@ def test_bot_background_favours_its_own_boosting_element():
     assert chosen == "water"
 
 
+def test_bot_background_baseline_is_opponent_adjusted_not_raw():
+    """The bar a candidate background must clear is the bot's best OPPONENT-ADJUSTED edge, not its
+    raw own stat: a stat the opponent matches gives no real edge, however high it reads on paper."""
+    bot_stats = {"force": 5, "agility": 1, "intellect": 1}
+    opponent_stats = {"force": 5, "agility": 0, "intellect": 0}  # cancels the bot's raw-highest stat
+    bot_hand = [_card(0, 3, 0, "water")]  # a real, if modest, agility edge once boosted
+    player_hand = [_card(0, 0, 0, "fire")]
+
+    chosen = choose_background(bot_stats, _ELEMENTS, (bot_hand, player_hand), opponent_stats, Rng(1))
+
+    assert chosen == "water"
+
+
 def test_count_end_stats_adds_base_and_queued_card_stats():
     queue = [_card(2, 0, 0), _card(3, 0, 0)]
     char = {"force": 5, "agility": 5, "intellect": 2}
