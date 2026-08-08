@@ -61,8 +61,8 @@ class Mixer:
         self._voices: list[Voice] = []
         self._lock = Lock()
 
-    def play(self, pcm: array, *, loop: bool = False, gain: float = 1.0) -> Voice:
-        voice = Voice(pcm=pcm, loop=loop, gain=gain)
+    def play(self, pcm: array, *, loop: bool = False, gain: float = 1.0, start_pos: int = 0) -> Voice:
+        voice = Voice(pcm=pcm, loop=loop, gain=gain, pos=start_pos)
         with self._lock:
             self._voices.append(voice)
         return voice

@@ -61,6 +61,10 @@ class Game:
     # The musical rules the cartridge's theme is composed under. Default is the cabinet's own
     # voice, so a game that says nothing still gets a soundtrack that sounds like it belongs.
     music_style: Style = ARCADE
+    # Whether the cartridge's own default tune (the one a player hears before entering play — see
+    # `EngineApp._start_theme`) carries the tempo-synced echo. Off by default: it is a deliberate,
+    # occasional touch (see `termcade.core.music._apply_echo`), not house style for every cartridge.
+    music_echo: bool = False
     # A last word over the settings once they are loaded, for a game whose defaults are DERIVED from
     # its own data rather than chosen by a player. `SettingsStore` merges a saved file *over* the
     # defaults — right for a preference, wrong for a derived value the file would then pin forever.

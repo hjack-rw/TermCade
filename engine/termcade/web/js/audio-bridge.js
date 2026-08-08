@@ -51,7 +51,7 @@
 
   // Mixing is the browser's: two sources on one destination sum, so an effect lands over the music
   // exactly as the engine's own Mixer does it at a terminal.
-  var start = function (a, gain, looping) {
+  var start = function (a, gain, looping, offset, stepSeconds, startedAt) {
     var s = ctx.createBufferSource(),
       g = ctx.createGain();
     s.buffer = a;
@@ -59,8 +59,19 @@
     g.gain.value = gain;
     s.connect(g);
     g.connect(ctx.destination);
-    s.start();
-    return { src: s, gain: g };
+    s.start(0, offset || 0);
+    return { src: s, gain: g, buffer: a, stepSeconds: stepSeconds, startedAt: startedAt, offset: offset || 0 };
+  };
+
+  // Where the incoming tune should start so it lands on the same step of the bar the outgoing one
+  // is currently on, instead of restarting at 0 -- the browser-side twin of `StreamPlayer.
+  // _sync_start_pos` in audio.py (same math, `ctx.currentTime` standing in for the sample-position
+  // playhead a local `Voice` tracks). Only meaningful between tunes composed off the same seed.
+  var syncOffset = function (t, stepSeconds, incomingDuration) {
+    if (!music || !music.stepSeconds || !stepSeconds) return 0;
+    var elapsed = (music.offset + (t - music.startedAt)) % music.buffer.duration;
+    var elapsedSteps = elapsed / music.stepSeconds;
+    return (elapsedSteps * stepSeconds) % incomingDuration;
   };
 
   var loop = function (m) {
@@ -75,7 +86,8 @@
     }
 
     var t = ctx.currentTime,
-      f = m.crossfade || 0;
+      f = m.crossfade || 0,
+      offset = m.sync ? syncOffset(t, m.stepSeconds, a.duration) : 0;
 
     // A crossfade runs both loops for its length and drops the outgoing one at the end — the same
     // shape as the engine's Mixer.fade, because it is replacing the same thing.
@@ -84,7 +96,7 @@
       old.gain.gain.setValueAtTime(old.gain.gain.value, t);
       old.gain.gain.linearRampToValueAtTime(0, t + f);
       old.src.stop(t + f);
-      music = start(a, 0, true);
+      music = start(a, 0, true, offset, m.stepSeconds, t);
       music.gain.gain.setValueAtTime(0, t);
       music.gain.gain.linearRampToValueAtTime(m.gain, t + f);
       return;
@@ -95,7 +107,7 @@
         music.src.stop();
       } catch (_) {}
     }
-    music = start(a, m.gain, true);
+    music = start(a, m.gain, true, offset, m.stepSeconds, t);
   };
 
   // Chunks are PLACED by their seq, not appended in arrival order. The socket delivers in order

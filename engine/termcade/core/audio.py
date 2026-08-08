@@ -63,12 +63,26 @@ CHUNK = 48 * 1024
 
 
 class AudioPlayer(Protocol):
-    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
+    def play_loop(
+        self,
+        wav: bytes,
+        *,
+        crossfade: float = 0.0,
+        step_seconds: float | None = None,
+        sync: bool = False,
+    ) -> None:
         """Start ``wav`` looping. Replaces whatever was looping before.
 
         ``crossfade`` seconds fades the outgoing loop down while the new one comes up, instead of
         cutting. A cut is right when the music was silent (starting, unmuting); a fade is right when
         one tune is replacing another mid-run.
+
+        ``step_seconds`` is this tune's own 16th-grid step duration (see
+        :attr:`termcade.core.music.Track.step_seconds`) — remembered so a *later* switch can sync
+        against it. ``sync``, on THIS switch, asks to land the incoming tune at the outgoing one's
+        current position in the bar rather than at its own start — musically correct only between
+        tunes composed off the same seed (see ``EngineApp.play_tune``), where it reads as the same
+        piece continuing (at a new tempo, if one changed) instead of restarting.
         """
 
     def play_once(self, pcm: array) -> None:
@@ -84,7 +98,14 @@ class AudioPlayer(Protocol):
 class NullPlayer:
     """Silence. The fallback whenever real audio is off, absent, or unwanted."""
 
-    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
+    def play_loop(
+        self,
+        wav: bytes,
+        *,
+        crossfade: float = 0.0,
+        step_seconds: float | None = None,
+        sync: bool = False,
+    ) -> None:
         return None
 
     def play_once(self, pcm: array) -> None:
@@ -106,6 +127,7 @@ class StreamPlayer:
 
         self._mixer = Mixer()
         self._music: Voice | None = None
+        self._music_step_seconds: float | None = None
         self._stream = sounddevice.RawOutputStream(
             samplerate=SAMPLE_RATE,
             channels=1,
@@ -121,18 +143,38 @@ class StreamPlayer:
         """
         outdata[:] = self._mixer.fill(frames)
 
-    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
+    def play_loop(
+        self,
+        wav: bytes,
+        *,
+        crossfade: float = 0.0,
+        step_seconds: float | None = None,
+        sync: bool = False,
+    ) -> None:
         samples = int(crossfade * SAMPLE_RATE)
+        pcm = pcm_of(wav)
+        start_pos = self._sync_start_pos(pcm, step_seconds) if sync else 0
         if self._music is not None and samples > 0:
             # Both loops run together for the length of the fade. The outgoing one drops itself once
             # it reaches silence — it loops, so it would otherwise play under the new tune forever.
             self._mixer.fade(self._music, 0.0, samples=samples, drop=True)
-            self._music = self._mixer.play(pcm_of(wav), loop=True, gain=0.0)
+            self._music = self._mixer.play(pcm, loop=True, gain=0.0, start_pos=start_pos)
             self._mixer.fade(self._music, MUSIC_GAIN, samples=samples)
+            self._music_step_seconds = step_seconds
             return
         if self._music is not None:
             self._mixer.stop(self._music)
-        self._music = self._mixer.play(pcm_of(wav), loop=True, gain=MUSIC_GAIN)
+        self._music = self._mixer.play(pcm, loop=True, gain=MUSIC_GAIN, start_pos=start_pos)
+        self._music_step_seconds = step_seconds
+
+    def _sync_start_pos(self, pcm: array, step_seconds: float | None) -> int:
+        """Where the incoming tune should start so it lands on the same step of the bar the
+        outgoing one is currently on, instead of restarting at 0 — see ``AudioPlayer.play_loop``.
+        """
+        if self._music is None or not self._music_step_seconds or not step_seconds or not len(pcm):
+            return 0
+        elapsed_steps = (self._music.pos / SAMPLE_RATE) / self._music_step_seconds
+        return int(elapsed_steps * step_seconds * SAMPLE_RATE) % len(pcm)
 
     def play_once(self, pcm: array) -> None:
         self._mixer.play(pcm, gain=SFX_GAIN)
@@ -198,10 +240,21 @@ class BrowserPlayer:
         self._sent.add(key)
         return key
 
-    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
+    def play_loop(
+        self,
+        wav: bytes,
+        *,
+        crossfade: float = 0.0,
+        step_seconds: float | None = None,
+        sync: bool = False,
+    ) -> None:
+        # The page does its own mixing (WebAudio), so it also does its own position-sync math —
+        # this only has to carry the same two numbers over that `StreamPlayer` computes with
+        # locally. See `audio-bridge.js`'s `loop()`.
         self._send({
             "action": "loop", "id": self._ensure(pcm_of(wav).tobytes()),
             "gain": MUSIC_GAIN, "crossfade": crossfade,
+            "stepSeconds": step_seconds, "sync": sync,
         })
 
     def play_once(self, pcm: array) -> None:

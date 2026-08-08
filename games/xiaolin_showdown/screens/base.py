@@ -75,7 +75,14 @@ class _Run:
         elif outcome.winner is not None:
             self.engine_app.play_tune(XIAOLIN_DEFEAT, name="defeat")  # type: ignore[attr-defined]
 
-        self.set_timer(  # type: ignore[attr-defined]
+        # Owned by the APP, not this screen: a screen-owned timer whose callback calls
+        # `switch_screen` ties `do_switch`'s completion into this same screen's own message-pump
+        # gather -- `do_switch` ends up awaiting `screen.remove()` while the screen's own pump is
+        # waiting on `do_switch` in turn. Confirmed via an asyncio task-stack dump (both tasks'
+        # `_fut_waiter` chains pointing at each other) after `test_reaching_the_point_limit_ends_
+        # the_game_instead_of_dueling` hung rather than failed. Arming it on `self.app` instead
+        # breaks that cycle -- the timer no longer belongs to the screen `do_switch` is removing.
+        self.app.set_timer(  # type: ignore[attr-defined]
             OUTCOME_TRANSITION_DELAY,
             lambda: self.app.switch_screen(  # type: ignore[attr-defined]
                 OutcomeScreen(

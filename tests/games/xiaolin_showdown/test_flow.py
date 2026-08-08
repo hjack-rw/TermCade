@@ -29,7 +29,7 @@ from xiaolin_showdown.logic.mechanics.scoring import initiative
 from xiaolin_showdown.screens.run.duel import DuelScreen
 from xiaolin_showdown.screens.display.format import card_label, points_label
 from xiaolin_showdown.screens.actions.lookup import LookUpScreen
-from xiaolin_showdown.screens.run.outcome import OutcomeScreen
+from xiaolin_showdown.screens.run.outcome import OUTCOME_TRANSITION_DELAY, OutcomeScreen
 from xiaolin_showdown.screens.reference.rules import RulesScreen
 from xiaolin_showdown.screens.run.start import StartScreen
 from xiaolin_showdown.screens.actions.use_power import UsePowerScreen
@@ -302,7 +302,7 @@ async def test_reaching_the_point_limit_ends_the_game_instead_of_dueling(tmp_pat
         app.ctx.state.player.points = 999  # already past the point limit
 
         await pilot.press("1")  # try Gong Yi Tanpai
-        await pilot.pause()
+        await pilot.pause(OUTCOME_TRANSITION_DELAY + 0.1)
 
         assert isinstance(app.screen, OutcomeScreen)  # the run ends now, no extra duel
 
@@ -324,7 +324,7 @@ async def test_a_subset_run_ends_at_its_own_target_not_the_settings_default(tmp_
         app.ctx.state.player.points = 6  # past it, but below the settings default
 
         await pilot.press("1")  # Gong Yi Tanpai
-        await pilot.pause()
+        await pilot.pause(OUTCOME_TRANSITION_DELAY + 0.1)
 
         assert isinstance(app.screen, OutcomeScreen), "the run ignored its own point_limit"
 

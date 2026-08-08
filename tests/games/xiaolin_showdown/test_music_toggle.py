@@ -26,7 +26,14 @@ class SpyPlayer:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def play_loop(self, wav: bytes, *, crossfade: float = 0.0) -> None:
+    def play_loop(
+        self,
+        wav: bytes,
+        *,
+        crossfade: float = 0.0,
+        step_seconds: float | None = None,
+        sync: bool = False,
+    ) -> None:
         self.calls.append("play")
 
     def play_once(self, pcm: array) -> None:

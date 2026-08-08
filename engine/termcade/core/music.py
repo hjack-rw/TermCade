@@ -207,6 +207,31 @@ def _brass_envelope(i: int, samples: int) -> float:
     return 1.0
 
 
+def _poly_blep(t: float, dt: float) -> float:
+    """Band-limited correction for a discontinuity at phase ``t``, one sample-step ``dt`` wide.
+
+    A naive square/pulse wave (``1.0 if phase < duty else -1.0``) jumps instantly at each edge,
+    which spreads energy into harmonics above the Nyquist rate — they alias back down as a harsh,
+    detuned buzz on the higher LEAD notes. This rounds each edge over a single sample so the
+    wave stays band-limited instead.
+    """
+    if t < dt:
+        t /= dt
+        return t + t - t * t - 1.0
+    if t > 1.0 - dt:
+        t = (t - 1.0) / dt
+        return t * t + t + t + 1.0
+    return 0.0
+
+
+def _pulse(phase: float, dt: float, duty: float) -> float:
+    """A polyBLEP-corrected pulse wave: one rising edge at 0, one falling edge at ``duty``."""
+    value = 1.0 if phase < duty else -1.0
+    value += _poly_blep(phase, dt)
+    value -= _poly_blep((phase - duty) % 1.0, dt)
+    return value
+
+
 def _render_voice(
     voice: str, hz: float, samples: int, amp: float, out: array, *, hz_end: float | None = None
 ) -> None:
@@ -224,7 +249,8 @@ def _render_voice(
     for i in range(samples):
         decay = i / samples
         f = hz if hz_end is None else hz + (hz_end - hz) * decay
-        phase = (phase + f / SAMPLE_RATE) % 1.0
+        dt = f / SAMPLE_RATE
+        phase = (phase + dt) % 1.0
         if voice == KICK:
             # A pitch sweep down into a thud — the whole kick drum, basically.
             swept = 110.0 * math.exp(-8.0 * decay)
@@ -235,16 +261,33 @@ def _render_voice(
         elif voice == BASS:
             value = (4 * abs(phase - 0.5) - 1) * math.exp(-1.4 * decay)  # triangle
         elif voice == BRASS:
-            square = 1.0 if phase < 0.5 else -1.0
+            square = _pulse(phase, dt, 0.5)
             fundamental = math.sin(2 * math.pi * phase)
             value = (0.6 * square + 0.4 * fundamental) * _brass_envelope(i, samples)
         else:
             duty = 0.5 if voice == LEAD else 0.25  # two pulse widths -> two timbres
-            value = (1.0 if phase < duty else -1.0) * math.exp(-4.5 * decay)  # square
+            value = _pulse(phase, dt, duty) * math.exp(-4.5 * decay)
         out[i] += value * amp
 
 
-def render(track: Track) -> bytes:
+# A tempo-synced echo on the LEAD line only: a dotted-eighth delay tap (3 steps on the 16th
+# grid, so the interval scales with bpm for free) decaying over two repeats. A special-occasion
+# effect, not house style — nothing composes it in by default, a caller opts in per render.
+_ECHO_DELAY_STEPS = 3
+_ECHO_REPEATS = 2
+_ECHO_DECAY = 0.35
+
+
+def _apply_echo(mix: array, lead: array, track: Track) -> None:
+    delay_samples = int(_ECHO_DELAY_STEPS * track.step_seconds * SAMPLE_RATE)
+    for r in range(1, _ECHO_REPEATS + 1):
+        offset = delay_samples * r
+        amp = _ECHO_DECAY**r
+        for i in range(len(lead) - offset):
+            mix[i + offset] += lead[i] * amp
+
+
+def render(track: Track, *, echo: bool = False) -> bytes:
     """Synthesize the track to 16-bit mono PCM, exactly one loop long.
 
     The last notes of the bar are still ringing when the loop ends, so they are rendered past
@@ -255,6 +298,7 @@ def render(track: Track) -> bytes:
     """
     loop = int(track.loop_seconds * SAMPLE_RATE)
     mix = array("d", bytes(8 * (loop + SAMPLE_RATE)))
+    lead = array("d", bytes(8 * (loop + SAMPLE_RATE))) if echo else None
 
     for note in track.notes:
         start = int(note.step * track.step_seconds * SAMPLE_RATE)
@@ -264,14 +308,57 @@ def render(track: Track) -> bytes:
         _render_voice(note.voice, hz, samples, note.amp, scratch)
         for i in range(samples):
             mix[start + i] += scratch[i]
+            if lead is not None and note.voice == LEAD:
+                lead[start + i] += scratch[i]
+
+    if lead is not None:
+        _apply_echo(mix, lead, track)
 
     for i in range(loop, len(mix)):
         mix[i - loop] += mix[i]
     del mix[loop:]
 
-    peak = max((abs(v) for v in mix), default=0.0)
-    gain = (0.92 / peak) if peak > 1e-9 else 0.0
-    return array("h", (int(v * gain * 32767) for v in mix)).tobytes()
+    return _limit(mix)
+
+
+# How close to full scale the limiter is allowed to drive the mix.
+_CEILING = 0.92
+
+
+def _limit(mix: array) -> bytes:
+    """Bring the mix up near ``_CEILING`` and only pull gain back during the rare moments that
+    would exceed it, instead of scaling the whole loop down to fit a single loud instant.
+
+    A flat peak-normalize sets one static gain for the entire loop from whichever sample is
+    loudest — typically a downbeat where bass, arp, lead and kick all land together — so every
+    quieter bar sits under level just to leave room for that one moment. Driving off the 95th
+    percentile instead (ignoring that handful of stacked-downbeat outliers) lets the rest of the
+    track sit near the ceiling; the attack/release-smoothed gain then only engages for the
+    outliers themselves, so it reads as louder and punchier rather than more compressed.
+    """
+    n = len(mix)
+    if n == 0:
+        return b""
+    p95 = sorted(abs(v) for v in mix)[int(n * 0.95)]
+    drive = (_CEILING / p95) if p95 > 1e-9 else 0.0
+
+    # Fast enough to catch a transient before it clips, slow enough that the gain reduction
+    # isn't itself audible as pumping.
+    attack_coef = 1.0 - math.exp(-1.0 / (0.003 * SAMPLE_RATE))
+    release_coef = 1.0 - math.exp(-1.0 / (0.080 * SAMPLE_RATE))
+
+    out = array("d", bytes(8 * n))
+    gain = 1.0
+    for i, v in enumerate(mix):
+        driven = v * drive
+        target = _CEILING / abs(driven) if abs(driven) > _CEILING else 1.0
+        gain += (target - gain) * (attack_coef if target < gain else release_coef)
+        out[i] = driven * gain
+
+    # A hard safety ceiling for whatever the smoothed gain still lets slip past it.
+    peak = max((abs(v) for v in out), default=0.0)
+    safety = (_CEILING / peak) if peak > _CEILING else 1.0
+    return array("h", (int(max(-1.0, min(1.0, v * safety)) * 32767) for v in out)).tobytes()
 
 
 def wav_bytes(pcm: bytes) -> bytes:
@@ -285,9 +372,9 @@ def wav_bytes(pcm: bytes) -> bytes:
     return buffer.getvalue()
 
 
-def theme(seed: int | str | None = None, style: Style = ARCADE) -> bytes:
+def theme(seed: int | str | None = None, style: Style = ARCADE, *, echo: bool = False) -> bytes:
     """The one call a game needs: seed in, loopable WAV out."""
-    return wav_bytes(render(compose(seed, style)))
+    return wav_bytes(render(compose(seed, style), echo=echo))
 
 
 CLICK = "click"

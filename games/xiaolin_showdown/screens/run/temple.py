@@ -266,10 +266,12 @@ class TempleScreen(XiaolinScreen):
 
     def on_mount(self) -> None:
         # Set here (not at character select) so loading a saved run into the temple also picks
-        # the right tune. `play_tune` no-ops when it's already playing.
+        # the right tune. `play_tune` no-ops when it's already playing. Named "run"/"boss" (not the
+        # menu's own "") because the menu tune carries an echo a run has to drop; `sync=True`
+        # because both share the menu's seed, so the switch lands on the same beat, not a restart.
         boss = self.state.boss_run
         self.engine_app.play_tune(
-            XIAOLIN_BOSS if boss else XIAOLIN, name="boss" if boss else ""
+            XIAOLIN_BOSS if boss else XIAOLIN, name="boss" if boss else "run", sync=True
         )
         if self._is_run_start and boss:
             self._show_boss_intro()

@@ -171,9 +171,16 @@ class EngineApp(App[None]):
         # Tunes are rendered once and KEPT, keyed by name — a toggle must be instant, and so must
         # switching back to a tune already heard (a boss run ending, say).
         self._tunes: dict[str, bytes] = {}
+        # Each tune's own grid-step duration, keyed the same way — a later switch needs the
+        # OUTGOING tune's step_seconds too, and it may no longer be the one rendering.
+        self._tune_step_seconds: dict[str, float] = {}
         self._tune = ""  # which tune is current; "" is the cartridge's own `music_style`
         self._tune_style: Style | None = None  # set when a cartridge switched to one of its own
         self._tune_seed: str | None = None  # set when that tune is composed off its own seed
+        # None (unset) defers to the cartridge's own `music_echo`; a `play_tune` call always pins
+        # an explicit True/False of its own, which is why this can't just default to `False`.
+        self._tune_echo: bool | None = None
+        self._tune_sync = False  # set per switch by `play_tune`; see its docstring
         self._crossfade = 0.0  # seconds, carried to the render worker when a switch has to wait on it
         self._sfx: dict[str, array] = {}  # synthesized on first press, then kept
 
@@ -258,7 +265,12 @@ class EngineApp(App[None]):
         if not self.music_on:
             self._player.stop()
         elif (tune := self._tunes.get(self._tune)) is not None:
-            self._player.play_loop(tune, crossfade=crossfade)
+            self._player.play_loop(
+                tune,
+                crossfade=crossfade,
+                step_seconds=self._tune_step_seconds.get(self._tune),
+                sync=self._tune_sync,
+            )
         else:
             # A thread worker here (`run_worker(self._start_theme, thread=True, group="theme")`)
             # hangs indefinitely when a second tune is rendered after the first — reproduced via
@@ -272,7 +284,14 @@ class EngineApp(App[None]):
             self._start_theme()
 
     def play_tune(
-        self, style: Style, *, name: str, seed: str | None = None, crossfade: float = MUSIC_CROSSFADE
+        self,
+        style: Style,
+        *,
+        name: str,
+        seed: str | None = None,
+        crossfade: float = MUSIC_CROSSFADE,
+        echo: bool = False,
+        sync: bool = False,
     ) -> None:
         """Switch the soundtrack to another style of the cartridge's own — a boss theme, say.
 
@@ -291,12 +310,37 @@ class EngineApp(App[None]):
         Pass one of your own when the moment needs to sound like an unrelated piece instead — the
         outcome screen's win jingle is not a variation on the temple's theme, it just isn't the same
         song, and no amount of octave or tempo makes a transposition stop sounding like one.
+
+        ``sync`` asks the switch to land on the outgoing tune's current position in the bar instead
+        of restarting at 0 — only sensible between tunes sharing a seed (the default ``seed``, not
+        one of your own), since that is what makes them the same underlying pattern at a possibly
+        different tempo. Set it on the switches that should read as one piece continuing (a boss
+        fight kicking the temple's own theme into a higher gear); leave it off where the new tune
+        is deliberately a different piece (the win jingle's own ``seed`` already makes ``sync``
+        meaningless there).
         """
         if name == self._tune:
             return
         playing = self._tunes.get(self._tune) is not None
         self._tune, self._tune_style, self._tune_seed = name, style, seed
+        self._tune_echo, self._tune_sync = echo, sync
         self.apply_music_setting(crossfade=crossfade if playing else 0.0)
+
+    def prerender_tune(self, style: Style, *, name: str, seed: str, echo: bool = False) -> None:
+        """Render a tune's bytes into the cache without playing it.
+
+        ``end_run`` used to hit this render cold, synchronously, in the same call that arms the
+        timer that switches to ``OutcomeScreen`` — and that combination hung the switch's screen
+        mount every time (reproduced outside pytest: a `faulthandler` + `asyncio.all_tasks` dump
+        caught `switch_screen`'s own mount-await stuck forever, never the render itself). Pre-
+        warming here, at a moment with no switch imminent, means `play_tune` always finds the
+        outcome jingle already rendered and takes the cheap `play_loop` path instead.
+        """
+        if name in self._tunes:
+            return
+        track = music.compose(seed, style)
+        self._tunes[name] = music.wav_bytes(music.render(track, echo=echo))
+        self._tune_step_seconds[name] = track.step_seconds
 
     def _start_theme(self) -> None:
         """Synthesize and start the soundtrack off the UI thread — rendering it takes long enough
@@ -314,13 +358,22 @@ class EngineApp(App[None]):
         seed = self._tune_seed or (self.game.game_id if self.game is not None else "termcade")
         name = self._tune
         style = self._tune_style or (self.game.music_style if self.game is not None else music.ARCADE)
-        rendered = music.theme(seed, style)
+        # Unset (None) means this is the cartridge's own default tune, never routed through
+        # `play_tune` — defer to its own `music_echo` rather than silently going echo-less.
+        echo = self._tune_echo if self._tune_echo is not None else (
+            self.game.music_echo if self.game is not None else False
+        )
+        track = music.compose(seed, style)
+        rendered = music.wav_bytes(music.render(track, echo=echo))
         self._tunes[name] = rendered
+        self._tune_step_seconds[name] = track.step_seconds
         # The render outlives a fast quit, and a player who muted while it ran wants silence, not a
         # late start — both would otherwise leave the OS looping a sound nobody asked for. It also
         # outlives a switch: by the time it lands the player may already be on another tune.
         if not self._closing and self.music_on and self._tune == name:
-            self._player.play_loop(rendered, crossfade=self._crossfade)
+            self._player.play_loop(
+                rendered, crossfade=self._crossfade, step_seconds=track.step_seconds, sync=self._tune_sync
+            )
         self._crossfade = 0.0
 
     def notify(self, message: str, *, title: str = "", log: bool = True, **kwargs: Any) -> None:

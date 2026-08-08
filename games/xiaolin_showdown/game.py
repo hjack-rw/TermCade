@@ -52,6 +52,9 @@ def build_game() -> Game:
         root_screen=StartScreen,
         theme_paths=[THEME],
         music_style=XIAOLIN,
+        # Heard at the menu, before a player commits to a run; dropped the moment one starts (see
+        # TempleScreen.on_mount, which always switches to a distinctly-named "run"/"boss" tune).
+        music_echo=True,
         # No floor. Every screen scrolls once its content outgrows the window (Textual's `Screen`
         # defaults to `overflow-y: auto`), verified reachable down to 60x14 — so a "too small"
         # overlay would only ever hide a board the player can already scroll. Zooming in past the
