@@ -109,16 +109,31 @@ class GameLogScreen(EngineScreen):
             return "bold"
         return f"bold {accent.hex}"
 
+    def _title_style(self, severity: str) -> str:
+        """``dim`` for an ordinary entry; the theme's warning/error colour for the two severities a
+        toast can actually raise as a problem (see ``EngineApp.notify``)."""
+        if severity not in ("warning", "error"):
+            return "dim"
+        try:
+            color = getattr(self.app.current_theme, severity)
+        except Exception:  # noqa: BLE001 — a themeless test app must still be able to read its log
+            return "dim"
+        return color or "dim"
+
     def _entry(self, entry: Entry) -> Text:
         """One entry: its title dim above what it said, the whole thing indented under its turn.
 
         Dim on the title, plain on the message — the same rule the console's help follows. The title is
         what the message is *about* ("Opponent's move"); the message is what you came to read, and a
         heading drawn as loudly as the text it heads competes with it.
+
+        A ``warning``/``error`` entry (the same severity its toast raised, see ``Entry.severity``)
+        trades dim for that colour instead — everything else stays dim, the same as before this
+        existed, so an ordinary line is never made to compete with the one that actually needs it.
         """
         text = Text()
         if entry.title:
-            text.append(f"  {entry.title}\n", style="dim")
+            text.append(f"  {entry.title}\n", style=self._title_style(entry.severity))
         # Every line of the message indented, not just the first: the opponent's whole move arrives as
         # one multi-line toast, and a block that hangs together under its title reads as one event —
         # which is what it is.

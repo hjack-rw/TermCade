@@ -3,7 +3,10 @@ power). Crossing the point limit ends the run at once."""
 
 from __future__ import annotations
 
+import asyncio
+
 from termcade.ui.screens.menu import MenuItem
+from termcade.ui.widgets import Button
 from termcade.ui.work import work
 
 from ...logic.flow.actions import deposit
@@ -13,6 +16,10 @@ from ...logic.flow.turn import VAULT
 from ..base import XiaolinMenu
 from ..display.format import card_label, points_label
 from ..display.headline import your_move
+
+# How long the cashed Wu's row fades before this screen pops (or the run ends) — a beat to read
+# which one just left before the screen changes under it.
+CASH_FADE_DELAY = 0.3
 
 
 class DepositScreen(XiaolinMenu):
@@ -29,10 +36,10 @@ class DepositScreen(XiaolinMenu):
         ]
 
     def on_select(self, item_id: str) -> None:
-        self._choose(self.state.player.hand[self.index_of(item_id, "dep")])
+        self._choose(item_id, self.state.player.hand[self.index_of(item_id, "dep")])
 
     @work
-    async def _choose(self, card: Card) -> None:
+    async def _choose(self, item_id: str, card: Card) -> None:
         if trigger_of(card.power) == "use":  # banking it forfeits the power — ask first
             forfeit = await self.confirm(
                 f"This Wu has a power: {card.power.name}. Forfeit it for points?",
@@ -42,9 +49,9 @@ class DepositScreen(XiaolinMenu):
             )
             if not forfeit:
                 return
-        self._bank(card)
+        await self._bank(item_id, card)
 
-    def _bank(self, card: Card) -> None:
+    async def _bank(self, item_id: str, card: Card) -> None:
         paid = deposit(self.state, card, rng=self.ctx.rng)
         if is_gamble(card.power):
             # The reveal IS the record — it says what the `?` turned out to be worth.
@@ -52,6 +59,11 @@ class DepositScreen(XiaolinMenu):
         else:
             # A deposit raises no toast (you watch the points move), so the log must be told.
             self.ctx.journal.add(f"You deposited {card.name} for {paid} pts.", title=your_move(VAULT))
+
+        # A beat of fade on the row itself — the only on-screen sign of which Wu just cashed,
+        # before the temple's own points figure ticks up to reflect it (see TempleScreen).
+        self.query_one(f"#{item_id}", Button).add_class("cashing")
+        await asyncio.sleep(CASH_FADE_DELAY)
 
         if self.state.player.points >= self.state.win_target(self.rules):
             self.end_run()

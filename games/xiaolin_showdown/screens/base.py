@@ -51,6 +51,11 @@ class _Run:
             VICTORY_THEME_CROSSFADE,
         )
 
+        # `final_score` never writes back to `state` — these are still the pre-scoring totals after
+        # it returns, for `OutcomeScreen` to tween up from (a spent draw pile cashes leftover hand
+        # cards into the score there, so the final total can differ from this snapshot).
+        player_points_before = self.state.player.points
+        bot_points_before = self.state.bot.points
         outcome = final_score(self.state, self.ctx.rng)  # type: ignore[attr-defined]
         if outcome.winner is self.state.player.character:
             settings = self.ctx.settings.current  # type: ignore[attr-defined]
@@ -71,7 +76,14 @@ class _Run:
             self.engine_app.play_tune(XIAOLIN_DEFEAT, name="defeat")  # type: ignore[attr-defined]
 
         self.set_timer(  # type: ignore[attr-defined]
-            OUTCOME_TRANSITION_DELAY, lambda: self.app.switch_screen(OutcomeScreen(outcome))  # type: ignore[attr-defined]
+            OUTCOME_TRANSITION_DELAY,
+            lambda: self.app.switch_screen(  # type: ignore[attr-defined]
+                OutcomeScreen(
+                    outcome,
+                    player_points_before=player_points_before,
+                    bot_points_before=bot_points_before,
+                )
+            ),
         )
 
 

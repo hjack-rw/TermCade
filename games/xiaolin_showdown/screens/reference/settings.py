@@ -224,6 +224,12 @@ class SettingsScreen(XiaolinScreen):
             if extra_message:
                 lines.append(extra_message)
             self.app.notify("\n".join(lines), title="Invalid settings", severity="warning")
+            # The toast says what changed; this says where to look. Both Starting Hand fields flash
+            # on the pool-overflow message — neither one alone was out of range, only their sum.
+            rejected = list(adjusted)
+            if extra_message:
+                rejected += ["starting_hand_player", "starting_hand_bot"]
+            self._flash_rejected(rejected)
             return
         # The toggles only land here, on Save — an abandoned screen changes nothing.
         base = replace(
@@ -264,6 +270,20 @@ class SettingsScreen(XiaolinScreen):
         deck_size, point_limit = deal_target(roster_of(self._difficulty), load_catalog().cards, probe)
         self.query_one("#set-max_deck_size", Input).value = str(deck_size)
         self.query_one("#set-point_limit", Input).value = str(point_limit)
+
+    def _flash_rejected(self, field_names: list[str]) -> None:
+        inputs = [self.query_one(f"#set-{name}", Input) for name in field_names]
+
+        def add() -> None:
+            for field in inputs:
+                field.add_class("rejected")
+
+        def remove() -> None:
+            for field in inputs:
+                field.remove_class("rejected")
+
+        self.set_timer(0.05, add)
+        self.set_timer(0.55, remove)
 
     def _toggle_background(self) -> None:
         self._random_background = not self._random_background

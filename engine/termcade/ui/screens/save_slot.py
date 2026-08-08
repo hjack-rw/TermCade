@@ -123,6 +123,7 @@ class SaveSlotScreen(MenuScreen):
             settings=self.ctx.settings.current,
             journal=self.ctx.journal,
         )
+        self.engine_app.notify(f"Saved to slot {slot + 1}.", log=False)
         self.app.pop_screen()
 
     def _load(self, slot: int) -> None:

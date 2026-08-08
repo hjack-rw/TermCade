@@ -26,6 +26,7 @@ from xiaolin_showdown.screens.display.headline import (
     wu_in_prose,
     your_move,
 )
+from xiaolin_showdown.screens.actions.deposit import CASH_FADE_DELAY
 from xiaolin_showdown.screens.run.temple import TempleScreen
 from factories import plain_wu
 
@@ -73,7 +74,9 @@ async def test_a_banked_wu_reaches_the_log(open_vault, state, catalog, card):
         await pilot.press("3")  # Deposit
         await pilot.pause()
         await pilot.click("#dep-0")
-        await pilot.pause()
+        # The cashed card's row fades before the screen pops (see deposit.py) — a bare pause()
+        # doesn't wait out that real timer.
+        await pilot.pause(CASH_FADE_DELAY + 0.1)
 
         assert isinstance(app.screen, TempleScreen)
         # Read off the card, never restated — a re-cost must not need this test edited.

@@ -87,7 +87,11 @@ class UsePowerScreen(XiaolinMenu):
     def action_cancel(self) -> None:
         if self._committing:
             # Not logged: a refusal isn't something that happened in the run.
-            self.engine_app.notify("Mala Mala Jong is assembling — there's no cancelling that.", log=False)
+            self.engine_app.notify(
+                "Mala Mala Jong is assembling — that's irreversible.",
+                log=False,
+                severity="warning",
+            )
             return
         self.app.pop_screen()
 

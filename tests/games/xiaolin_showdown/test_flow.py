@@ -20,6 +20,7 @@ from xiaolin_showdown.logic.config.ladder import LADDER, LADDER_OPTION
 from xiaolin_showdown.logic.flow.outcome import Outcome
 from xiaolin_showdown.logic.flow.setup import new_game
 from xiaolin_showdown.screens.run.character_select import CharacterSelectScreen
+from xiaolin_showdown.screens.actions.deposit import CASH_FADE_DELAY
 from xiaolin_showdown.screens.actions.detail import DetailScreen
 from termcade.ui.screens.dialog import ChoiceModal
 
@@ -162,7 +163,9 @@ async def test_deposit_banks_a_card_for_points(tmp_path):
         await pilot.press("3")  # Deposit
         await pilot.pause()
         await pilot.click(f"#dep-{index}")  # cash it, back to the vault
-        await pilot.pause()
+        # The cashed card's row fades before the screen pops (see deposit.py) — a bare pause()
+        # doesn't wait out that real timer.
+        await pilot.pause(CASH_FADE_DELAY + 0.1)
 
         assert isinstance(app.screen, TempleScreen)
         assert len(app.ctx.state.player.hand) == hand_before - 1

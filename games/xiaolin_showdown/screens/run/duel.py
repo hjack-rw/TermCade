@@ -53,6 +53,7 @@ class DuelScreen(XiaolinScreen):
         self._retreating = False
         self._committed = False  # once the showdown begins there is no walking away
         self._training_before = 0  # snapshot for the temple's tween on the way back — set below
+        self._points_before = 0  # same idea, for Points
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -88,7 +89,9 @@ class DuelScreen(XiaolinScreen):
         """
         if self._committed:
             # Not logged: a refusal isn't something that happened in the run.
-            self.engine_app.notify("Gong Yi Tanpai! There is no retreat from a showdown.", log=False)
+            self.engine_app.notify(
+                "Gong Yi Tanpai! There is no retreat from a showdown.", log=False, severity="warning"
+            )
             return
         self._retreating = True
         self._continue.set()
@@ -190,6 +193,9 @@ class DuelScreen(XiaolinScreen):
         # The training bar's value before this showdown can change it — carried into the next
         # Temple instance so it can tween from here instead of just jumping to the new total.
         self._training_before = state.player.training
+        # Same idea, for Points: a prize claim, a bot power effect — anything a showdown does
+        # before the way back to the temple.
+        self._points_before = state.player.points
 
         duel = Duel(state, rng, self._choices(), settings)
         self._duel = duel
@@ -270,13 +276,19 @@ class DuelScreen(XiaolinScreen):
     def _retreat_to_temple(self) -> None:
         """Abandon an uncommitted showdown — no prize drawn, no cards staked, nothing to undo.
 
-        Also the way back after a completed showdown (see `_leave`) — `_training_before` is the
-        pre-showdown snapshot either way, so an uncommitted retreat (where nothing changed) simply
-        carries a value equal to the current one and the temple's tween no-ops on it.
+        Also the way back after a completed showdown (see `_leave`) — `_training_before`/
+        `_points_before` are the pre-showdown snapshots either way, so an uncommitted retreat
+        (where nothing changed) simply carries values equal to the current ones and the temple's
+        tweens no-op on them.
         """
         from .temple import TempleScreen
 
-        self.app.switch_screen(TempleScreen(player_training_before=self._training_before))
+        self.app.switch_screen(
+            TempleScreen(
+                player_training_before=self._training_before,
+                player_points_before=self._points_before,
+            )
+        )
 
     def _show_board(self, duel: Duel) -> None:
         self.query_one("#duel-body", TooltipStatic).update(

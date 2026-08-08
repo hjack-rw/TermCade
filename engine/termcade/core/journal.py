@@ -38,6 +38,12 @@ class Entry:
     turn: int
     title: str
     message: str | Text
+    # Textual's own toast vocabulary ("information" | "warning" | "error"), reused here so the log
+    # and the toast that raised it always agree — see ``EngineApp.notify``. Decoration, not fact
+    # (same category as a Rich-coloured message, see the class docstring): not carried by
+    # ``snapshot``/``restore``, so a reloaded run's log reads neutral rather than remembering which
+    # lines once alarmed.
+    severity: str = "information"
 
 
 class Journal:
@@ -66,13 +72,15 @@ class Journal:
     def turn(self) -> int:
         return self._turn
 
-    def add(self, message: str | Text, *, title: str = "") -> None:
+    def add(self, message: str | Text, *, title: str = "", severity: str = "information") -> None:
         """Write a line under the turn in play. A blank one is dropped — it records nothing."""
         if isinstance(message, str):
             message = message.strip()
         if not str(message).strip():
             return
-        self._entries.append(Entry(turn=self._turn, title=title.strip(), message=message))
+        self._entries.append(
+            Entry(turn=self._turn, title=title.strip(), message=message, severity=severity)
+        )
         del self._entries[: max(0, len(self._entries) - self.LIMIT)]
 
     def next_turn(self) -> None:

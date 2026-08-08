@@ -35,11 +35,21 @@ from .format import (
 
 
 def _summary_line(
-    player: Player, bot: Player, state: XiaolinState, *, target: int, actions_left: int
+    player: Player,
+    bot: Player,
+    state: XiaolinState,
+    *,
+    target: int,
+    actions_left: int,
+    player_points_override: int | None = None,
 ) -> Text:
+    """``player_points_override`` shows a value other than the real ``player.points`` for one
+    frame, without ever touching it — the temple's points tween uses this the same way the
+    training bar's tween overrides its own cell."""
     line = Text()  # centred by the #summary `text-align`, not Rich justify (which uses natural width)
     # target is per-run (derived from the dealt deck), so it's surfaced via tooltip, not a static label.
-    points = labelled("Points", f"{player.points}/{bot.points}")
+    shown_points = player.points if player_points_override is None else player_points_override
+    points = labelled("Points", f"{shown_points}/{bot.points}")
     points.stylize(Style(meta={"tooltip": f"Earn {target} to win!"}))
     line.append_text(labelled("Actions Left", str(actions_left)))
     line.append("       ")
@@ -205,21 +215,28 @@ def _action_cell(entry: str, blocked: dict[str, str | None], action_by_key: Mapp
     return cell
 
 
-def _rows(cards: list[Card], name_width: int, col_width: dict[str, int]) -> list[Text]:
+def _rows(
+    cards: list[Card], name_width: int, col_width: dict[str, int], *, wear_limit: int | None = None
+) -> list[Text]:
     rows = []
     for index, card in enumerate(cards, 1):
         colour = COLORS.get(card.element, "white")
         icon = ICONS.get(display_type(card), "")
         name = card.name.rjust(name_width)
         stats = "/".join(stat_str(card.stats[key]).rjust(col_width[key]) for key in STAT_ORDER)
+        # One showdown from wear.py's own vault-out (`card.uses >= wear_limit`) — dimmed, so a Wu
+        # about to be lost reads as fading before the hand loses it, not only on hover.
+        worn = wear_limit is not None and card.uses == wear_limit - 1
+        name_style = f"dim {colour}" if worn else f"bold {colour}"
         # Styled Text, not markup, so the element colour renders reliably in a Static.
         row = Text()
         row.append(f"{index}. ", style="dim")
-        row.append(name, style=f"bold {colour}")
+        row.append(name, style=name_style)
         row.append(f"  {stats}  {icon}")
         # Rides on the row's own span (the panels share one Static, so a widget-level tooltip
         # wouldn't distinguish rows — see the state grid's tooltip note above).
-        row.stylize(Style(meta={"tooltip": f"Used: {card.uses}"}))
+        tooltip = f"Used: {card.uses}" + (" — one more showdown and it's gone" if worn else "")
+        row.stylize(Style(meta={"tooltip": tooltip}))
         rows.append(row)
     return rows
 
@@ -236,7 +253,9 @@ def _by_slot(card: Card) -> tuple[int, bool, str]:
     return (place, metal_wudai, card.name)
 
 
-def hands_lines(hand_a: list[Card], hand_b: list[Card]) -> tuple[list[Text], list[Text]]:
+def hands_lines(
+    hand_a: list[Card], hand_b: list[Card], *, wear_limit: int | None = None
+) -> tuple[list[Text], list[Text]]:
     """Format both hands with *shared* name and per-column widths, so the two panels come out
     the same size and every name / ``/`` separator / icon lines up down and across the columns.
 
@@ -247,7 +266,10 @@ def hands_lines(hand_a: list[Card], hand_b: list[Card]) -> tuple[list[Text], lis
     col_width = {
         key: max((len(stat_str(card.stats[key])) for card in both), default=1) for key in STAT_ORDER
     }
-    return _rows(hand_a, name_width, col_width), _rows(hand_b, name_width, col_width)
+    return (
+        _rows(hand_a, name_width, col_width, wear_limit=wear_limit),
+        _rows(hand_b, name_width, col_width, wear_limit=wear_limit),
+    )
 
 
 def _hand_panel(character_name: str, rows: list[Text]) -> BoxedPanel:

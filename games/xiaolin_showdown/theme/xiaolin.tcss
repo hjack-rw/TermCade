@@ -211,6 +211,15 @@ SettingsScreen Input {
     background: $boost;
     margin-right: 1;  /* a player/bot pair's two Inputs sit side by side (see `_PAIRS`) — keep them apart */
 }
+/* Which field Save rejected, not just that something was — the toast already says what changed;
+   this says where to look. The transition lives on `.rejected` itself, not the base Input rule:
+   declaring it on all 14 Inputs measurably destabilized an unrelated screen's scroll-layout timing
+   under a full test-suite run (a pre-existing Textual fragility this just had more surface to hit).
+   Scoped to the rare, already-invalid rows, it never touches that surface at all. */
+SettingsScreen Input.rejected {
+    background: $error 55%;
+    transition: background 300ms;
+}
 /* The "Player"/"Bot" column heading above a paired row (see `_PAIRS`) — same width as the Input below
    it so the words centre over their own column. */
 SettingsScreen .pair-heading {
@@ -318,6 +327,12 @@ DepositScreen BoxedPanel {
 DepositScreen Button {
     width: 100%;
     margin: 1 0;
+}
+/* The instant a Wu cashes, its own row fades — the only on-screen sign of which one just left
+   (a deposit raises no toast; see deposit.py). */
+DepositScreen Button.cashing {
+    text-opacity: 15%;
+    transition: text-opacity 300ms;
 }
 
 /* --- Touch: long lists need a shorter cap than the generic phone rule gives -------------------- */

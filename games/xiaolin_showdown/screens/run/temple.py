@@ -117,7 +117,11 @@ class TempleScreen(XiaolinScreen):
     ]
 
     def __init__(
-        self, *, player_training_before: int | None = None, is_run_start: bool = False
+        self,
+        *,
+        player_training_before: int | None = None,
+        player_points_before: int | None = None,
+        is_run_start: bool = False,
     ) -> None:
         super().__init__()
         self._suspended = False
@@ -128,6 +132,11 @@ class TempleScreen(XiaolinScreen):
         # bar would just jump straight to its new total with nothing to tween from. Cleared after
         # the first mount reads it (see `on_mount`) so a later `rebuild()` doesn't reapply it.
         self._player_training_before = player_training_before
+        # Same idea, for Points — set here for the cross-`switch_screen` return from a duel, and
+        # also set transiently by `on_screen_resume` for the same-instance return from Deposit or
+        # Use a Power (both push/pop, so no constructor is involved for that path).
+        self._player_points_before = player_points_before
+        self._points_before_suspend: int | None = None
         # True only for the Temple that opens a fresh run (see `character_select._begin_run`) —
         # every return-to-temple from a duel switches screens too, and would replay a boss intro
         # on every single showdown if this weren't distinguished from a genuine run start.
@@ -143,6 +152,17 @@ class TempleScreen(XiaolinScreen):
         panel = self.query_one("#actions", TooltipStatic)
         self.set_timer(0.05, lambda: panel.add_class("flash"))
         self.set_timer(0.55, lambda: panel.remove_class("flash"))
+
+    def _render_summary(self, *, player_points_override: int | None = None) -> Text:
+        """The summary line — factored out of `compose` so `_tween_points` can re-render just this
+        Static's content mid-fill, the same way `_render_state_grid` serves the training tween."""
+        state, rules = self.state, self.rules
+        return temple_render._summary_line(
+            state.player, state.bot, state,
+            target=state.win_target(rules),
+            actions_left=player_actions(state, rules) - state.actions_taken,
+            player_points_override=player_points_override,
+        )
 
     def _render_state_grid(self, *, player_training_override: int | None = None) -> Table:
         """The P1/P2 row grid — factored out of `compose` so `_tween_training` can re-render just
@@ -170,14 +190,11 @@ class TempleScreen(XiaolinScreen):
 
         with BoxedPanel(title="STATE OF THE GAME"):
             # TooltipStatic, not Static: the Points figure carries a hover tooltip via `meta`,
-            # which a plain Static never reads.
+            # which a plain Static never reads. First paint shows the OLD points when one is
+            # carried in, same as the training bar just below, so `on_mount`/`on_screen_resume`
+            # have somewhere to tween from.
             yield TooltipStatic(
-                temple_render._summary_line(
-                    player, bot, state,
-                    target=state.win_target(self.rules),
-                    actions_left=player_actions(state, self.rules) - state.actions_taken,
-                ),
-                id="summary",
+                self._render_summary(player_points_override=self._player_points_before), id="summary"
             )
             self._bars_were_compact = self._compact_bars()
             # The first paint shows the OLD value when one is carried in, so `on_mount`'s tween has
@@ -187,7 +204,9 @@ class TempleScreen(XiaolinScreen):
                 self._render_state_grid(player_training_override=self._player_training_before), id="state"
             )
 
-        player_rows, bot_rows = temple_render.hands_lines(player.whole_hand, bot.whole_hand)
+        player_rows, bot_rows = temple_render.hands_lines(
+            player.whole_hand, bot.whole_hand, wear_limit=rules.wear_limit
+        )
         with Horizontal(id="hands"):
             yield temple_render._hand_panel(jong.shown_name(player), player_rows)
             yield temple_render._hand_panel(jong.shown_name(bot), bot_rows)
@@ -218,11 +237,25 @@ class TempleScreen(XiaolinScreen):
     # A sub-screen may have changed the hands or the points, so the panels rebuild on the way back.
     def on_screen_suspend(self) -> None:
         self._suspended = True
+        # Deposit and Use a Power (both push/pop) are the only same-instance ways Points can
+        # change — snapshotted here so `on_screen_resume` has something to tween from, the same
+        # role `_training_before` plays for a duel's `switch_screen` return.
+        self._points_before_suspend = self.state.player.points
 
     def on_screen_resume(self) -> None:
         if self._suspended:
             self._suspended = False
-            self.rebuild()
+            before = self._points_before_suspend
+            after = self.state.player.points
+            if before is not None and before != after:
+                # Seed the value `compose` shows on this rebuild, same trick `on_mount` plays with
+                # the constructor-supplied `_player_points_before` — then clear it so a later
+                # rebuild renders the live figure, and tween once this recompose has landed.
+                self._player_points_before = before
+                self.rebuild()
+                self.call_after_refresh(lambda: self._start_points_tween(before))
+            else:
+                self.rebuild()
         if self._flash_actions_next_resume:
             self._flash_actions_next_resume = False
             # Deferred past the rebuild above: `rebuild()`'s own recompose isn't done yet at this
@@ -241,6 +274,14 @@ class TempleScreen(XiaolinScreen):
         if self._is_run_start and boss:
             self._show_boss_intro()
 
+        # Warm the outcome jingles here, off the run's own critical path — see `prerender_tune`.
+        # Lazy: outcome.py imports the temple's siblings, a top-level import here would cycle.
+        from ...music import XIAOLIN_DEFEAT, XIAOLIN_VICTORY
+        from .outcome import VICTORY_SEED
+
+        self.engine_app.prerender_tune(XIAOLIN_VICTORY, name="victory", seed=VICTORY_SEED)
+        self.engine_app.prerender_tune(XIAOLIN_DEFEAT, name="defeat", seed=self.game.game_id)
+
         # Only the very first compose should ever show the old value — clear it now so a later
         # `rebuild()` on this same instance renders the real, live training figure.
         before = self._player_training_before
@@ -254,6 +295,13 @@ class TempleScreen(XiaolinScreen):
             and not payout_ready(self.state.player, self.rules)
         ):
             self._tween_training(before, full_rebuild=False)
+
+        # Same idea, for Points: the very first compose already showed the old value (see
+        # `compose`) — clear it now so a later `rebuild()` on this instance renders the live one.
+        points_before = self._player_points_before
+        self._player_points_before = None
+        if points_before is not None and points_before != self.state.player.points:
+            self._tween_points(points_before, full_rebuild=False)
         self._offer_payout()
 
     def _show_boss_intro(self) -> None:
@@ -267,14 +315,7 @@ class TempleScreen(XiaolinScreen):
         self.set_timer(1.4, self._restore_summary)
 
     def _restore_summary(self) -> None:
-        state, rules = self.state, self.rules
-        self.query_one("#summary", TooltipStatic).update(
-            temple_render._summary_line(
-                state.player, state.bot, state,
-                target=state.win_target(rules),
-                actions_left=player_actions(state, rules) - state.actions_taken,
-            )
-        )
+        self.query_one("#summary", TooltipStatic).update(self._render_summary())
 
     def _offer_payout(self) -> None:
         """Offer a full training bar's payout once per fill. The flag re-arms once the payout is
@@ -385,6 +426,29 @@ class TempleScreen(XiaolinScreen):
             self.rebuild()
         else:
             grid_widget.update(self._render_state_grid())
+
+    def _start_points_tween(self, before: int) -> None:
+        """Deferred entry point for the same-instance return from Deposit/Use a Power — clears the
+        seeded override once this recompose has actually landed (see `on_screen_resume`), the same
+        role `on_mount` plays for the constructor-supplied value, then starts the tween."""
+        self._player_points_before = None
+        self._tween_points(before, full_rebuild=False)
+
+    @work
+    async def _tween_points(self, before: int, *, full_rebuild: bool = True) -> None:
+        """Ease the summary line's Points figure from its old value to its new one — same trick as
+        `_tween_training`, on `#summary` instead of `#state`."""
+        after = self.state.player.points
+        summary_widget = self.query_one("#summary", TooltipStatic)
+        steps = 4
+        for step in range(1, steps):
+            shown = round(before + (after - before) * step / steps)
+            summary_widget.update(self._render_summary(player_points_override=shown))
+            await asyncio.sleep(0.05)
+        if full_rebuild:
+            self.rebuild()
+        else:
+            summary_widget.update(self._render_summary())
 
     @work
     async def _pick_training_stat(self) -> None:

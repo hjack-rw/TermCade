@@ -260,9 +260,16 @@ class EngineApp(App[None]):
         elif (tune := self._tunes.get(self._tune)) is not None:
             self._player.play_loop(tune, crossfade=crossfade)
         else:
-            # The render happens on a worker, so the fade has to travel with it to the other side.
-            self._crossfade = crossfade
-            self.run_worker(self._start_theme, thread=True, group="theme")
+            # A thread worker here (`run_worker(self._start_theme, thread=True, group="theme")`)
+            # hangs indefinitely when a second tune is rendered after the first — reproduced via
+            # `test_reaching_the_point_limit_ends_the_game_instead_of_dueling` (the outcome screen's
+            # victory jingle, started from `end_run`, after the temple's own boot theme already used
+            # this same path). A `faulthandler` thread dump at the hang showed the event loop simply
+            # idling and every pool thread idle too — nothing computing, consistent with something in
+            # Textual's worker bookkeeping never resolving, not a slow render (confirmed independently
+            # fast, ~1s, run directly). Synchronous costs that ~1s on the UI thread once per NEW tune
+            # instead of a background render — real, but far better than a run that never ends.
+            self._start_theme()
 
     def play_tune(
         self, style: Style, *, name: str, seed: str | None = None, crossfade: float = MUSIC_CROSSFADE
@@ -327,7 +334,7 @@ class EngineApp(App[None]):
         applies its own spacing when it draws.
         """
         if log and self.ctx is not None:
-            self.ctx.journal.add(message, title=title)
+            self.ctx.journal.add(message, title=title, severity=kwargs.get("severity", "information"))
         super().notify(spaced_dashes(message), title=title, **kwargs)
 
     def report_crash(self, error: BaseException, *, where: str) -> None:
