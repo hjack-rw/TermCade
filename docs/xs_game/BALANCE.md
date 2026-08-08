@@ -12,11 +12,10 @@ Disagree about a number, re-run the harness. Disagree about a design decision, r
 XS_BOSS=Wuya ./.venv/Scripts/python.exe scripts/balance.py . 400
 ```
 
-`scripts/balance.py` is the only harness that runs — a tracked dev script alongside the project's
-other generators (`scripts/build_cards.py`, `scripts/generate_card_ids.py`, ...).
-`scripts/train_sim.py` sits beside it but is **currently broken**: it still imports the flat
-`xiaolin_showdown.logic.duel`/`.setup`/`.turn` layout from before the `logic/flow/`, `logic/schema/`,
-`logic/config/` package split and was never migrated.
+`scripts/balance.py` is the main harness — a tracked dev script alongside the project's other
+generators (`scripts/build_cards.py`, `scripts/generate_card_ids.py`, ...).
+`scripts/train_sim.py` sits beside it, one-off harness for the training-bar sweep (`python
+scripts/train_sim.py [runs]`).
 
 Every `XS_*` env var referenced in `BALANCE-HISTORY.md` is a real override `balance.py` reads —
 `XS_BOSS`, `XS_CARD`/`XS_CARDS`, `XS_SEED_COUNTERS`, `XS_PILE`, and the rest.

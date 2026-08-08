@@ -15,6 +15,7 @@ declared and over what range — while :mod:`termcade.asset` does the reading an
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 from termcade import asset
@@ -385,8 +386,14 @@ def shadowed_faces() -> str:
     )
 
 
+@lru_cache(maxsize=None)
 def too_small_gate(min_size: tuple[int, int]) -> tuple[str, str]:
-    """A CSS overlay for a game that cannot reflow below ``min_size``. Empty for one that scrolls."""
+    """A CSS overlay for a game that cannot reflow below ``min_size``. Empty for one that scrolls.
+
+    Cached: ``head()`` and ``body()`` each call this once per page render for the same
+    ``min_size``, and there are only ever as many distinct sizes as there are cartridges — the
+    disk read and templating in :func:`asset.style` are otherwise redone for no reason.
+    """
     min_w, min_h = min_px(min_size)
     style = asset.style("too-small.css", max_w=min_w - 1, max_h=min_h - 1)
     return style, '<div id="tc-toosmall">Window too small &mdash; make it bigger to play.</div>'

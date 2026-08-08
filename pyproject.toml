@@ -10,7 +10,9 @@ requires-python = ">=3.12"
 # sounddevice carries the PortAudio binary that lets the engine hold an output stream open and mix
 # its own voices — without it there is no way to sound an effect over the music, only instead of it.
 # A machine with no device still runs: make_player falls back to silence.
-dependencies = ["textual>=0.80", "sounddevice>=0.4"]
+# rich is imported directly by several ui/ and core/ modules (Text, Style) — declared here rather
+# than left to arrive as textual's own transitive dependency, which is not a promise textual makes.
+dependencies = ["textual>=0.80", "sounddevice>=0.4", "rich"]
 
 [project.optional-dependencies]
 # Browser mode. No longer hard-pinned: nothing is matched inside textual-serve's generated
@@ -30,8 +32,8 @@ dev = [
     "pytest", "pytest-asyncio", "textual-dev", "ruff==0.15.20", "mypy==2.1.0", "textual-serve~=1.1", "fonttools", "pytest-playwright", "pillow",
 ]
 # Build the standalone double-click executable (see scripts/build_launcher.py). Pillow is also in dev
-# now that `ui/pixels.py` imports it — the type check needs the stubs, and `scripts/make_icon.py`
-# needs it to build.
+# for the same reason it's here: `scripts/make_icon.py` needs it to build, and the type check needs
+# the stubs. Nothing in the shipped package imports it — it is a build-time tool, not a runtime one.
 build = ["pyinstaller>=6.0", "textual-serve~=1.1", "pillow"]
 
 [project.scripts]

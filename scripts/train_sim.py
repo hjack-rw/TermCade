@@ -19,10 +19,10 @@ sys.path[:0] = ["engine", "games", "scripts"]
 
 from termcade.core.rng import Rng  # noqa: E402
 from termcade.core.settings import Difficulty, Settings  # noqa: E402
-from xiaolin_showdown.logic.duel import Duel  # noqa: E402
-from xiaolin_showdown.logic.settings import XiaolinSettings, roster_of  # noqa: E402
-from xiaolin_showdown.logic.setup import new_game  # noqa: E402
-from xiaolin_showdown.logic.turn import bot_turn, refill_hands  # noqa: E402
+from xiaolin_showdown.logic.flow.duel import Duel  # noqa: E402
+from xiaolin_showdown.logic.config.settings import XiaolinSettings, roster_of  # noqa: E402
+from xiaolin_showdown.logic.flow.setup import new_game  # noqa: E402
+from xiaolin_showdown.logic.flow.turn import bot_turn, refill_hands  # noqa: E402
 
 from balance import CATALOG, competent_choices, player_temple_action  # noqa: E402
 
@@ -86,7 +86,7 @@ async def play(seed, difficulty, *, length, win, loss, train_on):
         if length and bar.can_train(state.player) and bar.length - bar.progress <= train_on:
             bar.add(1)
             trainings["player"] += 1
-            state.actions_taken = settings.actions_per_turn  # training COSTS the turn's action
+            state.actions_taken = settings.actions_per_turn_player  # training COSTS the turn's action
         else:
             player_temple_action(state, settings, rng, difficulty)
         if state.player.points >= settings.point_limit:
@@ -118,7 +118,7 @@ async def play(seed, difficulty, *, length, win, loss, train_on):
         if length and bar.can_train(state.bot) and bar.length - bar.progress <= train_on:
             bar.add(1)
             trainings["bot"] += 1
-            state.bot_actions_taken = settings.actions_per_turn
+            state.bot_actions_taken = settings.actions_per_turn_bot
         elif not state.has_ended:
             bot_turn(state, settings, rng=rng, difficulty=difficulty)
         trained["bot"] = trained["bot"] or bars["bot"].cash(state.bot)

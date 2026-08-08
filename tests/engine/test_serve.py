@@ -420,6 +420,18 @@ def test_a_game_without_a_min_size_gets_no_gate() -> None:
     assert "tc-toosmall" not in _html(minimum=None)
 
 
+def test_too_small_gate_is_cached_across_head_and_body() -> None:
+    """``head()`` and ``body()`` each ask for the same ``min_size``'s gate once per render — the
+    second ask must be a cache hit, not a second disk read and re-template."""
+    page.too_small_gate.cache_clear()
+
+    first = page.too_small_gate(_MIN)
+    second = page.too_small_gate(_MIN)
+
+    assert first == second
+    assert page.too_small_gate.cache_info().hits >= 1
+
+
 def test_autofit_clamps_to_the_readable_font_range() -> None:
     """Interpolating the constants back out of the page only proves they were interpolated. What
     matters is the RELATION: a floor below the ceiling, and a floor a person can still read."""
