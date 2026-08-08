@@ -29,6 +29,7 @@ from ..characters import chase, hannibal, jack
 from ..mechanics.cards import hand_over
 from ..schema.models import Card, Character, Player
 from ..config.settings import XiaolinSettings, deposit_limit, player_actions, plays_keen
+from ..content.naming import display_name
 from ..schema.state import XiaolinState
 from .training import add_progress, can_train, pick_stat, raise_stat, turn_over
 
@@ -389,7 +390,7 @@ def bot_turn(
     One turn, one action — the rule that binds the player binds the bot: a hand that refilled itself
     for free would not be a resource, and a Wu spent out of one would cost nothing.
     """
-    name = state.bot.character.name.split("_")[0]
+    name = display_name(state.bot.character.name, short=True)
     log: list[BotMove] = []
 
     # Every action charges its own budget — `use_power` does it for the powers, and the draw and the

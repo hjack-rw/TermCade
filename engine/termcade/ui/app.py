@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import os
+import queue
+import threading
 from array import array
 from pathlib import Path, PurePath
-from typing import Any
+from typing import Any, Callable
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -174,6 +176,16 @@ class EngineApp(App[None]):
         # Each tune's own grid-step duration, keyed the same way — a later switch needs the
         # OUTGOING tune's step_seconds too, and it may no longer be the one rendering.
         self._tune_step_seconds: dict[str, float] = {}
+        # Names queued or currently rendering — guards `prerender_tune` against queuing the same
+        # tune twice while it's already waiting or in flight.
+        self._prerendering: set[str] = set()
+        # One render at a time, off the UI thread: a separate `threading.Thread` per tune let two
+        # or three CPU-bound renders fight the UI thread for GIL slices at once, which is what was
+        # producing torn frames and audio glitches on a real terminal (see `prerender_tune`). A
+        # single persistent worker serializes them — still off the UI thread, never competing with
+        # itself.
+        self._render_jobs: queue.Queue[Callable[[], None]] = queue.Queue()
+        threading.Thread(target=self._render_worker, daemon=True, name="tune-render").start()
         self._tune = ""  # which tune is current; "" is the cartridge's own `music_style`
         self._tune_style: Style | None = None  # set when a cartridge switched to one of its own
         self._tune_seed: str | None = None  # set when that tune is composed off its own seed
@@ -326,26 +338,48 @@ class EngineApp(App[None]):
         self._tune_echo, self._tune_sync = echo, sync
         self.apply_music_setting(crossfade=crossfade if playing else 0.0)
 
+    def _render_worker(self) -> None:
+        """The one thread that ever synthesizes a tune. Started once in ``__init__``; runs for the
+        life of the app, pulling jobs off ``_render_jobs`` one at a time."""
+        while True:
+            self._render_jobs.get()()
+
     def prerender_tune(self, style: Style, *, name: str, seed: str, echo: bool = False) -> None:
-        """Render a tune's bytes into the cache without playing it.
+        """Queue a tune's bytes to render into the cache without playing it, off the UI thread.
 
         ``end_run`` used to hit this render cold, synchronously, in the same call that arms the
         timer that switches to ``OutcomeScreen`` — and that combination hung the switch's screen
         mount every time (reproduced outside pytest: a `faulthandler` + `asyncio.all_tasks` dump
-        caught `switch_screen`'s own mount-await stuck forever, never the render itself). Pre-
-        warming here, at a moment with no switch imminent, means `play_tune` always finds the
-        outcome jingle already rendered and takes the cheap `play_loop` path instead.
+        caught `switch_screen`'s own mount-await stuck forever, never the render itself). Calling
+        this early, well before that switch, gives the render worker room to finish before anyone
+        needs the result — a duel is never won or lost in the first few seconds of a run. Worst
+        case, it hasn't finished by the time `play_tune` wants it: `apply_music_setting` already
+        renders synchronously when a tune isn't in the cache, so a still-queued prerender just
+        costs that same fallback, not a hang.
         """
-        if name in self._tunes:
+        if name in self._tunes or name in self._prerendering:
             return
-        track = music.compose(seed, style)
-        self._tunes[name] = music.wav_bytes(music.render(track, echo=echo))
-        self._tune_step_seconds[name] = track.step_seconds
+        self._prerendering.add(name)
+
+        def render() -> None:
+            track = music.compose(seed, style)
+            rendered = music.wav_bytes(music.render(track, echo=echo))
+            self._tunes[name] = rendered
+            self._tune_step_seconds[name] = track.step_seconds
+            self._prerendering.discard(name)
+
+        self._render_jobs.put(render)
 
     def _start_theme(self) -> None:
         """Synthesize and start the soundtrack off the UI thread — rendering it takes long enough
         to be seen as a stutter on the first frame. Only ever runs once; the toggle replays the
         bytes it left behind.
+
+        Stays synchronous, unlike `prerender_tune`: this fires from `TempleScreen.on_mount` right
+        alongside the (now backgrounded) outcome-jingle prerenders, and threading it too stacked a
+        THIRD CPU-bound render thread against Textual's first paint of that screen's own multi-panel
+        layout — real terminal contention a headless Pilot test never renders enough to catch,
+        confirmed only by actually playing it (garbled/duplicated border glyphs on first paint).
 
         Seeded by ``game_id`` so a cartridge always sounds like itself, and *not* from ``ctx.rng``:
         pulling decoration off the play stream is exactly the mistake ``Rng.spawn`` exists to
