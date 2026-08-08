@@ -31,3 +31,23 @@ XIAOLIN_BOSS = Style(
     roots_hz=XIAOLIN.roots_hz,
     bpm_range=(126, 146),
 )
+
+# The outcome screen's pair: same melody, same seed, played under different rules. The win fanfare
+# (see `music.VICTORY`) is a sting on top of this, not instead of it — this is what keeps playing
+# once the sting has finished ringing out.
+XIAOLIN_VICTORY = Style(
+    scale=XIAOLIN.scale,
+    progressions=XIAOLIN.progressions,
+    roots_hz=tuple(hz * 2 for hz in XIAOLIN.roots_hz),
+    bpm_range=(104, 120),
+)
+# A run running out: same melody, same seed, dropped an octave and dragging. The bass follows the
+# root down there too, low enough that it would otherwise eat the mix's headroom (see `Style.
+# bass_gain`) — pulled back so the drag reads as tempo, not as one voice drowning the rest.
+XIAOLIN_DEFEAT = Style(
+    scale=XIAOLIN.scale,
+    progressions=XIAOLIN.progressions,
+    roots_hz=tuple(hz / 2 for hz in XIAOLIN.roots_hz),
+    bpm_range=(56, 68),
+    bass_gain=0.55,
+)

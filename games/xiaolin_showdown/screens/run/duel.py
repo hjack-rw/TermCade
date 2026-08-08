@@ -14,6 +14,7 @@ import asyncio
 
 from rich.style import Style
 from rich.text import Text
+from termcade.core import music
 from termcade.ui.work import work
 from textual.app import ComposeResult
 from textual.content import ContentText
@@ -51,6 +52,7 @@ class DuelScreen(XiaolinScreen):
         self._duel: Duel | None = None
         self._retreating = False
         self._committed = False  # once the showdown begins there is no walking away
+        self._training_before = 0  # snapshot for the temple's tween on the way back — set below
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -116,10 +118,28 @@ class DuelScreen(XiaolinScreen):
             [("Heads", "heads"), ("Tails", "tails")],
             title="COIN TOSS",
         )
+        await self._spin_coin()
         # Priority was already decided; reveal a face consistent with it — a matching call wins.
         face = call if player_won else ("tails" if call == "heads" else "heads")
         outcome = "You win priority!" if player_won else "You lose priority!"
         await self.show_message(f"The coin lands {face.upper()}.  {outcome}", title="COIN TOSS")
+
+    async def _spin_coin(self) -> None:
+        """A few frames of flicker in the prompt line before the reveal — the coin modal is already
+        gone, so this screen's own prompt is the only thing left on top."""
+        prompt = self.query_one("#duel-prompt", Static)
+        for frame in ("HEADS", "TAILS", "HEADS", "TAILS", "HEADS", "TAILS"):
+            prompt.update(Text(f"[ {frame} ]", justify="center"))
+            await asyncio.sleep(0.12)
+        prompt.update("")
+
+    def _flash_result(self, winner: bool | None) -> None:
+        """A beat of colour on the board the instant a showdown resolves — win, tie, or loss — the
+        same pulse-then-fade the outcome screen uses for the run's final verdict."""
+        pulse_class = "pulse-tie" if winner is None else "pulse-win" if winner else "pulse-loss"
+        body = self.query_one("#duel-body", TooltipStatic)
+        self.set_timer(0.05, lambda: body.add_class(pulse_class))
+        self.set_timer(0.55, lambda: body.remove_class(pulse_class))
 
     def _announce_wager(self, duel: DuelState, state: XiaolinState) -> None:
         """Announce the wager the opponent set."""
@@ -167,6 +187,9 @@ class DuelScreen(XiaolinScreen):
     @work
     async def _run_showdown(self) -> None:
         state, settings, rng = self.state, self.rules, self.ctx.rng
+        # The training bar's value before this showdown can change it — carried into the next
+        # Temple instance so it can tween from here instead of just jumping to the new total.
+        self._training_before = state.player.training
 
         duel = Duel(state, rng, self._choices(), settings)
         self._duel = duel
@@ -198,6 +221,8 @@ class DuelScreen(XiaolinScreen):
             if stage == SETUP and duel.duel.player_priority and duel.duel.challenge != TOURNAMENT:
                 self._announce_wager(duel.duel, state)
             if stage == END:  # the END stage has already run
+                self.engine_app.play_sfx(music.WIN if duel.duel.winner else music.LOSE)
+                self._flash_result(duel.duel.winner)
                 self._announce_end_surprises(duel.duel)
                 break
             await self._await_continue("Continue")
@@ -243,10 +268,15 @@ class DuelScreen(XiaolinScreen):
             self._retreat_to_temple()
 
     def _retreat_to_temple(self) -> None:
-        """Abandon an uncommitted showdown — no prize drawn, no cards staked, nothing to undo."""
+        """Abandon an uncommitted showdown — no prize drawn, no cards staked, nothing to undo.
+
+        Also the way back after a completed showdown (see `_leave`) — `_training_before` is the
+        pre-showdown snapshot either way, so an uncommitted retreat (where nothing changed) simply
+        carries a value equal to the current one and the temple's tween no-ops on it.
+        """
         from .temple import TempleScreen
 
-        self.app.switch_screen(TempleScreen())
+        self.app.switch_screen(TempleScreen(player_training_before=self._training_before))
 
     def _show_board(self, duel: Duel) -> None:
         self.query_one("#duel-body", TooltipStatic).update(

@@ -53,7 +53,7 @@ def _begin_run(screen: XiaolinMenu, catalog: Catalog, character: Character, oppo
 
     moves = bot_turn(state, settings, rng=screen.ctx.rng, difficulty=difficulty)
     state.bot_turn_done = True
-    screen.app.switch_screen(TempleScreen())
+    screen.app.switch_screen(TempleScreen(is_run_start=True))
     screen.app.notify(
         "\n".join(move.line for move in moves),
         title=opponent_move([move.action for move in moves]),

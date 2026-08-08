@@ -6,11 +6,13 @@ layer cannot ask, it takes the answer as an argument.
 
 from __future__ import annotations
 
+import asyncio
 from copy import deepcopy
 
 from rich.text import Text
 from termcade.ui.screens.menu import MenuItem
 from termcade.ui.work import work
+from textual.widgets import Static
 
 from ...logic.flow.actions import (
     can_combine_yoyo,
@@ -28,13 +30,14 @@ from ...logic.flow.actions import (
     usable_powers,
     use_power,
 )
+from ...logic.characters.jong import PART_TYPES
 from ...logic.schema.constants import YIN_YANG_YOYO_ID
 from ...logic.mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of
 from ...logic.schema.models import Card
 from ...logic.config.settings import player_actions
 from ...logic.flow.turn import EARLY_BIRD, POWER
 from ..base import XiaolinMenu
-from ..display.format import card_options, prompt
+from ..display.format import card_name_text, card_options, prompt
 from ..display.headline import card_headline, power_headline, your_move
 
 NOTHING_COMING = "The pile is empty — nothing is coming."
@@ -53,13 +56,40 @@ def _ordinal(position: int) -> str:
     return f"{position}{suffix}"
 
 
+def _assembly_order(hand: list[Card]) -> list[Card]:
+    """The Wu locking into Mala Mala Jong, in slot order (head, torso, arms, boots, amulet), the
+    Heart last. Mirrors ``jong._one_of_each_part``/``_is_heart`` — those stay private to the logic
+    module, so the display-only ordering is kept here rather than reaching in for them."""
+    found: dict[str, Card] = {}
+    for card in hand:
+        if card.type in PART_TYPES and card.type not in found:
+            found[card.type] = card
+    assert len(found) == len(PART_TYPES), "_assembly_order called without a full set — gate with can_construct first"
+    heart = next((card for card in hand if mechanic_of(card.power) is Mechanic.ANIMATE), None)
+    assert heart is not None, "_assembly_order called without a Heart — gate with can_construct first"
+    return [found[slot] for slot in PART_TYPES] + [heart]
+
+
 class UsePowerScreen(XiaolinMenu):
     """The Early Bird is listed among the Wu powers — same action cost, but belongs to no card."""
 
-    BINDINGS = [("escape", "app.pop_screen", "Cancel")]
+    BINDINGS = [("escape", "cancel", "Cancel")]
 
     menu_title = "POWERS"
     menu_description = "Choose a power"
+
+    def __init__(self) -> None:
+        super().__init__()
+        # Set once `_construct` commits its irreversible mutation, so Escape can't pop this screen
+        # out from under the still-running assembly animation — see `_construct`/`action_cancel`.
+        self._committing = False
+
+    def action_cancel(self) -> None:
+        if self._committing:
+            # Not logged: a refusal isn't something that happened in the run.
+            self.engine_app.notify("Mala Mala Jong is assembling — there's no cancelling that.", log=False)
+            return
+        self.app.pop_screen()
 
     def menu_items(self) -> list[MenuItem]:
         # One button per distinct power. Two identical Wu (two Eagle Scopes) spend the same and read
@@ -109,7 +139,16 @@ class UsePowerScreen(XiaolinMenu):
     def _return_to_temple(self, toast: str, log_line: str, action: str) -> None:
         """Every power-worker ends the same way: pop back to the temple, flash a toast that never
         self-logs, then journal the outcome. Centralized so a forgotten ``log=False`` can't
-        double-log a toast."""
+        double-log a toast.
+
+        Flags the Temple underneath (always this screen's pusher — see `TempleScreen.action_use_power`)
+        so its next resume gives the Actions panel a beat of colour too — a toast alone is easy to
+        miss, and unlike the toast this reads from the screen the player is looking at."""
+        temple = self.app.screen_stack[-2]
+        from ..run.temple import TempleScreen  # lazy: temple.py imports this module at the top level
+
+        if isinstance(temple, TempleScreen):
+            temple.flag_power_used()
         self.app.pop_screen()
         self.engine_app.notify(toast, log=False)
         self.ctx.journal.add(log_line, title=your_move(action))
@@ -135,14 +174,36 @@ class UsePowerScreen(XiaolinMenu):
     @work
     async def _construct(self) -> None:
         """Become Mala Mala Jong: keep the body and the wudai, exile the Heart, bank the rest."""
+        # Captured before `construct_jong` empties the hand down to the kept parts and the wudai.
+        parts = _assembly_order(self.state.player.hand)
         purged = construct_jong(self.state, is_player=True)
+        # Irreversible past this point — block Escape so it can't pop the screen out from under the
+        # animation while this worker is still mid-flight (see `action_cancel`).
+        self._committing = True
         banked = f" {len(purged)} Wu banked." if purged else ""
+        await self._show_assembly(parts)
         self._return_to_temple(
             f"You assembled Mala Mala Jong.{banked}",
             "You constructed Mala Mala Jong — a 6/6/6 body of Shen Gong Wu.\n"
             "Reach the end of the game in the form to win outright.",
             POWER,
         )
+
+    async def _show_assembly(self, parts: list[Card]) -> None:
+        """The five slots locking in, then the Heart, one Wu at a time — each named in its own
+        element colour, the same as everywhere else a Wu is shown. A generic fill bar wouldn't say
+        *what* just assembled."""
+        desc = self.query_one(".panel-desc", Static)
+        lines = Text()
+        for card in parts:
+            if lines.plain:
+                lines.append("\n")
+            lines.append_text(card_name_text(card))
+            desc.update(lines.copy())
+            await asyncio.sleep(0.25)
+        await asyncio.sleep(0.2)
+        desc.update(Text("MALA MALA JONG!", style="bold"))
+        await asyncio.sleep(0.3)
 
     @work
     async def _farsight(self) -> None:

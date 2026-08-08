@@ -50,6 +50,7 @@ Button {
     background: transparent;
     border: round $surface-lighten-2;
     color: $text;
+    transition: color 200ms;  /* eases the hover/focus color swap instead of snapping */
 }
 
 /* Focus is the arrow-key navigation cursor, so it must be unmistakable: a negative (reverse-video)

@@ -173,6 +173,7 @@ class EngineApp(App[None]):
         self._tunes: dict[str, bytes] = {}
         self._tune = ""  # which tune is current; "" is the cartridge's own `music_style`
         self._tune_style: Style | None = None  # set when a cartridge switched to one of its own
+        self._tune_seed: str | None = None  # set when that tune is composed off its own seed
         self._crossfade = 0.0  # seconds, carried to the render worker when a switch has to wait on it
         self._sfx: dict[str, array] = {}  # synthesized on first press, then kept
 
@@ -263,7 +264,9 @@ class EngineApp(App[None]):
             self._crossfade = crossfade
             self.run_worker(self._start_theme, thread=True, group="theme")
 
-    def play_tune(self, style: Style, *, name: str) -> None:
+    def play_tune(
+        self, style: Style, *, name: str, seed: str | None = None, crossfade: float = MUSIC_CROSSFADE
+    ) -> None:
         """Switch the soundtrack to another style of the cartridge's own — a boss theme, say.
 
         The cabinet knows how to play a tune; only the cartridge knows *which* tune a moment calls for,
@@ -272,12 +275,21 @@ class EngineApp(App[None]):
 
         A switch CROSSFADES, because one tune is replacing another under a player who is mid-run and
         did not ask for a jolt. Starting from silence still cuts — there is nothing to fade from.
+        ``crossfade`` defaults to the cabinet's own pace; pass a longer one to keep the incoming
+        tune quiet in the background for longer — under a jingle it's meant to stay behind, say,
+        rather than climbing to full volume partway through it.
+
+        ``seed`` defaults to the cartridge's own ``game_id`` — the same melody under different rules,
+        which is what makes a boss theme read as "the same place, tenser" rather than a new track.
+        Pass one of your own when the moment needs to sound like an unrelated piece instead — the
+        outcome screen's win jingle is not a variation on the temple's theme, it just isn't the same
+        song, and no amount of octave or tempo makes a transposition stop sounding like one.
         """
         if name == self._tune:
             return
         playing = self._tunes.get(self._tune) is not None
-        self._tune, self._tune_style = name, style
-        self.apply_music_setting(crossfade=MUSIC_CROSSFADE if playing else 0.0)
+        self._tune, self._tune_style, self._tune_seed = name, style, seed
+        self.apply_music_setting(crossfade=crossfade if playing else 0.0)
 
     def _start_theme(self) -> None:
         """Synthesize and start the soundtrack off the UI thread — rendering it takes long enough
@@ -289,9 +301,10 @@ class EngineApp(App[None]):
         prevent, and a fixed string can't make it in the first place. The seed picks the tune; the
         cartridge's ``music_style`` decides what kind of music it is a tune of.
         """
-        seed = self.game.game_id if self.game is not None else "termcade"
-        # The SEED stays the cartridge's either way, so a switched tune is the same melody under
-        # different rules — the faster cousin of what was playing, not an unrelated piece.
+        # The seed stays the cartridge's by default, so a switched tune is the same melody under
+        # different rules — the faster cousin of what was playing, not an unrelated piece. A tune
+        # that asked for its own seed (see `play_tune`) is the deliberate exception.
+        seed = self._tune_seed or (self.game.game_id if self.game is not None else "termcade")
         name = self._tune
         style = self._tune_style or (self.game.music_style if self.game is not None else music.ARCADE)
         rendered = music.theme(seed, style)

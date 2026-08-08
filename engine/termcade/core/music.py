@@ -46,6 +46,10 @@ class Style:
     progressions: tuple[tuple[tuple[int, ...], ...], ...]  # chord cycles the seed chooses between
     roots_hz: tuple[float, ...]  # where the whole track sits
     bpm_range: tuple[int, int]
+    # Scales the bass note's amplitude. A root dropped an octave puts the bass low enough that
+    # peak normalization (see `render`) lets it eat the headroom the other voices need — this is
+    # the knob a style pulls to hold the floor down without silencing it outright.
+    bass_gain: float = 1.0
 
 
 # The cabinet's own voice, and the fallback for a cartridge that names no style: natural minor,
@@ -65,6 +69,11 @@ ARCADE = Style(
 BASS = "bass"
 ARP = "arp"
 LEAD = "lead"
+# A held instrument tone, not a press: eased in instead of snapping to full amplitude, and a
+# square blended with its own fundamental sine to round off the harshness a bare square carries.
+# LEAD and ARP jump straight to peak on purpose — that jolt is what makes a keypress feel pressed —
+# but the same jolt on a note held for half a second reads as a click, not a horn.
+BRASS = "brass"
 KICK = "kick"
 SNARE = "snare"
 HAT = "hat"
@@ -146,7 +155,7 @@ def _fill(track: Track) -> list[Note]:
 
         # Bass — the chord's root on beats 1 and 3. Rotor-free, so the floor never moves.
         if beat in (0, 8):
-            notes.append(Note(step, BASS, chord[0] - 24, 7, 0.34))
+            notes.append(Note(step, BASS, chord[0] - 24, 7, 0.34 * track.style.bass_gain))
 
         # Arp — chord tones on every 16th. A pure function of the step; no rotor either.
         notes.append(Note(step, ARP, chord[step % len(chord)], 1, 0.10))
@@ -183,6 +192,21 @@ def _noise(index: int) -> float:
     return ((index * 1103515245 + 12345) >> 16 & 0x7FFF) / 16383.5 - 1.0
 
 
+def _brass_envelope(i: int, samples: int) -> float:
+    """Attack in, hold, release out — a fixed shape rather than one continuous decay curve, so the
+    note reaches true silence by its own end instead of being cut off mid-fade. That cut is what a
+    decay-only envelope always risks: it approaches zero but never has to reach it by a fixed
+    sample count, so short notes especially end on an audible step into whatever comes next.
+    """
+    attack_n = min(samples, int(0.015 * SAMPLE_RATE))
+    release_n = min(samples - attack_n, int(0.12 * SAMPLE_RATE))
+    if i < attack_n:
+        return i / attack_n
+    if i >= samples - release_n:
+        return (samples - i) / release_n
+    return 1.0
+
+
 def _render_voice(
     voice: str, hz: float, samples: int, amp: float, out: array, *, hz_end: float | None = None
 ) -> None:
@@ -210,6 +234,10 @@ def _render_voice(
             value = _noise(i) * math.exp(-fall * decay)
         elif voice == BASS:
             value = (4 * abs(phase - 0.5) - 1) * math.exp(-1.4 * decay)  # triangle
+        elif voice == BRASS:
+            square = 1.0 if phase < 0.5 else -1.0
+            fundamental = math.sin(2 * math.pi * phase)
+            value = (0.6 * square + 0.4 * fundamental) * _brass_envelope(i, samples)
         else:
             duty = 0.5 if voice == LEAD else 0.25  # two pulse widths -> two timbres
             value = (1.0 if phase < duty else -1.0) * math.exp(-4.5 * decay)  # square
@@ -266,6 +294,9 @@ CLICK = "click"
 CONFIRM = "confirm"
 BACK = "back"
 ERROR = "error"
+WIN = "win"
+LOSE = "lose"
+VICTORY = "victory"
 
 # Each effect is a run of notes on the music's own voices, so an effect sits in the same timbre as
 # the track it lands on — and, like the theme, ships as no file at all. Pitches are absolute Hz
@@ -285,6 +316,36 @@ _SFX: dict[str, tuple[tuple[str, float, float, float, float], ...]] = {
     CONFIRM: ((ARP, 880.0, 880.0, 0.04, 0.45), (ARP, 1320.0, 1500.0, 0.10, 0.45)),  # rising
     BACK: ((ARP, 740.0, 370.0, 0.09, 0.40),),                                       # falling
     ERROR: ((LEAD, 170.0, 60.0, 0.22, 0.55),),                                      # a low growl
+    # A major triad climbing into a held top note — a duel round won.
+    WIN: (
+        (ARP, 523.25, 523.25, 0.08, 0.55),
+        (ARP, 659.25, 659.25, 0.08, 0.55),
+        (ARP, 783.99, 783.99, 0.08, 0.55),
+        (LEAD, 1046.5, 1046.5, 0.25, 0.60),
+    ),
+    # Two steps down, then a long sag to nothing — a duel round lost.
+    LOSE: (
+        (LEAD, 392.0, 392.0, 0.10, 0.50),
+        (LEAD, 329.63, 329.63, 0.10, 0.50),
+        (LEAD, 261.63, 130.8, 0.35, 0.55),
+    ),
+    # A brass call-and-answer, not a blip: an ascending triad stated, a breath, the same triad
+    # answered a step further and louder, another breath, then a lip-slur up into a held top note —
+    # the buildup a fanfare takes before the *actual* tune is allowed to start. BRASS, not LEAD: an
+    # instrument sustains, it doesn't snap to a peak and decay away like a keypress does.
+    VICTORY: (
+        (BRASS, 392.00, 392.00, 0.13, 0.24),   # call: G4 — stated slower and quiet, distance before the push
+        (BRASS, 523.25, 523.25, 0.13, 0.26),   # C5
+        (BRASS, 659.25, 659.25, 0.18, 0.28),   # E5
+        (BRASS, 0.0, 0.0, 0.06, 0.0),          # breath — shorter now that the note ahead of it tapers into it
+        (BRASS, 392.00, 392.00, 0.10, 0.44),   # answer: same call again, now up close...
+        (BRASS, 523.25, 523.25, 0.10, 0.44),
+        (BRASS, 659.25, 659.25, 0.10, 0.46),
+        (BRASS, 783.99, 783.99, 0.15, 0.48),   # ...pushed one step further: G5
+        (BRASS, 0.0, 0.0, 0.03, 0.0),          # breath
+        (BRASS, 783.99, 1046.5, 0.08, 0.41),   # the slur up into landing
+        (BRASS, 1046.5, 1046.5, 0.45, 0.43),   # held — rings well into the theme before it fades
+    ),
 }
 
 

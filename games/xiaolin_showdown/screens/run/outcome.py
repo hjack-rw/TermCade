@@ -15,6 +15,24 @@ from ...logic.flow.outcome import Outcome
 from ..base import XiaolinScreen
 from ..display.format import display_name
 
+# A seed of its own (see `EngineApp.play_tune`) — the win jingle has to sound like an unrelated
+# piece, not the temple's theme sped up and transposed.
+VICTORY_SEED = "xiaolin_showdown:victory"
+
+# Just enough that the fanfare's first note isn't fighting the theme's for the same instant — not
+# the whole buildup, which would leave the theme with nothing left to intersect.
+VICTORY_FANFARE_DELAY = 0.05
+
+# Slower than the cabinet's own MUSIC_CROSSFADE: the theme has to stay behind the fanfare while it's
+# still ringing, not climb to full volume partway through it and crowd the thing it's building up to.
+VICTORY_THEME_CROSSFADE = 3.0
+
+# How long `end_run` (see base.py) holds the prior screen before switching to this one. The music
+# is started there, before the switch — this is what gives it a beat's head start rather than
+# starting cold the instant GAME OVER appears, while still leaving the last duel on screen long
+# enough to read before the screen changes under it.
+OUTCOME_TRANSITION_DELAY = 0.4
+
 
 class OutcomeScreen(XiaolinScreen):
     def __init__(self, outcome: Outcome) -> None:
@@ -37,6 +55,22 @@ class OutcomeScreen(XiaolinScreen):
             yield Button("Menu", id="menu")
             yield Button("Quit", id="quit")
         yield Footer()
+
+    def on_mount(self) -> None:
+        # The music itself is already playing by the time this screen mounts — started in
+        # `end_run` (see base.py), a beat before the switch that brought this screen up.
+        outcome = self._outcome
+        if outcome.winner is None:
+            pulse_class = "pulse-tie"
+        elif outcome.winner is self.state.player.character:
+            pulse_class = "pulse-win"
+        else:
+            pulse_class = "pulse-loss"
+        verdict = self.query_one("#verdict", Static)
+        # Add the class a beat after mount, not in compose: a transition only animates a *change*,
+        # so starting the background already coloured would just paint it, not pulse it.
+        self.set_timer(0.05, lambda: verdict.add_class(pulse_class))
+        self.set_timer(0.55, lambda: verdict.remove_class(pulse_class))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         # Lazy imports keep the screen-transition graph free of import cycles.

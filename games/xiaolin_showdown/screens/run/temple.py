@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from typing import Literal
 
+from rich.table import Table
 from rich.text import Text
 from termcade.ui.work import work
 from textual import events
@@ -45,7 +47,7 @@ from ...music import XIAOLIN, XIAOLIN_BOSS
 from ..base import XiaolinScreen
 from ..actions.deposit import DepositScreen
 from ..display import temple_render
-from ..display.format import card_options, prompt
+from ..display.format import card_options, display_name, prompt
 from ..display.headline import your_move
 from ..actions.lookup import LookUpScreen
 from ..reference.rules import RulesScreen
@@ -114,15 +116,55 @@ class TempleScreen(XiaolinScreen):
         ("escape", "app.pop_screen", "Menu"),
     ]
 
-    def __init__(self) -> None:
+    def __init__(
+        self, *, player_training_before: int | None = None, is_run_start: bool = False
+    ) -> None:
         super().__init__()
         self._suspended = False
         self._payout_offered = False  # offer a waiting training payout once, not on every return
+        self._flash_actions_next_resume = False
+        # A prior Temple instance's training value, carried across the `switch_screen` a showdown
+        # does on its way back — this instance never rebuilds from that one, so without this the
+        # bar would just jump straight to its new total with nothing to tween from. Cleared after
+        # the first mount reads it (see `on_mount`) so a later `rebuild()` doesn't reapply it.
+        self._player_training_before = player_training_before
+        # True only for the Temple that opens a fresh run (see `character_select._begin_run`) —
+        # every return-to-temple from a duel switches screens too, and would replay a boss intro
+        # on every single showdown if this weren't distinguished from a genuine run start.
+        self._is_run_start = is_run_start
+
+    def flag_power_used(self) -> None:
+        """Set by `UsePowerScreen._return_to_temple` right before it pops back to this screen, so
+        the next resume gives the Actions panel a beat of colour once its own rebuild has actually
+        landed — flashing before that rebuild would land on the widget it's about to tear down."""
+        self._flash_actions_next_resume = True
+
+    def _flash_actions(self) -> None:
+        panel = self.query_one("#actions", TooltipStatic)
+        self.set_timer(0.05, lambda: panel.add_class("flash"))
+        self.set_timer(0.55, lambda: panel.remove_class("flash"))
+
+    def _render_state_grid(self, *, player_training_override: int | None = None) -> Table:
+        """The P1/P2 row grid — factored out of `compose` so `_tween_training` can re-render just
+        this cell's content mid-fill without re-running the whole screen's `compose`.
+
+        ``player_training_override`` shows a value other than the real ``player.training`` for one
+        frame, without ever writing it — the tween must never touch the actual persisted stat."""
+        state, rules = self.state, self.rules
+        player, bot = state.player, state.bot
+        init_player, init_bot = initiative(player, bot)
+        return temple_render._state_grid(
+            player, bot, init_player, init_bot,
+            train_length_player=rules.train_length_player,
+            train_length_bot=rules.train_length_bot,
+            settings=rules,
+            compact=self._bars_were_compact, short_names=self._short_names,
+            player_training_override=player_training_override,
+        )
 
     def compose(self) -> ComposeResult:
         state, rules = self.state, self.rules
         player, bot = state.player, state.bot
-        init_player, init_bot = initiative(player, bot)
 
         yield Header()
 
@@ -138,15 +180,11 @@ class TempleScreen(XiaolinScreen):
                 id="summary",
             )
             self._bars_were_compact = self._compact_bars()
+            # The first paint shows the OLD value when one is carried in, so `on_mount`'s tween has
+            # somewhere to climb from — everything else on this grid is already the true, current
+            # state, only the bar itself is deliberately shown a beat behind.
             yield TooltipStatic(
-                temple_render._state_grid(
-                    player, bot, init_player, init_bot,
-                    train_length_player=rules.train_length_player,
-                    train_length_bot=rules.train_length_bot,
-                    settings=rules,
-                    compact=self._bars_were_compact, short_names=self._short_names,
-                ),
-                id="state",
+                self._render_state_grid(player_training_override=self._player_training_before), id="state"
             )
 
         player_rows, bot_rows = temple_render.hands_lines(player.whole_hand, bot.whole_hand)
@@ -185,6 +223,12 @@ class TempleScreen(XiaolinScreen):
         if self._suspended:
             self._suspended = False
             self.rebuild()
+        if self._flash_actions_next_resume:
+            self._flash_actions_next_resume = False
+            # Deferred past the rebuild above: `rebuild()`'s own recompose isn't done yet at this
+            # point (see its docstring) — flashing now would land on the `#actions` widget about to
+            # be torn down, not the one that replaces it.
+            self.call_after_refresh(self._flash_actions)
         self._offer_payout()
 
     def on_mount(self) -> None:
@@ -194,7 +238,43 @@ class TempleScreen(XiaolinScreen):
         self.engine_app.play_tune(
             XIAOLIN_BOSS if boss else XIAOLIN, name="boss" if boss else ""
         )
+        if self._is_run_start and boss:
+            self._show_boss_intro()
+
+        # Only the very first compose should ever show the old value — clear it now so a later
+        # `rebuild()` on this same instance renders the real, live training figure.
+        before = self._player_training_before
+        self._player_training_before = None
+        if (
+            before is not None
+            and before != self.state.player.training
+            # A full bar is about to raise its own modal (see `_offer_payout` below) — that already
+            # reads as the moment of confirmation, so animating the bar first would either finish
+            # invisibly under it or just delay it for no reason.
+            and not payout_ready(self.state.player, self.rules)
+        ):
+            self._tween_training(before, full_rebuild=False)
         self._offer_payout()
+
+    def _show_boss_intro(self) -> None:
+        """A beat of menace before the run's first temple turn, in place of the usual summary line —
+        the boss's name, briefly. Nothing else about a boss run needed a screen of its own for this."""
+        summary = self.query_one("#summary", TooltipStatic)
+        name = display_name(self.state.bot.character.name, upper=True)
+        summary.update(Text(f"⚔  {name}  ⚔", justify="center"))
+        summary.add_class("boss-intro")
+        self.set_timer(1.4, lambda: summary.remove_class("boss-intro"))
+        self.set_timer(1.4, self._restore_summary)
+
+    def _restore_summary(self) -> None:
+        state, rules = self.state, self.rules
+        self.query_one("#summary", TooltipStatic).update(
+            temple_render._summary_line(
+                state.player, state.bot, state,
+                target=state.win_target(rules),
+                actions_left=player_actions(state, rules) - state.actions_taken,
+            )
+        )
 
     def _offer_payout(self) -> None:
         """Offer a full training bar's payout once per fill. The flag re-arms once the payout is
@@ -265,6 +345,7 @@ class TempleScreen(XiaolinScreen):
         if payout_ready(self.state.player, self.rules):
             self._pick_training_stat()  # the bar is already full: picking the stat is free
             return
+        before = self.state.player.training
         if train(self.state, self.rules, rng=self.ctx.rng):  # rng lets a Hodoku Mouse take the fill back
             self._pick_training_stat()  # this very turn filled it
             return
@@ -274,7 +355,36 @@ class TempleScreen(XiaolinScreen):
             f"{self.state.player.training}/{self.rules.train_length_player}!",
             title=your_move(TRAIN),
         )
-        self.rebuild()
+        self._tween_training(before)
+
+    @work
+    async def _tween_training(self, before: int, *, full_rebuild: bool = True) -> None:
+        """Ease the training bar from its old value to its new one.
+
+        The state grid is one Rich table baked into a single Static, not live per-cell widgets, so
+        this re-renders just that Static a few times with an interpolated value rather than tearing
+        down the whole screen for every intermediate step. The interpolated value is only ever passed
+        into the render, never written to `player.training` — that field is real, persisted game
+        state, and a save (or this worker getting cancelled by navigating away mid-tween) must never
+        see anything but the true value `train()` already committed.
+
+        ``full_rebuild`` decides how it ends: the explicit Train action spends an action, which can
+        also change what the Actions panel allows, so that caller wants the whole screen refreshed.
+        A fresh Temple mounting after a showdown already composed everything else from current truth —
+        the bar was the one cell deliberately shown a beat behind, so finishing it just needs one more
+        plain render, not a full recompose.
+        """
+        after = self.state.player.training
+        grid_widget = self.query_one("#state", TooltipStatic)
+        steps = 4
+        for step in range(1, steps):
+            shown = round(before + (after - before) * step / steps)
+            grid_widget.update(self._render_state_grid(player_training_override=shown))
+            await asyncio.sleep(0.05)
+        if full_rebuild:
+            self.rebuild()
+        else:
+            grid_widget.update(self._render_state_grid())
 
     @work
     async def _pick_training_stat(self) -> None:

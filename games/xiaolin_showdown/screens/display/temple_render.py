@@ -60,6 +60,7 @@ def _state_grid(
     settings: XiaolinSettings,
     compact: bool = False,
     short_names: bool = False,
+    player_training_override: int | None = None,
 ) -> Table:
     # initiative_sources returns this duelist's own buffs plus the opponent's debuffs — a card in your
     # bracket may be sitting in their hand.
@@ -82,10 +83,10 @@ def _state_grid(
         ("P", "Dk", "Init") if compact else ("Player ", "Deck", "Initiative")
     )
     rows = (
-        (f"{player_label}1", player, init_player, player_sources, train_length_player),
-        (f"{player_label}2", bot, init_bot, bot_sources, train_length_bot),
+        (f"{player_label}1", player, init_player, player_sources, train_length_player, player_training_override),
+        (f"{player_label}2", bot, init_bot, bot_sources, train_length_bot, None),
     )
-    for label, duelist, init, sources, train_length in rows:
+    for label, duelist, init, sources, train_length, training_override in rows:
         char = duelist.character
         name = Text(f"{affiliation_icon(char)} ")
         name.append(display_name(char.name, upper=True, short=short_names), style="bold")
@@ -100,7 +101,7 @@ def _state_grid(
             Text(f"{label}:", style="dim"),
             name,
             Text(""),  # flex spacer
-            _training_cell(duelist, train_length, settings, compact=compact),
+            _training_cell(duelist, train_length, settings, compact=compact, shown_training=training_override),
             Text(""),  # flex spacer
             labelled(deck_label, str(len(duelist.deck))),
             Text(""),  # gap before Initiative
@@ -110,11 +111,20 @@ def _state_grid(
 
 
 def _training_cell(
-    duelist: Player, train_length: int, settings: XiaolinSettings, *, compact: bool = False
+    duelist: Player,
+    train_length: int,
+    settings: XiaolinSettings,
+    *,
+    compact: bool = False,
+    shown_training: int | None = None,
 ) -> Text:
     """A duelist's training bar. Every stat at the cap and it *cannot* train: it reads MASTER,
     centred in a dashed ruler as wide as the bar, tooltip ``-/-``. A boss is usually there by
-    design, but the cap is a player setting now — read the real state, not the tier."""
+    design, but the cap is a player setting now — read the real state, not the tier.
+
+    ``shown_training`` overrides the displayed value without touching ``duelist.training`` itself —
+    the temple's mid-fill tween uses this to animate a frame that was never the real, persisted
+    value."""
     cell = Text("Train: " if compact else "Training: ", style="dim")
     if not can_train(duelist, settings):
         # Measured off the real bar (not a hand-derived segment count), so MASTER centres against the
@@ -125,8 +135,9 @@ def _training_cell(
         cell.append("-" * dashes + word + "-" * dashes)
         cell.stylize(Style(meta={"tooltip": "-/-"}))
         return cell
-    cell.append(render_bar(duelist.training / train_length, train_length, segments=not compact))
-    cell.stylize(Style(meta={"tooltip": f"{duelist.training}/{train_length}"}))
+    training = duelist.training if shown_training is None else shown_training
+    cell.append(render_bar(training / train_length, train_length, segments=not compact))
+    cell.stylize(Style(meta={"tooltip": f"{training}/{train_length}"}))
     return cell
 
 
