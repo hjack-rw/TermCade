@@ -22,16 +22,18 @@ Every `XS_*` env var referenced in `BALANCE-HISTORY.md` is a real override `bala
 
 ## Current boss ladder
 
-n=500 each, `balance.py`, measured 2026-08-06 (commit `b1537fa`):
+n=400 each, `balance.py`, measured 2026-08-08 (commit `2c06a5e`) — re-checked after a pass of
+bugfixes to `choose_background` and temple AI's initiative reads; both moved nothing outside
+normal sampling noise for this n, so the ladder stands unchanged:
 
 | tier        | player win | showdowns/run |
 | ----------- | ---------- | ------------- |
-| Easy        | **92.4%**  | 14.6          |
-| Hard        | **47.0%**  | 14.2          |
-| Hannibal    | **14.6%**  | 8.2           |
-| Wuya        | **10.6%**  | 9.2           |
-| Chase       | **5.2%**   | 7.5           |
-| Jack Spicer | **22.2%**  | 8.8           |
+| Easy        | **90.8%**  | 14.5          |
+| Hard        | **47.2%**  | 13.8          |
+| Hannibal    | **16.2%**  | 8.3           |
+| Wuya        | **10.2%**  | 9.2           |
+| Chase       | **5.0%**   | 7.5           |
+| Jack Spicer | **21.2%**  | 8.8           |
 
 Order: Hannibal > Wuya > Chase, all above the hard tier's own difficulty — intended, "3 distinct
 bosses that all are hard to kill and a ladder for us to know about." Do not re-tune chasing tighter
