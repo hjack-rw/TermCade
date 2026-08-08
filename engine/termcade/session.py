@@ -111,7 +111,7 @@ def _log_child_rss(active_at_end: int) -> None:
     """
     if resource is None:
         return
-    peak_kb = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss  # type: ignore[attr-defined]
+    peak_kb = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
     log.info("session ended (was %d concurrent); worst child RSS seen so far: %.1f MB", active_at_end, peak_kb / 1024)
 
 
