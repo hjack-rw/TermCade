@@ -43,6 +43,16 @@ log = logging.getLogger("termcade.session")
 
 TOUCH_ENV = "TERMCADE_TOUCH"
 
+# Bounds for the client-supplied width/height query params, which flow unchecked into the spawned
+# session subprocess's COLUMNS/LINES env vars otherwise — a client could hand it a negative number or
+# a value in the millions. Generous enough for any real terminal; narrow enough to stop that.
+MIN_TERMINAL_SIZE = 10
+MAX_TERMINAL_SIZE = 1000
+
+
+def _clamp_terminal_size(value: int) -> int:
+    return max(MIN_TERMINAL_SIZE, min(value, MAX_TERMINAL_SIZE))
+
 # The most players served at once. Each is a full Textual render process, so on a RAM-metered host
 # too many at once trips the OOM killer and the box goes down for EVERYONE, with no auto-restart on
 # the free Pterodactyl tier — one session over budget costs every player until someone hits Restart
@@ -221,8 +231,8 @@ class TermCadeServer(Server):
 
         self._active += 1
         websocket = web.WebSocketResponse(heartbeat=15)
-        width = to_int(request.query.get("width", "80"), 80)
-        height = to_int(request.query.get("height", "24"), 24)
+        width = _clamp_terminal_size(to_int(request.query.get("width", "80"), 80))
+        height = _clamp_terminal_size(to_int(request.query.get("height", "24"), 24))
 
         app_service: TermCadeAppService | None = None
         try:

@@ -7,6 +7,8 @@ values win where they exist.
 
 from __future__ import annotations
 
+import json
+
 from termcade.core.settings import Difficulty, Settings, SettingsStore
 
 
@@ -46,3 +48,34 @@ def test_load_missing_file_returns_defaults_without_aliasing(tmp_path):
     # The loaded copy must not alias the defaults dict.
     loaded.options["sound"] = False
     assert defaults.options["sound"] is True
+
+
+def test_load_corrupt_file_falls_back_to_defaults_instead_of_crashing(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text("not json", encoding="utf-8")
+    defaults = Settings(difficulty=Difficulty.EASY, options={"sound": True})
+
+    loaded = SettingsStore(path, defaults).load()
+
+    assert loaded.difficulty is Difficulty.EASY
+    assert loaded.options == {"sound": True}
+
+
+def test_load_corrupt_file_heals_itself_for_the_next_launch(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text("not json", encoding="utf-8")
+
+    SettingsStore(path, Settings()).load()
+
+    assert Settings.from_dict(json.loads(path.read_text()), Settings()) == Settings()
+
+
+def test_apply_sets_current_without_writing_to_disk(tmp_path):
+    path = tmp_path / "settings.json"
+    store = SettingsStore(path, Settings())
+    store.load()
+
+    store.apply(Settings(difficulty=Difficulty.BOSS))
+
+    assert store.current.difficulty is Difficulty.BOSS
+    assert not path.exists()

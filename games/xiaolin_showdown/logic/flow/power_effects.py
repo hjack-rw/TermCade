@@ -19,6 +19,7 @@ from ..config.settings import XiaolinSettings
 from .training import add_progress, pick_stat, raise_stat, train_boost_step
 from ..schema.models import Card, Player
 from ..schema.state import XiaolinState
+from .duel import challenge_options_from
 from .turn import bank_value, shelve
 from .wear import hand_over
 
@@ -262,7 +263,7 @@ def _foresee(spend: _Spend) -> _Fill | None:
     spend.state.forced_priority = not spend.is_player  # the opponent leads
     spend.state.conch_tiebreak = spend.is_player  # the caster keeps the ground despite not leading
     if spend.is_player:  # the opponent is the bot — its call is deterministic, so pin and reveal it
-        stats = list(spend.them.character.stats)
+        stats = challenge_options_from(spend.them.character.stats, spend.state)
         spend.state.locked_challenge = bot.choose_challenge(
             spend.them.character.stats, stats, spend.them.whole_hand,
             spend.me.character.stats, spend.rng or Rng(0),  # a tie-break stream; the caster supplies it

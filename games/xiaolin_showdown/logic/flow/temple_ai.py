@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from . import bot
+from ..characters import jong
 from ..characters.wuya import WITCH_EARLY_BIRD_GAP
 from ..mechanics.powers import GAMBLE_SPREAD, Mechanic, is_gamble, mechanic_of
 from ..mechanics.scoring import initiative
@@ -219,11 +220,12 @@ def _wants_initiative(state: XiaolinState, is_player: bool = False) -> bool:
     answer the hands are not already giving.
     """
     me, them = state.duelist(is_player), state.opponent(is_player)
+    my_stats, their_stats = jong.battle_stats(me), jong.battle_stats(them)
     edges = [
-        me.character.stats[stat]
+        my_stats[stat]
         + max((card.stats[stat] or 0 for card in me.hand), default=0)
-        - them.character.stats[stat]
-        for stat in me.character.stats
+        - their_stats[stat]
+        for stat in my_stats
     ]
     return max(edges, default=0) > 0
 

@@ -9,6 +9,7 @@ from termcade.core.rng import Rng
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.flow.actions import use_power
 from xiaolin_showdown.logic.schema.catalog import load_catalog
+from xiaolin_showdown.logic.schema.constants import TOURNAMENT, TOURNAMENT_BATTLES
 from xiaolin_showdown.logic.mechanics.powers import mechanic_of
 from xiaolin_showdown.logic.schema.models import Mechanic, Power
 from xiaolin_showdown.logic.schema.state import XiaolinState
@@ -66,6 +67,50 @@ def test_the_pin_and_ground_are_spent_when_the_showdown_ends():
     # Simulate the end-of-showdown reset (duel._end clears them).
     state.forced_priority = state.locked_challenge = state.conch_tiebreak = None
     assert state.locked_challenge is None
+
+
+def test_prognosis_does_not_repin_a_stat_already_named_this_duel():
+    """The pin obeys the same no-repeat rule as a live challenge call: the bot's strongest stat is
+    off the table once it's already been named, so Prognosis must fall to the next-best legal one."""
+    conch = wu(0, 0, 4, mechanic=Mechanic.PROGNOSIS, name="Conch")
+    state = _state(duelist(hand=[conch]), duelist(stats={"force": 1, "agility": 1, "intellect": 5}))
+    state.previous_challenge = ["intellect"]  # the bot's strongest stat — already named this duel
+    use_power(state, conch, DEFAULT, is_player=True, rng=Rng(0))
+    assert state.locked_challenge != "intellect"
+    assert state.locked_challenge == "force"  # next-best of what's left, tie broken toward force
+
+
+def test_prognosis_can_pin_a_tournament_when_the_bot_leads_broadly():
+    """Prognosis's pin must offer the tournament too, exactly when a live challenge call would —
+    both hands need three-plus Wu, and the bot must lead on a majority of the stats."""
+    conch = wu(0, 0, 4, mechanic=Mechanic.PROGNOSIS, name="Conch")
+    filler = [wu(name=f"Filler {i}") for i in range(TOURNAMENT_BATTLES)]
+    bot = duelist(hand=filler, stats={"force": 5, "agility": 5, "intellect": 0})
+    player = duelist(hand=[conch, *filler])
+    state = _state(player, bot)
+    use_power(state, conch, DEFAULT, is_player=True, rng=Rng(0))
+    assert state.locked_challenge == TOURNAMENT
+
+
+def test_stacking_two_initiative_powers_contests_the_showdown():
+    """A second initiative power (Glasses, then the Conch) landing on an already-answered showdown
+    contests it instead of overwriting the first answer: neither pin stands, the coin decides."""
+    glasses = wu(0, 0, 3, mechanic=Mechanic.ENHANCED_VISION, name="Glasses")
+    conch = wu(0, 0, 4, mechanic=Mechanic.PROGNOSIS, name="Conch")
+    state = _state(
+        duelist(hand=[glasses, conch]), duelist(stats={"force": 1, "agility": 1, "intellect": 5})
+    )
+
+    use_power(state, glasses, DEFAULT, is_player=True, priority=True, rng=Rng(0))
+    assert state.forced_priority is True  # the first power's answer stands...
+
+    report = use_power(state, conch, DEFAULT, is_player=True, rng=Rng(0))
+
+    assert state.initiative_contested is True  # ...until a second one lands on the same showdown
+    assert state.forced_priority is None
+    assert state.locked_challenge is None
+    assert state.conch_tiebreak is None
+    assert report.toast == "You both reached for the initiative — a coin toss will decide who leads."
 
 
 def test_caleido_scope_carries_telepatheia_now():

@@ -26,7 +26,7 @@ decisions come from :mod:`.bot`. Advancing one stage per call mirrors one "Conti
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from copy import deepcopy
 from dataclasses import dataclass, field
 
@@ -54,6 +54,23 @@ from .wear import hand_over
 
 END, COMMITMENT, SETUP, BOOST, CARD, RESOLVEMENT = range(6)
 LAST_STAGE = RESOLVEMENT  # the showdown cycles stages 0..5, but BOOST..CARD repeats per Wu wagered
+
+
+def challenge_options_from(candidates: Iterable[str], state: XiaolinState) -> list[str]:
+    """Filter a pool of candidate stats down to what may legally be called: nothing already named
+    this duel, plus the tournament when both hands can field it.
+
+    Split out of :meth:`Duel._challenge_options` so a caller who cannot see the wager card yet (e.g.
+    Prognosis, pinning the bot's call from the temple before the showdown deals its stakes) still gets
+    the same no-repeat / tournament-eligibility rules — the pool differs, the rule does not.
+    """
+    options = [s for s in candidates if s not in state.previous_challenge]
+    if (
+        TOURNAMENT not in state.previous_challenge
+        and min(len(state.player.hand), len(state.bot.hand)) >= TOURNAMENT_BATTLES
+    ):
+        options.append(TOURNAMENT)
+    return options
 
 # The summon-flavour pools and their resolvers live in :mod:`.summons`; the duel passes the two
 # characters and the arena, and shows the name they return in place of the Wu's own.
@@ -1108,13 +1125,7 @@ class Duel:
         can field three — like any wager, a challenge the other cannot answer is not a challenge.
         """
         stats = self.duel.stakes.stats.keys() if self.duel.stakes else ()
-        options = [s for s in stats if s not in self.state.previous_challenge]
-        if (
-            TOURNAMENT not in self.state.previous_challenge
-            and min(len(self.state.player.hand), len(self.state.bot.hand)) >= TOURNAMENT_BATTLES
-        ):
-            options.append(TOURNAMENT)
-        return options
+        return challenge_options_from(stats, self.state)
 
     def _background_options(self) -> list[str]:
         return [e for e in ELEMENTS if e not in self.state.previous_background]

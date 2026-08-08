@@ -171,6 +171,34 @@ async def test_loading_a_slot_refills_the_run_log(make_app):
         assert [e.message for e in app.ctx.journal.entries] == ["They banked the Sphere."]
 
 
+async def test_loading_a_slot_applies_its_frozen_settings_in_session_only(make_app):
+    """The save's frozen settings win for this run, but loading must not retro-fit the settings
+    file on disk — a save is not a preference change."""
+    from termcade.core.settings import Difficulty, Settings
+
+    app = make_app(_Blank)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.ctx.state = app.ctx.game.state_cls()
+        app.ctx.saves.save(
+            0,
+            app.ctx.state,
+            app.ctx.rng,
+            title="hard-mode-save",
+            settings=Settings(difficulty=Difficulty.HARD),
+        )
+        app.ctx.settings.apply(Settings(difficulty=Difficulty.EASY))  # differs from the save
+
+        app.push_screen(SaveSlotScreen("load", next_screen=_Blank))
+        await pilot.pause()
+        await pilot.click("#slot-0")
+        await pilot.pause()
+
+        assert app.ctx.settings.current.difficulty == Difficulty.HARD
+        settings_path = app.ctx.data_dir / "settings.json"
+        assert not settings_path.exists() or Difficulty.EASY.value not in settings_path.read_text()
+
+
 async def test_the_load_picker_offers_a_delete_button_per_occupied_slot(make_app):
     app = make_app(_Blank)
     async with app.run_test() as pilot:

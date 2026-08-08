@@ -166,3 +166,18 @@ def test_a_garbage_cap_falls_back_to_the_default(monkeypatch) -> None:
     monkeypatch.setenv(session.MAX_SESSIONS_ENV, "lots")
 
     assert session._max_sessions() == session.DEFAULT_MAX_SESSIONS
+
+
+@pytest.mark.parametrize(
+    "value, clamped",
+    [
+        (80, 80),  # ordinary size, untouched
+        (-1, session.MIN_TERMINAL_SIZE),  # negative — a hostile or malformed client value
+        (0, session.MIN_TERMINAL_SIZE),
+        (10_000_000, session.MAX_TERMINAL_SIZE),  # absurdly large — must not reach the subprocess env
+    ],
+)
+def test_terminal_size_is_clamped_to_a_sane_range(value, clamped) -> None:
+    """width/height come from a client-supplied query param and flow into the spawned session
+    subprocess's environment unmodified otherwise — a resource-exhaustion vector left open."""
+    assert session._clamp_terminal_size(value) == clamped

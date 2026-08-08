@@ -129,13 +129,14 @@ class SaveSlotScreen(MenuScreen):
     def _load(self, slot: int) -> None:
         state_cls: type[GameState] = self.ctx.game.state_cls
         try:
-            state, rng, _meta, _settings = self.ctx.saves.load(slot, state_cls, self.ctx)
+            state, rng, _meta, settings = self.ctx.saves.load(slot, state_cls, self.ctx)
         except SaveError as e:
             # A corrupt or unreadable save must not crash the picker — flag it and stay put.
             self.app.notify(str(e), title="Load failed", severity="error")
             return
         self.ctx.state = state  # empties the journal — a new state is a new run
         self.ctx.rng = rng
+        self.ctx.settings.apply(settings)  # the save's frozen settings win, in-session only
         # ...then refill the log from the save, so the loaded run opens on what happened, not a blank.
         saved_journal = self.ctx.saves.journal_of(slot)
         if saved_journal is not None:

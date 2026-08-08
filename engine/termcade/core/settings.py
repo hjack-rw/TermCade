@@ -12,6 +12,7 @@ something wrong: the next person to read the file believes it still means someth
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -63,8 +64,18 @@ class SettingsStore:
 
     def load(self) -> Settings:
         if self._path.exists():
-            data = json.loads(self._path.read_text(encoding="utf-8"))
-            self._current = self._pruned(Settings.from_dict(data, self._defaults))
+            try:
+                data = json.loads(self._path.read_text(encoding="utf-8"))
+                self._current = self._pruned(Settings.from_dict(data, self._defaults))
+            except (json.JSONDecodeError, TypeError, ValueError, KeyError):
+                # A malformed settings file must not brick the app on boot — fall back to
+                # defaults, same as a first launch, and heal the file so the next launch
+                # doesn't hit the same corruption.
+                self._current = Settings(
+                    difficulty=self._defaults.difficulty,
+                    options=dict(self._defaults.options),
+                )
+                self.save()
         else:
             self._current = Settings(
                 difficulty=self._defaults.difficulty,
@@ -96,7 +107,20 @@ class SettingsStore:
         if settings is not None:
             self._current = settings
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(self.current.to_dict(), indent=2), encoding="utf-8")
+        # Atomic: fill a sibling temp file, then os.replace it into place, so an interrupted
+        # write can never truncate an existing settings.json (mirrors SaveBackend.write).
+        tmp = self._path.with_name(self._path.name + ".tmp")
+        tmp.write_text(json.dumps(self.current.to_dict(), indent=2), encoding="utf-8")
+        os.replace(tmp, self._path)
+
+    def apply(self, settings: Settings) -> None:
+        """Make ``settings`` current for this session only — no write to disk.
+
+        For a loaded save's frozen settings: that run must play by the rules it was saved
+        under, but loading it is not a preference change and must not retro-fit the file on
+        disk (see :meth:`SaveManager.load`'s docstring in ``saves.py``).
+        """
+        self._current = settings
 
     @property
     def current(self) -> Settings:
