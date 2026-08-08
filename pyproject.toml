@@ -71,6 +71,10 @@ line-length = 100
 
 [tool.mypy]
 python_version = "3.12"
+# Pinned to the deployment target (Docker/Linux), not the host running the check — otherwise a
+# POSIX-only stub (e.g. `resource`) type-checks differently on a Windows dev box than in CI, and an
+# ignore comment one platform needs is "unused" on the other.
+platform = "linux"
 # Core must stay clean; relax nothing here until it hurts.
 warn_unused_ignores = true
 warn_redundant_casts = true
