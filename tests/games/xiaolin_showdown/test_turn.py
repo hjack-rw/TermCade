@@ -17,13 +17,11 @@ from xiaolin_showdown.logic.flow.turn import (
     VAULT,
     DUEL_FLOOR,
     PASSED,
-    bank_value,
     bot_turn,
-    max_hand_size,
     oversee_hand_size,
     refill_hands,
-    shelve,
 )
+from xiaolin_showdown.logic.flow.values import bank_value, max_hand_size, shelve
 
 from factories import duelist, wu
 

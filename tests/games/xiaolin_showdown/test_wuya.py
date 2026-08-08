@@ -10,7 +10,8 @@ from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.logic.schema.state import XiaolinState
 from xiaolin_showdown.logic.characters.wuya import WITCH_RECALL_LIMIT, WITCH_RECALL_MARGIN
 from xiaolin_showdown.logic.flow.training import can_train
-from xiaolin_showdown.logic.flow.turn import RECALL, bank_value, bot_turn
+from xiaolin_showdown.logic.flow.turn import RECALL, bot_turn
+from xiaolin_showdown.logic.flow.values import bank_value
 
 from factories import duelist, wu
 

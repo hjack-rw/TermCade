@@ -27,7 +27,8 @@ from ...logic.schema.constants import ELEMENTS, TOURNAMENT
 from ...logic.schema.models import Card
 from ...logic.config.settings import XiaolinSettings
 from ...logic.schema.state import XiaolinState
-from ...logic.flow.turn import bot_turn, max_hand_size, refill_hands, shelve
+from ...logic.flow.turn import bot_turn, refill_hands
+from ...logic.flow.values import max_hand_size, shelve
 from ..base import XiaolinScreen
 from ..display.duel_board import _board_text, _showdown_story, _wager_label
 from ..display.headline import SHOWDOWN_LOG, opponent_move

@@ -11,6 +11,7 @@ from __future__ import annotations
 from termcade.core.rng import Rng
 
 from ..characters import jong
+from ..characters.wuya import WITCH_EARLY_BIRD_GAP
 from ..schema.catalog import load_mechanic_config
 from ..schema.constants import EAGLE_SCOPE_ID, FALCONS_EYE_ID, YANG_YOYO_ID, YIN_YANG_YOYO_ID, YING_YOYO_ID
 from ..mechanics.scoring import initiative
@@ -20,7 +21,7 @@ from ..config.settings import XiaolinSettings, deposit_limit, player_actions
 from ..schema.state import XiaolinState
 from . import bot
 from .training import add_progress, can_train, doubles_training, payout_ready
-from .turn import bank_value, duel_value, max_hand_size, shelve
+from .values import bank_value, duel_value, max_hand_size, shelve
 from .power_effects import FIZZLE_MESSAGE, PowerReport, _Spend, _fire
 
 _WITCHCRAFT = load_mechanic_config()["witchcraft"]
@@ -233,6 +234,20 @@ def _has_target(state: XiaolinState, card: Card, settings: XiaolinSettings, is_p
     return True
 
 
+# A mechanic constant, not a player setting — the same margin the pool's own numbers are priced
+# against. Wuya's own version lives beside her, in `WITCH_EARLY_BIRD_GAP`.
+EARLY_BIRD_GAP = 3
+
+
+def early_bird_gap(state: XiaolinState, *, is_player: bool) -> int:
+    """The initiative lead needed to fly the Early Bird — a mechanic constant, not a player setting;
+    shortened for Wuya, whose sense finds the moment for her. Everyone else pays it in full."""
+    me = state.duelist(is_player)
+    if mechanic_of(me.character.power) is Mechanic.WITCHCRAFT:
+        return min(EARLY_BIRD_GAP, WITCH_EARLY_BIRD_GAP)
+    return EARLY_BIRD_GAP
+
+
 def early_bird_options(state: XiaolinState, *, is_player: bool = True) -> list[Card]:
     """The Wu you may surrender to the Early Bird: your *highest* initiative, by magnitude.
 
@@ -262,7 +277,6 @@ def early_bird_blocked(state: XiaolinState, settings: XiaolinSettings) -> str | 
         return spent
     if not state.card_deck:
         return "No Wu left on the pile."
-    from .temple_ai import early_bird_gap  # local: temple_ai imports this module
     lead = initiative_lead(state, is_player=True)
     gap = early_bird_gap(state, is_player=True)
     if lead < gap:

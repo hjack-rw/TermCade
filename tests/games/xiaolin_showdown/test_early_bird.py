@@ -12,6 +12,7 @@ from itertools import combinations_with_replacement
 import pytest
 
 from xiaolin_showdown.logic.flow.actions import (
+    EARLY_BIRD_GAP,
     can_early_bird,
     early_bird,
     early_bird_blocked,
@@ -21,8 +22,8 @@ from xiaolin_showdown.logic.flow.actions import (
 from xiaolin_showdown.logic.mechanics.cards import is_one_of
 from xiaolin_showdown.logic.mechanics.scoring import initiative
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
-from xiaolin_showdown.logic.flow.turn import duel_value
-from xiaolin_showdown.logic.flow.temple_ai import EARLY_BIRD_GAP, choose_early_bird
+from xiaolin_showdown.logic.flow.values import duel_value
+from xiaolin_showdown.logic.flow.temple_ai import choose_early_bird
 from factories import wu
 
 # Read by property, never by id — the pool is rebalanced constantly and these must survive it.
@@ -360,7 +361,7 @@ def test_the_opponent_declines_a_confirmed_worse_trade(state, catalog):
 
     The worm is a controlled, inserted card, not whatever the seed happened to deal: the front of
     the pile can land on a DRAGON or another mechanic priced by something other than its raw stats
-    (`turn.duel_value`), which would make a stats-only "confirmed worse" setup meaningless.
+    (`values.duel_value`), which would make a stats-only "confirmed worse" setup meaningless.
     """
     settings = _bot_outruns(state, catalog)
     state.bot.points, state.player.points = 1, 9

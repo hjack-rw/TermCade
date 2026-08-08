@@ -18,7 +18,7 @@ from termcade.app.game import GameContext
 from termcade.ui.screens.console import Command
 
 from .logic.schema.catalog import load_catalog
-from .logic.flow.turn import shelve
+from .logic.flow.values import shelve
 from .logic.characters.jong import PART_TYPES
 from .logic.config.ladder import LADDER, LADDER_OPTION
 from .logic.mechanics.powers import Mechanic, mechanic_of

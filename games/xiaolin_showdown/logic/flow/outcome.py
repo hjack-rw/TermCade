@@ -17,7 +17,7 @@ from termcade.core.rng import Rng
 from ..schema.models import Card, Character
 from ..schema.state import XiaolinState
 from . import bot
-from .turn import bank_value
+from .values import bank_value
 
 
 @dataclass(frozen=True)

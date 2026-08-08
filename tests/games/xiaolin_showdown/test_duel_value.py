@@ -14,7 +14,7 @@ So this file is the thing that has something to say. A new mechanic must be **pr
 from __future__ import annotations
 
 from xiaolin_showdown.logic.mechanics.powers import Mechanic, mechanic_of
-from xiaolin_showdown.logic.flow.turn import (
+from xiaolin_showdown.logic.flow.values import (
     _MECHANIC_VALUE,
     _STATS_ARE_THE_WHOLE_VALUE,
     _WORTH_NOTHING_ON_THE_TABLE,
@@ -30,7 +30,7 @@ def test_every_mechanic_is_priced_or_excused():
     assert not missing, (
         f"unpriced mechanic(s): {sorted(m.value for m in missing)} — a Wu carrying one is worth its "
         f"printed stats and nothing else, so a card that prints '? ? ?' reads as junk. Price it in "
-        f"turn._MECHANIC_VALUE, or excuse it in turn._STATS_ARE_THE_WHOLE_VALUE."
+        f"values._MECHANIC_VALUE, or excuse it in values._STATS_ARE_THE_WHOLE_VALUE."
     )
 
 

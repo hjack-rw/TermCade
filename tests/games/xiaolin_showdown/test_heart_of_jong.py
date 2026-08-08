@@ -24,7 +24,7 @@ from xiaolin_showdown.logic.flow.summons import _JONG_FORMS
 from xiaolin_showdown.logic.mechanics.powers import ANIMATE_FIELD_STAT, ANIMATE_STAT, is_boost_slot
 from xiaolin_showdown.logic.mechanics.resolve import as_boost, resolve_played_power
 from xiaolin_showdown.logic.flow.setup import new_game
-from xiaolin_showdown.logic.flow.turn import duel_value
+from xiaolin_showdown.logic.flow.values import duel_value
 
 WEAR_LIMIT = XiaolinSettings().wear_limit
 

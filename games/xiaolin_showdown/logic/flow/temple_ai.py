@@ -13,15 +13,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from . import bot
+from .actions import early_bird_gap, early_bird_options, initiative_lead
 from ..characters import jong
-from ..characters.wuya import WITCH_EARLY_BIRD_GAP
 from ..mechanics.powers import GAMBLE_SPREAD, Mechanic, is_gamble, mechanic_of
 from ..mechanics.scoring import initiative
 from ..schema.models import Card
 from ..config.settings import XiaolinSettings, player_actions
 from ..schema.state import XiaolinState
 from .training import can_train, train_boost_step
-from .turn import duel_value
+from .values import duel_value
 
 # How much better the best Wu on the shelf must be than the one a plain Draw would hand over, before
 # the Glove of Jisaku is worth *being spent* to reach it. A Draw costs the same action and costs no
@@ -286,19 +286,6 @@ def _worth_reaching_for(state: XiaolinState, is_player: bool = False) -> bool:
 
 # --- The Early Bird: a Wu off the pile, taken by being faster ----------------------
 
-# A mechanic constant, not a player setting — the same margin the pool's own numbers are priced
-# against. Wuya's own version lives beside her, in `WITCH_EARLY_BIRD_GAP`.
-EARLY_BIRD_GAP = 3
-
-
-def early_bird_gap(state: XiaolinState, *, is_player: bool) -> int:
-    """The initiative lead needed to fly the Early Bird — a mechanic constant, not a player setting;
-    shortened for Wuya, whose sense finds the moment for her. Everyone else pays it in full."""
-    me = state.duelist(is_player)
-    if mechanic_of(me.character.power) is Mechanic.WITCHCRAFT:
-        return min(EARLY_BIRD_GAP, WITCH_EARLY_BIRD_GAP)
-    return EARLY_BIRD_GAP
-
 
 def choose_early_bird(
     state: XiaolinState, settings: XiaolinSettings, *, is_player: bool = False
@@ -310,8 +297,6 @@ def choose_early_bird(
     prize taken is never weighed, only what's given up) — a Teleskopia already fired legitimately
     turns that into a known quantity, and a confirmed worse trade is vetoed (see `known_upcoming_pile`).
     """
-    from .actions import early_bird_options, initiative_lead  # local: actions imports this module
-
     me, them = state.duelist(is_player), state.opponent(is_player)
     spent = state.actions_spent(is_player)
     # Each side flies against its own budget — in a boss run the player's is the larger one.

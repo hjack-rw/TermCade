@@ -24,7 +24,7 @@ from ..schema.constants import ELEMENTS, OPPOSITES, TOURNAMENT
 from ..mechanics.powers import Mechanic, chooses_element, is_uncontrolled, mechanic_of, names_a_stat
 from ..mechanics.resolve import as_boost, resolve_played_power
 from ..schema.models import Card, Player
-from .turn import duel_value
+from .values import duel_value
 
 
 def is_jack(player: Player) -> bool:

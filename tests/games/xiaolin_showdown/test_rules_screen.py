@@ -14,7 +14,7 @@ import pytest
 from textual.widgets import Input, ListItem, ListView
 
 from xiaolin_showdown.logic.flow.battle import Round
-from xiaolin_showdown.logic.flow.temple_ai import EARLY_BIRD_GAP
+from xiaolin_showdown.logic.flow.actions import EARLY_BIRD_GAP
 from xiaolin_showdown.logic.mechanics.prize import PrizeRoute, claim_route
 from xiaolin_showdown.logic.config.settings import XiaolinSettings
 from xiaolin_showdown.screens.reference.rules import (

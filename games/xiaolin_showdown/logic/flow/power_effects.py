@@ -16,11 +16,12 @@ from ..characters import jong
 from ..mechanics.cards import index_of, is_one_of
 from ..mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of
 from ..config.settings import XiaolinSettings
+from . import bot
 from .training import add_progress, pick_stat, raise_stat, train_boost_step
 from ..schema.models import Card, Player
 from ..schema.state import XiaolinState
 from .duel import challenge_options_from
-from .turn import bank_value, shelve
+from .values import bank_value, shelve
 from .wear import hand_over
 
 
@@ -255,8 +256,6 @@ def _foresee(spend: _Spend) -> _Fill | None:
     PINNED now (from its current stats and hand) and revealed to the caster; a human opponent still
     names theirs live, so nothing is pinned there and only the ground changes hands.
     """
-    from . import bot  # local: bot imports this module
-
     if _already_answered(spend.state):
         _contest_initiative(spend.state)
         return {"answer": "the coin"}  # ignored: `_fire` swaps in CONTESTED_INITIATIVE

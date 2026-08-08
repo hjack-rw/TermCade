@@ -17,7 +17,7 @@ from termcade.core.rng import Rng
 
 from ..mechanics.cards import hand_over, is_one_of
 from ..schema.models import Card, Player
-from .turn import bank_value
+from .values import bank_value
 
 __all__ = ["hand_over", "record_showdown"]
 

@@ -28,7 +28,7 @@ sys.path[:0] = [REPO + "/games", REPO + "/engine"]
 
 from termcade.core.rng import Rng  # noqa: E402
 from termcade.core.settings import Difficulty, Settings  # noqa: E402
-from xiaolin_showdown.logic.flow import bot, temple_ai  # noqa: E402
+from xiaolin_showdown.logic.flow import actions, bot, temple_ai  # noqa: E402
 
 # The bot's own constants, swept from the outside so a claim about one of them is measured, not argued.
 if os.environ.get('XS_REVIVAL'):
@@ -40,7 +40,8 @@ if os.environ.get('XS_BIRD_CEILING'):
 if os.environ.get('XS_SWAP_MARGIN'):
     temple_ai.SWAP_MARGIN = int(os.environ['XS_SWAP_MARGIN'])
 if os.environ.get('XS_WITCH_BIRD_GAP'):  # Wuya's Early-Bird sense: the lead she needs to fly the bird
-    temple_ai.WITCH_EARLY_BIRD_GAP = int(os.environ['XS_WITCH_BIRD_GAP'])
+    from xiaolin_showdown.logic.flow import actions as _actions_witch_bird
+    _actions_witch_bird.WITCH_EARLY_BIRD_GAP = int(os.environ['XS_WITCH_BIRD_GAP'])
 if os.environ.get('XS_BEAST_MARGIN'):
     from xiaolin_showdown.logic.characters import chase as _chase_margin
     _chase_margin.BEAST_MARGIN = int(os.environ['XS_BEAST_MARGIN'])
@@ -550,7 +551,7 @@ async def main():
         print(f"    {str(mechanic):16} {count:5}")
 
     leads = FLIGHTS["leads"]
-    reached = sum(1 for lead in leads if lead >= temple_ai.EARLY_BIRD_GAP)
+    reached = sum(1 for lead in leads if lead >= actions.EARLY_BIRD_GAP)
     print(f"\n  the opponent fired a temple power {FLIGHTS.get('bot_powers', [0])[0]}x across all runs")
     print(f"  the Early Bird: flown {FLIGHTS['player']}x by the player, {FLIGHTS['bot']}x by the "
           f"opponent — the gap was reachable in {reached}/{len(leads)} player turns "

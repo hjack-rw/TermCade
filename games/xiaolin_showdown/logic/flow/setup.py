@@ -20,7 +20,8 @@ from ..mechanics.powers import Mechanic, mechanic_of
 from ..schema.models import Card, Character, Player
 from ..config.settings import XiaolinSettings, deal_target, pile_size_for, point_limit_for
 from ..schema.state import XiaolinState
-from .turn import counters_against, duel_value
+from .turn import counters_against
+from .values import duel_value
 
 # Deal weight = how likely a Wu is dealt into a run. Points (so the deck can reach the target) and duel
 # strength (so the fights stay sharp) both pull it up; the base keeps every Wu reachable. Points lead,

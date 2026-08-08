@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from ..schema.catalog import load_mechanic_config
 from ..schema.state import XiaolinState
-from ..flow.turn import duel_value
+from ..flow.values import duel_value
 
 _WITCHCRAFT = load_mechanic_config()["witchcraft"]
 

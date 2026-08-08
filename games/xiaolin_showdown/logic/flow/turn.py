@@ -14,27 +14,29 @@ from dataclasses import dataclass
 from termcade.core.rng import Rng
 from termcade.core.settings import Difficulty
 
-from ..mechanics.powers import (
-    ANIMATE_STAT,
-    MORPH_ASIDE,
-    MORPH_CONTESTED,
-    NAMED_STAT_VALUE,
-    Mechanic,
-    is_gamble,
-    is_uncontrolled,
-    mechanic_of,
-    roll_gamble,
-)
+from ..mechanics.powers import Mechanic, mechanic_of
 from ..characters import chase, hannibal, jack
+from ..characters.wuya import recall_index, worth_recalling
 from ..mechanics.cards import hand_over
+from ..schema.constants import YIN_YANG_YOYO_ID
 from ..schema.models import Card, Character, Player
 from ..config.settings import XiaolinSettings, deposit_limit, player_actions, plays_keen
 from ..content.naming import display_name
 from ..schema.state import XiaolinState
+from . import bot as bot_module
+from .actions import (
+    can_combine_yoyo,
+    can_construct,
+    can_self_correct_yoyo,
+    combine_yoyo,
+    construct_jong,
+    early_bird,
+    self_correct_yoyo,
+    use_power,
+)
+from .temple_ai import choose_early_bird, choose_temple_power
 from .training import add_progress, can_train, pick_stat, raise_stat, turn_over
-
-# What a booster is worth in a showdown, since it carries no stats of its own.
-BOOSTER_PREMIUM = 4
+from .values import bank_value, duel_value, max_hand_size, shelve
 
 # The bot never banks its hand below this floor. A deposit requires more than DUEL_FLOOR left in
 # hand (see `_bank_surplus`), so 2 is the minimum that still allows any deposit at all.
@@ -98,14 +100,6 @@ def oversee_hand_size(
     return False
 
 
-def shelve(player: Player, card: Card, *, rng: Rng) -> None:
-    """Put a Wu on a personal deck — and shuffle it in. The deck is an OBSTACLE, not an ordered stack:
-    a shelved Wu must not come back in a known order or on a countable turn, or it could be memorised
-    and played around. Load-bearing randomness (it decides a draw), so it draws the main stream."""
-    player.deck.append(card)
-    rng.shuffle(player.deck)
-
-
 def _charge_the_turn(state: XiaolinState, settings: XiaolinSettings, *, is_player: bool) -> None:
     """Being dealt back in *is* the turn's action, not a gift on top of it.
 
@@ -137,152 +131,6 @@ def _emergency_fill(
     while state.card_deck and owed > 0:
         _draw_from_main(state, player)
         owed -= 1
-
-
-# What a Wu is worth on the table when its printed stats say nothing (a `? ? ?` card reads as ZERO).
-# Same currency as a printed stat.
-_MECHANIC_VALUE: dict[Mechanic, int] = {
-    # Priced off the Morph rule itself, so retuning the rule re-prices the bot.
-    Mechanic.MORPH: MORPH_ASIDE * 2 + MORPH_CONTESTED,
-    Mechanic.BUFF: NAMED_STAT_VALUE,
-    Mechanic.MISFORTUNE: NAMED_STAT_VALUE,
-    Mechanic.NULLIFY_STATS: 5,
-    Mechanic.NULLIFY_WU: 5,
-    Mechanic.NULLIFY_CURSE: 4,
-    # Prints 0/0/0; its swing is board-dependent and uncapped (see `duel.Duel._conduct_bonus`), so
-    # the bot can't know its true value at decision time. Priced level with NULLIFY_CURSE.
-    Mechanic.CONDUCT: 4,
-    # `temple_ai._worth_swapping` decides when it's worth spending; priced here for what it's worth
-    # banked instead, when that policy passes it up.
-    Mechanic.TRANSFER: 5,
-    # `temple_ai._worth_refreshing` decides when it's worth spending; priced here for what it's worth
-    # banked instead, when that policy passes it up.
-    Mechanic.REFRESH: 3,
-    # Prints 0/0/0 but FIELDED it wins the showdown outright (see `bot.choose_card`, which always
-    # fields it). Spending it deliberately is `temple_ai._worth_wishing`; this price is what it's
-    # worth held or banked as junk, not what a chosen Vault pull is worth.
-    # (Deposited it is worth its 10 printed points, counted the ordinary way.)
-    Mechanic.WISH: 10,
-    # Prints ? ? ? but in the boost slot comes alive as a flat ANIMATE_STAT form — priced off that so
-    # retuning the form re-prices the bot.
-    Mechanic.ANIMATE: ANIMATE_STAT * 3,
-    # Prints ? ? ?; the swap outlives the battle (see `duel.Duel._swap_stat_and_flip`) — no spend
-    # policy yet, level with TRANSFER.
-    Mechanic.STAT_SWAP: 5,
-    # Never dealt (see `constants.in_pool`) — only reached by combining both halves — but still needs
-    # a price so a bot holding one never banks it as junk. Same swap as STAT_SWAP, priced a step above.
-    Mechanic.CHI_SWAP: 6,
-}
-
-# (Witchcraft is a CHARACTER power — no card carries it, so its table price is moot; it sits in
-# `_STATS_ARE_THE_WHOLE_VALUE` below purely to satisfy the every-mechanic-is-accounted guard.)
-
-# Mechanics whose printed stats are the whole value, declared rather than assumed. The two sets must
-# cover every `Mechanic` — `test_every_mechanic_is_priced` enforces it. An unpriced `? ? ?` Wu reads as
-# zero: the bot banks the strongest card in the game for 2 points.
-#
-# Two of them are excused for a *different* reason: they are worth nothing on the table at all, and
-# that is deliberate. Kept apart from the rest because "its stats say what it is worth" and "it is
-# worth nothing" are different claims, and only the second one may price at zero.
-_WORTH_NOTHING_ON_THE_TABLE: frozenset[Mechanic] = frozenset(
-    {
-        Mechanic.FILLER,  # deck padding: no stats, no power, no business being fielded
-        # The joke Wu prints `? ? ?` and does nothing in a battle. Everything it is worth is at the
-        # temple, where it is rolled for points — so zero on the table is honest, not an oversight.
-        Mechanic.GAMBLE,
-    }
-)
-
-_STATS_ARE_THE_WHOLE_VALUE: frozenset[Mechanic] = _WORTH_NOTHING_ON_THE_TABLE | frozenset(
-    {
-        Mechanic.INNATE,  # the stats *are* the Wu
-        Mechanic.INITIATIVE,  # its bonus is a hand power; in a battle it is only its stats
-        Mechanic.HAND_SIZE,  # likewise — it buys a hand slot, not a blow
-        Mechanic.DOUBLE_TRAINING,  # a hand power (doubles training); in a battle it is only its stats
-        Mechanic.HAND_FIZZLE,  # unprinted (see `powers.UNPRINTED`)
-        Mechanic.DRAW,  # a temple power; on the table it is just its printed stats
-        Mechanic.READ_DECK,  # likewise
-        Mechanic.SCRY,  # likewise
-        Mechanic.ENHANCED_VISION,  # likewise
-        Mechanic.FETCH,  # likewise
-        Mechanic.BOUNCE,  # likewise
-        Mechanic.LUCK,  # likewise — it acts on the lost pile, never in a battle
-        Mechanic.PROGNOSIS,  # likewise — a temple power, on the table just its printed stats
-        Mechanic.WITCHCRAFT,  # a character power (Wuya's) — no card ever prints it
-        Mechanic.BEAST_FORM,  # a character power (Chase's) — likewise
-        # The dragon and the booster carry no stats but decide duels — they are priced by
-        # BOOSTER_PREMIUM in `duel_value` rather than here, which is the older seam.
-        Mechanic.DRAGON,
-        Mechanic.BOOST,
-        # Jack-Bot is an inalienable boss fixture, never pooled or bought — its -1/-1/-1 lands on the
-        # opponent (`resolve.curse_from_boost`), not scored as its own printed stats, so there is
-        # nothing here for a points-vs-stats check to weigh in the first place.
-        Mechanic.BOT,
-        # Worth more than its printed stats (it vetoes the elemental bonus and the prize's elemental
-        # route both), but priced by stats alone deliberately — do not raise it.
-        Mechanic.NULLIFY_ELEMENT,
-        # Worth more than its printed stats (it reverses the elemental bonus), but priced by them —
-        # the reversal is contextual, read by the bot's play-it-out eval, not here.
-        Mechanic.REVERSE_ELEMENT,
-        # The four boss counters print real stats; their showdown effect (negate a boost, recolour a
-        # side or the arena) is contextual and read by the bot's play-it-out eval, not priced here.
-        Mechanic.NULLIFY_BOOST,
-        Mechanic.CLEANSE,
-        Mechanic.SET_ELEMENT,
-        Mechanic.WARD,
-        Mechanic.SET_ARENA,
-        # Prints real stats; its shield (no curse on the stat it boosts) is contextual, read by the
-        # bot's play-it-out eval, not priced here.
-        Mechanic.STAT_SHIELD,
-        # Prints real stats; its seize is contextual, read by the bot's play-it-out eval
-        # (`bot._worth_the_side_effect`, `_SIDE_EFFECT_MECHANICS`), not priced here.
-        Mechanic.SEIZE_GROUND,
-        # Prints real stats; its win-vs-construct is entirely contextual — worth nothing outside a
-        # Jack fight, and even then only in two of his four states. Read by the bot's play-it-out
-        # eval, not priced here.
-        Mechanic.HACK,
-        # Prints real stats; the steal it buys is read by the bot's play-it-out eval (it already has
-        # `bot.steal_target` to weigh the hand it would take), not priced flat here — a steal against
-        # an empty hand and deck is worth nothing, and no fixed number captures that.
-        Mechanic.STEAL,
-        # Prints real stats; its temple undo (Retrokinesis) has nothing to fix — every bot action is
-        # already play-it-out-best when taken. Fielded into a duel, its rewrite power is player-only
-        # by a hardcoded dispatch check ("the bot never amends", duel.py) — not a missing heuristic.
-        Mechanic.AMEND,
-        # A summon: on the table it is just its printed stats (the fielded horde/clone). Its extra worth
-        # is the temple +training, a use `temple_ai._worth_summoning_to_train` decides — so table value
-        # is the stats alone; the training value is weighed separately, at spend time.
-        Mechanic.TRAIN_BOOST,
-        # Prints real stats; its doubled elemental bonus is contextual (great in tune, awful against),
-        # read by the bot's play-it-out eval, not priced here.
-        Mechanic.DOUBLE_ELEMENT,
-        # Its printed stats are its whole table value — the fat deposit is the points column, which the
-        # bot reads straight off when it decides what to bank.
-        Mechanic.TREASURE,
-    }
-)
-
-
-def duel_value(card: Card) -> int:
-    """Roughly what ``card`` is worth held in a showdown.
-
-    Stat magnitude, not signed value: a negative stat is a *weapon* (``powers`` mirrors it onto the
-    opponent's queue), so it is as worth keeping as a positive one. A booster carries no stats but
-    decides duels, hence the premium.
-
-    A Wu whose stats resolve at play prints none, so the stats cannot answer for it either — its
-    mechanic does, through :data:`_MECHANIC_VALUE`. Without that, every card that reads `? ? ?` is
-    worth nothing to the opponent, and it will cheerfully bank an Emperor Scorpion for two points.
-    """
-    # The Sapphire Dragon prints no stats and LOSES the showdown if fielded — its whole worth is the
-    # temple level it grants. Priced so the bot holds it over junk rather than banking it away;
-    # temple_ai has no policy to actually spend it. (Deposited, it is its printed points.)
-    if is_uncontrolled(card.power):
-        return 8
-    stats = sum(abs(v) for v in card.stats.values() if v is not None)
-    mechanic = mechanic_of(card.power)
-    premium = BOOSTER_PREMIUM if mechanic is Mechanic.BOOST else 0
-    return stats + _MECHANIC_VALUE.get(mechanic, 0) + premium
 
 
 def pick_deposit(hand: list[Card], difficulty: Difficulty, wear_limit: int) -> Card | None:
@@ -336,15 +184,6 @@ def _priority_deposit(bot: Player, wear_limit: int) -> Card | None:
         return None
     fresh = [card for card in counters if card.uses < wear_limit - 1]
     return max(fresh or counters, key=lambda c: c.points)
-
-
-def bank_value(card: Card, rng: Rng) -> int:
-    """What depositing this Wu pays: its printed points, unless it is the gamble, which is rolled.
-
-    Both duelists bank on the same terms and neither is told the gamble's worth — the bot picks it by
-    the DB expected value (``GAMBLE_SPREAD``), blind like a player eyeing a ``?``.
-    """
-    return roll_gamble(rng) if is_gamble(card.power) else card.points
 
 
 # Game Log action names, for whoever spends the turn — one list, so a move of theirs files under the
@@ -427,9 +266,6 @@ def _fly_early_bird(
 ) -> BotMove | None:
     """Take a Wu off the shared pile with no showdown — the one action that raids the pile rather
     than the bot's own shelf. ``early_bird`` charges the turn itself."""
-    from .actions import early_bird  # local: actions imports this module
-    from .temple_ai import choose_early_bird
-
     bird = choose_early_bird(state, settings)
     if bird is not None:
         taken = state.card_deck[0]
@@ -447,8 +283,6 @@ def _recall_witchcraft(
 ) -> BotMove | None:
     """Wuya's temple action: call the most valuable lost Wu back, paying no Wu for it. A known weapon
     from the lost beats a blind draw, and her bond finds the best one, not merely the oldest."""
-    from ..characters.wuya import recall_index, worth_recalling
-
     if mechanic_of(state.bot.character.power) is Mechanic.WITCHCRAFT and worth_recalling(state):
         revived = state.lost.pop(recall_index(state))
         state.bot.hand.append(hand_over(revived))
@@ -509,9 +343,6 @@ def _play_power(
 ) -> BotMove | None:
     """Spend a Wu's power when one is worth more than the points it would bank. The opponent reads
     only what a player could — see ``temple_ai.choose_temple_power``."""
-    from .actions import use_power  # local: actions imports this module
-    from .temple_ai import choose_temple_power
-
     play = choose_temple_power(state, settings)
     if play is not None:
         report = use_power(
@@ -536,8 +367,6 @@ def _construct_jong(
 ) -> BotMove | None:
     """Assemble Mala Mala Jong the moment the full set is in hand. The construct races the game to its
     close for an outright win, so it outranks every other temple move — take it and lock the hand."""
-    from .actions import can_construct, construct_jong
-
     if not can_construct(state, settings.actions_per_turn_bot, is_player=False):
         return None
     construct_jong(state, is_player=False)
@@ -555,9 +384,6 @@ def _combine_yoyo(
     which are just as available next turn and none of which this opportunity is."""
     from copy import deepcopy
 
-    from ..schema.constants import YIN_YANG_YOYO_ID
-    from .actions import can_combine_yoyo, combine_yoyo
-
     if not can_combine_yoyo(state, settings.actions_per_turn_bot, is_player=False):
         return None
     combined = deepcopy(state.catalog.card(YIN_YANG_YOYO_ID))
@@ -572,8 +398,6 @@ def _self_correct_good_jack(
     flip back to himself. Good Jack forfeits every one of his bot forms while worn (`Duel._boost`'s
     gate on `Player.yoyo_flipped`), so there is no reason to stay a moment longer than the Yo-Yo
     makes him."""
-    from .actions import can_self_correct_yoyo, self_correct_yoyo
-
     bot = state.bot
     if mechanic_of(bot.character.power) is not Mechanic.BOT or not bot.yoyo_flipped:
         return None
@@ -640,8 +464,6 @@ def _bot_acts(
     the generic order, which is where its power finally fires. Chase runs a stripped order that spends
     no powers at all.
     """
-    from . import bot as bot_module  # deferred: bot.py imports duel_value from this module
-
     # A construct's hand is locked: it draws nothing, banks nothing, recalls nothing (Wuya's witchcraft
     # would otherwise pull a Wu into the sealed hand, and banking could deposit a part and silently
     # break the set). It only races — so once in form the bot passes every temple turn. Construct itself
@@ -658,12 +480,6 @@ def _bot_acts(
 
     order = _CHASE_ORDER if chase else _GENERIC_ORDER
     return _first_move(order, state, settings, rng, difficulty, name)
-
-
-def max_hand_size(player: Player, base: int) -> int:
-    """The size limit, plus one while a "Third-Arm Sash" (a HAND_SIZE Wu) is held."""
-    sash = any(mechanic_of(c.power) is Mechanic.HAND_SIZE for c in player.whole_hand)
-    return base + int(sash)
 
 
 def _draw_from_main(state: XiaolinState, player: Player) -> None:

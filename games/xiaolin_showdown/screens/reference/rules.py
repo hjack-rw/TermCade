@@ -23,7 +23,7 @@ from termcade.ui.typography import spaced_dashes
 from ...logic.mechanics.prize import PrizeRoute
 from ...logic.config.settings import BOSS_PLAYER_ACTIONS, XiaolinSettings, deposit_limit
 from ...logic.schema.state import XiaolinState
-from ...logic.flow.temple_ai import EARLY_BIRD_GAP
+from ...logic.flow.actions import EARLY_BIRD_GAP
 from ...logic.flow.training import boss_loss_fill
 from ..base import XiaolinScreen
 
