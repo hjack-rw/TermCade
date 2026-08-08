@@ -184,6 +184,21 @@ def test_the_bot_spends_the_sapphire_dragon_to_train():
     assert play is not None and play.card.id == SAPPHIRE
 
 
+def test_the_bot_cashes_in_a_level_a_summon_just_completed():
+    """Unlike the player, the bot has no screen polling `payout_ready` after every action — a full
+    bar has to cash itself in right where it fills, or nothing ever raises the stat (`_play_power`
+    outranks `_cash_training` in the bot's own turn order, so it can keep getting preempted)."""
+    from xiaolin_showdown.logic.flow.actions import use_power
+    from xiaolin_showdown.logic.flow.training import payout_ready
+
+    state = _bot_temple_state([SAPPHIRE, PLAIN_WU], 0)
+    before = sum(state.bot.character.stats.values())
+    sapphire = state.bot.hand[0]
+    use_power(state, sapphire, XiaolinSettings(), is_player=False, rng=Rng(1))
+    assert sum(state.bot.character.stats.values()) == before + 1
+    assert not payout_ready(state.bot, XiaolinSettings(), is_player=False)  # cashed in, not waiting
+
+
 def test_the_bot_feeds_a_summon_only_when_it_completes_a_level():
     """A +3 is worth more fielded than fed to a low bar; near the top, it finishes a level and pays out."""
     from xiaolin_showdown.logic.flow.temple_ai import choose_temple_power

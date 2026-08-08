@@ -16,7 +16,7 @@ from ..characters import jong
 from ..mechanics.cards import index_of, is_one_of
 from ..mechanics.powers import SCOPE_DEPTH, Mechanic, mechanic_of
 from ..config.settings import XiaolinSettings
-from .training import add_progress, train_boost_step
+from .training import add_progress, pick_stat, raise_stat, train_boost_step
 from ..schema.models import Card, Player
 from ..schema.state import XiaolinState
 from .turn import bank_value, shelve
@@ -351,9 +351,18 @@ def _amend(spend: _Spend) -> _Fill | None:
 def _train_boost(spend: _Spend) -> _Fill | None:
     """A summon Wu (Tongue of Saiping and kin) spent at the temple: shove a share of the training bar
     (see :func:`.training.train_boost_step`) into the caster's at once. ``usable_powers`` only offers
-    it while a stat can still climb, so the fill is always real — it never fizzles."""
+    it while a stat can still climb, so the fill is always real — it never fizzles.
+
+    A full bar cashes in on the spot for the BOT, same as a showdown loss does in
+    ``training.record_showdown`` — the bot has no screen polling `payout_ready` after every action
+    the way the player's temple does, so nothing else would ever raise the stat. Left unguarded here,
+    a full bar could sit stuck: `_play_power` outranks `_cash_training` in the bot's own turn order,
+    so another usable power (train-boost or not) keeps preempting it every turn. The player's own
+    payout still waits for their choice — this only fires for the bot.
+    """
     step = train_boost_step(spend.card.power.train_step, spend.settings, is_player=spend.is_player)
-    add_progress(spend.me, spend.settings, step, is_player=spend.is_player)
+    if add_progress(spend.me, spend.settings, step, is_player=spend.is_player) and not spend.is_player:
+        raise_stat(spend.me, pick_stat(spend.me, spend.settings))
     return {"step": step}
 
 
