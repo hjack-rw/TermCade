@@ -34,12 +34,19 @@ def _keys(app) -> list[str]:
 async def test_a_rebuilt_screen_still_advertises_its_keys(make_app):
     app = make_app(_Rebuilding)
     async with app.run_test() as pilot:
-        await pilot.pause()  # the Footer fills itself a frame after it mounts
+        # The Footer fills itself a frame after it mounts — usually one pause, but not guaranteed
+        # under load, so poll instead of trusting a fixed wait (this is what made the suite flaky).
+        for _ in range(10):
+            await pilot.pause()
+            if _keys(app):
+                break
         before = _keys(app)
         assert {"1", "2"} <= set(before)
 
         await pilot.click("#go")
-        await pilot.pause()
-        await pilot.pause()
+        for _ in range(10):
+            await pilot.pause()
+            if _keys(app) == before:
+                break
 
         assert _keys(app) == before

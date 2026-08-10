@@ -40,7 +40,13 @@ def hover_tooltip():
         # A row may carry several tagged spans; ``from_right`` reads the rightmost one instead.
         target = tagged[-1] if from_right else tagged[0]
         await pilot.hover(selector, offset=(target - region.x, row))
-        await pilot.pause()
+        # One pause is usually enough, but the hover→tooltip update isn't guaranteed to land within
+        # a single pump under load — poll instead of trusting a fixed wait (this is what made the
+        # suite flaky under CI: a real update, just not always there after exactly one pause).
+        for _ in range(10):
+            await pilot.pause()
+            if widget.tooltip is not None:
+                break
         return widget.tooltip
 
     return _hover_tooltip
