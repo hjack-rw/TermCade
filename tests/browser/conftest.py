@@ -55,6 +55,14 @@ def served() -> Iterator[str]:
         "PUBLIC_URL": f"http://127.0.0.1:{port}",
         "GAME": "xiaolin",
         "GAME_FACTORY": "xiaolin_showdown.game:build_game",
+        # DEFAULT_MAX_SESSIONS=3 is tuned for a shared public deployment on a free-tier box — it has
+        # no business capping a single test process. One test at a time still opens a fresh page (and
+        # so a fresh session) faster than the PRIOR page's server-side teardown always completes, so
+        # the default cap turns into a real race: a page loaded while `_active` was transiently still
+        # at 3 gets the "server full" fallback instead of the game — which has no `.xterm-screen` at
+        # all, so the caller's wait times out no matter how long the timeout is. Reproduced locally by
+        # forcing TERMCADE_MAX_SESSIONS=1 and confirmed identical to the CI failure.
+        "TERMCADE_MAX_SESSIONS": "50",
     }
     env.pop("TERMCADE_MUTE", None)  # these tests are about sound reaching the page
     env.pop("TERMCADE_CODES", None)  # ...and not about the passcode gate
