@@ -9,6 +9,8 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Page
 
+from conftest import XTERM_READY_TIMEOUT_MS
+
 pytestmark = [pytest.mark.browser, pytest.mark.slow]
 
 # One from each face and one from neither, so a regression names itself: `⚙` lives only in the
@@ -80,7 +82,7 @@ def test_the_page_asks_nothing_of_the_network_but_us(browser, served: str) -> No
     page.on("request", lambda r: external.append(r.url) if served not in r.url else None)
     try:
         page.goto(served, wait_until="networkidle")
-        page.wait_for_selector(".xterm-screen", timeout=30_000)
+        page.wait_for_selector(".xterm-screen", timeout=XTERM_READY_TIMEOUT_MS)
     finally:
         page.close()
     assert not external, f"the page reached outside itself: {external}"

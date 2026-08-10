@@ -12,6 +12,8 @@ from playwright.sync_api import Page
 
 from termcade import page as page_assets
 
+from conftest import XTERM_READY_TIMEOUT_MS
+
 pytestmark = [pytest.mark.browser, pytest.mark.slow]
 
 # Wrap the socket before textual.js opens it and keep every stdin frame the page sends.
@@ -56,7 +58,7 @@ def tapped(browser, served: str):
     p = browser.new_page(viewport={"width": 844, "height": 390}, is_mobile=True, has_touch=True)
     p.add_init_script(_TAP)
     p.goto(served, wait_until="networkidle")
-    p.wait_for_selector(".xterm-screen", timeout=30_000)
+    p.wait_for_selector(".xterm-screen", timeout=XTERM_READY_TIMEOUT_MS)
     p.wait_for_timeout(1500)
     try:
         yield p

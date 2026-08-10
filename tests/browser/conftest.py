@@ -32,6 +32,11 @@ _PHONE_UA = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 )
 
+# How long a page may wait for the terminal to come up. Each browser page spawns its own subprocess
+# server-side (see `termcade.session`), and CI's runner has measurably less headroom than a dev box
+# for that cold start — 30s was tight enough to time out under CI load with nothing actually wrong.
+XTERM_READY_TIMEOUT_MS = 60_000
+
 
 def _free_port() -> int:
     with socket.socket() as s:
@@ -95,8 +100,8 @@ def phone(browser: Browser, served: str) -> Iterator[Page]:
         viewport=_VIEWPORT, is_mobile=True, has_touch=True, user_agent=_PHONE_UA
     )
     page.goto(served, wait_until="networkidle")
-    page.wait_for_selector(".xterm-screen", timeout=30_000)
-    page.wait_for_function("document.fonts.status === 'loaded'", timeout=30_000)
+    page.wait_for_selector(".xterm-screen", timeout=XTERM_READY_TIMEOUT_MS)
+    page.wait_for_function("document.fonts.status === 'loaded'", timeout=XTERM_READY_TIMEOUT_MS)
     try:
         yield page
     finally:

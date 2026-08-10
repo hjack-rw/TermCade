@@ -17,6 +17,7 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Browser
 
+from conftest import XTERM_READY_TIMEOUT_MS
 from xiaolin_showdown.game import build_game
 
 pytestmark = [pytest.mark.browser, pytest.mark.slow]
@@ -52,7 +53,7 @@ def sideways(browser: Browser, served: str):
     page = browser.new_page(**DEVICE)
     page.add_init_script(_SPY)
     page.goto(served, wait_until="networkidle")
-    page.wait_for_selector(".xterm-screen", timeout=30_000)
+    page.wait_for_selector(".xterm-screen", timeout=XTERM_READY_TIMEOUT_MS)
     page.wait_for_timeout(3000)
     try:
         yield page

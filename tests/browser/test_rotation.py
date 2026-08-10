@@ -16,6 +16,8 @@ from playwright.sync_api import Browser, Page
 
 from xiaolin_showdown.game import build_game
 
+from conftest import XTERM_READY_TIMEOUT_MS
+
 pytestmark = [pytest.mark.browser, pytest.mark.slow]
 
 _PORTRAIT = {"width": 390, "height": 844}
@@ -65,7 +67,7 @@ def upright(browser: Browser, served: str):
     page = browser.new_page(viewport=_PORTRAIT, is_mobile=True, has_touch=True)
     page.add_init_script(_SPY)
     page.goto(served, wait_until="networkidle")
-    page.wait_for_selector(".xterm-screen", timeout=30_000)
+    page.wait_for_selector(".xterm-screen", timeout=XTERM_READY_TIMEOUT_MS)
     page.wait_for_timeout(3000)
     try:
         yield page

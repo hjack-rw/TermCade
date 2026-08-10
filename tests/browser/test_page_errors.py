@@ -25,6 +25,8 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, ConsoleMessage, Error, Page
 
+from conftest import XTERM_READY_TIMEOUT_MS
+
 pytestmark = [pytest.mark.browser, pytest.mark.slow]
 
 _VIEWPORT = {"width": 844, "height": 390}
@@ -59,8 +61,8 @@ def watched(browser: Browser, served: str) -> Iterator[tuple[Page, _Complaints]]
     page = browser.new_page(viewport=_VIEWPORT, is_mobile=True, has_touch=True)
     complaints.watch(page)
     page.goto(served, wait_until="networkidle")
-    page.wait_for_selector(".xterm-screen", timeout=30_000)
-    page.wait_for_function("document.fonts.status === 'loaded'", timeout=30_000)
+    page.wait_for_selector(".xterm-screen", timeout=XTERM_READY_TIMEOUT_MS)
+    page.wait_for_function("document.fonts.status === 'loaded'", timeout=XTERM_READY_TIMEOUT_MS)
     try:
         yield page, complaints
     finally:

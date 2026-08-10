@@ -11,6 +11,8 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Browser
 
+from conftest import XTERM_READY_TIMEOUT_MS
+
 pytestmark = [pytest.mark.browser, pytest.mark.slow]
 
 _PORTRAIT = {"width": 390, "height": 844}
@@ -22,7 +24,7 @@ _FONT = "() => parseInt(new URLSearchParams(location.search).get('fontsize'), 10
 def _open(browser: Browser, served: str, viewport: dict[str, int], query: str = ""):
     page = browser.new_page(viewport=viewport, is_mobile=True, has_touch=True)
     page.goto(served + query, wait_until="networkidle")
-    page.wait_for_selector(".xterm-screen", timeout=30_000)
+    page.wait_for_selector(".xterm-screen", timeout=XTERM_READY_TIMEOUT_MS)
     page.wait_for_timeout(2500)
     return page
 
