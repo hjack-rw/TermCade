@@ -32,7 +32,10 @@ COPY --from=builder /dist/*.whl /tmp/
 RUN pip install --no-cache-dir "$(ls /tmp/*.whl)[serve]" && rm -rf /tmp/*.whl
 
 RUN useradd --create-home --uid 1000 player && mkdir -p /data && chown player /data
-VOLUME ["/data"]
+# No `VOLUME` instruction: Railway's builder rejects it outright ("use Railway Volumes" instead of
+# the Docker-native directive), and `docker-compose.yml`'s own `tc_saves:/data` mount works without
+# it — Compose's `volumes:` doesn't need the image to declare one. Railway's own Volume, attached to
+# this service at /data on the platform side, is what persists saves/`codes.txt` there in production.
 EXPOSE 8000
 
 COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
