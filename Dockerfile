@@ -39,6 +39,10 @@ RUN useradd --create-home --uid 1000 player && mkdir -p /data && chown player /d
 EXPOSE 8000
 
 COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-USER player
+# No USER here: a host that mounts an external volume at $TERMCADE_DATA_DIR (Railway Volumes, among
+# others) replaces this layer's chown'd /data with the volume's own root-owned filesystem at
+# container start — `player` can no longer write to it. The container starts as root so the
+# entrypoint can chown whatever actually landed at that path, then drops to `player` itself before
+# running the real command.
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["xiaolin"]
