@@ -22,7 +22,6 @@ closed-beta gate in front of everything — see :mod:`termcade.beta`.
 from __future__ import annotations
 
 import atexit
-import importlib
 import logging
 import os
 import shutil
@@ -44,7 +43,7 @@ from termcade.page import (
     faces,
     head,
 )
-from termcade.session import TermCadeServer
+from termcade.session import TermCadeServer, game_factory_from_env
 
 log = logging.getLogger("termcade.serve")
 
@@ -179,15 +178,13 @@ def _descriptor_sizes() -> tuple[tuple[int, int], tuple[int, int] | None, tuple[
     slightly wrong grid. Logged rather than swallowed, because a guessed size looks like a layout
     bug from the outside and the reason has to be findable.
     """
-    factory = os.environ.get("GAME_FACTORY")
-    if not factory:
+    factory = game_factory_from_env()
+    if factory is None:
         return DEFAULT_FIT_SIZE, DEFAULT_MIN_SIZE, None
-    module_name, _, attr = factory.partition(":")
     try:
-        game = getattr(importlib.import_module(module_name), attr)()
-    except Exception:  # noqa: BLE001 — import, attribute, or the factory itself; all mean "guess"
-        log.exception("GAME_FACTORY %r could not be read — sizing the page from engine defaults",
-                      factory)
+        game = factory()
+    except Exception:  # noqa: BLE001 — the factory itself failing also means "guess"
+        log.exception("GAME_FACTORY could not be read — sizing the page from engine defaults")
         return DEFAULT_FIT_SIZE, DEFAULT_MIN_SIZE, None
     return game.fit_size or DEFAULT_FIT_SIZE, game.min_size, game.touch_fit_size
 
@@ -200,9 +197,15 @@ def main() -> None:
         # No engine-level default: which console command to run is a per-cartridge decision, and a
         # silent guess here would serve the WRONG game rather than fail — worse than a crash at boot.
         raise SystemExit("GAME is not set — which console command should `serve` run?")
+    # "0.0.0.0" almost everywhere, but some hosts assign the bind address for you rather than let
+    # you choose it: alwaysdata's ``user_program`` sites hand it over as `IP` (their own name for
+    # it, an IPv6-only address specific to that site) instead of taking one from us. HOST still
+    # wins if a host ever wants to set it explicitly. public_url is unaffected either way: it's the
+    # browser-facing address, already independent of the bind host below.
+    host = os.environ.get("HOST") or os.environ.get("IP", "0.0.0.0")
     fit_size, min_size, touch_fit = _descriptor_sizes()
     make_server(
-        port=port, public_url=public_url, game=game,
+        port=port, public_url=public_url, game=game, host=host,
         fit_size=fit_size, min_size=min_size, touch_fit_size=touch_fit,
     ).serve()
 

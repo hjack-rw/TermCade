@@ -195,3 +195,53 @@ def test_terminal_size_is_clamped_to_a_sane_range(value, clamped) -> None:
     """width/height come from a client-supplied query param and flow into the spawned session
     subprocess's environment unmodified otherwise — a resource-exhaustion vector left open."""
     assert session._clamp_terminal_size(value) == clamped
+
+
+def test_resolve_game_factory_finds_a_real_callable() -> None:
+    factory = session.resolve_game_factory("xiaolin_showdown.game:build_game")
+
+    assert factory is not None
+    game = factory()
+    assert game.game_id  # a real Game, not just "didn't raise"
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "no colon at all",  # not "pkg.module:attr" shaped
+        "totally.fake.module:whatever",  # the module does not exist
+        "xiaolin_showdown.game:NoSuchAttribute",  # the module exists, the attribute does not
+        "xiaolin_showdown.game:__name__",  # resolves, but to a str, not a callable
+    ],
+)
+def test_resolve_game_factory_refuses_rather_than_raises(spec) -> None:
+    """A typo in GAME_FACTORY must not crash the server at boot — same posture as
+    _max_sessions falling back on a garbage cap, for the same reason."""
+    assert session.resolve_game_factory(spec) is None
+
+
+def test_game_factory_from_env_is_none_when_unset(monkeypatch) -> None:
+    monkeypatch.delenv(session.GAME_FACTORY_ENV, raising=False)
+
+    assert session.game_factory_from_env() is None
+
+
+def test_game_factory_from_env_resolves_a_configured_factory(monkeypatch) -> None:
+    monkeypatch.setenv(session.GAME_FACTORY_ENV, "xiaolin_showdown.game:build_game")
+
+    factory = session.game_factory_from_env()
+
+    assert factory is not None
+    assert factory().game_id
+
+
+def test_inprocess_is_off_by_default(monkeypatch) -> None:
+    monkeypatch.delenv(session.INPROCESS_ENV, raising=False)
+
+    assert session._use_inprocess() is False
+
+
+def test_inprocess_turns_on_when_set(monkeypatch) -> None:
+    monkeypatch.setenv(session.INPROCESS_ENV, "1")
+
+    assert session._use_inprocess() is True

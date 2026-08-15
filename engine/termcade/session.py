@@ -21,18 +21,23 @@ loudly at import or attribute lookup instead of silently at render. ``pyproject.
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import logging
 import os
 import re
 from collections.abc import Awaitable, Callable
+from pathlib import Path
+from typing import cast
 
 from aiohttp import web
 from textual_serve.app_service import AppService
 from textual_serve.server import Server, to_int
 
 from termcade import asset
-from termcade.web_driver import DRIVER
+from termcade.app.game import Game
+from termcade.ui.app import EngineApp
+from termcade.web_driver import DRIVER, InProcessWebDriver
 
 try:
     import resource  # POSIX only — absent on Windows dev boxes
@@ -42,6 +47,61 @@ except ImportError:
 log = logging.getLogger("termcade.session")
 
 TOUCH_ENV = "TERMCADE_TOUCH"
+# Defined here rather than in beta.py: session.py cannot import FROM beta.py (beta.py already
+# imports TermCadeServer from here), and this in-process path needs the value below.
+# beta.py imports it from here instead of keeping its own copy.
+DATA_DIR_ENV = "TERMCADE_DATA_DIR"
+
+# Opt-in switch for the in-process session model (InProcessSession, below) over the default
+# subprocess-per-session one (TermCadeAppService). Off by default: catalog mutation-safety and a
+# concurrent-session blocking-call audit are still open, and those are exactly what turns from
+# theoretical into real the moment actual concurrent duels share a process. Once both land, this
+# can become the only path rather than an opt-in.
+INPROCESS_ENV = "TERMCADE_INPROCESS"
+
+# `GAME_FACTORY`'s own env var name lives in serve.py today (where it is read for page sizing);
+# duplicated as a literal there deliberately rather than imported, since serve.py already imports
+# FROM session.py and importing back would cycle. resolve_game_factory's signature (spec: str) is
+# the actual shared logic; the env var name each caller reads it from is theirs to own.
+GAME_FACTORY_ENV = "GAME_FACTORY"
+
+
+def resolve_game_factory(spec: str) -> Callable[[], Game] | None:
+    """``"pkg.module:callable"`` -> the callable, or ``None`` if the spec can't be resolved.
+
+    Shared by serve.py (which only ever calls the result once, to read a game's page-sizing
+    descriptor) and InProcessSession (which calls it once per new session, to build that
+    session's own Game) — both need the exact same ``pkg.module:attr`` parse, and a factory
+    resolved two different ways in two places is a bug waiting for the two to drift.
+    """
+    module_name, _, attr = spec.partition(":")
+    if not attr:
+        log.warning("GAME_FACTORY %r is not of the form 'pkg.module:callable'", spec)
+        return None
+    try:
+        factory = getattr(importlib.import_module(module_name), attr)
+    except Exception:  # noqa: BLE001 — import or attribute error; either means "can't resolve"
+        log.exception("GAME_FACTORY %r could not be imported", spec)
+        return None
+    if not callable(factory):
+        log.warning("GAME_FACTORY %r resolved to a non-callable", spec)
+        return None
+    return cast("Callable[[], Game]", factory)
+
+
+def game_factory_from_env() -> Callable[[], Game] | None:
+    """The env's ``GAME_FACTORY``, resolved — or ``None`` if unset or unresolvable, which is the
+    in-process path's actual prerequisite: without it, :class:`InProcessSession` has nothing to
+    build a session's ``Game`` from, and :meth:`TermCadeServer.handle_websocket` falls back to the
+    subprocess model regardless of :data:`INPROCESS_ENV`."""
+    spec = os.environ.get(GAME_FACTORY_ENV)
+    return resolve_game_factory(spec) if spec else None
+
+
+def _use_inprocess() -> bool:
+    """Whether :data:`INPROCESS_ENV` asks for the in-process session model over the default
+    subprocess-per-session one. See that constant for why the default is off."""
+    return bool(os.environ.get(INPROCESS_ENV))
 
 # Bounds for the client-supplied width/height query params, which flow unchecked into the spawned
 # session subprocess's COLUMNS/LINES env vars otherwise — a client could hand it a negative number or
@@ -53,18 +113,24 @@ MAX_TERMINAL_SIZE = 1000
 def _clamp_terminal_size(value: int) -> int:
     return max(MIN_TERMINAL_SIZE, min(value, MAX_TERMINAL_SIZE))
 
-# The most players served at once. Each is a full Textual render process, so on a RAM-metered host
-# too many at once trips the OOM killer and the box goes down for EVERYONE, with no auto-restart on
-# the free Pterodactyl tier — one session over budget costs every player until someone hits Restart
-# in the panel. Better to turn the next player away than lose it for all. Raise TERMCADE_MAX_SESSIONS
-# in the environment to lift the cap with no redeploy.
+# The most players served at once. Under the default subprocess model (TERMCADE_INPROCESS off),
+# each is a full Textual render process, so on a RAM-metered host too many at once trips the OOM
+# killer and the box goes down for EVERYONE, with no auto-restart on a free host — one session over
+# budget costs every player until someone manually restarts it. Better to turn the next player away
+# than lose it for all. Raise TERMCADE_MAX_SESSIONS in the environment to lift the cap with no
+# redeploy.
 #
-# 6 was the original guess and OOM-killed the box in production. A settled session measures ~64 MB
-# (24 MB interpreter/import baseline -> 64 MB after mount, Windows-measured so if anything an
-# overestimate of Linux). But steady-state isn't the peak: several players joining at once each pay
-# a boot-time import burst, and input triggers a frame-diffing spike — neither captured by a settled
-# reading. 3 is the floor this product needs and leaves real headroom under the 512 MB ceiling; raise
-# it only after production RSS logging (see ``_log_child_rss``) shows the headroom is real.
+# 6 was the original guess and OOM-killed the box in production. A settled subprocess session
+# measures ~64 MB (24 MB interpreter/import baseline -> 64 MB after mount, Windows-measured so if
+# anything an overestimate of Linux); steady-state isn't the peak, since several players joining at
+# once each pay a boot-time import burst on top. Every no-card free host found tops out at 256-512
+# MB, tighter than the box 6 already died on — 2 was the number that left real headroom under that
+# model. 3 (2026-08-15) trades some of it back: no live host has logged real production RSS under
+# the subprocess model to confirm 3 is safe there (~192 MB worst case, and nothing is currently
+# deployed to test it against) — the confidence instead comes from the shared-process redesign
+# (TERMCADE_INPROCESS, see project memory), whose real Docker-measured cost for 3 concurrent
+# sessions is ~40 MB total, comfortably safe if that flag is ever the one actually running. Drop
+# back to 2 if the subprocess model stays what's live somewhere and turns out tight.
 MAX_SESSIONS_ENV = "TERMCADE_MAX_SESSIONS"
 DEFAULT_MAX_SESSIONS = 3
 
@@ -151,6 +217,90 @@ class TermCadeAppService(AppService):
         return environment
 
 
+class InProcessSession:
+    """An ``AppService``-shaped session that hosts an ``EngineApp`` as a task in THIS process,
+    instead of spawning a subprocess for it — see :class:`~termcade.web_driver.InProcessWebDriver`
+    for what that requires on the driver side.
+
+    Implements only the subset of ``AppService``'s public interface
+    ``Server._process_messages`` actually calls (``send_bytes``, ``set_terminal_size``, ``blur``,
+    ``focus``) — reusing that dispatch loop unchanged, rather than re-deriving its own copy of the
+    same four-way branch on the websocket's JSON envelope.
+    """
+
+    def __init__(
+        self,
+        game_factory: Callable[[], Game],
+        *,
+        data_dir: Path | None,
+        is_touch: bool,
+        write_bytes: Callable[[bytes], Awaitable[object]],
+    ) -> None:
+        self._app = EngineApp(game_factory(), data_dir=data_dir, is_touch=is_touch)
+        self._app.driver_class = InProcessWebDriver
+        self._write_bytes = write_bytes
+        self._run_task: asyncio.Task[None] | None = None
+        self._pump_task: asyncio.Task[None] | None = None
+
+    @property
+    def _driver(self) -> InProcessWebDriver | None:
+        return cast("InProcessWebDriver | None", self._app._driver)
+
+    async def start(self, width: int, height: int) -> None:
+        self._run_task = asyncio.create_task(
+            self._app.run_async(headless=False, mouse=True, size=(width, height))
+        )
+        # The driver does not exist until run_async's own startup reaches _get_driver -- give
+        # that a moment before handing back control, bounded rather than a fixed sleep so a slow
+        # box gets more time and a stuck one fails loudly instead of silently pumping nothing.
+        for _ in range(50):
+            if self._driver is not None:
+                break
+            await asyncio.sleep(0.01)
+        else:
+            raise RuntimeError("EngineApp did not construct its driver within 0.5s of starting")
+        self._pump_task = asyncio.create_task(self._driver.pump_output(self._write_bytes))
+
+    async def send_bytes(self, data: bytes) -> bool:
+        driver = self._driver
+        if driver is None:
+            return False
+        # _process_messages hands over envelope[1].encode("utf-8") -- undone here rather than
+        # changed there, so that upstream-shared dispatch loop stays reusable byte-for-byte
+        # instead of forked for this one difference.
+        driver.feed_input(data.decode("utf-8"))
+        return True
+
+    async def set_terminal_size(self, width: int, height: int) -> None:
+        driver = self._driver
+        if driver is not None:
+            driver.on_meta("resize", {"width": width, "height": height})
+
+    async def blur(self) -> None:
+        driver = self._driver
+        if driver is not None:
+            driver.on_meta("blur", {})
+
+    async def focus(self) -> None:
+        driver = self._driver
+        if driver is not None:
+            driver.on_meta("focus", {})
+
+    async def stop(self) -> None:
+        if self._run_task is None:
+            return
+        self._app.exit()
+        try:
+            await asyncio.wait_for(self._run_task, timeout=5)
+        except Exception:  # noqa: BLE001 — best-effort teardown; a stuck session must not wedge the server
+            log.exception("in-process session did not shut down cleanly")
+        if self._pump_task is not None:
+            try:
+                await asyncio.wait_for(self._pump_task, timeout=1)
+            except Exception:  # noqa: BLE001 — same: report, do not propagate into the caller's finally
+                log.exception("in-process session's output pump did not stop cleanly")
+
+
 class TermCadeServer(Server):
     """A ``Server`` whose sessions get the engine's meta channel and a per-session environment.
 
@@ -166,6 +316,9 @@ class TermCadeServer(Server):
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
         self._active = 0
         self._max_sessions = _max_sessions()
+        # Resolved once at boot, not per session: importlib.import_module is a real (if small)
+        # cost, and the factory a session gets never varies within one running server anyway.
+        self._game_factory = game_factory_from_env()
 
     async def _make_app(self) -> web.Application:
         """As upstream, plus: the PAGE is never cached.
@@ -237,8 +390,40 @@ class TermCadeServer(Server):
         for a request carrying no valid passcode."""
         return False
 
+    def _build_session(
+        self, request: web.Request, websocket: web.WebSocketResponse
+    ) -> TermCadeAppService | InProcessSession:
+        """This request's session, in-process or subprocess-backed — see :meth:`handle_websocket`
+        for why the caller does not need to know which."""
+        env = self.session_env(request)
+        if _use_inprocess() and self._game_factory is not None:
+            data_dir_str = env.get(DATA_DIR_ENV)
+            return InProcessSession(
+                self._game_factory,
+                data_dir=Path(data_dir_str) if data_dir_str else None,
+                is_touch=env.get(TOUCH_ENV) == "1",
+                write_bytes=websocket.send_bytes,
+            )
+        return TermCadeAppService(
+            self.command,
+            extra_env=env,
+            write_bytes=websocket.send_bytes,
+            write_str=websocket.send_str,
+            close=websocket.close,
+            download_manager=self.download_manager,
+            debug=self.debug,
+        )
+
     async def handle_websocket(self, request: web.Request) -> web.WebSocketResponse:
-        """As upstream, but with our own ``AppService`` and this session's environment."""
+        """As upstream, but with our own session and this session's environment.
+
+        Two session shapes, chosen per-request: :class:`TermCadeAppService` (default — a real
+        subprocess, one per session) or :class:`InProcessSession` (opt-in via
+        :data:`INPROCESS_ENV`, when :attr:`_game_factory` resolved — an ``EngineApp`` task in
+        this process instead). Both expose the same four methods :meth:`_process_messages`
+        (upstream's own dispatch loop, unchanged) actually calls, so everything below this point
+        does not need to know which one it has.
+        """
         if self.reject(request):
             return web.WebSocketResponse()
         if self._active >= self._max_sessions:
@@ -252,30 +437,22 @@ class TermCadeServer(Server):
         width = _clamp_terminal_size(to_int(request.query.get("width", "80"), 80))
         height = _clamp_terminal_size(to_int(request.query.get("height", "24"), 24))
 
-        app_service: TermCadeAppService | None = None
+        session: TermCadeAppService | InProcessSession | None = None
         try:
             await websocket.prepare(request)
-            app_service = TermCadeAppService(
-                self.command,
-                extra_env=self.session_env(request),
-                write_bytes=websocket.send_bytes,
-                write_str=websocket.send_str,
-                close=websocket.close,
-                download_manager=self.download_manager,
-                debug=self.debug,
-            )
-            await app_service.start(width, height)
+            session = self._build_session(request, websocket)
+            await session.start(width, height)
             try:
-                await self._process_messages(websocket, app_service)
+                await self._process_messages(websocket, session)  # type: ignore[arg-type]
             finally:
-                await app_service.stop()
+                await session.stop()
         except asyncio.CancelledError:
             await websocket.close()
         except Exception as error:  # noqa: BLE001 — upstream's own contract: log, close, move on
             log.exception(error)
         finally:
-            if app_service is not None:
-                await app_service.stop()
+            if session is not None:
+                await session.stop()
             _log_child_rss(self._active)
             self._active -= 1
         return websocket

@@ -15,7 +15,7 @@ from __future__ import annotations
 import hashlib
 import sqlite3
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, lru_cache
 from pathlib import Path
 from typing import Callable
 
@@ -132,7 +132,23 @@ def catalog_tampered(db_path: Path | str = DEFAULT_DB) -> bool:
     return catalog_fingerprint(catalog, config) != CANONICAL
 
 
+@lru_cache(maxsize=None)
 def load_catalog(db_path: Path | str = DEFAULT_DB) -> Catalog:
+    """The catalog at ``db_path``, read once per distinct path and reused after that.
+
+    Was a fresh, uncached ``sqlite3.connect()`` (~1.5-2ms measured) on every call, fired from
+    ``GameContext.__init__`` among many other sites — on one process serving several sessions on a
+    shared event loop, that blocks EVERY concurrently-connected player's render/input for its
+    duration, not just the caller's. Safe to cache now, not before: the DB is a build artifact that
+    never changes within a running process (see the module docstring), and the returned ``Catalog``
+    holds the ONLY copy of each ``Card``/``Power`` object every caller will ever see from this
+    function — so caching means every session sharing one process shares those objects, which is
+    exactly the identity-sharing risk that requires ``new_game``'s ``deepcopy`` calls (and nothing
+    downstream skipping them) to still be what actually keeps two sessions' cards apart. See
+    ``tests/games/xiaolin_showdown/test_showdown_invariants.py::
+    test_two_games_sharing_one_catalog_never_share_a_card_by_identity`` for the regression coverage
+    that invariant now has.
+    """
     con = sqlite3.connect(str(db_path))
     try:
         powers = [_power(row) for row in con.execute("SELECT * FROM power")]

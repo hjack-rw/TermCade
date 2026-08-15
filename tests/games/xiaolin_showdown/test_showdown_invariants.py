@@ -184,3 +184,51 @@ async def test_the_loser_forfeits_exactly_what_they_staked(catalog, seed):
     forfeited = d.bot.stakes if d.winner else d.player.stakes
     for card in forfeited:
         assert any(card is held for held in winner_hand), f"{card.name} was staked but never handed over"
+
+
+def _every_card(state) -> list:
+    """Every Card object this game actually holds, in play or not — the full set a concurrent
+    sibling game must never share so much as one object with."""
+    return (
+        list(state.card_deck)
+        + list(state.player.hand) + list(state.player.inalienable_hand) + list(state.player.vault)
+        + list(state.bot.hand) + list(state.bot.inalienable_hand) + list(state.bot.vault)
+    )
+
+
+@pytest.mark.parametrize("seed_a,seed_b", [(1, 2), (1234, 1234)])
+def test_two_games_sharing_one_catalog_never_share_a_card_by_identity(catalog, seed_a, seed_b):
+    """The invariant the whole shared-process redesign leans on: today's per-session subprocess
+    model makes cross-session sharing physically impossible (separate OS memory), regardless of
+    whether the catalog's own Card objects were ever safe to share. Collapsing sessions into one
+    process removes that free protection — this must hold on its own merits, from ``new_game`` and
+    the ``deepcopy`` calls inside it alone, with no process boundary left to lean on. The `catalog`
+    fixture is session-scoped (see conftest.py) — every test in this whole run already shares one
+    Catalog instance, exactly the shape two concurrent in-process sessions would.
+
+    ``seed_a == seed_b`` is included deliberately: an identical deal is the harder case (the two
+    games ask the catalog for the very same card ids, in the same order) and the one most likely to
+    tempt a future "cache the deal" optimization into handing back the same object twice.
+    """
+    game_a = new_game(catalog, Rng(seed_a), catalog.character(1))
+    game_b = new_game(catalog, Rng(seed_b), catalog.character(1))
+
+    cards_a, cards_b = _every_card(game_a), _every_card(game_b)
+    catalog_ids = {id(c) for c in catalog.cards}
+    ids_a, ids_b = {id(c) for c in cards_a}, {id(c) for c in cards_b}
+
+    assert not (ids_a & ids_b), "two games sharing one catalog share a Card object"
+    assert not (ids_a & catalog_ids), "a game is holding the catalog's own Card object, not a copy"
+    assert not (ids_b & catalog_ids), "a game is holding the catalog's own Card object, not a copy"
+
+    # The direct version of the same claim: mutate one game's copy of a card both dealt, and the
+    # other's must be untouched. id()-uniqueness alone would not catch two DIFFERENT objects that
+    # happen to alias a THIRD mutable object nested inside them (e.g. a shared `power`) — this does.
+    shared_ids = {c.id for c in cards_a} & {c.id for c in cards_b}
+    assert shared_ids, "test setup is meaningless with no card dealt into both games"
+    probe_id = next(iter(shared_ids))
+    card_a = next(c for c in cards_a if c.id == probe_id)
+    card_b = next(c for c in cards_b if c.id == probe_id)
+    before = card_b.uses
+    card_a.uses += 1
+    assert card_b.uses == before, "mutating one game's card changed the other's"

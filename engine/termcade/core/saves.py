@@ -9,6 +9,16 @@ ruleset it was created with. The engine never inspects the ``state`` payload.
 ``SaveManager`` depends on the ``SaveBackend`` protocol, not a concrete store, so
 the storage medium is swappable: ``JsonFileBackend`` (one file per slot) and
 ``SqliteBackend`` (one indexed row per slot) both satisfy it.
+
+Every backend method is synchronous (a fresh ``sqlite3.connect()`` per call, same shape
+``load_catalog()`` used to have) and called directly from sync UI code — never awaited. On
+a shared event loop (see the in-process session model, ``termcade.session``) that briefly
+blocks every OTHER concurrently-connected session, same class of risk as
+``load_catalog()`` and the audio-chunking loop. Left as-is rather than audited-and-fixed:
+unlike those two, this is NOT cacheable (save data is per-player and mutable — a stale
+cache would serve wrong or cross-player data) and NOT a hot path — "menu-only... never
+mid-duel", above, is exactly why: a save/load fires once at a deliberate menu transition,
+not per frame or per keystroke. Revisit only if that calling pattern ever changes.
 """
 
 from __future__ import annotations

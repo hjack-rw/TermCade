@@ -232,6 +232,15 @@ class BrowserPlayer:
             return key
         encoded = base64.b64encode(pcm).decode("ascii")
         chunks = [encoded[at : at + CHUNK] for at in range(0, len(encoded), CHUNK)]
+        # No yield point between chunks, and this whole call chain (play_loop/play_sfx down to
+        # here) is synchronous by contract, on purpose — audio is fired from a keypress handler,
+        # not awaited. Harmless under one-process-per-session (each subprocess has its own CPU
+        # slice regardless), but under the in-process session model this runs on the SHARED event
+        # loop: a long enough tune could starve every OTHER concurrently-connected session's
+        # rendering and input for the duration of this loop. Not fixed here — doing so properly
+        # means async-ifying AudioPlayer's whole sync contract and every sync call site, a much
+        # larger change than this comment. Bounded for now by TERMCADE_MAX_SESSIONS (still 2 by
+        # default) and TERMCADE_INPROCESS still being opt-in; revisit if either changes.
         for index, chunk in enumerate(chunks):
             self._send({
                 "action": "chunk", "id": key, "seq": index, "total": len(chunks),

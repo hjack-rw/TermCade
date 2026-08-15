@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from typing import Literal
 
 from rich.table import Table
@@ -16,7 +15,6 @@ from textual.containers import Horizontal
 from textual.geometry import Size
 from textual.widgets import Footer, Header
 
-from termcade.ui.screens.base import TOUCH_ENV
 from termcade.ui.screens.log import GameLogScreen
 from termcade.ui.screens.save_slot import SaveSlotScreen
 from termcade.ui.widgets import BoxedPanel, TooltipStatic
@@ -74,7 +72,7 @@ class TempleScreen(XiaolinScreen):
         The DEVICE answers this, not the column width — a phone in landscape can report more
         columns than a laptop, so width alone can't tell them apart.
         """
-        return bool(os.environ.get(TOUCH_ENV))
+        return self.engine_app.is_touch
 
     def _compact_bars(self, size: Size | None = None) -> bool:
         """Whether the training bars should be a percentage instead of a bar.

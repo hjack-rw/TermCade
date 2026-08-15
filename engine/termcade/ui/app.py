@@ -148,6 +148,7 @@ class EngineApp(App[None]):
         *,
         data_dir: Path | None = None,
         seed: int | str | None = None,
+        is_touch: bool | None = None,
     ) -> None:
         # Engine theme is always loaded; a game contributes its own theme files on top.
         engine_theme: str | PurePath = Path(__file__).resolve().parent / "theme" / "engine.tcss"
@@ -161,11 +162,16 @@ class EngineApp(App[None]):
         )
         self._min_size = game.min_size if game is not None else None
         self._resize_timer: Timer | None = None
-        # Read once, at boot: a session's subprocess is told this in its environment at spawn (see
-        # `termcade.session`) and it never changes for the life of the process. Reading it fresh at
-        # every call site is what made it awkward to override in a test without monkeypatching the
-        # environment 7 times over; every other site below reads this attribute instead.
-        self.is_touch = bool(os.environ.get(TOUCH_ENV))
+        # Read once, at boot, never at every call site (every other site below reads this attribute
+        # instead) -- that made it awkward to override in a test without monkeypatching the
+        # environment 7 times over, and it is now load-bearing for a second reason: a session's
+        # subprocess is told this via its OWN environment at spawn (see `termcade.session`), which
+        # works because each subprocess gets a real, OS-isolated env block. An in-process session has
+        # no such isolation -- os.environ is one shared, process-wide dict once several sessions
+        # share a process -- so it is passed explicitly there instead. The env var stays as the
+        # fallback for the (still-current, subprocess-per-session) production entry point, which does
+        # not pass it explicitly.
+        self.is_touch = is_touch if is_touch is not None else bool(os.environ.get(TOUCH_ENV))
         # With no game there is no context to own the player, but the empty cabinet still hums.
         player = self.ctx.audio if self.ctx is not None else make_player()
         self._music = TunePlayer(player, game=game, settings=self.ctx.settings if self.ctx else None)

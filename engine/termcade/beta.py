@@ -33,12 +33,12 @@ from pathlib import Path
 from aiohttp import web
 
 from termcade import asset
+from termcade.session import DATA_DIR_ENV as DATA_DIR_ENV  # re-exported: beta.DATA_DIR_ENV is public
 from termcade.session import TermCadeServer
 
 log = logging.getLogger("termcade.beta")
 
 CODES_ENV = "TERMCADE_CODES"
-DATA_DIR_ENV = "TERMCADE_DATA_DIR"
 COOKIE = "termcade_beta"
 
 # Bad-guess lockout: enough to blunt a naive brute force against a handful of short codes, not a
