@@ -154,10 +154,13 @@ def make_server(
     if statics is not None:
         kwargs["statics_path"] = statics
 
-    codes = beta.codes_path()
-    if codes is None:
+    codes_file = beta.codes_path()
+    inline_codes = beta.codes_from_env()
+    if codes_file is None and inline_codes is None:
         return TermCadeServer(game, **kwargs)
-    return beta.BetaServer(game, codes_path=codes, data_dir=_data_dir(), **kwargs)
+    return beta.BetaServer(
+        game, codes_path=codes_file, inline_codes=inline_codes, data_dir=_data_dir(), **kwargs
+    )
 
 
 def _data_dir() -> Path:

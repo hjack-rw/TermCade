@@ -39,6 +39,12 @@ from termcade.session import TermCadeServer
 log = logging.getLogger("termcade.beta")
 
 CODES_ENV = "TERMCADE_CODES"
+# Comma-separated passcodes given directly through the environment, for a host with no writable,
+# persistent, or uploadable filesystem to point TERMCADE_CODES at — e.g. Back4app Containers,
+# which has neither a file-upload API nor a free-tier volume. Loaded once at startup (env vars
+# don't change under a running process the way a file can), unlike TERMCADE_CODES's file, which is
+# re-read per request specifically so a host that CAN edit a live file gets revoke-without-restart.
+CODES_INLINE_ENV = "TERMCADE_CODES_INLINE"
 COOKIE = "termcade_beta"
 
 # Bad-guess lockout: enough to blunt a naive brute force against a handful of short codes, not a
@@ -70,6 +76,16 @@ def load_codes(path: Path) -> frozenset[str]:
         return frozenset()
     codes = {line.strip() for line in lines}
     return frozenset(code for code in codes if code and not code.startswith("#") and is_well_formed(code))
+
+
+def codes_from_env() -> frozenset[str] | None:
+    """Passcodes given via :data:`CODES_INLINE_ENV`, or ``None`` if it is unset — the same shape
+    :func:`load_codes` returns, so a caller can use either source interchangeably."""
+    raw = os.environ.get(CODES_INLINE_ENV)
+    if raw is None:
+        return None
+    codes = {c.strip() for c in raw.split(",")}
+    return frozenset(c for c in codes if c and is_well_formed(c))
 
 
 def is_well_formed(code: str) -> bool:
@@ -125,15 +141,34 @@ def player_dir(base: Path, code: str) -> Path:
 class BetaServer(TermCadeServer):
     """A ``Server`` that checks a passcode at the door and gives each one its own save directory.
 
-    ``codes_path`` is the file of valid passcodes; ``data_dir`` the base the per-player directories
-    are made under.
+    Exactly one of ``codes_path`` (a file, re-read per request) or ``inline_codes`` (loaded once
+    from :data:`CODES_INLINE_ENV`) is expected to carry the valid codes; ``data_dir`` is the base
+    the per-player directories are made under.
     """
 
-    def __init__(self, *args: object, codes_path: Path, data_dir: Path, **kwargs: object) -> None:
+    def __init__(
+        self,
+        *args: object,
+        codes_path: Path | None = None,
+        inline_codes: frozenset[str] | None = None,
+        data_dir: Path,
+        **kwargs: object,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self._codes_path = codes_path
+        self._inline_codes = inline_codes
         self._data_dir = data_dir
         self._limiter = _RateLimiter()
+
+    def _current_codes(self) -> frozenset[str]:
+        """The valid codes right now — the file re-read fresh (so a host that can edit it gets
+        revoke-without-restart), or the inline set fixed at startup, whichever this server has."""
+        if self._inline_codes is not None:
+            return self._inline_codes
+        codes_path = self._codes_path
+        if codes_path is not None:
+            return load_codes(codes_path)
+        return frozenset()
 
     def authorized_code(self, request: web.Request) -> str | None:
         """The valid passcode carried by ``request``, or ``None``. Re-read per request, so removing
@@ -141,7 +176,7 @@ class BetaServer(TermCadeServer):
         code = request.cookies.get(COOKIE, "")
         if not is_well_formed(code):
             return None
-        return code if _matches(code, load_codes(self._codes_path)) else None
+        return code if _matches(code, self._current_codes()) else None
 
     async def _make_app(self) -> web.Application:
         app = await super()._make_app()
@@ -170,7 +205,7 @@ class BetaServer(TermCadeServer):
             )
 
         offered = request.query.get("code", "")
-        if is_well_formed(offered) and _matches(offered, load_codes(self._codes_path)):
+        if is_well_formed(offered) and _matches(offered, self._current_codes()):
             # Raised rather than returned: aiohttp deprecated returning an HTTPException, and the
             # cookie set on it survives being raised.
             redirect = web.HTTPFound(request.path)

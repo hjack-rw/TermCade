@@ -38,7 +38,13 @@ RUN useradd --create-home --uid 1000 player && mkdir -p /data && chown player /d
 # this service at /data on the platform side, is what persists saves/`codes.txt` there in production.
 EXPOSE 8000
 
-COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+# chmod as its own RUN, not COPY --chmod=0755: Back4app's Kaniko builder was observed silently
+# dropping the exec bit from COPY --chmod, so the entrypoint launched fine everywhere already
+# tested (Railway, Bot-Hosting) but failed on Back4app with "exec ...: permission denied:
+# unknown" at container start. RUN chmod is the one form every builder (classic Docker,
+# BuildKit, Kaniko) applies consistently.
+RUN chmod 0755 /usr/local/bin/entrypoint.sh
 # No USER here: a host that mounts an external volume at $TERMCADE_DATA_DIR (Railway Volumes, among
 # others) replaces this layer's chown'd /data with the volume's own root-owned filesystem at
 # container start — `player` can no longer write to it. The container starts as root so the

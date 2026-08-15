@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import cast
@@ -53,11 +54,26 @@ TOUCH_ENV = "TERMCADE_TOUCH"
 DATA_DIR_ENV = "TERMCADE_DATA_DIR"
 
 # Opt-in switch for the in-process session model (InProcessSession, below) over the default
-# subprocess-per-session one (TermCadeAppService). Off by default: catalog mutation-safety and a
-# concurrent-session blocking-call audit are still open, and those are exactly what turns from
-# theoretical into real the moment actual concurrent duels share a process. Once both land, this
-# can become the only path rather than an opt-in.
+# subprocess-per-session one (TermCadeAppService). Still opt-in rather than the default: catalog
+# identity-sharing is covered (load_catalog's cache is deep-copied per new_game, with a regression
+# test — see catalog.py), and a grep of the shipped game's logic tree turned up no blocking I/O on
+# the session path (the one time.sleep found is in the desktop launcher's browser-open poll, which
+# never runs on a served session) — but that is a spot-check, not a formal audit of every code path
+# a future cartridge might add. Safe enough to opt into for a known-small concurrent load (a demo
+# capped at a few sessions); promote to the default only once a second cartridge exists to prove the
+# pattern generalises.
 INPROCESS_ENV = "TERMCADE_INPROCESS"
+
+# Opt-in switch for per-session throwaway save directories on the OPEN server (no TERMCADE_CODES).
+# Without this, every open-server session falls back to one shared app_dir() (see GameContext),
+# which is correct for the single-self-hoster case make_server's docstring describes ("a player
+# serving the game to their own machine") — one player, one stable save, persisting across
+# reconnects as expected. It is wrong the moment more than one stranger can hit the same open
+# server at once (a public demo): concurrent sessions would silently share one saves.db and
+# overwrite each other's slot. This flag trades that persistence away for isolation — each session
+# gets a fresh, empty, never-cleaned-up temp directory instead, appropriate for a demo host that
+# gets restarted/redeployed periodically anyway, not for a deployment anyone expects to keep a save.
+DEMO_ENV = "TERMCADE_DEMO"
 
 # `GAME_FACTORY`'s own env var name lives in serve.py today (where it is read for page sizing);
 # duplicated as a literal there deliberately rather than imported, since serve.py already imports
@@ -102,6 +118,20 @@ def _use_inprocess() -> bool:
     """Whether :data:`INPROCESS_ENV` asks for the in-process session model over the default
     subprocess-per-session one. See that constant for why the default is off."""
     return bool(os.environ.get(INPROCESS_ENV))
+
+
+def _demo_mode() -> bool:
+    """Whether :data:`DEMO_ENV` asks for per-session throwaway save directories on the open
+    server. See that constant for why this is not the open server's default behaviour."""
+    return bool(os.environ.get(DEMO_ENV))
+
+
+def _session_scratch_dir() -> Path:
+    """A fresh, empty save directory for one demo session — never cleaned up, since demo hosts
+    are expected to restart/redeploy on their own schedule and a leaked few-KB ``saves.db`` is
+    cheaper than wiring session-end cleanup through both the subprocess and in-process paths for
+    a directory nothing is meant to keep anyway."""
+    return Path(tempfile.mkdtemp(prefix="termcade-demo-"))
 
 # Bounds for the client-supplied width/height query params, which flow unchecked into the spawned
 # session subprocess's COLUMNS/LINES env vars otherwise — a client could hand it a negative number or
@@ -380,10 +410,19 @@ class TermCadeServer(Server):
         return response
 
     def session_env(self, request: web.Request) -> dict[str, str]:
-        """What this session's subprocess is told beyond what it inherits."""
+        """What this session's subprocess is told beyond what it inherits.
+
+        Under :data:`DEMO_ENV`, every session also gets its own throwaway :data:`DATA_DIR_ENV`
+        here — see that constant for why the open server does not do this unconditionally.
+        :class:`~termcade.beta.BetaServer` overrides this and always sets its own
+        :data:`DATA_DIR_ENV` afterward, so a demo deploy never runs with the beta gate too.
+        """
+        env: dict[str, str] = {}
+        if _demo_mode():
+            env[DATA_DIR_ENV] = str(_session_scratch_dir())
         if is_touch(request.headers.get("User-Agent", "")):
-            return {TOUCH_ENV: "1"}
-        return {}
+            env[TOUCH_ENV] = "1"
+        return env
 
     def reject(self, request: web.Request) -> bool:
         """Whether to refuse this session outright. The open server never does; the beta gate does
