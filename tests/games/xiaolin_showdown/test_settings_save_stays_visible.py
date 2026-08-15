@@ -41,9 +41,15 @@ async def test_save_is_reachable_by_scrolling_the_screen(tmp_path):
         await pilot.pause()
 
         app.screen.scroll_end(animate=False)
-        await pilot.pause()
-
         save = app.screen.query_one("#save", Button)
+        # One pause is usually enough, but the post-scroll layout reflow isn't guaranteed to land
+        # within a single pump under load — poll instead of trusting a fixed wait (same class of
+        # flake as hover_tooltip in tests/conftest.py, same fix: CI, 2026-08-15).
+        for _ in range(30):
+            await pilot.pause()
+            if save.region.bottom <= app.screen.size.height:
+                break
+
         assert save.region.height > 0, "Save was not laid out at all"
         assert save.region.bottom <= app.screen.size.height, "Save is still off-screen after scrolling"
 

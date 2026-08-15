@@ -43,7 +43,10 @@ def hover_tooltip():
         # One pause is usually enough, but the hover→tooltip update isn't guaranteed to land within
         # a single pump under load — poll instead of trusting a fixed wait (this is what made the
         # suite flaky under CI: a real update, just not always there after exactly one pause).
-        for _ in range(10):
+        # 10 iterations still wasn't always enough under the full suite's load (CI, 2026-08-15) —
+        # each iteration only costs a pump when it isn't the one that finds it, so a bigger ceiling
+        # doesn't slow a normal pass, only buys headroom for a genuinely loaded run.
+        for _ in range(30):
             await pilot.pause()
             if widget.tooltip is not None:
                 break
