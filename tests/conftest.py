@@ -40,14 +40,22 @@ def hover_tooltip():
         # A row may carry several tagged spans; ``from_right`` reads the rightmost one instead.
         target = tagged[-1] if from_right else tagged[0]
         await pilot.hover(selector, offset=(target - region.x, row))
-        # One pause is usually enough, but the hover→tooltip update isn't guaranteed to land within
-        # a single pump under load — poll instead of trusting a fixed wait (this is what made the
-        # suite flaky under CI: a real update, just not always there after exactly one pause).
-        # 10 iterations still wasn't always enough under the full suite's load (CI, 2026-08-15) —
-        # each iteration only costs a pump when it isn't the one that finds it, so a bigger ceiling
-        # doesn't slow a normal pass, only buys headroom for a genuinely loaded run.
-        for _ in range(30):
-            await pilot.pause()
+        # A hover on a widget that already had a DIFFERENT tooltip showing (any hover after the
+        # first on the same TooltipStatic instance, e.g. a second row in the same panel) doesn't
+        # update `.tooltip` on the spot: TooltipStatic._on_mouse_move re-arms Textual's own
+        # `app.TOOLTIP_DELAY`-second timer rather than setting it synchronously (see that method's
+        # docstring, and the precedent at tests/engine/ui/test_screens.py::
+        # test_the_tooltip_returns_after_the_pointer_moves, which waits `TOOLTIP_DELAY + 0.15`
+        # for exactly this). A first-ever hover doesn't need the timer at all, which is why this
+        # flaked only on a test's SECOND hover, and only under the full suite's load: a step of
+        # bare `pilot.pause()` costs an unpredictable (often near-zero) slice of real time, so a
+        # fixed iteration count is not the same thing as a fixed time budget. Poll with an explicit
+        # step so the real elapsed time is what's bounded, not the pump count — this still returns
+        # the moment a same-pump update lands (no needless wait on the common, timer-free path),
+        # it just can no longer fall short of the one real delay Textual itself imposes.
+        step = 0.05
+        for _ in range(int((app.TOOLTIP_DELAY + 0.3) / step)):
+            await pilot.pause(step)
             if widget.tooltip is not None:
                 break
         return widget.tooltip
