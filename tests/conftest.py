@@ -83,11 +83,19 @@ def tooltips_in():
 # by hand, so a new app test cannot quietly land in the fast lane and slow it down for everyone.
 _APP_TESTS = ("test_flow.py", "test_screens.py", "test_button_highlight.py", "test_saves.py")
 
+# Fixtures that boot a real Textual app + pilot, wherever the test lives. `_APP_TESTS` gates the
+# `slow` marker by FILE (files that are wholly app-driving), which is the wrong granularity for
+# retry-worthiness: test_initiative_display.py mixes fast rules-layer tests with two real
+# open_vault-driven ones in the same file, so filename alone missed them — confirmed by a real
+# CI failure (2026-08-16, commit 08347eb) that this exact gap let through with zero rerun attempts.
+_APP_FIXTURES = ("open_vault", "make_app")
+
 
 def pytest_collection_modifyitems(items):
     for item in items:
         if item.path.name in _APP_TESTS:
             item.add_marker(pytest.mark.slow)
+        if item.path.name in _APP_TESTS or any(f in item.fixturenames for f in _APP_FIXTURES):
             # A real Textual app under full-suite load has occasional, genuine timing races —
             # some in this project's own widgets, some (confirmed 2026-08-15/16) inside Textual's
             # own library internals, e.g. Header._on_mount's set_title() racing teardown. Neither
