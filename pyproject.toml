@@ -29,7 +29,7 @@ dev = [
     # ruff and mypy are PINNED: unpinned, CI installs a newer release than the local venv, and a lint
     # rule that shifts between versions fails CI on files nobody touched (ruff 0.15's isort re-sorted
     # the whole tree once). Pin, so `ruff check .` means the same thing on both sides. Bump deliberately.
-    "pytest", "pytest-asyncio", "textual-dev", "ruff==0.15.20", "mypy==2.1.0", "textual-serve~=1.1", "fonttools", "pytest-playwright", "pillow",
+    "pytest", "pytest-asyncio", "textual-dev", "ruff==0.15.20", "mypy==2.1.0", "textual-serve~=1.1", "fonttools", "pytest-playwright", "pillow", "pytest-rerunfailures",
 ]
 # Build the standalone double-click executable (see scripts/build_launcher.py). Pillow is also in dev
 # for the same reason it's here: `scripts/make_icon.py` needs it to build, and the type check needs
